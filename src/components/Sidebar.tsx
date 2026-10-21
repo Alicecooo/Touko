@@ -2,8 +2,8 @@ import { track } from "@/lib/analytics";
 import { OrganizationIdentity } from "./OrganizationIdentity";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch } from "react";
 import { createPortal } from "react-dom";
-import { Activity, Archive, BellDot, Bot as BotIcon, Check, CheckCheck, ChevronRight, ClipboardCopy, Copy, Crown, FolderMinus, FolderOpen, FolderPlus, Library, Loader2, MessageSquarePlus, MoreHorizontal, Pencil, PanelLeftClose, PanelLeftOpen, Phone, Pin, PinOff, Plus, Search, Share2, SlidersHorizontal, Trash2, Users, X } from "lucide-react";
-import { api, useStore, formatTime, visibleMessages, currentTaskBot, botOpensTo, openBot, openThread, type Action, type AppState, type Bot, type BotProject, type Group, type InstanceInfo, type Message } from "@/state/store";
+import { Activity, Archive, BellDot, Bot as BotIcon, Check, CheckCheck, ChevronRight, ClipboardCopy, Copy, Crown, FolderMinus, FolderOpen, FolderPlus, Library, Loader2, MessageSquarePlus, MoreHorizontal, Pencil, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Plus, Search, Share2, SlidersHorizontal, Trash2, Users, X } from "lucide-react";
+import { api, useStore, formatTime, visibleMessages, currentTaskBot, botOpensTo, openBot, type Action, type AppState, type Bot, type BotProject, type Group, type InstanceInfo, type Message } from "@/state/store";
 import { approvalModeFor } from "../../shared/approval-mode";
 import { liveActivityLabel } from "@/lib/live-activity";
 import { llmThreadTitlesEnabled } from "@/lib/feature-flags";
@@ -48,7 +48,6 @@ import { SidebarAppsButton, SidebarFooterNav } from "./SidebarFooterNav";
 import { GlassBar, GlassScrollFrame, GlassScroller } from "./GlassScrollFrame";
 import { DesktopWorkspaceSwitcher } from "./DesktopWorkspaceSwitcher";
 import { SidebarProfileMenu } from "./SidebarProfileMenu";
-import { UpdateIndicator } from "./UpdateIndicator";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
 import { SidebarResizeHandle, useSidebarWidth } from "./SidebarResizeHandle";
 import { SIMPLE_RAIL_BUTTON, SIMPLE_TOP_BUTTON, SidebarEdgeToggle, SidebarSearchPill, SidebarSearchToggle } from "./SidebarSimpleTop";
@@ -58,8 +57,6 @@ import { botShowsUnread } from "@/lib/bot-unread";
 import { attentionHasRunningWork, attentionJumpAction, attentionTriggerLabel, attentionUnpinAction, AttentionThreadRows, crossBotAttentionThreads, crossBotPinnedThreads, SidebarBotActivity, sidebarBotActivityTasks } from "./SidebarBotActivity";
 import { SidebarAttentionPanel } from "./SidebarAttentionPanel";
 import { SidebarPinnedThreadsPanel } from "./SidebarPinnedThreadsPanel";
-import { useLiveMedia } from "@/lib/live-call-media";
-import { LiveCallPill, liveBadgeFor } from "./LiveCallPill";
 import { ShortcutHint } from "./ShortcutHint";
 import { roomThreadSpeakerId, roomThreadWorking } from "@/lib/room-threads";
 import { usePopoverDismiss } from "@/hooks/use-popover-dismiss";
@@ -1032,7 +1029,6 @@ export interface BotRowProps {
   reveal: AppState["revealThread"];
   pendingQueued: AppState["pendingQueued"];
   instances: InstanceInfo[];
-  liveCall: AppState["liveCall"];
   locale: string;
   generatedTitles: boolean;
   density: SidebarDensity;
@@ -1059,11 +1055,9 @@ export function botRowProps(
     reveal: reveal && (bot.threadId === reveal.threadId || bot.tasks?.some((task) => task.threadId === reveal.threadId)) ? reveal : null,
     pendingQueued: state.pendingQueued,
     instances: state.instances,
-    liveCall: state.liveCall,
     locale: activeLocale(),
     generatedTitles: llmThreadTitlesEnabled(state.config),
-    dispatch,
-  };
+    dispatch};
 }
 
 function useVisibleMessages(bot: Bot): Message[] {
@@ -1073,9 +1067,8 @@ function useVisibleMessages(bot: Bot): Message[] {
 
 export const BotListItem = memo(function BotListItem(props: BotRowProps) {
   const advanced = useAdvancedMode();
-  const { bot, selected, deleting, mascotMotion, reveal, pendingQueued, instances, liveCall, density, quiet, query, dispatch, onMenu } = props;
+  const { bot, selected, deleting, mascotMotion, reveal, pendingQueued, instances, density, quiet, query, dispatch, onMenu } = props;
   const showThreads = useShowThreads();
-  const liveMedia = useLiveMedia();
   const remoteClient = typeof window !== "undefined" && window.ogb?.remoteClient?.active === true;
   const [renaming, setRenaming] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
@@ -1110,7 +1103,6 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
   const teammateWait = !waiting && !working && (Boolean(bot.waitingForTeammates) || activityTasks.some((task) => Boolean(task.waitingForTeammates)));
   const queued = activityTasks.some((task) => task.queued);
   const unread = botShowsUnread(bot);
-  const onLiveCall = liveBadgeFor(bot.id, liveMedia, liveCall);
   const statusLine = deleting || working || waiting || teammateWait || queued;
   const body = (
     <>
@@ -1145,13 +1137,7 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
             </Crown>
           </span>
         )}
-        {onLiveCall && iconOnly && (
-          <span className="absolute -right-1 -top-1 flex rounded-full bg-panel p-0.5">
-            <Phone className="size-3 shrink-0 text-success" role="img" aria-label={t("call.live.badge")} data-testid="live-call-badge">
-              <title>{t("call.live.badge")}</title>
-            </Phone>
-          </span>
-        )}
+        
       </span>
       <div className={cn("min-w-0 flex-1", iconOnly && "hidden")}>
         <div className="flex items-baseline justify-between gap-2">
@@ -1179,11 +1165,7 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
               </Crown>
             )}
             {title && !renaming && <span className="sr-only">{`, ${title}`}</span>}
-            {onLiveCall && !iconOnly && !renaming && (
-              <Phone className="size-3 shrink-0 text-success" role="img" aria-label={t("call.live.badge")} data-testid="live-call-badge">
-                <title>{t("call.live.badge")}</title>
-              </Phone>
-            )}
+            
           </span>
           {selected && last && !renaming && !expanded && (
             <span className="shrink-0 text-[12px] tabular-nums text-ink-secondary transition-opacity group-hover:opacity-0 group-focus-within:opacity-0 touch:opacity-0">
@@ -1239,7 +1221,7 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
           !renaming && iconOnly
             ? deleting
               ? t("sidebar.bot.deletingAria", { name: bot.name })
-              : `${bot.name}${bot.title?.trim() ? ` · ${bot.title.trim()}` : ""}${bot.chiefOfStaff ? ` · ${t("sidebar.bot.chiefOfStaff")}` : ""}${onLiveCall ? ` · ${t("call.live.badge")}` : ""}${waiting ? ` · ${t("sidebar.preview.waiting")}` : working ? ` · ${t("chat.activity.working")}` : teammateWait ? ` · ${t("sidebar.preview.waitingOnTeammate")}` : queued ? ` · ${t("task.queued")}` : ""}${unread ? ` · ${t("task.unread")}` : ""}`
+              : `${bot.name}${bot.title?.trim() ? ` · ${bot.title.trim()}` : ""}${bot.chiefOfStaff ? ` · ${t("sidebar.bot.chiefOfStaff")}` : ""}${waiting ? ` · ${t("sidebar.preview.waiting")}` : working ? ` · ${t("chat.activity.working")}` : teammateWait ? ` · ${t("sidebar.preview.waitingOnTeammate")}` : queued ? ` · ${t("task.queued")}` : ""}${unread ? ` · ${t("task.unread")}` : ""}`
             : undefined
         }
         aria-busy={deleting || undefined}
@@ -2016,11 +1998,7 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
       </p>
 
       <GlassBar edge="bottom">
-      <LiveCallPill
-        currentBotId={state.activeView === "chat" ? state.selectedId : null}
-        onOpen={(botId, threadId) => openThread(dispatch, { botId, threadId }, state, showThreads)}
-        iconOnly={density === "icons"}
-      />
+      
 
       {rail ? <SimpleRailFooter
         onSearch={() => {
@@ -2038,7 +2016,6 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
         />
         {density === "icons" ? (
           <div className="flex flex-col items-center justify-center gap-1">
-            <UpdateIndicator />
             <SidebarProfileMenu iconOnly />
           </div>
         ) : (
@@ -2046,7 +2023,6 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
             <div className="min-w-0 flex-1">
               <SidebarProfileMenu />
             </div>
-            <UpdateIndicator />
             <SidebarAppsButton />
           </div>
         )}

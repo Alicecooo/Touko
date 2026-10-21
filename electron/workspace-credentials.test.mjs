@@ -21,6 +21,7 @@ describe("workspace credential migration", () => {
       xai: { key: "xai-secret", url: "https://api.example.test/v1" },
       box: { token: "boat-secret" },
       tts: { key: "tts-secret", fishKey: "fish-secret", voice: "narrator" },
+      live: { key: "live-secret", voice: "alloy" },
       imageGen: { key: "image-secret" },
       opencodeGo: { apiKey: "ocg-secret" },
       profile: { name: "Ada" },
@@ -31,19 +32,18 @@ describe("workspace credential migration", () => {
     expect(result.credentials).toEqual({
       xaiApiKey: "xai-secret",
       boxToken: "boat-secret",
-      ttsKey: "tts-secret",
-      fishAudioKey: "fish-secret",
       opencodeGoApiKey: "ocg-secret",
       openaiImageApiKey: "image-secret",
     });
     expect(result.config).toEqual({
       xai: { url: "https://api.example.test/v1" },
       box: {},
-      tts: { voice: "narrator" },
       imageGen: {},
       opencodeGo: {},
       profile: { name: "Ada" },
     });
+    expect(result.config).not.toHaveProperty("tts");
+    expect(result.config).not.toHaveProperty("live");
     expect(config.xai.key).toBe("xai-secret");
   });
 
@@ -64,11 +64,12 @@ describe("workspace credential migration", () => {
   it("is idempotent: a second boot over migrated output changes nothing", () => {
     const first = migrateWorkspaceCredentials(
       { xai: { key: "xai-secret" }, tts: { key: "tts-secret", voice: "narrator" } },
-      {},
+      { ttsKey: "tts-old", fishAudioKey: "fish-old", openaiLiveKey: "live-old" },
     );
     const second = migrateWorkspaceCredentials(first.config, first.credentials);
     expect(second.configChanged).toBe(false);
     expect(second.credentialsChanged).toBe(false);
+    expect(first.credentials).toEqual({ xaiApiKey: "xai-secret" });
     expect(second.credentials).toEqual(first.credentials);
     expect(second.config).toEqual(first.config);
   });
@@ -85,12 +86,12 @@ describe("workspace credential migration", () => {
   it("treats an empty saved value as no information and keeps the stored secret", () => {
     // The packaged app tombstones every external-mode save as "" in config.json while the key goes to credentials.bin.
     const result = migrateWorkspaceCredentials(
-      { xai: { key: "" }, tts: { key: "   " } },
-      { xaiApiKey: "xai-OLD", ttsKey: "tts-OLD", boxToken: "box-keep" },
+      { xai: { key: "" }, tts: { key: "   " }, live: { key: "live" } },
+      { xaiApiKey: "xai-OLD", ttsKey: "tts-OLD", fishAudioKey: "fish-OLD", openaiLiveKey: "live-OLD", boxToken: "box-keep" },
     );
-    expect(result.credentialsChanged).toBe(false);
-    expect(result.credentials).toEqual({ xaiApiKey: "xai-OLD", ttsKey: "tts-OLD", boxToken: "box-keep" });
-    expect(result.config).toEqual({ xai: {}, tts: {} });
+    expect(result.credentialsChanged).toBe(true);
+    expect(result.credentials).toEqual({ xaiApiKey: "xai-OLD", boxToken: "box-keep" });
+    expect(result.config).toEqual({ xai: {} });
     expect(result.configChanged).toBe(true);
   });
 
@@ -128,8 +129,6 @@ describe("workspace credential env", () => {
       workspaceCredentialEnv({
         xaiApiKey: "xai-secret",
         boxToken: "boat-secret",
-        ttsKey: "tts-secret",
-        fishAudioKey: "fish-secret",
         opencodeGoApiKey: "ocg-secret",
         openaiImageApiKey: "image-secret",
         composioApiKey: "ak_handled-separately",
@@ -137,8 +136,6 @@ describe("workspace credential env", () => {
     ).toEqual({
       XAI_API_KEY: "xai-secret",
       BOX_TOKEN: "boat-secret",
-      OMB_TTS_KEY: "tts-secret",
-      OMB_FISH_AUDIO_API_KEY: "fish-secret",
       OPENCODE_API_KEY: "ocg-secret",
       OMB_OPENAI_IMAGE_KEY: "image-secret",
     });

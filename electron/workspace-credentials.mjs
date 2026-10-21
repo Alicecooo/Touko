@@ -1,4 +1,4 @@
-export const WORKSPACE_CREDENTIALS = [{ section: "xai", field: "key", name: "xaiApiKey", env: "XAI_API_KEY" }, { section: "tts", field: "key", name: "ttsKey", env: "OMB_TTS_KEY" }, { section: "tts", field: "fishKey", name: "fishAudioKey", env: "OMB_FISH_AUDIO_API_KEY" }, { section: "decider", field: "key", name: "jevApiKey", env: "OMB_JEV_API_KEY" }, { section: "decider", field: "openrouterKey", name: "openrouterDeciderKey", env: "OMB_OPENROUTER_DECIDER_KEY" }, { section: "imageGen", field: "key", name: "openaiImageApiKey", env: "OMB_OPENAI_IMAGE_KEY" }, { section: "imageGen", field: "customApiKey", name: "customImageApiKey", env: "OMB_CUSTOM_IMAGE_KEY" }, { section: "live", field: "key", name: "openaiLiveKey", env: "OMB_OPENAI_LIVE_KEY" }, { section: "opencodeGo", field: "apiKey", name: "opencodeGoApiKey", env: "OPENCODE_API_KEY" }];
+export const WORKSPACE_CREDENTIALS = [{ section: "xai", field: "key", name: "xaiApiKey", env: "XAI_API_KEY" }, { section: "decider", field: "key", name: "jevApiKey", env: "OMB_JEV_API_KEY" }, { section: "decider", field: "openrouterKey", name: "openrouterDeciderKey", env: "OMB_OPENROUTER_DECIDER_KEY" }, { section: "imageGen", field: "key", name: "openaiImageApiKey", env: "OMB_OPENAI_IMAGE_KEY" }, { section: "imageGen", field: "customApiKey", name: "customImageApiKey", env: "OMB_CUSTOM_IMAGE_KEY" }, { section: "opencodeGo", field: "apiKey", name: "opencodeGoApiKey", env: "OPENCODE_API_KEY" }];
 
 /** Moves plaintext secrets into the store and deletes the field. "" never drops a stored secret: every packaged
  * credential save writes an empty tombstone to config.json. The caller persists credentials before config. */
@@ -7,6 +7,18 @@ export function migrateWorkspaceCredentials(config, credentials) {
   const nextCredentials = { ...credentials };
   let configChanged = false;
   let credentialsChanged = false;
+  for (const field of ["tts", "live"]) {
+    if (Object.hasOwn(nextConfig, field)) {
+      delete nextConfig[field];
+      configChanged = true;
+    }
+  }
+  for (const name of ["ttsKey", "fishAudioKey", "openaiLiveKey"]) {
+    if (Object.hasOwn(nextCredentials, name)) {
+      delete nextCredentials[name];
+      credentialsChanged = true;
+    }
+  }
   for (const { section, field, name } of WORKSPACE_CREDENTIALS) {
     const home = nextConfig?.[section];
     if (!home || typeof home !== "object" || Array.isArray(home)) continue;

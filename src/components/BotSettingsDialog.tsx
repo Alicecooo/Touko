@@ -17,7 +17,7 @@ import { RoutinesSection } from "./bot-settings/RoutinesSection";
 import { AccessSection } from "./bot-settings/AccessSection";
 import { ModelSection } from "./bot-settings/ModelSection";
 import { PermissionsSection } from "./bot-settings/PermissionsSection";
-import { VoiceSection } from "./bot-settings/VoiceSection";
+import { NotificationsSection } from "./bot-settings/NotificationsSection";
 import { HistorySection } from "./bot-settings/HistorySection";
 import { UsageSection } from "./bot-settings/UsageSection";
 import { VisibilitySection } from "./bot-settings/VisibilitySection";
@@ -136,8 +136,8 @@ export function BotSettingsDialog({ bot, overlay = false }: {
         return <ModelSection bot={bot} />;
       case "permissions":
         return <PermissionsSection bot={bot} derived={derived} />;
-      case "voice":
-        return <VoiceSection bot={bot} derived={derived} />;
+      case "notifications":
+        return <NotificationsSection bot={bot} derived={derived} />;
       case "visibility":
         return <VisibilitySection bot={bot} />;
       case "history":
@@ -190,7 +190,7 @@ export function BotSettingsDialog({ bot, overlay = false }: {
           <button
             type="button"
             onClick={() => dispatch({ type: "toggleSettings", open: false })}
-            aria-label="Close settings"
+            aria-label={t("settings.close")}
             className="rounded-md p-1 text-ink-secondary hover:bg-control hover:text-ink"
           >
             <X size={18} className="pointer-events-none" />

@@ -1,9 +1,9 @@
 import { track } from "@/lib/analytics";
-import { allow, APP, BOT_SOURCE, BOT_TEMPLATE, CALL_MODE, CONNECTOR_RESULT, engineSlug, KEY_PROVIDER, KEY_RESULT, KEY_VIA, ROOM_MODE, SIGN_IN_ENGINE, SIGN_IN_METHOD, type BotSource, type ConnectorResult, type KeyProvider, type KeyResult, type KeyVia, type SignInMethod } from "@/lib/analytics-allowlist";
+import { allow, APP, BOT_SOURCE, BOT_TEMPLATE, CONNECTOR_RESULT, engineSlug, KEY_PROVIDER, KEY_RESULT, KEY_VIA, ROOM_MODE, SIGN_IN_ENGINE, SIGN_IN_METHOD, type BotSource, type ConnectorResult, type KeyProvider, type KeyResult, type KeyVia, type SignInMethod } from "@/lib/analytics-allowlist";
 
 type Instances = ReadonlyArray<{ instanceId: string; driverKind: string }>;
 
-const CHECKED_BEFORE_SAVE = new Set<string>(["boat", "composio", "elevenlabs", "fish_audio"]);
+const CHECKED_BEFORE_SAVE = new Set<string>(["boat", "composio"]);
 
 /** The server saves these keys only after their provider accepted them; every other key is unverified until tested. */
 export function savedKeyResult(provider: KeyProvider | "other"): KeyResult {
@@ -54,6 +54,3 @@ export function roomMessageSent(mode: string, queued: boolean): void {
   track("message_sent", { room: true, mode: allow(mode, ROOM_MODE), queued });
 }
 
-export function callStarted(instances: Instances, instanceId: unknown, mode: string): void {
-  track("call_started", { driver: engineSlug(instances, instanceId), mode: allow(mode, CALL_MODE) });
-}

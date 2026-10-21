@@ -73,10 +73,9 @@ export function hintSeenPatch(
 }
 
 
-export type BeatId = "hello" | "reel" | "engines" | "import" | "permissions" | "bot";
+export type BeatId = "hello" | "reel" | "engines" | "import" | "bot";
 
 export interface BeatOptions {
-  dictation: boolean;
   reel: boolean;
   hosted?: boolean;
   /** This computer has skills or MCP servers from another AI tool to bring in. */
@@ -91,7 +90,6 @@ export function beatsFor(options: BeatOptions): BeatId[] {
   if (options.reel) beats.push("reel");
   beats.push("engines");
   if (options.setupImport) beats.push("import");
-  if (options.dictation) beats.push("permissions");
 
 
   beats.push("bot");

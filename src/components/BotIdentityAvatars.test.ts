@@ -36,7 +36,7 @@ vi.mock("@/state/store", async (original) => {
 });
 // Replaced whole rather than spread over: its context default reads window.ogb at import time, and there is no DOM.
 vi.mock("./DesktopCapabilities", () => ({
-  useDesktopCapabilities: () => ({ capabilities: { dictation: { available: false } } }),
+  useDesktopCapabilities: () => ({ capabilities: {  } }),
   useCaptionChrome: () => ({}),
 }));
 vi.mock("react-dom", async (original) => ({ ...await original<object>(), createPortal: (children: unknown) => children }));

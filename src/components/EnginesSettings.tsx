@@ -356,6 +356,7 @@ export function EnginesSettings() {
         <div className="min-w-0 flex-1 basis-60 space-y-2 px-4">
           <h1 className="text-[22px] font-semibold tracking-tight text-ink">{t("settings.engines.title")}</h1>
           <p className="mt-2 max-w-lg text-[13px] leading-relaxed text-ink-secondary">{t("engines.library.intro")}</p>
+          <p className="max-w-lg text-[12px] leading-relaxed text-ink-secondary">{t("engines.library.selectionHint")}</p>
         </div>
         <RefreshEngines />
       </div>

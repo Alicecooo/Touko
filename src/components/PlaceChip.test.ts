@@ -34,7 +34,6 @@ vi.mock("./DesktopCapabilities", async (importOriginal) => ({
   ...await importOriginal<typeof import("./DesktopCapabilities")>(),
   useDesktopCapabilities: () => ({
     capabilities: {
-      dictation: { available: false },
       host: { packaged: true, platform: "darwin" },
       localComputer: { available: true, support: "supported", enabled: true, status: "enabled" },
     },

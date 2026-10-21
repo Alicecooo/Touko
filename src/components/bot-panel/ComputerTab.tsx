@@ -55,7 +55,6 @@ export function ComputerTab({ bot, derived, onOpen }: { bot: Bot; derived: Deriv
       .map((place) => ({ value: place as PlaceChoice, label: worksOnSimpleLabel(place, platform), ...choice(place) })),
   ];
   const moreChoices = [
-    ...(placeViews.vm.policy ? [{ value: "vm" as PlaceChoice, label: t("place.vm"), ...choice("vm") }] : []),
     ...(placeViews.browser.policy ? [{ value: "browser" as PlaceChoice, label: t("botPanel.place.browserOnly"), ...choice("browser") }] : []),
     { value: "off" as PlaceChoice, label: t("place.off"), disabled: false, tooltip: undefined },
   ];

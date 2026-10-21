@@ -321,7 +321,7 @@ describe("the bot panel in Simple mode", () => {
     ["overview", "settings", "overview"], ["identity", "details", undefined], ["slack", "settings", "slack"],
     ["soul", "details", "instructions"], ["skills", "library", "skills"], ["memory", "library", "memory"],
     ["routines", "details", "routines"], ["access", "computer", undefined], ["model", "details", "model"],
-    ["permissions", "details", "approvals"], ["voice", "settings", "voice"], ["visibility", "settings", "visibility"],
+    ["permissions", "details", "approvals"], ["visibility", "settings", "visibility"],
     ["history", "settings", "history"], ["usage", "settings", undefined],
   ] as const)("lands a deep link to %s on %s › %s", (section, tab, page) => {
     expect([sectionTarget(section).tab, sectionTarget(section).page]).toEqual([tab, page]);
@@ -967,13 +967,6 @@ describe("the Settings tab", () => {
   });
 
   it("searches pages, rows and other tabs, and says where each lives", () => {
-    const voice = settings(makeBot(), "elevenlabs");
-    expect(voice.html).toContain("1 result");
-    const hit = find(voice, "data-panel-page", "voice");
-    expect(hit.props).toMatchObject({ title: "Voice", hint: "Settings › Profile" });
-    click(hit);
-    expect(onOpen).toHaveBeenLastCalledWith("voice");
-
     const model = settings(makeBot(), "fallback");
     expect(find(model, "data-panel-page", "model").props.hint).toBe("Details › Model");
 

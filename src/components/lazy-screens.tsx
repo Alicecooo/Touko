@@ -71,14 +71,13 @@ export const ComputerPanel = lazyScreen("ComputerPanel", async () => (await impo
 
 export const InspectorPanel = lazyScreen("InspectorPanel", async () => (await import("./InspectorPanel")).InspectorPanel);
 
-export const LocalVmWorkspace = lazyScreen("LocalVmWorkspace", async () => (await import("./LocalVmWorkspace")).LocalVmWorkspace);
 export const NewBotDialog = lazyScreen("NewBotDialog", async () => (await import("./NewBotDialog")).NewBotDialog);
 
 export const TriggersPage = lazyScreen("TriggersPage", async () => (await import("./TriggersPage")).TriggersPage);
 export const SettingsModal = lazyScreen("SettingsModal", async () => (await import("./SettingsModal")).SettingsModal);
 export const TeamMapPage = lazyScreen("TeamMapPage", async () => (await import("./TeamMapPage")).TeamMapPage);
 
-const SCREENS = [ActivityPanel, BotSettingsDialog, ComputerPanel, InspectorPanel, LocalVmWorkspace, NewBotDialog, SettingsModal, TeamMapPage, TriggersPage];
+const SCREENS = [ActivityPanel, BotSettingsDialog, ComputerPanel, InspectorPanel, NewBotDialog, SettingsModal, TeamMapPage, TriggersPage];
 
 if (typeof location !== "undefined" && new URLSearchParams(location.search).has("desktop-settings")) {
   void SettingsModal.preload().catch(() => {});

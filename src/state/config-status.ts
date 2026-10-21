@@ -1,5 +1,5 @@
 // What GET /api/config tells the app about the server and its settings (re-exported by store.tsx).
-import type { EffortLevel, LiveSettings } from "../../shared/wire";
+import type { EffortLevel } from "../../shared/wire";
 import type { OnboardingStatus } from "@/lib/onboarding";
 import type { ModelSelection } from "./store";
 
@@ -45,22 +45,6 @@ export interface ConfigStatus {
   /** `providerKeys`: names of the keys saved for OpenCode's other
    * providers, never the keys. */
   opencodeGo?: { configured: boolean; providerKeys?: string[] };
-  /** Voice. `configured` = the engine has what it needs (an ElevenLabs or
-   * Fish Audio key, or a Chatterbox server address); `ready` = that AND a voice, which is
-   * what it takes to actually speak. The key itself is never echoed back;
-   * `baseUrl`/`model` are Chatterbox settings, not credentials. */
-  tts?: {
-    configured: boolean;
-    ready: boolean;
-    voice: string;
-    provider?: "elevenlabs" | "fish" | "system" | "chatterbox" | "xai";
-    baseUrl?: string;
-    model?: string;
-    /** Fish Audio speech model; present only while Fish is the provider. */
-    fishModel?: "s2.1-pro" | "s2.1-pro-free";
-    /** ElevenLabs voice comes with Cloud Pro; no key is saved. */
-    included?: boolean;
-  };
   /** The decision model: switches and whether a key is on file. The key
    * itself never comes back. `enabled` is the switch as it takes effect
    * (off while no key is saved). `included`: Cloud Pro's decisions, no key
@@ -77,8 +61,6 @@ export interface ConfigStatus {
     enabled: boolean;
     jobs: { roomRouting: boolean };
   };
-  /** Live calls (OpenAI GPT-Live): configured-or-not, never the key. */
-  live?: LiveSettings;
   /** Shared write-only credential for on-demand GPT Image avatars. */
   imageGen?: {
     configured: boolean;

@@ -27,7 +27,7 @@ type StateMessage = {
   role?: string;
   text?: string;
   from?: { botId?: string; name?: string };
-  tool?: { name?: string; ok?: boolean; spoken?: string };
+  tool?: { name?: string; ok?: boolean };
 };
 
 const api = async (

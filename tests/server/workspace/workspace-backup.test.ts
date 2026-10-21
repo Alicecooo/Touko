@@ -47,7 +47,7 @@ function fixture(root: string): DatabaseSync {
   mkdirSync(join(root, "task-workspaces", "bot", "thread"), { recursive: true });
   writeFileSync(join(root, "task-workspaces", "bot", "thread", "binary.bin"), Buffer.alloc(2 * 1024 * 1024, 0xa5));
   json(join(root, "config.json"), { language: "ja", instances: { custom: { driver: "claudeAgent", config: { configDir: join(root, "providers", "account") } } }, apiKey: "private-key-in-config" });
-  json(join(root, "bots.json"), [{ id: "bot", threadId: "thread", cwd: join(root, "task-workspaces", "bot", "thread"), soul: `Each morning read ${root}/notes.md.`, avatarUrl: "/api/attachments/avatar.png", avatarCrop: "circle", voice: "source-provider-voice", tasks: [{ threadId: "thread", cwd: join(root, "task-workspaces", "bot", "thread") }] }]);
+  json(join(root, "bots.json"), [{ id: "bot", threadId: "thread", cwd: join(root, "task-workspaces", "bot", "thread"), soul: `Each morning read ${root}/notes.md.`, avatarUrl: "/api/attachments/avatar.png", avatarCrop: "circle", tasks: [{ threadId: "thread", cwd: join(root, "task-workspaces", "bot", "thread") }] }]);
   json(join(root, "groups.json"), [{ id: "room", memberIds: ["bot"], cwd: "/external/project" }]);
   json(join(root, "routines.json"), { version: 1, routines: [{ id: "routine", enabled: true }], runs: [{ id: "waiting", status: "queued" }, { id: "historical", status: "completed" }] });
   json(join(root, "webhooks.json"), { version: 1, webhooks: [{ id: "hook", endpointId: "endpoint", enabled: true, secretHash: "a".repeat(64) }], deliveries: [{ id: "delivery" }] });
@@ -173,7 +173,6 @@ describe("encrypted full workspace backups", () => {
       expect(result).toMatchObject({ restored: true, id: staged.id });
       const restoredBot = readJson(join(target, "bots.json"))[0];
       expect(restoredBot).toMatchObject({ id: "bot", cwd: join(target, "task-workspaces", "bot", "thread"), soul: `Each morning read ${join(target, "notes.md")}.`, avatarUrl: "/api/attachments/avatar.png", avatarCrop: "circle" });
-      expect(restoredBot).not.toHaveProperty("voice");
       expect(readFileSync(join(target, restoredBot.avatarUrl.slice("/api/".length)))).toEqual(AVATAR_BYTES);
       expect(readJson(join(target, "groups.json"))[0].cwd).toBe("/external/project");
       expect(readJson(join(target, "config.json"))).toEqual({ ...connections, language: "ja" });

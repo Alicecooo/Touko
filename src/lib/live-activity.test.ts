@@ -17,12 +17,6 @@ describe("liveActivityLabel", () => {
     expect(liveActivityLabel(activity("Read", { ok: true }))).toBe("Thinking");
   });
 
-  it("uses the server's narration for the exact live action", () => {
-    expect(liveActivityLabel(activity("Edit", { spoken: "editing a file" }))).toBe(
-      "Editing a file",
-    );
-  });
-
   it("maps common native and MCP tool names when narration is unavailable", () => {
     expect(liveActivityLabel(activity("Bash: pnpm test"))).toBe("Running a command");
     expect(liveActivityLabel(activity("mcp__computer__click"))).toBe("Using the computer");
@@ -44,8 +38,8 @@ describe("liveActivityLabel", () => {
 });
 
 describe("activityStepLabel", () => {
-  it("names a step the way the working line does: the server's narration first", () => {
-    expect(activityStepLabel({ name: "Edit", spoken: "editing a file" })).toBe("Editing a file");
+  it("names a step with the localized label for its tool", () => {
+    expect(activityStepLabel({ name: "Edit" })).toBe("Editing a file");
     expect(activityStepLabel({ name: "mcp__computer__click" })).toBe("Using the computer");
   });
 
@@ -58,14 +52,6 @@ describe("activityStepLabel", () => {
     expect(activityStepLabel({ name: "make_invoice: read the file" })).toBe("Working");
   });
 
-  // "Edit" and "editing a file" read the same, so only these cases tell narration from a name-derived label.
-  it("prefers the narration to the label the tool's name would give", () => {
-    expect(activityStepLabel({ name: "Bash", spoken: "checking the build." })).toBe("Checking the build");
-  });
-
-  it("falls back to the tool's name when the narration is blank", () => {
-    expect(activityStepLabel({ name: "Bash", spoken: "   " })).toBe("Running a command");
-  });
 });
 
 describe("liveActivityPhrases", () => {
@@ -88,11 +74,6 @@ describe("liveActivityPhrases", () => {
     expect(liveActivityPhrases(activity("Read")).phrases).toEqual(["Reading a file", "Reading through", "Looking it over"]);
   });
 
-  it("never rotates the server's exact narration", () => {
-    const narrated = liveActivityPhrases(activity("Bash", { spoken: "running the test suite" }));
-    expect(narrated.phrases).toEqual(["Running the test suite"]);
-    expect(narrated.phase).toBe("spoken:running the test suite");
-  });
 });
 
 describe("phraseAt", () => {

@@ -29,12 +29,12 @@ describe("parseBotProfilePatch (strict — the paired boundary)", () => {
 
   it("accepts the full identity surface", () => {
     const result = parseBotProfilePatch(
-      { name: "Mira", title: "Lead", description: "plans", notifications: true, voice: "vx", speakReplies: false },
+      { name: "Mira", title: "Lead", description: "plans", notifications: true },
       true,
     );
     expect(result).toEqual({
       ok: true,
-      patch: { name: "Mira", title: "Lead", description: "plans", notifications: true, voice: "vx", speakReplies: false },
+      patch: { name: "Mira", title: "Lead", description: "plans", notifications: true },
     });
   });
 });

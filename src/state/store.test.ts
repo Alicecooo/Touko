@@ -4,37 +4,7 @@ import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  api,
-  ApiError,
-  CLOUD_LINK_SETTINGS,
-  configStatusFromFrame,
-  currentTaskBot,
-  desktopApprovalBridge,
-  initialState,
-  liveCallFromFrame,
-  loadSnapshotBoundary,
-  openBot,
-  openNotificationTarget,
-  openThread,
-  persistBotUpdate,
-  persistTaskApproval,
-  pinBotThreadAction,
-  reducer,
-  requestConfirmedBotDeletion,
-  runtimeFrameAction,
-  StoreProvider,
-  useStore,
-  visibleMessages,
-  visibleNotificationThread,
-  type AppState,
-  type Bot,
-  type BotAnnouncement,
-  type ConfigStatusFrame,
-  type Group,
-  type Message,
-  type Action,
-} from "./store";
+import { api, ApiError, CLOUD_LINK_SETTINGS, configStatusFromFrame, currentTaskBot, desktopApprovalBridge, initialState, loadSnapshotBoundary, openBot, openNotificationTarget, openThread, persistBotUpdate, persistTaskApproval, pinBotThreadAction, reducer, requestConfirmedBotDeletion, runtimeFrameAction, StoreProvider, useStore, visibleMessages, visibleNotificationThread, type AppState, type Bot, type BotAnnouncement, type ConfigStatusFrame, type Group, type Message, type Action } from "./store";
 import { LAST_CONVERSATION_KEY } from "@/lib/last-conversation";
 import { cacheDesktopCapabilities, desktopCapabilitiesNow } from "@/lib/desktop";
 import { LAST_BOT_SECTION_KEY } from "@/lib/last-bot-section";
@@ -1029,7 +999,6 @@ describe("config status frames", () => {
         threads: { maxConcurrentPerBot: 10 },
         localVm: { mode: "per-bot", maxInstances: 3 },
         opencodeGo: { configured: true },
-        tts: { configured: true, ready: true, voice: "Ada" },
         profile: { name: "Ian", email: "ian@example.test" },
         features: { skillAuthoring: true },
       }),
@@ -1043,7 +1012,6 @@ describe("config status frames", () => {
       threads: { maxConcurrentPerBot: 10 },
       localVm: { mode: "per-bot", maxInstances: 3 },
       opencodeGo: { configured: true },
-      tts: { configured: true, ready: true, voice: "Ada" },
       profile: { name: "Ian", email: "ian@example.test" },
       features: { skillAuthoring: true },
     });
@@ -2529,14 +2497,6 @@ describe("live config frames", () => {
       billing: { currency: "USD" },
     });
   });
-
-  it("keeps live settings when a config frame arrives", () => {
-    const live = { configured: true, voice: "sol", readTypedReplies: false, idleMinutes: 7 };
-    const config = configStatusFromFrame({ ...baseFrame, live });
-    expect(config.live).toEqual(live);
-    const state = reducer(initialState, { type: "configStatus", config });
-    expect(state.config?.live).toEqual(live);
-  });
 });
 
 
@@ -2634,44 +2594,6 @@ describe("conversation model variant discoveries", () => {
     state = reducer(state, { type: "hydrate", bots: [owner], groups: [], computerControl: {} });
     expect(state.modelVariantSessions).toEqual({});
     expect(state.bots[0].tasks![0].modelSelection?.variant).toBe("minimal");
-  });
-});
-
-describe("live call state", () => {
-  const call = { callId: "c1", botId: "b1", threadId: "t1", client: "ios", voice: "marin", startedAt: 1, status: "live" } as const;
-  it("starts empty and follows live.call frames", () => {
-    expect(initialState.liveCall).toBeNull();
-    const live = reducer(initialState, { type: "liveCall", call });
-    expect(live.liveCall).toEqual(call);
-    const ended = reducer(live, { type: "liveCall", call: { ...call, status: "ended", endReason: "idle" } });
-    expect(ended.liveCall?.status).toBe("ended");
-    expect(reducer(ended, { type: "liveCall", call: null }).liveCall).toBeNull();
-  });
-
-  it("takes a lookup of the line only if no newer frame landed while it was out", () => {
-    const since = initialState.liveCallVersion;
-    const framed = reducer(initialState, { type: "liveCall", call });
-    expect(reducer(framed, { type: "liveCallLookup", call: null, since, seq: 1 })).toBe(framed);
-    const fresh = reducer(framed, { type: "liveCallLookup", call: { ...call, status: "ended", endReason: "idle" }, since: framed.liveCallVersion, seq: 2 });
-    expect(fresh.liveCall?.status).toBe("ended");
-    expect(fresh.liveCallVersion).toBe(framed.liveCallVersion);
-  });
-
-  it("never lets an earlier lookup's answer replace a later one's", () => {
-    const since = initialState.liveCallVersion;
-    const later = reducer(initialState, { type: "liveCallLookup", call, since, seq: 2 });
-    expect(later.liveCall).toEqual(call);
-    expect(reducer(later, { type: "liveCallLookup", call: null, since, seq: 1 })).toBe(later);
-    const inOrder = reducer(reducer(initialState, { type: "liveCallLookup", call: null, since, seq: 1 }), { type: "liveCallLookup", call, since, seq: 2 });
-    expect(inOrder.liveCall).toEqual(call);
-  });
-
-  it("reads a live.call frame's call, and ignores a frame without one", () => {
-    expect(liveCallFromFrame({ kind: "live.call", botId: "b1", threadId: "t1", call })).toEqual({ call });
-    expect(liveCallFromFrame({ kind: "live.call", botId: "b1", threadId: "t1", call: null })).toEqual({ call: null });
-    expect(liveCallFromFrame({ kind: "live.call", botId: "b1", threadId: "t1" })).toBeNull();
-    expect(liveCallFromFrame({ kind: "live.call", call: "c1" })).toBeNull();
-    expect(liveCallFromFrame({ kind: "live.call", call: { status: "live" } })).toBeNull();
   });
 });
 

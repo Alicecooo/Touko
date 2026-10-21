@@ -7,11 +7,9 @@ import { AlertTriangle, Check, ChevronLeft, ChevronRight, Copy, Crown, Monitor, 
 import { WorkingDots } from "@/components/WorkingIndicator";
 import { ACTION_ICON, MESSAGE_ROW, MessageActions, messageActionClass } from "@/components/MessageActions";
 import { useBotMessageMenu, userMessageMenu } from "@/components/message-menu";
-import { useSpeech } from "@/lib/tts/useSpeech";
-import { localSystemVoiceActive } from "@/lib/local-voice";
 import { computerStartLine } from "@/lib/computer-start";
 import { useCaptionChrome, useDesktopCapabilities } from "@/components/DesktopCapabilities";
-import { api, currentTaskBot, useStore, formatTime, openNotificationTarget, openThread, visibleMessages, type Action, type Bot, type ConfigStatus, type InstanceInfo, type Message, type AppState, awayFromMainThread, openBot } from "@/state/store";
+import { api, currentTaskBot, useStore, formatTime, openNotificationTarget, visibleMessages, type Action, type Bot, type InstanceInfo, type Message, type AppState, awayFromMainThread, openBot } from "@/state/store";
 import { EngineSetup } from "./EngineSetup";
 import { CHATGPT_USAGE_URL, ManageUsageLink } from "./ChatGptPlanStatus";
 import { CODEX_USAGE_URL, codexUsageLimitReached } from "../../shared/codex-usage-limit";
@@ -36,7 +34,6 @@ import { showWorkingDots } from "@/lib/turn-tail";
 import { lastNonReceipt } from "@/lib/receipts";
 import { liveActivityPhrases } from "@/lib/live-activity";
 import { ChatMarkdown } from "./ChatMarkdown";
-import { VoiceNoteBubble, type VoiceNoteAttachment } from "./VoiceNoteBubble";
 import { RawMarkdownView, RawToggleAction } from "./RawMarkdownToggle";
 import { ThreadChip } from "./ThreadChip";
 import { VerifyCard } from "./VerifyCard";
@@ -60,7 +57,6 @@ import { ConnectorCard } from "./ConnectorCard";
 import { SecretRequestCard } from "./SecretRequestCard";
 import { SignInRequestCard } from "./SignInRequestCard";
 import { hasRoutineExecutionTask, RoutineRunCard } from "./RoutineRunCard";
-import { CallRecordRow } from "./CallRecordRow";
 import { AttachmentGallery, collectMessageFiles, replyAttachmentGroup, splitMessageAttachments } from "./AttachmentGallery";
 import { ScreenFrame } from "./ScreenFrame";
 import { CompactionChip, DigestChip } from "./DigestChip";
@@ -70,11 +66,6 @@ import { ModelPicker } from "./ModelPicker";
 import { ChatHeaderMenu } from "./ChatMoreMenu";
 import { useChatFindRequests } from "@/lib/chat-find";
 import { CitationSelectionToolbar, SentCitations } from "./CitationUI";
-
-import { SpeakButton } from "./SpeakButton";
-import { CallOverlay } from "./CallView";
-import { LiveCallBar } from "./LiveCallBar";
-import { LiveCallChip } from "./LiveCallPill";
 import { effectivePlace, toolPlace, type EffectivePlace } from "@/lib/place";
 import { cn } from "@/lib/cn";
 import { activeLocale, t } from "@/lib/i18n";
@@ -109,9 +100,6 @@ interface ChatRows {
   botId: string;
   threadId: string;
   botName: string;
-  voiceId?: string;
-  tts: ConfigStatus["tts"];
-  localVoice: boolean;
   busy: boolean;
   hasMore: boolean;
   bots: readonly Bot[];
@@ -387,33 +375,25 @@ const Bubble = memo(function Bubble({
   replyTarget?: Message;
   onReply: (message: Message) => void;
 }) {
-  const { botId, threadId, botName, voiceId, tts, localVoice, busy, mentionPeers, mentionPerson, focus, dispatch, onBranch, bubbleStyle, conversational, simple, openedAt } = useChatRows();
+  const { botId, threadId, botName, busy, mentionPeers, mentionPerson, focus, dispatch, onBranch, bubbleStyle, conversational, simple, openedAt } = useChatRows();
   const remoteClient = window.ogb?.remoteClient?.active === true;
   const peer = peerLine(message) ?? peerRequest(message, botId);
   const user = message.role === "user" && !peer;
   const [expanded, setExpanded] = useState(false);
   const focusedSearch = focus?.messageId === message.id && Boolean(focus.matchText);
   const [viewRaw, setViewRaw] = useState(false);
-  const speech = useSpeech();
-  const speaking = speech.messageId === message.id && speech.status !== "idle";
   const rawText = peer ? peer.body : (message.text ?? "");
   const text = user ? rawText : stripLeakedSystemHarnessMessages(rawText);
   const botMenu = useBotMessageMenu({
     text,
-    botId,
     messageId: message.id,
-    voiceId,
-    tts,
-    localVoice,
-    canSpeak: message.kind === "text" && !peer,
     viewRaw,
     onToggleRaw: () => setViewRaw((raw) => !raw),
     onRegenerate: !busy ? onRegenerate : undefined,
     pin: remoteClient ? undefined : {
       pinned,
       onToggle: () => dispatch({ type: "updateTask", botId, threadId, patch: { pinnedMessageId: pinned ? "" : message.id } }),
-    },
-  });
+    }});
   const attached = useMemo(() => splitMessageAttachments(message.attachments), [message.attachments]);
   const generatedPaths = attached.images;
   const linkedFiles = useMemo(
@@ -423,10 +403,6 @@ const Bubble = memo(function Bubble({
   const group = useMemo(
     () => !user && text.trim() ? replyAttachmentGroup(text, message.attachments) : null,
     [user, text, message.attachments],
-  );
-  const voiceNotes = useMemo(
-    () => message.attachments?.filter((attachment): attachment is VoiceNoteAttachment => attachment.kind === "audio") ?? [],
-    [message.attachments],
   );
   const reply = useReplySegments(conversational && !user && !peer && !viewRaw && !replyTarget && message.kind === "text", text, message.at, openedAt);
   const split = reply.segments.length > 1;
@@ -547,11 +523,7 @@ const Bubble = memo(function Bubble({
                 </div>
               )}
               {message.quickModel && <QuickModelNote model={message.quickModel} />}
-              {message.via === "call" && (
-                <span className="mt-1 text-[11px] text-ink-tertiary" title={t("chat.viaCall")}>
-                  {t("chat.viaCall")}
-                </span>
-              )}
+              
               {collapsible && (
                 <button onClick={() => setExpanded(true)} className="mt-1 text-[12.5px] text-ink-secondary hover:text-ink">
                   {t("chat.showFull")}
@@ -565,13 +537,7 @@ const Bubble = memo(function Bubble({
             </>
           ) : (
             <MessageBoundary key={viewRaw ? "raw" : "rendered"} fallbackText={text || t("chat.generatedImage")}>
-              {voiceNotes.length > 0 && (
-                <div className={cn("flex flex-col", (text || generatedPaths.length > 0 || linkedFiles.length > 0) && "mb-2")}>
-                  {voiceNotes.map((note) => (
-                    <VoiceNoteBubble key={note.path} attachment={note} />
-                  ))}
-                </div>
-              )}
+              
               {!group && <AttachmentGallery images={generatedPaths} files={linkedFiles} message={{ threadId, messageId: message.id }} className={text ? undefined : "mb-0"} eager={eagerAttachments} />}
               {split ? (
                 <ConversationalReply segments={reply.segments} firstNew={reply.firstNew} citation={{ messageId: message.id, botId, threadId }}
@@ -586,13 +552,11 @@ const Bubble = memo(function Bubble({
           )}
         </div>
         {!user && (
-          <MessageActions side="bot" forceOpen={viewRaw || speaking} menu={botMenu}>
+          <MessageActions side="bot" forceOpen={viewRaw} menu={botMenu}>
             <ReplyAction onReply={() => onReply(message)} />
             {text && <CopyButton text={text} className={messageActionClass} />}
             {text && viewRaw && <RawToggleAction active onToggle={() => setViewRaw(false)} className={messageActionClass} />}
-            {text && speaking && (
-              <SpeakButton text={text} botId={botId} messageId={message.id} voiceId={voiceId} tts={tts} localVoice={localVoice} className={cn(messageActionClass, "text-accent")} />
-            )}
+            
           </MessageActions>
         )}
         <span
@@ -767,7 +731,7 @@ const MessagesList = memo(function MessagesList({
   onRegenerate: () => void;
   onReply: (message: Message) => void;
 }) {
-  const { botId, threadId, botName, busy, hasMore, focus, showToolCalls, locale } = useChatRows();
+  const { botId, threadId, botName, focus, showToolCalls, locale } = useChatRows();
   const items = useMemo(() => groupTranscript(messages), [messages, locale]);
   const newestMessageId = messages.at(-1)?.id;
   let newestUserMessageId: string | undefined;
@@ -855,8 +819,6 @@ const MessagesList = memo(function MessagesList({
               return <MessageBoundary fallbackText={m.text ?? ""}><WidgetMessage botId={botId} threadId={threadId} message={m} /></MessageBoundary>;
             case "routine.run":
               return <RoutineRunRow message={m} botId={botId} />;
-            case "call":
-              return m.call ? <CallRecordRow message={m} transcript={transcript} botName={botName} threadId={threadId} busy={busy} hasMore={hasMore} /> : null;
             case "activity": {
               if (m.dataResult) return <DataResultChip message={m} />;
               if (isStatusActivity(m)) return <StatusActivityRow message={m} />;
@@ -1051,8 +1013,6 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   const mentionPeers = useMemo(() => bots.filter((peer) => peer.id !== bot.id), [bots, bot.id]);
   const focus = state.focusMessage?.threadId === bot.threadId ? state.focusMessage : null;
   const showToolCalls = showToolCallsEnabled(state.config);
-  const tts = state.config?.tts;
-  const localVoice = localSystemVoiceActive();
   const locale = activeLocale();
   const busy = Boolean(bot.busy);
   const openedAt = useThreadOpenedAt(bot.threadId);
@@ -1064,8 +1024,8 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   const bubbleStyle = useMemo(() => (colorMine ? userBubbleStyle(bot.color) : undefined), [colorMine, bot.color]);
   const hasMore = Boolean(bot.hasMore);
   const rows = useMemo<ChatRows>(
-    () => ({ botId: bot.id, threadId: bot.threadId, botName: bot.name, voiceId: bot.voice, tts, localVoice, busy, hasMore, bots, mentionPeers, mentionPerson: { profileName: state.config?.profile?.name }, focus, showToolCalls, locale, dispatch, onBranch, bubbleStyle, conversational: isConversational(bot.replyStyle), simple: !advanced, openedAt }),
-    [bot.id, bot.threadId, bot.name, bot.voice, tts, localVoice, busy, hasMore, bots, mentionPeers, state.config?.profile?.name, focus, showToolCalls, locale, dispatch, onBranch, bubbleStyle, bot.replyStyle, advanced, openedAt],
+    () => ( { botId: bot.id, threadId: bot.threadId, botName: bot.name, busy, hasMore, bots, mentionPeers, mentionPerson: { profileName: state.config?.profile?.name }, focus, showToolCalls, locale, dispatch, onBranch, bubbleStyle, conversational: isConversational(bot.replyStyle), simple: !advanced, openedAt}),
+    [bot.id, bot.threadId, bot.name, busy, hasMore, bots, mentionPeers, state.config?.profile?.name, focus, showToolCalls, locale, dispatch, onBranch, bubbleStyle, bot.replyStyle, advanced, openedAt],
   );
   const place = effectivePlace(bot, bot.tasks?.find((task) => task.threadId === bot.threadId));
 
@@ -1156,7 +1116,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   return (
     <ThreadLinkContext value={threadLink}>
     <main className="relative flex h-full min-w-0 flex-1 flex-col bg-app">
-      <CallOverlay bot={bot} />
+      
       <GlassScrollFrame className="flex-1 [--glass-tint:var(--color-app)]">
       {/* z-[25]: above the room set-up card (z-20), below the CallOverlay (z-30). */}
       <GlassBar edge="top" className="z-[25]">
@@ -1257,7 +1217,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
           <ThreadContextWarning bot={bot} messages={messages} />
           {/* Simple mode moves the model, the computer and ⋯ into the bot panel; a remote client's panel has neither. */}
           {advanced && !remoteClient && <ModelPicker key={bot.threadId} bot={bot} threadId={bot.threadId} />}
-          <LiveCallChip currentBotId={bot.id} onOpen={(botId, threadId) => openThread(dispatch, { botId, threadId }, state, showThreads)} />
+          
           {(advanced || remoteClient) && <button
             data-tour="computer"
             onClick={() => dispatch({ type: "toggleComputer" })}
@@ -1408,7 +1368,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
           <JumpToLatestButton onClick={jumpToLatest} className="pointer-events-auto bottom-2" />
         </div>
       )}
-      <LiveCallBar bot={bot} />
+      
       {(
       <Composer
         key={bot.threadId}

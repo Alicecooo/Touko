@@ -301,15 +301,8 @@ export interface WireBot {
   approvalMode?: ApprovalMode;
   /** Tools this bot may always use without asking. */
   alwaysAllow?: string[];
-  /** Speak this bot's replies aloud as they settle, without being asked. */
-  speakReplies?: boolean;
   /** How replies are shaped. Absent = "default". */
   replyStyle?: ReplyStyle;
-  /** This bot's own voice id, so a room of bots doesn't sound like one person. */
-  voice?: string;
-  /** Whether this bot may send voice notes. Absent/true = allowed; false
-   * hides the tool and refuses the route even with a voice configured. */
-  voiceNotes?: boolean;
   /** Whether this bot uses native memory. Absent/true = enabled. */
   memoryEnabled?: boolean;
   /** Queue direct-chat messages behind outstanding delegated work. */
@@ -395,17 +388,14 @@ export type CardAnswerer = (
   | { kind: "session"; name: string; person?: string }
   | { kind: "loopback" }
   | { kind: "worker" }
-) & {
-  /** "call": decided by voice on a Live call, not tapped. */
-  via?: "call";
-};
+);
 
 /** One transcript line, serialized as stored. */
 export interface WireMessage {
   roomRequest?: { id: string; phase: "request" | "result" };
   id: string;
   role: "bot" | "user";
-  kind: "text" | "options" | "activity" | "screen" | "connector" | "secret" | "signin" | "routine.run" | "goal.run" | "digest" | "compaction" | "call" | "widget";
+  kind: "text" | "options" | "activity" | "screen" | "connector" | "secret" | "signin" | "routine.run" | "goal.run" | "digest" | "compaction" | "widget";
   text?: string;
   digest?: TurnDigest;
   compaction?: {
@@ -434,11 +424,9 @@ export interface WireMessage {
   routineRun?: RoutineRunCardData;
   /** Terminal receipt for a bounded multi-bot channel goal. */
   goalRun?: GroupGoalRunCardData;
-  /** call rows (kind "call"): the finished Live call this row records. */
-  call?: LiveCallRecord;
   /** activity messages: tool name + outcome. */
   tool?: {
-    name: string; ok?: boolean; spoken?: string; setup?: boolean; terminal?: boolean; summary?: string; input?: string; output?: string;
+    name: string; ok?: boolean; setup?: boolean; terminal?: boolean; summary?: string; input?: string; output?: string;
     /** error rows: the installed Claude Code is too old for the model, and
      * the UI can offer to update it in place. */
     claudeUpdate?: boolean;
@@ -461,11 +449,7 @@ export interface WireMessage {
   aside?: boolean;
   /** A user-role message that arrived through the server's HTTP API
    * ("api"), or a request a person spoke on a Live call ("call"). */
-  via?: "api" | "call";
-  /** The Live call a "call" line was spoken on (LiveCallState.callId). Set
-   * only on user messages with `via: "call"`; a turn's own messages point
-   * at their request through `requestMessageId` instead. */
-  callId?: string;
+  via?: "api";
   /** A user line an external interface relayed through the guarded send
    * route (the Slack worker): nobody typed it in one of this workspace's
    * clients. A Live call never reads it back as what the caller typed. */
@@ -602,58 +586,6 @@ export interface QuotaSwitchCardData {
   engines: Array<{ instanceId: string; name: string }>;
   messageId?: string;
   rootId?: string;
-}
-
-/** Which app holds the microphone of a Live call: the desktop app (its own
- * page or a server's page in it), a web browser, or a phone. Self-declared;
- * for display and logs only. The phone apps show a value they do not know as
- * "another device". */
-export type LiveClient = "desktop" | "web" | "ios" | "android";
-export type LiveCallStatus = "connecting" | "live" | "ending" | "ended";
-/** Why a call ended. "signed-out": the sign-in or paired phone that started
- * it was signed out, revoked or unpaired. A client that does not know a
- * reason shows the call's `error` text, or plain "Call ended.". */
-export type LiveEndReason =
-  | "hung-up" | "idle" | "expired" | "content" | "remote-hangup" | "connection-lost"
-  | "sideband-lost" | "deleted" | "shutdown" | "signed-out" | "error";
-
-/** The one Live call a harness runs. Never carries the key or any speech. */
-export interface LiveCallState {
-  callId: string;
-  botId: string;
-  threadId: string;
-  client: LiveClient;
-  voice: string;
-  /** epoch ms when the session was created */
-  startedAt: number;
-  status: LiveCallStatus;
-  endReason?: LiveEndReason;
-  /** short, user-facing; present when the call ended on a problem */
-  error?: string;
-}
-
-/** One finished Live call, written once when a call that went live ends. Never carries speech. */
-export interface LiveCallRecord {
-  callId: string;
-  botId: string;
-  client: LiveClient;
-  /** epoch ms, = LiveCallState.startedAt */
-  startedAt: number;
-  /** epoch ms when the call ended */
-  endedAt: number;
-  /** whole seconds: OpenAI usage seconds when given, else wall clock */
-  seconds: number;
-  endReason: LiveEndReason;
-  /** only when LLM thread titles are on and the engine can generateText */
-  title?: string;
-}
-
-/** Non-secret Live settings, as GET /api/config and PATCH /api/live/settings report them. */
-export interface LiveSettings {
-  configured: boolean;
-  voice: string;
-  readTypedReplies: boolean;
-  idleMinutes: number;
 }
 
 export interface ConnectorCardData {
@@ -906,6 +838,5 @@ export type ServerFrame =
   /** A bot's data sheet changed. Whole sheet each time. */
   | DataBroadcast
   | { kind: "bot.deleted"; botId: string }
-  | { kind: "live.call"; botId: string; threadId: string; call: LiveCallState | null }
   /** The config status object spread flat into the frame. */
   | ({ kind: "config" } & Record<string, unknown>);

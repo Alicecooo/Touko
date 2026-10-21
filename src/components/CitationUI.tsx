@@ -54,7 +54,7 @@ function CitationEditor({
     <div
       ref={ref}
       role="dialog"
-      aria-label="Comment on citation"
+      aria-label={t("ui.label.commentOnCitation")}
       className="fixed z-50 w-[min(28rem,calc(100vw-1rem))] rounded-xl border border-hairline/50 bg-panel p-3 text-ink shadow-2xl"
       style={point}
       onKeyDown={(event) => {
@@ -74,9 +74,9 @@ function CitationEditor({
         dir="auto"
         value={comment}
         rows={3}
-        aria-label="Comment on selected text"
+        aria-label={t("ui.label.commentOnSelectedText")}
         aria-invalid={tooLong || undefined}
-        placeholder="Add an optional comment…"
+        placeholder={t("ui.label.addAnOptionalComment")}
         onChange={(event) => setComment(event.target.value)}
         onKeyDown={(event) => {
           if (sendsMessage(event.nativeEvent, sendKey)) {
@@ -250,12 +250,12 @@ export function CitationBadge({
         <span className="truncate">{citation.quote.replace(/\s+/g, " ")}</span>
       </button>
       {onRemove && (
-        <button type="button" onClick={onRemove} aria-label="Remove citation" className="flex size-5 items-center justify-center rounded-full text-ink-secondary hover:bg-raised hover:text-ink"><X size={11} /></button>
+        <button type="button" onClick={onRemove} aria-label={t("ui.label.removeCitation")} className="flex size-5 items-center justify-center rounded-full text-ink-secondary hover:bg-raised hover:text-ink"><X size={11} /></button>
       )}
       {open && createPortal(
         <div
           role="dialog"
-          aria-label="Citation details"
+          aria-label={t("ui.label.citationDetails")}
           className="fixed z-50 w-[min(30rem,calc(100vw-1rem))] rounded-xl border border-hairline/50 bg-panel p-3 text-left text-ink shadow-2xl"
           style={point}
           ref={(element) => {

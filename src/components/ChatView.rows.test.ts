@@ -6,7 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AppState, Bot, InstanceInfo, Message } from "@/state/store";
 
-const renders = vi.hoisted(() => ({ botText: 0, userText: 0, toolChip: 0, speak: 0 }));
+const renders = vi.hoisted(() => ({ botText: 0, userText: 0, toolChip: 0 }));
 vi.mock("./ChatMarkdown", async (importOriginal) => ({
   ...await importOriginal<typeof import("./ChatMarkdown")>(),
   ChatMarkdown: ({ text }: { text: string }) => {
@@ -28,31 +28,15 @@ vi.mock("./ToolActivity", async (importOriginal) => ({
     return createElement("span", null, tool.name);
   },
 }));
-// The real button, run inside a counting component, so every render of it is counted.
-vi.mock("./SpeakButton", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./SpeakButton")>();
-  return {
-    ...actual,
-    SpeakButton: (props: Parameters<typeof actual.SpeakButton>[0]) => {
-      renders.speak++;
-      return actual.SpeakButton(props);
-    },
-    useSpeakAction: (args: Parameters<typeof actual.useSpeakAction>[0]) => {
-      renders.speak++;
-      return actual.useSpeakAction(args);
-    },
-  };
-});
 vi.mock("./DesktopCapabilities", async (importOriginal) => ({
   ...await importOriginal<typeof import("./DesktopCapabilities")>(),
-  useDesktopCapabilities: () => ({ capabilities: { dictation: { available: false }, host: { packaged: true, platform: "other" }, localComputer: { available: false } }, ready: true }),
+  useDesktopCapabilities: () => ({ capabilities: { host: { packaged: true, platform: "other" }, localComputer: { available: false } }, ready: true }),
 }));
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }));
 vi.mock("./ModelPicker", () => ({ ModelPicker: () => null }));
 
 const { ChatView } = await import("./ChatView");
 const { BotEditorStore, initialState, reducer } = await import("@/state/store");
-const { setRemoteVoiceProvider } = await import("@/lib/local-voice");
 const { t } = await import("@/lib/i18n");
 
 const message = (id: string, parentId: string | undefined, fields: Partial<Message>): Message =>
@@ -112,7 +96,7 @@ async function menusWith(label: string) {
   return found;
 }
 async function rowRendersAfter(change: (current: AppState) => AppState) {
-  renders.botText = renders.userText = renders.toolChip = renders.speak = 0;
+  renders.botText = renders.userText = renders.toolChip = 0;
   state = change(state);
   await draw();
   return { ...renders };
@@ -145,20 +129,20 @@ describe("chat transcript rows", () => {
   it("renders no row when another bot changes", async () => {
     const scout = state.bots.find((bot) => bot.id === "scout")!;
     expect(await rowRendersAfter((current) => reducer(current, { type: "botPatched", bot: { ...scout, busy: true } })))
-      .toEqual({ botText: 0, userText: 0, toolChip: 0, speak: 0 });
+      .toEqual({ botText: 0, userText: 0, toolChip: 0 });
   });
 
   it("renders no row when this bot changes in a way no row shows", async () => {
     expect(await rowRendersAfter((current) => {
       const { messages: _transcript, ...frame } = current.bots.find((bot) => bot.id === "pepper")!;
       return reducer(current, { type: "botPatched", bot: { ...frame, turnStartedAt: 5, tasks: frame.tasks?.map((task) => ({ ...task, updatedAt: 99 })) } });
-    })).toEqual({ botText: 0, userText: 0, toolChip: 0, speak: 0 });
+    })).toEqual({ botText: 0, userText: 0, toolChip: 0 });
   });
 
   it("renders only the tool chip that changed", async () => {
     expect(await rowRendersAfter((current) => reducer(current, {
       type: "messagePatched", threadId: "pepper-thread", message: { ...running, tool: { name: "Read file 2, page 2" } },
-    }))).toEqual({ botText: 0, userText: 0, toolChip: 1, speak: 0 });
+    }))).toEqual({ botText: 0, userText: 0, toolChip: 1 });
     expect(document.body.textContent).toContain("Read file 2, page 2");
   });
 
@@ -182,28 +166,5 @@ describe("chat transcript rows", () => {
     expect(await regenerate()).toEqual([]);
     await rowRendersAfter(busy(false));
     expect(await regenerate()).toEqual(["m5"]);
-  });
-
-  it("follows this device's voice choice at the next store event", async () => {
-    const bridge = window.ogb;
-    window.ogb = { ...bridge, platform: "darwin", remoteClient: { active: true } } as typeof window.ogb;
-    const kept = new Map<string, string>();
-    vi.stubGlobal("localStorage", { getItem: (key: string) => kept.get(key) ?? null, setItem: (key: string, value: string) => kept.set(key, value) });
-    vi.stubGlobal("speechSynthesis", { getVoices: () => [] });
-    vi.stubGlobal("SpeechSynthesisUtterance", class {});
-    const speak = async () => (await menusWith(t("chat.speak.read"))).map((item) => `${item.title}${item.disabled ? " (off)" : ""}`);
-    const switchTo = async (provider: "host" | "system") => {
-      await rowRendersAfter((current) => reducer(current, { type: "toggleSettings", open: true }));
-      setRemoteVoiceProvider(provider);
-      await rowRendersAfter((current) => reducer(current, { type: "toggleSettings", open: false }));
-    };
-    try {
-      await switchTo("system");
-      expect(await speak()).toEqual([t("chat.speak.read"), t("chat.speak.read")]);
-      await switchTo("host");
-      expect(await speak()).toEqual([`${t("chat.speak.needsKey")} (off)`, `${t("chat.speak.needsKey")} (off)`]);
-    } finally {
-      window.ogb = bridge;
-    }
   });
 });

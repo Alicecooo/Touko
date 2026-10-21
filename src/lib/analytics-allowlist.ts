@@ -14,8 +14,7 @@ export function allow<const T extends string>(value: unknown, list: readonly T[]
 
 export const KEY_PROVIDER = [
   "anthropic", "openai", "openrouter", "openai_compat", "xai", "mistral", "cerebras", "groq", "meta", "composio",
-  "opencode_go", "custom_endpoint", "elevenlabs", "fish_audio", "jev", "openrouter_decider", "openai_image", "custom_image",
-  "openai_live",
+  "opencode_go", "custom_endpoint", "jev", "openrouter_decider", "openai_image", "custom_image",
 ] as const;
 export type KeyProvider = (typeof KEY_PROVIDER)[number];
 
@@ -25,10 +24,9 @@ export const SECTION_PROVIDER = {
   groq: "groq", meta: "meta",
 } as const satisfies Record<string, KeyProvider>;
 
-const CREDENTIAL_PROVIDER = new Map<string, KeyProvider>(Object.entries({
-   xaiApiKey: "xai", opencodeGoApiKey: "opencode_go", ttsKey: "elevenlabs", fishAudioKey: "fish_audio",
-  openaiImageApiKey: "openai_image",
-} satisfies Record<CredentialTargetId, KeyProvider>));
+const CREDENTIAL_PROVIDER = new Map<string, KeyProvider>(Object.entries( {
+   xaiApiKey: "xai", opencodeGoApiKey: "opencode_go",
+  openaiImageApiKey: "openai_image"} satisfies Record<CredentialTargetId, KeyProvider>));
 
 export function credentialProvider(target: unknown): KeyProvider | "other" {
   return (typeof target === "string" && CREDENTIAL_PROVIDER.get(target)) || "other";
@@ -78,9 +76,7 @@ export const BOT_SOURCE = ["blank", "template", "preset"] as const;
 export type BotSource = (typeof BOT_SOURCE)[number];
 export const CONNECTOR_RESULT = ["connected", "failed", "expired", "timed_out"] as const;
 export type ConnectorResult = (typeof CONNECTOR_RESULT)[number];
-export const CALL_MODE = ["turns", "live"] as const;
 export const ROOM_MODE = ["chat", "goal"] as const;
-export const VOICE = ["elevenlabs", "fish", "system", "chatterbox", "xai", "none"] as const;
 export const DECIDER = ["jev", "openrouter", "off"] as const;
 export const CONNECTORS_MODE = ["managed", "self_hosted", "unavailable"] as const;
 export const LOCAL_VM_MODE = ["shared", "per_bot", "pool"] as const;

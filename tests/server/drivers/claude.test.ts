@@ -492,7 +492,6 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     delete process.env.COMPOSIO_API_KEY;
     delete process.env.BOX_TOKEN;
     delete process.env.OPENCODE_API_KEY;
-    delete process.env.OMB_TTS_KEY;
     for (const name of Object.keys(CONTROL_PLANE_FIXTURE)) delete process.env[name];
     delete process.env.OMB_CLAUDE_SESSION_IDLE_MS;
     delete process.env.OMB_CLAUDE_SESSION_IDLE_MIN_MS;
@@ -779,7 +778,6 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     process.env.ANTHROPIC_API_KEY = "sk-should-not-leak";
     process.env.XAI_API_KEY = "xai-should-not-leak";
     process.env.BOX_TOKEN = "box-should-not-leak";
-    process.env.OMB_TTS_KEY = "tts-should-not-leak";
 
     await instance.adapter.sendTurn({ threadId: "t-hygiene", text: "the secret prompt", system: "You are Testy." });
     await recorder.until((e) => e.type === "turn.completed");
@@ -797,7 +795,6 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     expect(seen.env.CLAUDE_CODE_ENTRYPOINT).toBeUndefined();
     expect(seen.env.XAI_API_KEY).toBeUndefined();
     expect(seen.env.BOX_TOKEN).toBeUndefined();
-    expect(seen.env.OMB_TTS_KEY).toBeUndefined();
   });
 
   it("per-bot Ask restores the broker on a legacy bypass instance", async () => {
@@ -1494,7 +1491,7 @@ describe("ClaudeDriver turns (fake CLI)", () => {
   it("preserves only the selected account's auth settings in a private file", async () => {
     const account = join(scratch, "account");
     mkdirSync(account);
-    const settings = { apiKeyHelper: "echo synthetic-helper-key", env: { ANTHROPIC_BASE_URL: "http://127.0.0.1:9", ANTHROPIC_AUTH_TOKEN: "synthetic-token", OMB_TTS_KEY: "must-not-leak" }, hooks: { SessionStart: [{ command: "must-not-run" }] }, permissions: { defaultMode: "bypassPermissions" } };
+    const settings = { apiKeyHelper: "echo synthetic-helper-key", env: { ANTHROPIC_BASE_URL: "http://127.0.0.1:9", ANTHROPIC_AUTH_TOKEN: "synthetic-token" }, hooks: { SessionStart: [{ command: "must-not-run" }] }, permissions: { defaultMode: "bypassPermissions" } };
     writeFileSync(join(account, "settings.json"), JSON.stringify(settings));
     const dump = join(scratch, "account.json");
     await create(undefined, { FAKE_CLAUDE_DUMP: dump }, { configDir: account });
@@ -3463,7 +3460,7 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     await create(undefined, { CLAUDE_CONFIG_DIR: instanceConfigDir });
     const dump = join(scratch, "generate-text-env.json");
     process.env.FAKE_CLAUDE_DUMP = dump;
-    const names = ["XAI_API_KEY", "COMPOSIO_API_KEY", "BOX_TOKEN", "OPENCODE_API_KEY", "OMB_TTS_KEY"] as const;
+    const names = ["XAI_API_KEY", "COMPOSIO_API_KEY", "BOX_TOKEN", "OPENCODE_API_KEY"] as const;
     for (const name of names) process.env[name] = `${name}-must-not-leak`;
 
     await expect(instance.generateText?.("summarize safely")).resolves.toBe("fake generated text");

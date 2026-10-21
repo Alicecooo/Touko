@@ -31,10 +31,6 @@ vi.mock("@/lib/interface-mode", async (original) => ({ ...await original<typeof 
 vi.mock("@/lib/thread-preferences", async (original) => ({ ...await original<typeof import("@/lib/thread-preferences")>(),
   useShowThreads: () => true,
 }));
-vi.mock("@/lib/live-call-media", async (original) => {
-  const actual = await original<typeof import("@/lib/live-call-media")>();
-  return { ...actual, useLiveMedia: actual.liveMedia };
-});
 import { BotListItem, botRowProps, type BotRowProps } from "./Sidebar";
 import { forgetSearchDisclosuresForTests } from "@/lib/search-disclosure";
 

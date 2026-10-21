@@ -170,7 +170,7 @@ function parseEnvironments(raw) {
     seen.add(id);
     seen.add(origin);
     const color = cleanColor(entry?.color);
-    environments.push({ id, kind: "remote", name: cleanName(entry?.name, nameFromOrigin(origin)), origin, ...(entry?.microphone === true ? { microphone: true } : {}),
+    environments.push({ id, kind: "remote", name: cleanName(entry?.name, nameFromOrigin(origin)), origin, 
       ...(color ? { color } : {}), ...(entry?.home === true ? { home: true } : {}) });
   }
   const activeId = typeof value?.activeId === "string" && environments.some((e) => e.id === value.activeId) ? value.activeId : LOCAL_ID;
@@ -244,11 +244,6 @@ function withoutEnvironment(state, id) {
   return { environments, activeId: state.activeId === id ? LOCAL_ID : state.activeId };
 }
 
-function withMicrophone(state, id) {
-  if (!state.environments.some((e) => e.id === id)) return state;
-  return { ...state, environments: state.environments.map((e) => (e.id === id ? { ...e, microphone: true } : e)) };
-}
-
 function withActive(state, id) {
   if (id !== LOCAL_ID && !state.environments.some((e) => e.id === id)) return state;
   return { ...state, activeId: id };
@@ -286,7 +281,6 @@ module.exports = {
   withEnvironment,
   withEnvironmentLook,
   withLocalEnvironment,
-  withMicrophone,
   withoutEnvironment,
   serverMenuLabels,
   workspaceMenuTemplate,

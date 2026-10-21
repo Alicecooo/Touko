@@ -16,7 +16,7 @@ export type PageId =
   | "setup" | "model" | "instructions" | "approvals" | "always" | "routines" | "apps"
   | "memory" | "skills"
   | "browser" | "folder"
-  | "voice" | "blurb" | "team" | "chiefteams" | "mcp" | "tools" | "webhooks" | "visibility" | "slack"
+  | "notifications" | "blurb" | "team" | "chiefteams" | "mcp" | "tools" | "webhooks" | "visibility" | "slack"
   | "overview" | "prompt" | "history";
 
 export interface PageMeta {
@@ -37,7 +37,7 @@ export const PAGES: Record<PageId, PageMeta> = {
   skills: { title: "botSettings.simple.skills", home: "library", where: "botPanel.where.skills", keywords: "skills import command learned procedures organization library teach" },
   browser: { title: "place.browser", home: "computer", where: "computer.tab.computer", keywords: "browser logins sign in record steps profile sign out" },
   folder: { title: "computer.files.folder", home: "computer", where: "computer.tab.computer", keywords: "working folder directory cwd files" },
-  voice: { title: "botPanel.page.voice", home: "settings", where: "botPanel.where.profile", keywords: "voice speak read aloud elevenlabs fish chatterbox grok voice notes alerts notifications" },
+  notifications: { title: "notifications.title", home: "settings", where: "botPanel.where.profile", keywords: "alerts notifications" },
   blurb: { title: "botPanel.page.blurb", home: "settings", where: "botPanel.where.profile", keywords: "blurb description what it does" },
   team: { title: "botPanel.page.team", home: "settings", where: "botPanel.where.teamwork", keywords: "team move to team section" },
   chiefteams: { title: "botPanel.page.chiefTeams", home: "settings", where: "botPanel.where.teamwork", keywords: "chief of staff additional teams coordinate" },
@@ -71,7 +71,7 @@ const SECTION_TARGET: Record<BotSettingsSection, PanelTarget> = {
   access: { tab: "computer" },
   model: { tab: "details", page: "model" },
   permissions: { tab: "details", page: "approvals" },
-  voice: { tab: "settings", page: "voice" },
+  notifications: { tab: "settings", page: "notifications" },
   visibility: { tab: "settings", page: "visibility" },
   history: { tab: "settings", page: "history" },
   usage: { tab: "settings", anchor: "activity" },

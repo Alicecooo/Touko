@@ -14,8 +14,6 @@ import {
 const MAPPINGS: Array<[CredentialTargetId, CredentialConfig]> = [
   ["xaiApiKey", { xai: { key: "secret" } }],
   ["opencodeGoApiKey", { opencodeGo: { apiKey: "secret" } }],
-  ["ttsKey", { tts: { key: "secret" } }],
-  ["fishAudioKey", { tts: { fishKey: "secret" } }],
   ["openaiImageApiKey", { imageGen: { key: "secret" } }],
 ];
 
@@ -37,11 +35,7 @@ describe("credential request allowlist", () => {
   });
 
   it("checks configured state without exposing values", () => {
-    expect(credentialIsConfigured({ tts: { key: "secret" } }, "ttsKey")).toBe(true);
-    expect(credentialIsConfigured({ tts: { key: "" } }, "ttsKey")).toBe(false);
-    expect(credentialIsConfigured({ tts: { fishKey: "secret" } }, "fishAudioKey")).toBe(true);
-    expect(credentialIsConfigured({ tts: { fishKey: "" } }, "fishAudioKey")).toBe(false);
-    expect(Object.keys(CREDENTIAL_TARGETS)).toHaveLength(5);
+    expect(Object.keys(CREDENTIAL_TARGETS)).toHaveLength(3);
   });
 
   // The key becomes OPENCODE_API_KEY, which only OpenCode Zen and Go read: the

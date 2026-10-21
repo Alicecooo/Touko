@@ -13,7 +13,7 @@ vi.mock("@/lib/interface-mode", async (original) => ({
 }));
 vi.mock("./DesktopCapabilities", async (original) => ({
   ...await original<typeof import("./DesktopCapabilities")>(),
-  useDesktopCapabilities: () => ({ capabilities: { dictation: { available: false }, host: { packaged: false, platform: "other" }, localComputer: { available: false } }, ready: true }),
+  useDesktopCapabilities: () => ({ capabilities: { host: { packaged: false, platform: "other" }, localComputer: { available: false } }, ready: true }),
 }));
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }));
 

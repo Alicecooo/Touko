@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { Check, TerminalSquare } from "lucide-react";
 import { MausAvatar } from "@/components/Avatar";
@@ -73,7 +74,7 @@ export function AgentChat({ playing, onCue, onEnded, label }: SceneProps) {
             {ASK}
           </div>
           <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-raised text-[11px] font-semibold text-ink">
-            You
+            {t("sidebar.profile.you")}
           </div>
         </div>
 

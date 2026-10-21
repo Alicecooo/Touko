@@ -93,7 +93,7 @@ export function ExportTranscriptMenu({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        aria-label="Export conversation"
+        aria-label={t("ui.label.exportConversation")}
         aria-haspopup="menu"
         aria-expanded={open}
         className={cn(
@@ -101,7 +101,7 @@ export function ExportTranscriptMenu({
           open ? "text-accent" : "text-ink-secondary hover:text-ink",
           className,
         )}
-        title="Export conversation as Markdown"
+        title={t("ui.label.exportConversationAsMarkdown")}
       >
         <Share size={18} />
       </button>
@@ -109,7 +109,7 @@ export function ExportTranscriptMenu({
       {motion.shown && (
         <div
           role="menu"
-          aria-label="Export options"
+          aria-label={t("ui.label.exportOptions")}
           className={cn("absolute right-0 top-full z-40 mt-1 w-[220px] overflow-hidden rounded-xl border border-hairline/50 bg-card py-1.5 shadow-2xl shadow-black/50", motion.className)} {...motion.exitProps}
         >
           <div className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink-tertiary">

@@ -19,7 +19,7 @@ import { SkillsSection } from "../bot-settings/SkillsSection";
 import { SlackSection } from "../bot-settings/SlackSection";
 import { SoulSection } from "../bot-settings/SoulSection";
 import { VisibilitySection } from "../bot-settings/VisibilitySection";
-import { VoiceSection } from "../bot-settings/VoiceSection";
+import { NotificationsSection } from "../bot-settings/NotificationsSection";
 import type { useBotHistory, useBotOverview } from "../bot-settings/useBotOverview";
 import type { useBotSettingsDerived } from "../bot-settings/useBotSettingsDerived";
 import { BrowserLogins } from "./apps-and-logins";
@@ -249,8 +249,8 @@ export function PageBody({ page, ...context }: PageContext & { page: PageId }): 
       return <BrowserPage bot={bot} derived={derived} />;
     case "folder":
       return <FolderPage bot={bot} derived={derived} />;
-    case "voice":
-      return <VoiceSection bot={bot} derived={derived} />;
+    case "notifications":
+      return <NotificationsSection bot={bot} derived={derived} />;
     case "blurb":
       return (
         <IdentitySection

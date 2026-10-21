@@ -109,12 +109,6 @@ function desktopCapabilities({
     screenPreview.reasonCode =
       hostPlatform === "linux" ? "headless-session" : "unsupported-platform";
   }
-  const dictation = {
-    available: isMac,
-    engine: "none",
-    onDevice: isMac,
-  };
-  dictation.reasonCode = "unsupported-platform";
   const localComputer = {
     available: localAvailable,
     support:
@@ -160,7 +154,6 @@ function desktopCapabilities({
   if (remote) {
     const unavailable = { reasonCode: "remote-server" };
     Object.assign(screenPreview, { available: false, interaction: "none" }, unavailable);
-    Object.assign(dictation, { available: false, engine: "none", onDevice: false }, unavailable);
     Object.assign(localComputer, {
       available: false,
       support: "unsupported",
@@ -193,9 +186,7 @@ function desktopCapabilities({
     windowChrome:
       hostPlatform === "win32" ? "win-caption" : "native",
     screenPreview,
-    dictation,
-    localComputer,
-  };
+    localComputer};
 }
 
 function connectionEnabled(platform, connection) {

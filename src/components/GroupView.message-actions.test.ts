@@ -16,7 +16,7 @@ vi.mock("@/state/store", async (importOriginal) => {
 });
 vi.mock("./DesktopCapabilities", async (importOriginal) => ({
   ...await importOriginal<typeof import("./DesktopCapabilities")>(),
-  useDesktopCapabilities: () => ({ capabilities: { dictation: { available: false }, host: { packaged: true, platform: "other" }, localComputer: { available: false, reasonCode: "x", message: "" } }, ready: true }),
+  useDesktopCapabilities: () => ({ capabilities: { host: { packaged: true, platform: "other" }, localComputer: { available: false, reasonCode: "x", message: "" } }, ready: true }),
   useCaptionChrome: () => ({}),
 }));
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }));
@@ -24,7 +24,7 @@ vi.mock("@/lib/analytics", () => ({ track: vi.fn() }));
 const { Transcript } = await import("./GroupView");
 const { MessageBoundary } = await import("./ChatView");
 
-const lead = { id: "lead", name: "Lead", color: "blue", voice: "verse" } as Bot;
+const lead = { id: "lead", threadId: "lead-thread", name: "Lead", title: "", description: "", notifications: true, color: "blue" } as Bot;
 const room = {
   id: "room", threadId: "room-thread", name: "Launch", memberIds: ["lead"],
   defaultResponder: { kind: "member", botId: "lead" }, bulletin: "", unread: false,
@@ -72,20 +72,6 @@ describe("room message actions", () => {
     expect(html).toContain('aria-haspopup="menu"');
     expect(html).not.toContain("Show raw markdown");
     expect(html).not.toContain("Pin message");
-  });
-
-  it("puts read aloud, raw markdown and pin in a room reply's more menu", () => {
-    vi.unstubAllGlobals();
-    const messages = [text("a", "bot", "The build is green")];
-    flushSync(() => root.render(createElement(Transcript, {
-      group: { ...room, messages }, members: [lead], locale: "en", messages, transcript: messages, onReply: () => {},
-    })));
-    flushSync(() => host.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!.click());
-    const items = [...host.querySelectorAll<HTMLButtonElement>("[role=menuitem]")];
-    expect(items.map((item) => item.textContent)).toEqual(expect.arrayContaining(["Read this aloud", "Show raw markdown", "Pin message", "Copy message ID"]));
-    const speak = items.find((item) => item.textContent === "Read this aloud");
-    expect(speak?.title).toBe("Add an ElevenLabs key in an agent profile to read messages aloud");
-    expect(speak?.disabled).toBe(true);
   });
 
   it("copies a person's message and folds a long one", () => {

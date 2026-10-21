@@ -173,18 +173,6 @@ export function verificationServerEnvironment(parentEnv: NodeJS.ProcessEnv, data
   if (parentEnv.OMB_TEST_ORG_LIBRARY_KEY) childEnv.OMB_TEST_ORG_LIBRARY_KEY = parentEnv.OMB_TEST_ORG_LIBRARY_KEY;
   // One log line per browser call and preview frame.
   if (parentEnv.OMB_BROWSER_TIMING === "1") childEnv.OMB_BROWSER_TIMING = "1";
-  // A loopback fake only: the key never reaches a real provider.
-  const liveUrl = parentEnv.OMB_OPENAI_LIVE_URL?.trim() ?? "";
-  if (/^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(liveUrl)) {
-    childEnv.OMB_OPENAI_LIVE_URL = liveUrl;
-    if (parentEnv.OMB_OPENAI_LIVE_KEY) childEnv.OMB_OPENAI_LIVE_KEY = parentEnv.OMB_OPENAI_LIVE_KEY;
-  }
-  // Live calls need Pro; without it the fixture refuses a call with 402 needsPro.
-  if (parentEnv.OMB_PRO_PLAN?.trim() === "1") childEnv.OMB_PRO_PLAN = "1";
-  // Arms the one-shot audio-append failure inside the fixture server.
-  if (parentEnv.OMB_TEST_FAIL_AUDIO_APPEND_ONCE) {
-    childEnv.OMB_TEST_FAIL_AUDIO_APPEND_ONCE = parentEnv.OMB_TEST_FAIL_AUDIO_APPEND_ONCE;
-  }
   // The Claude broker's approval deadline fires on a marker file, not after 15 minutes.
   if (parentEnv.OMB_TEST_APPROVAL_CLOCK === "1") childEnv.OMB_TEST_APPROVAL_CLOCK = "1";
   // The stall watchdog fires on a marker file, not after 20 minutes of silence.
@@ -204,7 +192,6 @@ export function verificationServerArgs(childEnv: NodeJS.ProcessEnv): string[] {
   const hook = (file: string) => ["--import", pathToFileURL(join(ROOT, "tests", "support", file)).href];
   return [
     "--experimental-strip-types",
-    ...(childEnv.OMB_TEST_FAIL_AUDIO_APPEND_ONCE === "1" ? hook("voice/reject-first-audio-save.mjs") : []),
     ...(childEnv.OMB_TEST_DESKTOP_OWNER_TOKEN ? hook("environment/desktop-parent-process.mjs") : []),
     ...(childEnv.OMB_TEST_APPROVAL_CLOCK === "1" ? hook("agent/expire-approvals.mjs") : []),
     ...(childEnv.OMB_TEST_STALL_CLOCK === "1" ? hook("runtime/expire-stalled-turns.mjs") : []),

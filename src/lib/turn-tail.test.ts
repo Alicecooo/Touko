@@ -33,7 +33,7 @@ describe("awaitedMemberId", () => {
   const waitChip = msg({
     kind: "activity",
     from: { botId: "b", name: "B", color: "blue" },
-    tool: { name: "B is finishing another conversation — will reply here when free", spoken: "B is finishing another conversation" },
+    tool: { name: "B is finishing another conversation — will reply here when free" },
   });
 
   it("names the member whose wait chip is the newest thing in a working room with no speaker", () => {

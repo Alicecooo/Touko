@@ -17,7 +17,7 @@ vi.mock("@/state/store", async (importOriginal) => {
 });
 vi.mock("./DesktopCapabilities", async (importOriginal) => ({
   ...await importOriginal<typeof import("./DesktopCapabilities")>(),
-  useDesktopCapabilities: () => ({ capabilities: { dictation: { available: false } }, ready: true }),
+  useDesktopCapabilities: () => ({ capabilities: {  }, ready: true }),
 }));
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }));
 

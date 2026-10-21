@@ -42,7 +42,6 @@ import { acquireDataDirLease } from "./data-dir-lease.mjs";
 import { switchLocalEnvironment } from "./environment-switch.mjs";
 import { createManagedDesktopClient, createManagedDesktopRelay, createManagedDesktopStore } from "./managed-desktop.mjs";
 import { DESKTOP_PORTS, jsonFile, registerDesktopPrefs } from "./desktop-prefs.mjs";
-import { createProPlanRelay } from "./pro-plan.mjs";
 import { createOrgLibrary } from "./org-library.mjs";
 import { createCompanyBackups } from "./company-backups.mjs";
 import { createCompanyBackupSchedule } from "./company-backup-schedule.mjs";
@@ -263,7 +262,6 @@ let companyBackupClientStateRequest = null;
 let companyRestoreCommitting = false;
 let companyBackupConfigurationRevision = 0;
 const managedDesktopRelay = createManagedDesktopRelay();
-const proPlanRelay = createProPlanRelay();
 const utilityServerExits = new WeakMap();
 const UTILITY_SERVER_STOP_TIMEOUT_MS = 6_500;
 const trustedApprovalMode = createTrustedApprovalModeCoordinator({ randomId: randomUUID });
@@ -806,7 +804,6 @@ async function startServerOn(port, dataDir = runningDataDir ?? startupEnvironmen
       : {}),
     OMB_CREDENTIAL_STORE: credentialStoreUnavailable ? "unavailable" : "ok",
     ...workspaceCredentialEnv(secureCredentials),
-    ...proPlanRelay.environment(),
   });
   delete childEnv.OMB_BROWSER_CONNECTION;
   delete childEnv.OMB_SERVER_COMPILE_CACHE;
@@ -1122,7 +1119,7 @@ ipcMain.on("desktop:unread-count", (event, value) => {
   applyUnreadBadge(sender);
 });
 
-const { LOCAL_ID, activeEnvironment, activeRemote, allowedOrigins, bootEnvironmentDir, parseEnvironments, parseHostedWorkspaceLink, serializeEnvironments, startupEnvironmentDir, withActive, withEnvironment, withEnvironmentLook, withLocalEnvironment, withMicrophone, withoutEnvironment, serverMenuLabels, workspaceMenuTemplate, workspaceNavigationAllowed, workspaceSenderAllowed, workspaceSummary, workspaceWindowTitle } = environmentsModule;
+const { LOCAL_ID, activeEnvironment, activeRemote, allowedOrigins, bootEnvironmentDir, parseEnvironments, parseHostedWorkspaceLink, serializeEnvironments, startupEnvironmentDir, withActive, withEnvironment, withEnvironmentLook, withLocalEnvironment, withoutEnvironment, serverMenuLabels, workspaceMenuTemplate, workspaceNavigationAllowed, workspaceSenderAllowed, workspaceSummary, workspaceWindowTitle } = environmentsModule;
 let environmentsState = { environments: [], activeId: LOCAL_ID };
 
 
@@ -1448,38 +1445,6 @@ async function connectHostedWorkspace(input, name) {
   return true;
 }
 
-
-
-
-
-
-
-// Per-server microphone consent; "Don't Allow" holds until quit or forget, so a page cannot keep re-asking.
-const remoteMicrophoneAsks = new Map();
-const remoteMicrophoneRefused = new Set();
-function askRemoteMicrophone(origin) {
-  const env = activeEnvironment(environmentsState);
-  if (!env || env.origin !== origin || env.microphone === true || remoteMicrophoneRefused.has(origin)) return null;
-  if (!remoteMicrophoneAsks.has(origin)) {
-    const ask = (async () => {
-      const options = {
-        type: "question",
-        buttons: ["Allow", "Don’t Allow"],
-        defaultId: 1,
-        cancelId: 1,
-        message: `Allow “${env.name}” to use the microphone?`,
-        detail: `${new URL(origin).host} wants to hear you for a Live call. Allow only a server you trust; this app remembers your answer for this server until you forget it.`,
-      };
-      const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
-      const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
-      if (response !== 0) return void remoteMicrophoneRefused.add(origin);
-      if (environmentsState.environments.some((e) => e.id === env.id && e.origin === origin)) persistEnvironments(withMicrophone(environmentsState, env.id));
-    })().finally(() => remoteMicrophoneAsks.delete(origin));
-    remoteMicrophoneAsks.set(origin, ask);
-  }
-  return remoteMicrophoneAsks.get(origin);
-}
-
 async function forgetEnvironment(id, purge = false) {
   const env = environmentsState.environments.find((e) => e.id === id);
   if (!env) return;
@@ -1496,7 +1461,6 @@ async function forgetEnvironment(id, purge = false) {
     if (response !== 0) return;
   }
   undefined.forget(env);
-  remoteMicrophoneRefused.delete(env.origin);
   const wasActive = environmentsState.activeId === id;
   if (purge === true && env.kind === "local") {
     // Never rm -rf "This computer"'s dir; the entry stays until the delete has actually happened.
@@ -1941,14 +1905,6 @@ ipcMain.handle("desktop-viewer:state-now", localOnly("desktop-viewer:state-now",
 // No Screen Recording request path: on macOS 15+ preflight caches per process, a helper is TCC-attributed
 // to itself on macOS 26, and Sequoia re-prompts anyway. The first real in-process capture prompts correctly.
 let appPermissions = null;
-ipcMain.handle("perm:status", (event) => ({
-  mic:
-    "unsupported",
-  pageMic: appPermissions?.pageMicrophone(event) ?? "refused",
-}));
-ipcMain.handle("perm:request-mic", localOnly("perm:request-mic", async () => {
-return false;
-}));
 
 // macOS never re-prompts a denied permission; System Settings is the only path.
 ipcMain.handle("perm:open-settings", localOnly("perm:open-settings", (_event, pane) => {
@@ -2479,8 +2435,6 @@ app.whenReady().then(async () => {
     
     
     activeRemoteOrigin: () => activeEnvironment(environmentsState)?.origin ?? null,
-    activeRemoteMicrophone: () => activeEnvironment(environmentsState)?.microphone === true,
-    askRemoteMicrophone,
   });
   session.defaultSession.setPermissionRequestHandler(appPermissions.request);
   session.defaultSession.setPermissionCheckHandler(appPermissions.check);

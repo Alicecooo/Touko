@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
-import { flushSync } from "react-dom";
-import type { BotVisibility, CardAnswerer, CloudBackend, ConnectorToolGrant, EffortLevel, InstalledPackageMetadata, LiveCallState, ServerFrame, GroupThreadUsage, SteerQueueReason, WireGroup, OptionCardData as WireOptionCard } from "../../shared/wire";
+
+import type { BotVisibility, CardAnswerer, CloudBackend, ConnectorToolGrant, EffortLevel, InstalledPackageMetadata, ServerFrame, GroupThreadUsage, SteerQueueReason, WireGroup, OptionCardData as WireOptionCard } from "../../shared/wire";
 import { movesThreadToTop } from "../../shared/wire";
 import { DATA_ROUTES, type DataSheet, type DataTable } from "../../shared/data-surface";
 import type { NotificationLogEntry } from "../../shared/notification";
@@ -33,12 +33,10 @@ import { firstUnreadMessageId, threadOpensUnread, threadReadCursor } from "@/lib
 import type { ComputerStart } from "@/lib/computer-start";
 import { parseComputerHelp } from "@/lib/computer-control";
 import { answerResponse, dismissResponse } from "@/lib/card-answer";
-import { currentCall } from "@/lib/call";
 import { readLastConversation, rememberConversation } from "@/lib/last-conversation";
 import { readLastBotSection, rememberBotSection } from "@/lib/last-bot-section";
 import { showNotification } from "@/lib/notify";
 import { useShowThreads } from "@/lib/thread-preferences";
-import { speaker } from "@/lib/tts";
 import { roleProfilePatch, type BotRole } from "@/lib/bot-roles";
 import { t } from "@/lib/i18n";
 import { createBotPatchQueue, type BotUpdatePatch } from "./bot-patch-queue";
@@ -132,7 +130,7 @@ export type ComputerControlState = { held: boolean; helpReason: string | null; h
 export interface Message extends Pick<import("../../shared/wire").WireMessage, "widget" | "routedBy" | "quickModel"> {
   id: string;
   role: "bot" | "user";
-  kind: "text" | "options" | "activity" | "screen" | "connector" | "secret" | "signin" | "routine.run" | "goal.run" | "digest" | "compaction" | "call" | "widget";
+  kind: "text" | "options" | "activity" | "screen" | "connector" | "secret" | "signin" | "routine.run" | "goal.run" | "digest" | "compaction" | "widget";
   text?: string;
   digest?: TurnDigest;
   compaction?: import("../../shared/wire").WireMessage["compaction"];
@@ -143,12 +141,10 @@ export interface Message extends Pick<import("../../shared/wire").WireMessage, "
   signIn?: import("../../shared/wire").SignInRequestCardData;
   routineRun?: RoutineRunCardData;
   goalRun?: GroupGoalRunCardData;
-  call?: import("../../shared/wire").LiveCallRecord;
   channelMode?: "chat" | "goal";
-  tool?: { name: string; ok?: boolean; spoken?: string; setup?: boolean; claudeUpdate?: boolean; place?: PlaceRow; summary?: string; input?: string; output?: string ; itemId?: string; outputPath?: string; fullResult?: boolean };
+  tool?: { name: string; ok?: boolean; setup?: boolean; claudeUpdate?: boolean; place?: PlaceRow; summary?: string; input?: string; output?: string ; itemId?: string; outputPath?: string; fullResult?: boolean };
   steered?: boolean;
-  via?: "api" | "call";
-  callId?: string;
+  via?: "api";
   requestMessageId?: string;
   turnId?: string;
   turnTerminal?: boolean;
@@ -314,10 +310,7 @@ export interface Bot {
   autoApprove?: boolean;
   approvalMode?: ApprovalMode;
   alwaysAllow?: string[];
-  speakReplies?: boolean;
   replyStyle?: import("../../shared/wire").WireBot["replyStyle"];
-  voice?: string;
-  voiceNotes?: boolean;
   memoryEnabled?: boolean;
   pinned?: boolean;
   hidden?: boolean;
@@ -432,7 +425,7 @@ export type { BrowserEngineSummary, BrowserProfile, ConfigStatus, ManagedPolicyS
 // A section left out here is wiped from state.config whenever a config frame lands.
 export type ConfigStatusFrame = Pick<
   ConfigStatus,
-  "xai" | "mistral" | "cerebras" | "groq" | "meta" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "fleet" | "composio" | "box" | "vps" | "rooms" | "mcp" | "threads" | "automaticRecovery" | "cacheKeepWarm" | "localVm" | "opencodeGo" | "tts" | "decider" | "imageGen" | "live" | "profile" | "language" | "features" | "onboarding" | "browserEngine" | "browserProfiles" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
+  "xai" | "mistral" | "cerebras" | "groq" | "meta" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "fleet" | "composio" | "box" | "vps" | "rooms" | "mcp" | "threads" | "automaticRecovery" | "cacheKeepWarm" | "localVm" | "opencodeGo" | "decider" | "imageGen" | "profile" | "language" | "features" | "onboarding" | "browserEngine" | "browserProfiles" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
 >;
 
 export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
@@ -457,10 +450,8 @@ export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
     cacheKeepWarm: frame.cacheKeepWarm,
     localVm: frame.localVm,
     opencodeGo: frame.opencodeGo,
-    tts: frame.tts,
     decider: frame.decider,
     imageGen: frame.imageGen,
-    live: frame.live,
     profile: frame.profile,
     language: frame.language,
     features: frame.features,
@@ -471,8 +462,7 @@ export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
     budgets: frame.budgets,
     billing: frame.billing,
     managedPolicy: frame.managedPolicy,
-    ...(frame.cloudHome ? { cloudHome: true } : {}),
-  };
+    ...(frame.cloudHome ? { cloudHome: true } : {})};
 }
 
 export interface EngineInstall {
@@ -572,7 +562,7 @@ export type BotSettingsSection =
   | "access"
   | "model"
   | "permissions"
-  | "voice"
+  | "notifications"
   | "visibility"
   | "history"
   | "usage";
@@ -593,9 +583,6 @@ export interface AppState {
   instances: InstanceInfo[];
   modelVariantSessions: Record<string, ModelVariantSession>;
   config: ConfigStatus | null;
-  liveCall: LiveCallState | null;
-  liveCallVersion: number;
-  liveCallLookupSeq: number;
   selectedId: string;
   activeView: "chat" | "team-map" | "routines" | "files";
   /** Folders a finished move left on this computer, for Files to offer sharing. */
@@ -789,8 +776,6 @@ export type Action =
  | { type: "setGroupHold"; groupId: string; botId: string; held: boolean }
  | { type: "instances"; instances: InstanceInfo[] }
  | { type: "configStatus"; config: ConfigStatus }
- | { type: "liveCall"; call: LiveCallState | null }
- | { type: "liveCallLookup"; call: LiveCallState | null; since: number; seq: number }
  | { type: "profileSaved"; profile: Partial<NonNullable<ConfigStatus["profile"]>> }
  | { type: "select"; id: string }
  | {
@@ -1163,12 +1148,6 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, instances: action.instances };
     case "configStatus":
       return { ...state, config: action.config };
-    case "liveCall":
-      return { ...state, liveCall: action.call, liveCallVersion: state.liveCallVersion + 1 };
-    case "liveCallLookup":
-      return action.since === state.liveCallVersion && action.seq > state.liveCallLookupSeq
-        ? { ...state, liveCall: action.call, liveCallLookupSeq: action.seq }
-        : state;
     case "profileSaved":
       return state.config ? {
         ...state,
@@ -1995,9 +1974,6 @@ export const initialState: AppState = {
   sections: [],
   instances: [],
   config: null,
-  liveCall: null,
-  liveCallVersion: 0,
-  liveCallLookupSeq: 0,
   selectedId: "",
   activeView: "chat",
   routines: [],
@@ -2046,27 +2022,7 @@ export const initialState: AppState = {
   revealThread: null,
   mascotMotion: null,
   pendingQueued: {},
-  consumedQueueIds: {},
-};
-
-/** A missing `call` key is malformed, never "the line is free". */
-export function liveCallFromFrame(frame: unknown): { call: LiveCallState | null } | null {
-  if (!frame || typeof frame !== "object" || !Object.prototype.hasOwnProperty.call(frame, "call")) return null;
-  const call: unknown = Reflect.get(frame, "call");
-  if (call === null) return { call: null };
-  if (!call || typeof call !== "object") return null;
-  const record = call as Record<string, unknown>;
-  if (typeof record.callId !== "string" || typeof record.botId !== "string" || typeof record.threadId !== "string" || typeof record.status !== "string") {
-    return null;
-  }
-  return { call: call as LiveCallState };
-}
-
-let liveCallLookups = 0;
-export function nextLiveCallLookup(): number {
-  liveCallLookups += 1;
-  return liveCallLookups;
-}
+  consumedQueueIds: {}};
 
 export class ApiError extends Error {
   readonly status: number;
@@ -3258,14 +3214,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       for (const key of keys) refreshState(key).version += 1;
     };
     const loadAll = async (): Promise<boolean> => {
-      const since = stateRef.current.liveCallVersion;
-      const seq = nextLiveCallLookup();
-      void api<unknown>("/api/live/call")
-        .then((body) => {
-          const answer = liveCallFromFrame(body);
-          if (alive && answer) flushSync(() => rawDispatch({ type: "liveCallLookup", call: answer.call, since, seq }));
-        })
-        .catch(() => {});
       const chat = () =>
         api(`/api/bots?messages=${MESSAGE_PAGE_SIZE}`).then(({ bots, groups, sections, computerControl, botQueuedMessages }) => {
           if (!alive) return;
@@ -3345,18 +3293,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               threadId: frame.threadId,
               queueId: frame.message.queueId,
             });
-          }
-          if (frame.message?.role === "bot" && frame.message?.kind === "text") {
-            const owner = stateRef.current.bots.find((b) => b.threadId === frame.threadId || b.tasks?.some((task) => task.threadId === frame.threadId));
-            const live = stateRef.current.liveCall;
-            const onLiveCall = Boolean(live && live.status !== "ended" && live.botId === owner?.id);
-            if (owner?.speakReplies && currentCall() === null && !onLiveCall && frame.message.text?.trim()) {
-              void speaker.speak(frame.message.text, {
-                botId: owner.id,
-                messageId: frame.message.id,
-                voiceId: owner.voice,
-              });
-            }
           }
           break;
         }
@@ -3453,12 +3389,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           botPatchQueue.cancel(frame.botId);
           rawDispatch({ type: "deleteBot", botId: frame.botId });
           break;
-        case "live.call": {
-          const framed = liveCallFromFrame(frame);
-          // Rendered at once: the next bot frame decides auto-speak from stateRef.
-          if (framed) flushSync(() => rawDispatch({ type: "liveCall", call: framed.call }));
-          break;
-        }
         case "config":
           rawDispatch({
             type: "configStatus",

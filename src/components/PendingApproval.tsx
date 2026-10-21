@@ -56,28 +56,6 @@ export function pendingApprovals(messages: Message[]): Pending[] {
     }));
 }
 
-export function spokenApprovalPrompt(pending: Pending, requester: string): string {
-  if (pending.message.card?.teamSetupRequest) return `${requester}: ${pending.message.card.title} Review the details and choose ${pending.message.card.options[0]} or ${pending.message.card.options[1] ?? "Cancel"}.`;
-  const isSkillRequest = isSkillApproval(pending);
-  const isProfileRequest = isProfileApproval(pending);
-  if (isSkillRequest) {
-    const updating = pending.message.card?.skillRequest?.action === "update";
-    const title = pending.message.card?.title.trim() || t(
-      updating ? "approval.voice.defaultUpdateSkill" : "approval.voice.defaultEnableSkill",
-    );
-    return t("approval.voice.skill", {
-      requester,
-      title: `${title}${/[.!?]$/.test(title) ? "" : "."}`,
-      action: t(updating ? "approval.voice.actionUpdate" : "approval.voice.actionEnable"),
-    });
-  }
-  if (isProfileRequest) {
-    const title = pending.message.card?.title.trim() || t("approval.voice.defaultUpdateProfile");
-    return t("approval.voice.profile", { requester, title });
-  }
-  return t("approval.voice.command", { requester, tool: toolLabel(pending.tool), detail: pending.detail });
-}
-
 function label(pending: Pending): string {
   if (pending.message.card?.teamSetupRequest) return pending.message.card.title;
   if (isSkillApproval(pending)) {

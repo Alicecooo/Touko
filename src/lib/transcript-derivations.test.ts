@@ -69,19 +69,6 @@ describe("transcriptLookups", () => {
     expect(transcriptLookups([digest], [digest]).retryableId).toBeUndefined();
   });
 
-  it("keeps Retry on the last conversational row when a live call's record follows it", () => {
-    const record = msg("call", {
-      kind: "call",
-      text: "Call with Ada · 1:42",
-      at: 37,
-      parentId: "k",
-      call: { callId: "c1", botId: "ada", client: "ios", startedAt: 0, endedAt: 37, seconds: 102, endReason: "hung-up" },
-    });
-    expect(transcriptLookups([...all, record], [...branch, record]).retryableId).toBe("o");
-    expect(transcriptLookups([root, record, digest], [root, record, digest]).retryableId).toBe("root");
-    expect(transcriptLookups([root, digest, record], [root, digest, record]).retryableId).toBe("root");
-    expect(transcriptLookups([record], [record]).retryableId).toBeUndefined();
-  });
 });
 
 describe("formatTime", () => {

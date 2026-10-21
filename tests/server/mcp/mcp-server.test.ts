@@ -171,7 +171,7 @@ describe("MCP tool execution", () => {
       if (path === "/api/threads/task-1/messages?limit=200") return {
         messages: [{
           id: "m1", at: 123, role: "bot", kind: "screen", png: "base64-pixels",
-          tool: { name: "Browser", ok: false, spoken: "browser failed", setup: true, raw: "drop" },
+          tool: { name: "Browser", ok: false, setup: true, raw: "drop" },
           card: { title: "Run command?", requestId: "secret-request", allowKey: "Bash:git", answered: false },
         }],
         hasMore: true,
@@ -181,7 +181,7 @@ describe("MCP tool execution", () => {
     const result: any = await handleToolCall("get_bot_messages", { bot_id: "bot-1", limit: 200 }, fetcher);
     expect(result.messages[0]).toMatchObject({
       id: "m1", at: 123, hasImage: true,
-      tool: { name: "Browser", ok: false, spoken: "browser failed", setup: true },
+      tool: { name: "Browser", ok: false, setup: true },
     });
     expect(result.messages[0]).not.toHaveProperty("png");
     expect(result.messages[0].card).not.toHaveProperty("allowKey");

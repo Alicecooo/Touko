@@ -1,9 +1,7 @@
-import { Code, Copy, Eye, Pencil, Pin, PinOff, RefreshCw, Square, Volume2 } from "lucide-react";
+import { Code, Copy, Eye, Pencil, Pin, PinOff, RefreshCw } from "lucide-react";
 import { copyText } from "@/lib/copy-text";
 import { t } from "@/lib/i18n";
-import type { ConfigStatus } from "@/state/store";
 import { ACTION_ICON, type MessageMenuItem } from "@/components/MessageActions";
-import { useSpeakAction } from "@/components/SpeakButton";
 
 export type PinAction = { pinned: boolean; onToggle: () => void; hint?: string };
 
@@ -24,41 +22,20 @@ function idItem(messageId: string): MessageMenuItem {
 
 export function useBotMessageMenu({
   text,
-  botId,
   messageId,
-  voiceId,
-  tts,
-  localVoice,
-  canSpeak,
   viewRaw,
   onToggleRaw,
   onRegenerate,
   pin,
 }: {
   text: string;
-  botId?: string;
   messageId: string;
-  voiceId?: string;
-  tts: ConfigStatus["tts"];
-  localVoice: boolean;
-  canSpeak: boolean;
   viewRaw: boolean;
   onToggleRaw: () => void;
   onRegenerate?: () => void;
   pin?: PinAction;
 }): MessageMenuItem[] {
-  const speak = useSpeakAction({ text, botId, messageId, voiceId, tts, localVoice });
   const items: MessageMenuItem[] = [];
-  if (canSpeak && text) {
-    items.push({
-      key: "speak",
-      icon: speak.mine ? <Square {...ACTION_ICON} /> : <Volume2 {...ACTION_ICON} />,
-      label: speak.mine ? t("chat.speak.stop") : t("chat.speak.read"),
-      title: speak.label,
-      disabled: !speak.ready,
-      onSelect: speak.toggle,
-    });
-  }
   if (text) {
     items.push({
       key: "raw",

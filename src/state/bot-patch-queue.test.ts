@@ -209,8 +209,6 @@ describe("bot patch queue", () => {
         title: "Updated title",
         description: "Updated description",
         notifications: false,
-        voice: "voice-2",
-        speakReplies: true,
       },
       bot(),
     );
@@ -222,22 +220,20 @@ describe("bot patch queue", () => {
     await Promise.resolve();
     expect(authoritative).toHaveBeenLastCalledWith(
       expect.objectContaining({ name: "First" }),
-      expect.objectContaining({ name: "Second", voice: "voice-2", speakReplies: true }),
+      expect.objectContaining({ name: "Second" }),
     );
     expect(sent[1]).toMatchObject({
       name: "Second",
       title: "Updated title",
       description: "Updated description",
       notifications: false,
-      voice: "voice-2",
-      speakReplies: true,
     });
 
-    second.resolve(bot({ name: "Second", voice: "voice-2", speakReplies: true }));
+    second.resolve(bot({ name: "Second" }));
     await vi.runAllTicks();
     await queue.flush("bot-1");
     expect(authoritative).toHaveBeenLastCalledWith(
-      expect.objectContaining({ name: "Second", voice: "voice-2", speakReplies: true }),
+      expect.objectContaining({ name: "Second" }),
       {},
     );
   });

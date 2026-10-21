@@ -179,11 +179,11 @@ export function Terminal({ playing, onCue, onEnded, label }: SceneProps) {
             <div className="absolute left-1/2 top-[6px] w-[196px] -translate-x-1/2 rounded-xl border border-hairline/50 bg-panel px-4 py-2.5 shadow-[0_18px_40px_-16px_rgba(0,0,0,0.7)]">
               <div className="flex flex-col items-center">
                 <MausAvatar color="green" state="happy" size={24} animated={!still} trackPointer={false} />
-                <div className="mt-1 text-[10px] font-semibold text-ink">Welcome to Touko</div>
+                <div className="mt-1 text-[10px] font-semibold text-ink">{t("ui.label.welcomeToTouko")}</div>
                 <div className="mt-0.5 h-1 w-24 rounded bg-ink-secondary/40" />
-                <div className="mt-2 flex h-[18px] w-full items-center rounded-md border border-hairline/40 bg-inset px-2 text-[8px] text-ink-secondary">Your name</div>
+                <div className="mt-2 flex h-[18px] w-full items-center rounded-md border border-hairline/40 bg-inset px-2 text-[8px] text-ink-secondary">{t("settings.profile.name")}</div>
                 <div className="mt-1 flex h-[18px] w-full items-center rounded-md border border-hairline/40 bg-inset px-2 text-[8px] text-ink-secondary">you@example.com</div>
-                <div className="mt-1 flex h-[18px] w-full items-center justify-center rounded-md bg-accent text-[8.5px] font-medium text-white">Continue</div>
+                <div className="mt-1 flex h-[18px] w-full items-center justify-center rounded-md bg-accent text-[8.5px] font-medium text-white">{t("onboarding.continue")}</div>
               </div>
             </div>
           </div>

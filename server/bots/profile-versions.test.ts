@@ -11,7 +11,7 @@ import {
   recordProfileChange,
 } from "./profile-versions.ts";
 
-const base = { name: "Scout", title: "", description: "", soul: "", notifications: true, speakReplies: false };
+const base = { name: "Scout", title: "", description: "", soul: "", notifications: true };
 
 /** A real bot has its folder before any profile change (writeSoulMirror at creation), so the tests do too. */
 function withBotFolder(id: string): void {
@@ -25,11 +25,11 @@ describe("profileRevision", () => {
     for (const field of ["name", "title", "description", "soul", "cwd"] as const) {
       expect(profileRevision({ ...base, [field]: "x" })).not.toBe(profileRevision(base));
     }
-    for (const field of ["notifications", "speakReplies"] as const) {
+    for (const field of ["notifications"] as const) {
       expect(profileRevision({ ...base, [field]: !base[field] })).not.toBe(profileRevision(base));
     }
     expect(profileSnapshot({ name: "A", title: "B", description: "C", soul: undefined })).toEqual({
-      name: "A", title: "B", description: "C", soul: "", cwd: "", notifications: true, speakReplies: false,
+      name: "A", title: "B", description: "C", soul: "", cwd: "", notifications: true,
     });
   });
 });

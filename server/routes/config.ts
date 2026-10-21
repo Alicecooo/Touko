@@ -18,7 +18,6 @@ import { PROVIDER_KEY_KINDS } from "../model-catalog/provider-key-check.ts";
 import type { SessionRegistry } from "../auth/sessions.ts";
 import { parseSkillMd } from "../skills/skills.ts";
 import type { Store } from "../storage/store.ts";
-import * as tts from "../voice/tts/index.ts";
 import * as vps from "../computers/vps-computer.ts";
 import { PASS, type RouteHandler } from "./table.ts";
 
@@ -34,7 +33,7 @@ export type ModelSelectionCheck = { ok: true; selection: ModelSelection } | { ok
 export type ConfigStatus = Record<string, unknown>;
 
 export interface ConfigRouteDeps {
-  store: Pick<Store, "bots" | "patchBot" | "clearVoiceSelections">;
+  store: Pick<Store, "bots" | "patchBot">;
   cfg: AppConfig;
   registry: Pick<ProviderRegistry, "get" | "forgetSnapshots">;
   sessions: Pick<SessionRegistry, "revalidateEmailSessions">;
@@ -118,12 +117,6 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
         const planned = deciderSavePatch(patch.decider, cfg.decider, { included: deciderIncludedHere(), shared: deciderSharedKeyUsable(cfg) });
         if (!planned.ok) return json(res, 400, { error: planned.error });
         patch.decider = planned.patch;
-      }
-      const changingVoiceProvider = patch.tts?.provider !== undefined
-        && patch.tts.provider !== tts.voiceProvider(cfg);
-      if (changingVoiceProvider && patch.tts?.voice === undefined) {
-        // Voice ids are provider-owned: never carry one from one catalog into another.
-        patch.tts = { ...patch.tts, voice: "" };
       }
       if (providerConfigBusy.get()) return json(res, 409, { error: "provider settings are already being updated" });
       if (patch.browserProfiles !== undefined && body.expectedBrowserProfiles !== undefined) {
@@ -260,21 +253,6 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
           patch.composio = { ...patch.composio, apiKey: "", sessionId: "" };
         }
       }
-      
-      
-      
-      
-      
-      // Validated against each voice provider's own credential, so no service is ever sent another's key.
-      const newTts = patch.tts;
-      if (newTts?.key?.trim()) {
-        const check = await tts.verifyKey("elevenlabs", newTts.key.trim());
-        if (!check.ok) return json(res, 400, { error: check.message });
-      }
-      if (newTts?.fishKey?.trim()) {
-        const check = await tts.verifyKey("fish", newTts.fishKey.trim());
-        if (!check.ok) return json(res, 400, { error: check.message });
-      }
       const deciderKey = patch.decider ? deciderPatchKey(patch.decider, cfg.decider) : null;
       if (deciderKey) {
         const check = await decider.testKey(deciderKey.check);
@@ -342,8 +320,6 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
       const enginesBefore = engineLaunches(providerConfigs());
       const externalSecretStorage = url.searchParams.get("secretStorage") === "external";
       try {
-        // Before the provider commit, so a failed write never leaves a foreign voice id to speak.
-        if (changingVoiceProvider) store.clearVoiceSelections();
         if (externalSecretStorage) {
           // Supplied credentials are already in the OS-encrypted store: tombstone them so no older plaintext survives the merge.
           const persisted = structuredClone(patch);
@@ -351,13 +327,10 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
           if (persisted.composio?.apiKey !== undefined) persisted.composio.apiKey = "";
           
           if (persisted.opencodeGo?.apiKey !== undefined) persisted.opencodeGo.apiKey = "";
-          if (persisted.tts?.key !== undefined) persisted.tts.key = "";
-          if (persisted.tts?.fishKey !== undefined) persisted.tts.fishKey = "";
           if (persisted.decider?.key !== undefined) persisted.decider.key = "";
           if (persisted.decider?.openrouterKey !== undefined) persisted.decider.openrouterKey = "";
           if (persisted.imageGen?.key !== undefined) persisted.imageGen.key = "";
           if (persisted.imageGen?.customApiKey !== undefined) persisted.imageGen.customApiKey = "";
-          if (persisted.live?.key !== undefined) persisted.live.key = "";
           saveConfig(persisted);
           configWriteCommitted = true;
           syncCredentialEnv(patch);

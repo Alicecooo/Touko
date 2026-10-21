@@ -11,7 +11,6 @@ import type { ModelSelection, RequestOutcome, SteerOutcome } from "../harness/co
 import { parseDataContext, type DataContext } from "../data/context.ts";
 import type { Handoffs } from "../agent/delta-context.ts";
 import type { ProviderRegistry } from "../harness/registry.ts";
-import { spokenLineFields } from "../voice/live-call-record.ts";
 import type { ReplyTarget } from "../agent/replies.ts";
 import type { RequestAuth } from "../auth/request-auth.ts";
 import type { RoutineManager } from "../automation/routines.ts";
@@ -284,9 +283,7 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
           queueId: item.messageId,
           peerAsk: item.peerAsk,
           steered: true,
-          sender: item.sender,
-          ...spokenLineFields(item.via, item.callId),
-        }));
+          sender: item.sender}));
         const asked = messages.filter((_, index) => !held.items[index]?.unattended && !held.items[index]?.peerAsk).at(-1);
         if (asked) store.setTaskAskedAt(bot.id, bot.threadId, asked.at);
         for (const message of messages) handoffs.steered(bot.threadId, steerTarget, instance?.instanceId, message.id);

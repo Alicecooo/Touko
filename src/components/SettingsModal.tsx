@@ -10,10 +10,7 @@ import { AnthropicEveryClaudeBot, ApiKeyRow, OpenCodeProviderKeys, VpsConnection
 import { AnalyticsRow } from "./AnalyticsRow";
 import { OtherOpenAiCompatServers } from "./OpenAiCompatServers";
 import { DecisionModelSettings } from "./DecisionModelSettings";
-import { useUpdaterState } from "@/lib/updater";
-import { brand } from "../lib/brand";
 import { EnginesSettings } from "./EnginesSettings";
-import { LocalComputerSection } from "./LocalComputerSection";
 import { PeopleSection } from "./PeopleSection";
 import { ActivitySection } from "./ActivitySection";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
@@ -186,64 +183,6 @@ function ProfileFields() {
       />
       <AboutMeSettings />
     </div>
-  );
-}
-
-export function UpdatesRow() {
-  const s = useUpdaterState();
-  const updater = window.ogb?.updater;
-  if (!s || !updater) return null;
-  const label =
-    s.status === "checking"
-      ? t("settings.updates.checking")
-      : s.status === "downloading"
-        ? s.percent == null
-          ? t("settings.updates.startingDownload")
-          : t("settings.updates.downloading", { percent: Math.round(s.percent) })
-        : s.status === "preparing"
-          ? t("settings.updates.preparing")
-          : s.status === "downloaded"
-            ? s.installMode === "handoff"
-              ? t("settings.updates.readyInstall", { app: brand().name, version: s.version ?? "" })
-              : t("settings.updates.ready", { app: brand().name, version: s.version ?? "" })
-            : s.status === "installing"
-              ? s.message ||
-                (s.installMode === "handoff"
-                  ? t("settings.updates.openingTerminal")
-                  : t("settings.updates.restarting"))
-              : s.status === "handed-off"
-                ? t("settings.updates.handedOff")
-                : s.status === "error"
-                  ? t("settings.updates.failed", { message: s.message ?? t("settings.updates.unknownError") })
-                  : t("settings.updates.latest");
-  return (
-    <SettingRow title={t("settings.updates.title")} subtitle={label}>
-      <button
-        onClick={() => {
-          if (s.status === "downloaded") return void updater.install();
-          void updater.check();
-        }}
-        disabled={
-          s.status === "checking" || s.status === "downloading" || s.status === "preparing" ||
-          s.status === "installing" || s.retryable === false
-        }
-        className="ui-button"
-      >
-        {s.retryable === false
-          ? t("settings.updates.quitReopen")
-          : s.status === "downloaded"
-            ? s.installMode === "handoff"
-              ? t("settings.updates.install")
-              : t("settings.updates.restart")
-            : s.status === "preparing"
-              ? t("settings.updates.preparingShort")
-              : s.status === "installing"
-                ? s.installMode === "handoff"
-                  ? t("settings.updates.opening")
-                  : t("settings.updates.restartingShort")
-                : t("settings.updates.check")}
-      </button>
-    </SettingRow>
   );
 }
 
@@ -763,7 +702,6 @@ export function SettingsModal() {
             <ThreadCleanupSettings />
 
             {!remoteActive && <ReplayTourRow />}
-            <UpdatesRow />
             
           </>
         );
@@ -843,8 +781,8 @@ export function SettingsModal() {
       case "companion": return <CustomDomainSettings />;
       case "computer":
         return advanced
-          ? <><BuiltInBrowserRow /><BrowserProfilesRow /><LocalComputerSection /></>
-          : <LocalComputerSection />;
+          ? <><BuiltInBrowserRow /><BrowserProfilesRow /></>
+          : null;
       case "logins":
         return <LoginsSettings />;
       case "usage":

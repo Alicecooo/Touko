@@ -15,7 +15,6 @@ vi.mock("./DesktopCapabilities", async (importOriginal) => ({
       host: { platform: "win32", label: "Host", session: "unknown", packaged: true, homeDir: "/Users/me" },
       windowChrome: "native",
       screenPreview: { available: false, interaction: "none" },
-      dictation: { available: false, engine: "none", onDevice: false },
       localComputer: { available: false, support: "unsupported", enabled: false, status: "unavailable" },
     },
   }),

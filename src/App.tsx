@@ -6,20 +6,18 @@ import { useWelcomeViewer, WelcomeGate } from "@/components/onboarding/WelcomeGa
 import { spotlightsQuiet } from "@/lib/onboarding";
 import { FirstConversationTour } from "@/components/onboarding/FirstConversationTour";
 import { GuidedTour } from "@/components/onboarding/GuidedTour";
-import { LiveCallHost } from "@/components/LiveCallHost";
 import { ThreadRefsProvider } from "@/components/ThreadRefs";
 import { initAnalytics } from "@/lib/analytics";
 import { parseComputerHelp } from "@/lib/computer-control";
 import { Sidebar } from "@/components/Sidebar";
 import { ChatView } from "@/components/ChatView";
 import { GroupView } from "@/components/GroupView";
-import { SIDEBAR_AND_PANEL_FIT, SIDEBAR_INLINE, TWO_SIDE_PANELS_FIT, useMediaQuery } from "@/lib/use-media-query";
+import { SIDEBAR_AND_PANEL_FIT, TWO_SIDE_PANELS_FIT, useMediaQuery } from "@/lib/use-media-query";
 import { PluginsPanel, preloadConnectedApps } from "@/components/PluginsPanel";
-import { ActivityPanel, BotSettingsDialog, ComputerPanel, InspectorPanel, LocalVmWorkspace, NewBotDialog, preloadScreens, SettingsModal, TeamMapPage, TriggersPage } from "@/components/lazy-screens";
+import { ActivityPanel, BotSettingsDialog, ComputerPanel, InspectorPanel, NewBotDialog, preloadScreens, SettingsModal, TeamMapPage, TriggersPage } from "@/components/lazy-screens";
 import { WorkspaceBackupRecovery } from "@/components/WorkspaceBackupSettings";
 import { NotificationRail, NotificationsPanel } from "@/components/NotificationsPanel";
 import { useNotificationFeed } from "@/lib/notification-preferences";
-import { UpdateBanner } from "@/components/UpdateBanner";
 import { DesktopCapabilitiesProvider, useCaptionChrome, useDesktopCapabilities, WindowDragStrip } from "@/components/DesktopCapabilities";
 import { WindowCaptionButtons } from "@/components/WindowCaptionButtons";
 import { NoEngines } from "@/components/NoEngines";
@@ -43,7 +41,6 @@ function Shell() {
   const remoteClient = window.ogb?.remoteClient?.active === true;
   const twoSidePanelsFit = useMediaQuery(TWO_SIDE_PANELS_FIT, true);
   const sidebarAndPanelFit = useMediaQuery(SIDEBAR_AND_PANEL_FIT, true);
-  const sidebarInline = useMediaQuery(SIDEBAR_INLINE, false);
 
   useExternalChatLinks(state, dispatch);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -53,8 +50,6 @@ function Shell() {
     setLocale(language || globalThis.navigator?.language);
     setLocaleEpoch((epoch) => epoch + 1);
   }, [language]);
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [localVmWorkspaceBotId, setLocalVmWorkspaceBotId] = useState<string | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const previousViewRef = useRef(state.activeView);
   const calendarOriginRef = useRef<"chat" | "team-map">("chat");
@@ -122,26 +117,6 @@ function Shell() {
     previousViewRef.current = state.activeView;
   }, [state.activeView]);
 
-  useEffect(() => {
-    if (
-      localVmWorkspaceBotId &&
-      (state.activeView !== "chat" || state.selectedId !== localVmWorkspaceBotId)
-    ) {
-      setLocalVmWorkspaceBotId(null);
-    }
-  }, [localVmWorkspaceBotId, state.activeView, state.selectedId]);
-
-  const openLocalVmWorkspace = (botId: string) => {
-    dispatch({ type: "toggleComputer", open: false });
-    setLocalVmWorkspaceBotId(botId);
-  };
-
-  const openComputerFromWorkspace = (botId: string) => {
-    setLocalVmWorkspaceBotId(null);
-    dispatch({ type: "select", id: botId });
-    dispatch({ type: "toggleComputer", open: true });
-  };
-
   const closeCalendar = useCallback(() => {
     if (calendarOriginRef.current === "team-map") {
       dispatch({ type: "showTeamMap" });
@@ -152,16 +127,6 @@ function Shell() {
   const openCalendarRoom = useCallback((id: string) => {
     dispatch({ type: "select", id });
   }, [dispatch]);
-
-  const nativeViewOverlayOpen =
-    drawerOpen ||
-    paletteOpen ||
-    state.settingsOpen ||
-    state.computerOpen ||
-    state.inspectorOpen ||
-    state.activityOpen ||
-    state.appSettingsOpen ||
-    state.pluginsOpen;
 
   useEffect(() => window.ogb?.onOpenAppSettings?.(() => dispatch({ type: "toggleAppSettings", open: true })), [dispatch]);
 
@@ -189,13 +154,12 @@ function Shell() {
 
   return (
     <div className="flex h-full flex-col">
-      <UpdateBanner sidebarIndicator={!calendarFocus && (sidebarInline || drawerOpen)} />
       
       <div className="relative flex min-h-0 flex-1">
       {!calendarFocus && <button
         type="button"
         ref={menuButtonRef}
-        aria-label="Open bot list"
+        aria-label={t("sidebar.openBotList")}
         aria-expanded={drawerOpen}
         onClick={() => setDrawerOpen(true)}
         className="absolute left-3 top-3 z-30 rounded-md p-1.5 text-ink-secondary hover:bg-raised hover:text-ink md:hidden"
@@ -221,13 +185,6 @@ function Shell() {
         <TeamMapPage />
       ) : state.activeView === "routines" ? (
         <TriggersPage onBack={closeCalendar} onOpenRoom={openCalendarRoom} />
-      ) : localVmWorkspaceBotId ? (
-        <LocalVmWorkspace
-          primaryBotId={localVmWorkspaceBotId}
-          overlayOpen={nativeViewOverlayOpen}
-          onClose={() => setLocalVmWorkspaceBotId(null)}
-          onOpenComputer={openComputerFromWorkspace}
-        />
       ) : noEngines ? (
         <NoEngines />
       ) : group ? (
@@ -253,15 +210,7 @@ function Shell() {
       {state.settingsOpen && bot && (
         <BotSettingsDialog key={`settings:${bot.id}`} bot={bot} overlay={(state.inspectorOpen || state.computerOpen || (notificationFeed && state.notificationsOpen)) && !twoSidePanelsFit} />
       )}
-      {state.computerOpen && bot && (
-        (
-          <ComputerPanel
-            key={`computer:${bot.id}`}
-            bot={bot}
-            onOpenVmWorkspace={openLocalVmWorkspace}
-          />
-        )
-      )}
+      {state.computerOpen && bot && <ComputerPanel key={`computer:${bot.id}`} bot={bot} />}
       {state.inspectorOpen && bot && <InspectorPanel key={bot.threadId} bot={bot} />}
       {state.activityOpen && bot && <ActivityPanel key={`activity:${bot.id}`} bot={bot} />}
       {notificationFeed && !calendarFocus && state.notificationsOpen && <NotificationsPanel />}
@@ -272,7 +221,7 @@ function Shell() {
       {state.newBotOpen && <NewBotDialog />}
       
       {/* After the modals: same z-50 tier, so DOM order keeps the palette on top. */}
-      <CommandPalette onOpenChange={setPaletteOpen} />
+      <CommandPalette />
       {/* Blink resolves -webkit-app-region in DOM order, so this no-drag twin after the headers cuts the drawer button back out. */}
       {!calendarFocus && <span
         aria-hidden
@@ -303,7 +252,7 @@ function Application() {
         </ThreadRefsProvider>
         <WelcomeGate viewer={viewer} />
         <GuidedTour />
-        <LiveCallHost />
+        
         <FirstConversationTour quiet={spotlightsQuiet(viewer)} />
       </StoreProvider>
     </DesktopCapabilitiesProvider>

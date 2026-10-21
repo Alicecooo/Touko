@@ -16,10 +16,10 @@ export function nextZoom(current: number, direction: 1 | -1): number {
 }
 
 export const VIEWPORTS: ReadonlyArray<{ label: string; setting: PreviewViewportSetting }> = [
-  { label: "Fill the panel", setting: { mode: "fill" } },
-  { label: "Desktop · 1280×800", setting: { mode: "preset", preset: "desktop" } },
-  { label: "Tablet · 820×1180", setting: { mode: "preset", preset: "tablet" } },
-  { label: "Phone · 390×844", setting: { mode: "preset", preset: "phone" } },
+  { get label() { return t("ui.label.fillThePanel"); }, setting: { mode: "fill" } },
+  { get label() { return t("ui.label.desktop1280800"); }, setting: { mode: "preset", preset: "desktop" } },
+  { get label() { return t("ui.label.tablet8201180"); }, setting: { mode: "preset", preset: "tablet" } },
+  { get label() { return t("ui.label.phone390844"); }, setting: { mode: "preset", preset: "phone" } },
 ];
 
 const sameSetting = (a: PreviewViewportSetting, b: PreviewViewportSetting) =>
@@ -54,7 +54,7 @@ export function MoreMenu({ stream, ready, typing, setting, zoom, pip, onViewport
   const section = (children: ReactNode) => <div className="border-b border-hairline/40 py-1 last:border-b-0">{children}</div>;
   return (
     <details ref={menu} className="relative shrink-0">
-      <summary className="list-none cursor-pointer rounded-md p-1.5 text-ink-secondary hover:bg-inset hover:text-ink [&::-webkit-details-marker]:hidden" aria-label="Browser menu" title="Browser menu"><EllipsisVertical size={16} /></summary>
+      <summary className="list-none cursor-pointer rounded-md p-1.5 text-ink-secondary hover:bg-inset hover:text-ink [&::-webkit-details-marker]:hidden" aria-label={t("browser.panel.menu")} title={t("browser.panel.menu")}><EllipsisVertical size={16} /></summary>
       <div className="absolute right-0 top-full z-40 mt-2 flex w-56 flex-col rounded-xl border border-hairline/50 bg-card p-1 text-[12px] text-ink shadow-xl" role="menu">
         {stream ? section(<>
           <div className="px-3 pb-1 pt-1.5 text-[11px] text-ink-tertiary">{t("ui.browser.pageSize")}</div>
@@ -66,15 +66,15 @@ export function MoreMenu({ stream, ready, typing, setting, zoom, pip, onViewport
           <div className="flex items-center justify-between gap-2 px-3 py-1.5">
             <span>{t("ui.zoom")}</span>
             <span className="flex items-center gap-1">
-              <button type="button" className={small} aria-label="Zoom out" disabled={!ready || zoom <= ZOOM_LEVELS[0]} onClick={() => onZoom(nextZoom(zoom, -1))}><Minus size={12} /></button>
+              <button type="button" className={small} aria-label={t("canvas.zoomOut")} disabled={!ready || zoom <= ZOOM_LEVELS[0]} onClick={() => onZoom(nextZoom(zoom, -1))}><Minus size={12} /></button>
               <span className="min-w-11 text-center tabular-nums text-ink-secondary" aria-live="polite">{Math.round(zoom * 100)}%</span>
-              <button type="button" className={small} aria-label="Zoom in" disabled={!ready || zoom >= ZOOM_LEVELS.at(-1)!} onClick={() => onZoom(nextZoom(zoom, 1))}><Plus size={12} /></button>
-              <button type="button" className={small} aria-label="Reset zoom" disabled={!ready || zoom === 1} onClick={() => onZoom(1)}><RotateCcw size={12} /></button>
+              <button type="button" className={small} aria-label={t("canvas.zoomIn")} disabled={!ready || zoom >= ZOOM_LEVELS.at(-1)!} onClick={() => onZoom(nextZoom(zoom, 1))}><Plus size={12} /></button>
+              <button type="button" className={small} aria-label={t("ui.label.resetZoom")} disabled={!ready || zoom === 1} onClick={() => onZoom(1)}><RotateCcw size={12} /></button>
             </span>
           </div>
         </>) : null}
         {section(<>
-          {stream && pip ? <button type="button" role="menuitem" className={item} onClick={run(onPip)}>{pip.open ? "Close the floating view" : "Pop out (picture in picture)"}</button> : null}
+          {stream && pip ? <button type="button" role="menuitem" className={item} onClick={run(onPip)}>{pip.open ? t("ui.label.closeTheFloatingView") : t("ui.label.popOutPictureInPicture")}</button> : null}
           <button type="button" role="menuitem" className={item} disabled={!typing} onClick={run(onType)}>{t("ui.browser.typeText")}</button>
           <button type="button" role="menuitem" className={item} disabled={!typing} onClick={run(onSecret)}>{t("browser.typeSecret")}</button>
         </>)}

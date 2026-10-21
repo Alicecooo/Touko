@@ -323,10 +323,6 @@ export const CLIENT_ALLOW: ReadonlyArray<{ methods: readonly string[]; path: Reg
   { methods: ["POST"], path: /^\/api\/attachments$/ },
   { methods: ["GET"], path: /^\/api\/attachments\/[\w.-]+$/ },
   { methods: ["POST"], path: /^\/api\/files$/ },
-  // voice: labels and audio, never the key
-  { methods: ["GET"], path: /^\/api\/tts\/voices$/ },
-  { methods: ["POST"], path: /^\/api\/tts\/prepare$/ },
-  { methods: ["POST"], path: /^\/api\/tts\/speak$/ },
   // routines: the input carries no cwd or permission field
   { methods: ["GET"], path: /^\/api\/routines$/ },
   { methods: ["POST"], path: /^\/api\/routines$/ },

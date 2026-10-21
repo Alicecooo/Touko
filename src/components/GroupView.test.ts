@@ -6,7 +6,7 @@ import { StoreProvider, type Group, type Message } from "@/state/store";
 
 // Replaced whole: its context default reads window.ogb at import time.
 vi.mock("./DesktopCapabilities", () => ({
-  useDesktopCapabilities: () => ({ capabilities: { dictation: { available: false } } }),
+  useDesktopCapabilities: () => ({ capabilities: {  } }),
   useCaptionChrome: () => ({}),
 }));
 

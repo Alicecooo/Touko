@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConfigStatus, InstanceInfo } from "@/state/store";
 import {
   APP, CONNECTORS_MODE, DECIDER, EDITION, ENGINE, KEY_PROVIDER, LOCAL_VM_MODE, PLATFORM,
-  TRIAL_CREDIT, VOICE,
+  TRIAL_CREDIT,
 } from "./analytics-allowlist";
 import { buildUsageSnapshot, type SnapshotState, type UsageInput, type UsageSources } from "./usage-snapshot";
 
@@ -46,15 +46,15 @@ const DOCUMENTED = [
   "key_providers", "key_count", "bots_cloud_vps", "bots", "bots_local_vm", "bots_this_computer", "bots_browser", "bots_off", "bots_auto", "rooms", "bot_channels",
   "teams", "routines", "routines_enabled", "routines_cloud", "routines_room_goal", "routines_once", "routines_daily",
   "routines_interval", "routines_cron", "webhooks", "engines", "engine_count", "custom_endpoints", "trial_credit", "apps",
-  "apps_connected", "connectors_mode", "local_vm_mode", "vps_configured", "voice", "voice_included", "decider", "decider_included",
-  "live_calls", "members", "edition",
+  "apps_connected", "connectors_mode", "local_vm_mode", "vps_configured", "decider", "decider_included",
+  "members", "edition",
   "org_managed", "onboarded", "first_turn", "platform", "remote_client",
 ];
 
 const WORDS: Record<string, readonly string[]> = {
   key_providers: KEY_PROVIDER, engines: [...ENGINE, "other"], trial_credit: TRIAL_CREDIT,
   apps: [...APP, "other"], connectors_mode: [...CONNECTORS_MODE, "other"], local_vm_mode: [...LOCAL_VM_MODE, "other"],
-  voice: [...VOICE, "other"], decider: [...DECIDER, "other"], edition: [...EDITION, "other"], platform: PLATFORM,
+  decider: [...DECIDER, "other"], edition: [...EDITION, "other"], platform: PLATFORM,
 };
 
 function expectOnlyCountsFlagsAndWords(props: Record<string, unknown>) {
@@ -84,9 +84,7 @@ function hostileState(): SnapshotState {
       composio: { configured: true, mode: "self-hosted" },
       vps: { configured: true, sshAlias: HOSTILE }, rooms: { turnTimeoutMinutes: 30 }, localVm: { mode: "per-bot", maxInstances: 2 },
       opencodeGo: { configured: true, providerKeys: [HOSTILE] },
-      tts: { configured: true, ready: true, voice: HOSTILE, provider: "fish" },
       decider: { provider: "jev", model: HOSTILE, configured: true, enabled: true, jobs: { roomRouting: true } },
-      live: { configured: true, voice: HOSTILE, readTypedReplies: false, idleMinutes: 5 },
       imageGen: { configured: true, provider: "custom", model: HOSTILE, customUrl: `https://${HOSTILE}.example.com`, customModel: HOSTILE, customKeyConfigured: true },
       profile: { name: HOSTILE, email: `${HOSTILE}@example.com`, aboutMe: HOSTILE },
       language: "ja",
@@ -178,13 +176,13 @@ describe("the daily usage snapshot", () => {
     expect(await snapshot.sendDailySnapshot(hostileState(), hostileSources(), DAY)).toBe(true);
     const [sent] = snapshots();
     expect(sent).toEqual({
-      key_providers: ["anthropic", "openai_compat", "composio", "opencode_go", "fish_audio", "jev", "custom_image", "openai_live"],
-      key_count: 8, bots_cloud_vps: 3, bots: 9, bots_local_vm: 1, bots_this_computer: 1, bots_browser: 1, bots_off: 1, bots_auto: 2,
+      key_providers: ["anthropic", "openai_compat", "composio", "opencode_go", "jev", "custom_image"],
+      key_count: 6, bots_cloud_vps: 3, bots: 9, bots_local_vm: 1, bots_this_computer: 1, bots_browser: 1, bots_off: 1, bots_auto: 2,
       rooms: 2, bot_channels: 1, teams: 2,
       routines: 4, routines_enabled: 3, routines_cloud: 1, routines_room_goal: 1, routines_once: 1, routines_daily: 1, routines_interval: 1, routines_cron: 1,
       webhooks: 1, engines: ["claude", "openai_compat", "other"], engine_count: 4, custom_endpoints: 1, trial_credit: "used_up",
       apps: ["gmail", "other"], apps_connected: 4, connectors_mode: "self_hosted", local_vm_mode: "per_bot", vps_configured: true,
-      voice: "fish", voice_included: false, decider: "jev", decider_included: false, live_calls: true, members: 1, edition: "enterprise", org_managed: true, onboarded: true, first_turn: true,
+      decider: "jev", decider_included: false, members: 1, edition: "enterprise", org_managed: true, onboarded: true, first_turn: true,
       platform: "desktop", remote_client: false,
     });
     expect(Object.keys(sent!).sort()).toEqual([...DOCUMENTED].sort());
@@ -282,14 +280,6 @@ describe("what counts as a key, a computer source and an app", () => {
   it("counts a Composio key only for a self-hosted project, and names the mode either way", () => {
     expect(buildUsageSnapshot(minimal({ composio: { configured: true, mode: "managed" } }))).toMatchObject({ key_providers: [], connectors_mode: "managed" });
     expect(buildUsageSnapshot(minimal({ composio: { configured: true, mode: "self-hosted" } }))).toMatchObject({ key_providers: ["composio"], connectors_mode: "self_hosted" });
-  });
-
-  it("does not count managed voice and decision credentials as user keys", () => {
-    const sent = buildUsageSnapshot(minimal({
-      tts: { configured: true, ready: true, voice: "v", provider: "elevenlabs", included: true },
-      decider: { provider: "jev", configured: true, included: true, enabled: true, jobs: { roomRouting: true } },
-    }));
-    expect(sent).toMatchObject({ key_providers: [], voice: "elevenlabs", voice_included: true, decider: "jev", decider_included: true });
   });
 
   it("omits untrusted app inventories and lists that have not loaded", () => {

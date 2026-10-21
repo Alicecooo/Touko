@@ -17,7 +17,7 @@ const importSpecifiers = (source: string): string[] =>
 
 describe("provider fakes stay self-contained", () => {
   // A subprocess fake starts with a node shebang; in-process helpers may import from the repo.
-  const fakes = ["drivers", "auth", "voice"].flatMap((domain) =>
+  const fakes = ["drivers", "auth"].flatMap((domain) =>
     readdirSync(join(SUPPORT, domain)).filter((file) =>
       /^fake-.*\.ts$/.test(file) && !file.endsWith(".test.ts") && readFileSync(join(SUPPORT, domain, file), "utf8").startsWith("#!"),
     ).map((file) => `${domain}/${file}`),

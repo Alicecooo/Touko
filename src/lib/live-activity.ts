@@ -21,12 +21,6 @@ const FALLBACK_LABELS: Array<[RegExp, LocaleKey]> = [
   [/\b(?:ask_bot|send_message)\b/i, "chat.activity.askTeammate"],
 ];
 
-function sentenceCase(value: string): string {
-  const trimmed = value.trim().replace(/[.\s]+$/, "");
-  if (!trimmed) return t("chat.activity.thinking");
-  return `${trimmed[0].toUpperCase()}${trimmed.slice(1)}`;
-}
-
 export function liveActivityLabel(message?: Message): string {
   return liveActivityPhrases(message).phrases[0];
 }
@@ -80,14 +74,11 @@ export function liveActivityPhrases(message?: Message): LiveActivityPhrases {
   return toolActivityPhrases(message.tool);
 }
 
-export function activityStepLabel(tool: { name: string; spoken?: string }): string {
+export function activityStepLabel(tool: { name: string }): string {
   return toolActivityPhrases(tool).phrases[0];
 }
 
-function toolActivityPhrases(tool: { name: string; spoken?: string }): LiveActivityPhrases {
-  const spoken = tool.spoken?.trim();
-  if (spoken) return { phase: `spoken:${spoken}`, phrases: [sentenceCase(spoken)] };
-
+function toolActivityPhrases(tool: { name: string }): LiveActivityPhrases {
   const toolName = tool.name.replace(/^mcp__[^_]+__/, "").split(":", 1)[0] ?? "";
   for (const [pattern, key] of FALLBACK_LABELS) {
     if (pattern.test(toolName)) return phaseOf(key);

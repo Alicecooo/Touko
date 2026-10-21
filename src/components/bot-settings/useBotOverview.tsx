@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import { api, useStore, type Bot } from "@/state/store";
@@ -169,9 +170,9 @@ export function HistoryRollbackDialog({ history, returnFocusRef }: {
   return (
     <ConfirmDialog
       open={rollbackTarget !== null}
-      title="Restore previous instructions?"
-      body="Replaces current SOUL with the version before this change. Current version stays in History."
-      confirmLabel="Restore instructions"
+      title={t("history.restoreTitle")}
+      body={t("history.restoreHelp")}
+      confirmLabel={t("history.restoreAction")}
       tone="neutral"
       returnFocusRef={returnFocusRef}
       onCancel={() => setRollbackTarget(null)}

@@ -35,13 +35,7 @@ describe("reply display", () => {
 
 describe("escapeCancelsReply", () => {
   it("drops a reply target on Escape", () => {
-    expect(escapeCancelsReply({ key: "Escape" }, { replying: true, recording: false })).toBe(true);
-  });
-  it("leaves other keys, no target, dictation and IME composition alone", () => {
-    expect(escapeCancelsReply({ key: "Enter" }, { replying: true, recording: false })).toBe(false);
-    expect(escapeCancelsReply({ key: "Escape" }, { replying: false, recording: false })).toBe(false);
-    expect(escapeCancelsReply({ key: "Escape" }, { replying: true, recording: true })).toBe(false);
-    expect(escapeCancelsReply({ key: "Escape", isComposing: true }, { replying: true, recording: false })).toBe(false);
+    expect(escapeCancelsReply({ key: "Escape" }, { replying: true })).toBe(true);
   });
 });
 

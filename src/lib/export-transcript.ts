@@ -110,7 +110,7 @@ export function formatTranscriptMarkdown(options: ExportTranscriptOptions): stri
     }
 
     if (includeTools && message.kind === "activity" && message.tool) {
-      const toolLabel = message.tool.spoken || message.tool.name;
+      const toolLabel = message.tool.name;
       const statusIcon = message.tool.ok === false ? "❌" : "🔧";
       messageLines.push(`> ${statusIcon} _Used tool:_ ${inlineCode(toolLabel)}`);
     }

@@ -41,12 +41,6 @@ const __APP_VERSION__: string;
       interaction: "direct" | "portal-picker" | "none";
       reasonCode?: string;
     };
-    dictation: {
-      available: boolean;
-      engine: "apple-speech" | "none";
-      onDevice: boolean;
-      reasonCode?: string;
-    };
     localComputer: {
       available: boolean;
       support: "supported" | "limited" | "unsupported";
@@ -215,30 +209,11 @@ const __APP_VERSION__: string;
       /** Arms one user-initiated display capture request from this frame. */
       beginScreenPreviewIntent(): boolean;
       screenFrame(): Promise<string | null>;
-      /** Start native dictation. Call mode supplies endpointMs so silence
-       * finalizes a turn; composer dictation omits it and remains manual. */
-      speechStart(options?: { endpointMs?: number }): Promise<void>;
-      speechStop(): Promise<void>;
-      /** Finish capture and emit the recognizer's final transcript. */
-      speechFinish?(): Promise<void>;
-      onSpeechTranscript(
-        cb: (line: { partial?: boolean; text?: string; error?: string }) => void,
-      ): () => void;
-      onSpeechEnd(cb: (info: { code: number | null; reason?: string }) => void): () => void;
       /** Absolute path of a dropped File ("" when the drag carried no
        * file on disk). Absent in older builds of the shell. */
       getPathForFile?(file: File): string;
-      /** {mic} TCC status: granted|denied|not-determined|unknown. Screen
-       * status is deliberately absent — macOS 15+ caches it per-process,
-       * so it lies for the whole session after a grant. `pageMic`: whether
-       * this app lets the asking page use the microphone (this computer's
-       * page always; a server's page only on the person's own Cloud).
-       * Absent in older builds of the shell. */
-      permStatus(): Promise<{ mic: string; pageMic?: "allowed" | "refused" }>;
-      /** Triggers the macOS microphone prompt; resolves true when granted. */
-      permRequestMic(): Promise<boolean>;
       /** Opens System Settings on a privacy pane: mic|screen|speech|accessibility. */
-      permOpenSettings(pane: "mic" | "screen" | "speech" | "accessibility"): Promise<void>;
+      permOpenSettings(pane: "screen" | "accessibility"): Promise<void>;
       /** Relaunch the local desktop app through its normal shutdown cleanup. */
       relaunch?(): Promise<boolean>;
       /** Copies an engine install command and opens a blank terminal. False
@@ -311,7 +286,7 @@ const __APP_VERSION__: string;
       revealInFolder?(filePath: string): Promise<"shown" | "missing" | "invalid">;
       /** Save a provider credential through Electron's OS-backed store. */
       setCredential?(
-        name: "composioApiKey" | "xaiApiKey" | "opencodeGoApiKey" | "ttsKey" | "fishAudioKey" | "jevApiKey" | "openrouterDeciderKey" | "openaiImageApiKey" | "customImageApiKey" | "openaiLiveKey",
+        name: "composioApiKey" | "xaiApiKey" | "opencodeGoApiKey" | "jevApiKey" | "openrouterDeciderKey" | "openaiImageApiKey" | "customImageApiKey",
         value: string,
       ): Promise<ConfigStatus>;
       /** In-app auto-update (packaged app only; dormant in dev). Updates

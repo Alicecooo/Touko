@@ -1,6 +1,6 @@
 import { directMessageSent, roomMessageSent } from "@/lib/product-events";
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
-import { ArrowUp, BookOpen, Clock, Mic, Paperclip, Sparkles, Square, Target, Users, X } from "lucide-react";
+import { ArrowUp, BookOpen, Clock, Paperclip, Sparkles, Square, Target, Users, X } from "lucide-react";
 import { useStore, visibleMessages, currentTaskBot, type Bot, type Group, type Message } from "@/state/store";
 import { cn } from "@/lib/cn";
 import { useMenuMotion } from "./MenuMotion";
@@ -20,11 +20,9 @@ import { ApprovalModeSelector } from "./ApprovalModeSelector";
 import { CommandAllowlistDialog } from "./CommandAllowlistDialog";
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
 import { appendPastedText, handoffAttachmentImagePreview, clipboardHasImages, clipboardImageFiles, composeMessage, dataContextFor, composerShouldRefocus, composerTakesFocusOnOpen, imageAttachmentFromFile, replyTargetTakesFocus, intakeFiles, isLongPaste, optimisticImageAttachment, pasteAttachment, releaseAttachmentImagePreview, type Attachment, type PasteAttachment } from "@/lib/composer-attachments";
-import { MAUS_COLORS, normalizeState } from "@/lib/mascot";
+import { normalizeState } from "@/lib/mascot";
 import { goalCoordinatorForComposer, groupComposerHint, jevRoomRoutingOn, openTaskWorking, roomRespondersForComposer } from "@/lib/group-routing";
 import { PendingApprovalActions, PendingApprovalPanel, pendingApprovals } from "./PendingApproval";
-import { CallButton } from "./CallView";
-import { GroupCallButton } from "./GroupCallView";
 import { ComposerPlusMenu, GoalToggle } from "./ComposerPlusMenu";
 import { useDesktopCapabilities } from "./DesktopCapabilities";
 import { ComposerReplyStrip } from "./ReplyQuote";
@@ -156,8 +154,6 @@ export function Composer({
     },
     [text, editText, editAttachments],
   );
-  const [recording, setRecording] = useState(false);
-  const [speechError, setSpeechError] = useState<string | null>(null);
   const [caret, setCaret] = useState(0);
   const [highlight, setHighlight] = useState(0);
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
@@ -204,7 +200,6 @@ export function Composer({
   }, [replyToId]);
   const mentionListRef = useRef<HTMLDivElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
-  const baseText = useRef("");
 
   const botSupportsImages = (candidate?: Bot) =>
     Boolean(
@@ -616,42 +611,6 @@ export function Composer({
     editAttachments((prev) => [...prev, pasteAttachment(pasted)]);
   };
 
-  useEffect(() => {
-    if (!recording) return;
-    const bridge = window.ogb;
-    if (!bridge) {
-      setRecording(false);
-      return;
-    }
-    setSpeechError(null);
-    const offTranscript = bridge.onSpeechTranscript((line) => {
-      if (typeof line.text === "string") {
-        const base = baseText.current;
-        editText(base ? `${base} ${line.text}` : line.text);
-      }
-    });
-    const offEnd = bridge.onSpeechEnd(({ code, reason }) => {
-      setRecording(false);
-      if (code === 2) {
-        setSpeechError(t("composer.dictation.macOnly"));
-      } else if (code === 1) {
-        setSpeechError(t(
-          reason === "dictation-disabled"
-            ? "composer.dictation.disabled"
-            : reason === "speech-not-authorized"
-              ? "composer.dictation.permission"
-              : "composer.dictation.failed",
-        ));
-      }
-    });
-    void bridge.speechStart();
-    return () => {
-      offTranscript();
-      offEnd();
-      void bridge.speechStop();
-    };
-  }, [recording, editText]);
-
   const toggleGoal = () => {
     markDraftEdited(draftId);
     if (typedGoalText !== null) {
@@ -679,22 +638,9 @@ export function Composer({
     onManageCommandAllowlist: ownerOrAdmin === true ? () => setCommandAllowlistTarget({ botId: modeBot.id, botName: modeBot.name, threadId: modeBot.threadId }) : undefined,
   } : undefined;
 
-  const toggleMic = () => {
-    if (!capabilities.dictation.available || !window.ogb) {
-      setSpeechError(t("composer.dictation.unavailable"));
-      return;
-    }
-    baseText.current = text.trim();
-    setRecording((r) => !r);
-  };
-
   return (
     <div className="pointer-events-none relative px-5 pb-3">
-      {speechError && (
-        <div className="pointer-events-auto mb-2 w-full rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-[12px] text-warning">
-          {speechError}
-        </div>
-      )}
+      
       <div className="pointer-events-auto relative w-full">
         {failedSends.map((failed) => (
           <div
@@ -877,7 +823,6 @@ export function Composer({
                 onAttach={() => fileInput.current?.click()}
                 goal={goal}
                 approval={approvalChoice && modeBot && { name: modeBot.name, choice: approvalChoice }}
-                callBotId={bot && !group ? bot.id : undefined}
               />}
               {advanced && <button
                 type="button"
@@ -960,7 +905,7 @@ export function Composer({
                 return;
               }
             }
-            if (onClearReply && escapeCancelsReply(e.nativeEvent, { replying: Boolean(replyTo), recording })) {
+            if (onClearReply && escapeCancelsReply(e.nativeEvent, { replying: Boolean(replyTo) })) {
               e.preventDefault();
               onClearReply();
               return;
@@ -982,7 +927,6 @@ export function Composer({
               }
               send();
             }
-            if (e.key === "Escape" && recording) setRecording(false);
           }}
           // Not disabled during an upload: a disabled element drops keyboard focus for good. send() refuses while one
           // is pending.
@@ -994,10 +938,7 @@ export function Composer({
               : approval
               ? t("composer.placeholder.approval")
               : attachmentPending
-              ? t("composer.placeholder.attaching")
-              : recording
-              ? t("composer.placeholder.listening")
-              : replyTo && !busy
+              ? t("composer.placeholder.attaching")              : replyTo && !busy
               ? t("composer.placeholder.reply")
               : busy && canSteer
                 ? pendingCount > 0
@@ -1030,23 +971,9 @@ export function Composer({
             <Square size={14} className="fill-current" />
           </button>
         )}
-        {!locked && !busy && !hasContent && capabilities.dictation.available && (
-          <button
-            onClick={toggleMic}
-            aria-label={recording ? t("composer.dictation.stop") : t("composer.dictation.start")}
-            className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-full",
-              recording
-                ? "animate-pulse bg-danger/20 text-danger"
-                : advanced ? "text-ink-secondary hover:bg-raised hover:text-ink" : "bg-ink/[0.07] text-ink hover:bg-ink/[0.12]",
-            )}
-            title={recording ? t("composer.dictation.stopHint") : t("composer.dictation.hint")}
-          >
-            <Mic size={advanced ? 18 : 16} />
-          </button>
-        )}
-        {bot && !group && <CallButton bot={bot} placement="composer" fill={advanced ? undefined : MAUS_COLORS[bot.color] ?? MAUS_COLORS.green} />}
-        {group && !advanced && <GroupCallButton group={group} members={members ?? []} placement="composer" fill="var(--color-accent)" />}
+        
+        
+        
         {hasContent && !locked && (
           <button
             onClick={send}

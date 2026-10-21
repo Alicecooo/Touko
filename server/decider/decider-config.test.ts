@@ -155,6 +155,6 @@ describe("decider config", () => {
     expect(parseConfigPatch({ decider: { baseUrl: "http://127.0.0.1:9000", enabled: true } }).decider).toEqual({ baseUrl: "http://127.0.0.1:9000", enabled: true });
     expect(() => parseConfigPatch({ decider: { baseUrl: "file:///etc/passwd" } })).toThrow();
     expect(() => parseConfigPatch({ decider: { provider: "someone-else" } })).toThrow();
-    expect(parseStoredConfig({ tts: { voice: "narrator" } }).decider).toBeUndefined();
+    expect(parseStoredConfig({ unrelatedLegacyField: { value: "ignored" } }).decider).toBeUndefined();
   });
 });

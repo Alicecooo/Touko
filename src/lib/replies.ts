@@ -25,7 +25,7 @@ export function replyAuthor(message: Message, fallback?: string): string {
 
 export function escapeCancelsReply(
   event: { key: string; isComposing?: boolean },
-  { replying, recording }: { replying: boolean; recording: boolean },
+  { replying }: { replying: boolean },
 ): boolean {
-  return event.key === "Escape" && replying && !recording && !event.isComposing;
+  return event.key === "Escape" && replying && !event.isComposing;
 }

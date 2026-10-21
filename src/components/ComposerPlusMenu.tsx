@@ -1,18 +1,10 @@
 import type { ComponentProps } from "react";
-import { AudioLines, Check, ListChecks, Paperclip, Phone, Plus, Target } from "lucide-react";
+import { Check, ListChecks, Paperclip, Plus, Target } from "lucide-react";
 import { approvalModeFor } from "../../shared/approval-mode";
 import { approvalModeOptions, approvalModeOptionsFor, approvalModeSelectionRequiresLocalDesktop, shownApprovalMode } from "@/lib/approval-mode-options";
-import { CALL_MODES, effectiveCallMode, useCallMode } from "@/lib/call-mode";
-import { callCapabilityHelp } from "@/lib/call-capability";
-import { requestCallStart } from "@/lib/call-start-request";
-import { useOnCall } from "@/lib/call";
-import { isLiveCallRunning, useLiveMedia } from "@/lib/live-call-media";
-import { useStore } from "@/state/store";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import type { ApprovalModeSelector } from "./ApprovalModeSelector";
-import { useDesktopCapabilities } from "./DesktopCapabilities";
-import { liveLineHeldElsewhere } from "./LiveCallBar";
 import { SidebarPopoverMenu, type SidebarMenuItem } from "./SidebarPopoverMenu";
 
 type ApprovalChoice = ComponentProps<typeof ApprovalModeSelector>;
@@ -88,26 +80,13 @@ function approvalItem(name: string, choice: ApprovalChoice): SidebarMenuItem {
 
 /**
  * Simple mode's round + at the start of the composer: attach a file, Finish together (rooms), the thread's approval
- * level and the call mode (bots), each running the handler its Advanced button runs.
+ * level, each running the handler its Advanced button runs.
  */
-export function ComposerPlusMenu({ onAttach, goal, approval, callBotId }: {
+export function ComposerPlusMenu({ onAttach, goal, approval }: {
   onAttach: () => void;
   goal?: { on: boolean; onToggle: () => void };
   approval?: { name: string; choice: ApprovalChoice };
-  /** The bot whose call button the call mode starts, as that button's own mode menu did. */
-  callBotId?: string;
 }) {
-  const { capabilities, ready } = useDesktopCapabilities();
-  const storedMode = useCallMode();
-  const onCall = useOnCall();
-  const media = useLiveMedia();
-  const turnsHere = !ready || capabilities.dictation.available;
-  const callMode = effectiveCallMode(storedMode, { turnsHere, canLive: true });
-  const turnsHelp = turnsHere ? null : callCapabilityHelp(capabilities, Boolean(window.ogb?.speechStart));
-  const { state } = useStore();
-  // As the call button, which hides while Live is the mode and its line is held on another device.
-  const lineHeldElsewhere = callMode === "live" && liveLineHeldElsewhere(media, state.liveCall);
-  const calling = callBotId !== undefined && (onCall === callBotId || isLiveCallRunning(media.phase) || lineHeldElsewhere);
   const items: SidebarMenuItem[] = [
     { key: "attach", label: t("composer.attach"), icon: <Paperclip size={16} />, onSelect: onAttach },
     ...(goal ? [{
@@ -119,21 +98,6 @@ export function ComposerPlusMenu({ onAttach, goal, approval, callBotId }: {
       onSelect: goal.onToggle,
     } satisfies SidebarMenuItem] : []),
     ...(approval ? [approvalItem(approval.name, approval.choice)] : []),
-    ...(callBotId === undefined ? [] : CALL_MODES.map((entry, index): SidebarMenuItem => {
-      const unavailable = entry.id === "turns" ? turnsHelp : null;
-      return {
-        key: `call:${entry.id}`,
-        heading: index === 0 ? t("call.mode.menu") : undefined,
-        separatorBefore: index === 0,
-        label: t(entry.label),
-        // Only a reason it can't be used: the modes' long hints would make the + menu a page.
-        note: unavailable ? `${unavailable.label}. ${unavailable.reason}` : undefined,
-        icon: entry.id === "live" ? <Phone size={16} /> : <AudioLines size={16} />,
-        trailing: callMode === entry.id ? check : undefined,
-        disabled: calling || Boolean(unavailable),
-        onSelect: () => requestCallStart(callBotId, entry.id),
-      };
-    })),
   ];
   return (
     <SidebarPopoverMenu

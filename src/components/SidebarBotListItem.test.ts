@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { formatTime, initialState, type Bot } from "@/state/store";
+import { initialState, type Bot } from "@/state/store";
 
 vi.mock("./DesktopCapabilities", () => ({
   useDesktopCapabilities: () => ({}),
@@ -15,8 +15,6 @@ vi.mock("@/lib/interface-mode", async (original) => ({
 
 import { ConfirmDialogCard } from "./ConfirmDialog";
 import { BotDeleteMenuItem, BotListItem, botConfirmCopy, botRowProps, currentArchivableBot } from "./Sidebar";
-import { endCall } from "@/lib/call";
-import { configureLiveMedia, resetLiveMedia, startLiveCall } from "@/lib/live-call-media";
 
 const bot = (overrides: Partial<Bot> = {}): Bot => ({
   id: "atlas",
@@ -36,11 +34,7 @@ function renderRow(candidate: Bot, quiet = false, density: "comfortable" | "icon
   return renderToStaticMarkup(createElement(BotListItem, botRowProps(initialState, vi.fn(), candidate, { density, quiet, query: "", onMenu: vi.fn() })));
 }
 
-afterEach(() => {
-  resetLiveMedia();
-  endCall();
-  vi.unstubAllGlobals();
-});
+afterEach(() => vi.unstubAllGlobals());
 
 describe("BotListItem", () => {
   it("makes a bot waiting for you louder than a preview", () => {
@@ -129,56 +123,6 @@ describe("BotListItem", () => {
     }));
     expect(markup).toContain("Created notes.txt with three lines.");
     expect(markup).not.toContain("[digest]");
-  });
-
-  describe("the record of a live call that ended last", () => {
-    const at = (minute: number) => new Date(2026, 9, 6, 10, minute).getTime();
-    const record = {
-      id: "r1", role: "bot", kind: "call", at: at(2), text: "Call with Atlas · 1:42",
-      call: { callId: "c1", botId: "atlas", client: "ios", startedAt: at(0), endedAt: at(2), seconds: 102, endReason: "hung-up" },
-    };
-    const spoken = { id: "u1", role: "user", kind: "text", text: "what is the weather", at: at(0), via: "call", callId: "c1" };
-    const draw = (candidate: Bot, { selected = false, query = "" } = {}) => renderToStaticMarkup(createElement(BotListItem, botRowProps(
-      selected ? { ...initialState, activeView: "chat", selectedId: candidate.id } : initialState,
-      vi.fn(), candidate, { density: "comfortable", quiet: false, query, onMenu: vi.fn() },
-    )));
-
-    it("previews the last reply, not the record that follows it", () => {
-      const markup = draw(bot({
-        messages: [spoken, { id: "b1", role: "bot", kind: "text", text: "Sunny in Pune.", at: at(1) }, record] as Bot["messages"],
-      }));
-      expect(markup).toContain("Sunny in Pune.");
-      expect(markup).not.toContain("Call with Atlas");
-    });
-
-    it("previews a failed turn's row when the record follows it", () => {
-      const markup = draw(bot({
-        messages: [spoken, { id: "e1", role: "bot", kind: "activity", at: at(1), tool: { name: "error: This computer isn't a place on your OMB Cloud: its bots run in the cloud.", ok: false } }, record] as Bot["messages"],
-      }));
-      expect(markup).toContain("This computer isn&#x27;t a place on your OMB Cloud: its bots run in the cloud.");
-      expect(markup).not.toContain("Call with Atlas");
-    });
-
-    it("times the open row by the last reply, not by the hang-up", () => {
-      const markup = draw(bot({
-        messages: [spoken, { id: "b1", role: "bot", kind: "text", text: "Sunny in Pune.", at: at(1) }, record] as Bot["messages"],
-      }), { selected: true });
-      expect(markup).toContain(formatTime(at(1)));
-      expect(markup).not.toContain(formatTime(at(2)));
-    });
-
-    it("names the step the bot is on while it works, when the call ended under it", () => {
-      const markup = draw(bot({
-        busy: true,
-        tasks: [{ threadId: "thread-atlas", title: "Current", createdAt: 2, busy: true, activity: "working" }, { threadId: "thread-earlier", title: "Earlier", createdAt: 1 }],
-        messages: [
-          { ...spoken, text: "run the tests" },
-          { id: "a1", role: "bot", kind: "activity", at: at(1), requestMessageId: "u1", tool: { name: "Bash", spoken: "running the tests" } },
-          record,
-        ] as Bot["messages"],
-      }), { query: "current" });
-      expect(markup).toContain("Running the tests");
-    });
   });
 
   it("previews a failed turn without its error marker", () => {
@@ -304,25 +248,6 @@ describe("BotListItem", () => {
     expect(renderRow(bot({ busy: true }))).toContain('data-testid="working-dot"');
     expect(renderRow(bot())).not.toContain('data-testid="working-dot"');
     expect(renderRow(bot({ busy: true, activity: "waiting-on-you" }))).not.toContain('data-testid="working-dot"');
-  });
-
-  it("marks the bot this window is on a Live call with by a green phone badge", () => {
-    expect(renderRow(bot())).not.toContain('data-testid="live-call-badge"');
-
-    vi.stubGlobal("window", { ogb: { speechStop: vi.fn(async () => {}) } });
-    configureLiveMedia({ getUserMedia: () => new Promise<MediaStream>(() => {}) });
-    void startLiveCall({ botId: "atlas", threadId: "thread-atlas" });
-
-    const markup = renderRow(bot());
-    expect(markup).toContain('data-testid="live-call-badge"');
-    expect(markup).toContain('aria-label="On a Live call"');
-    expect(markup.indexOf('data-testid="live-call-badge"')).toBeGreaterThan(markup.indexOf(">Atlas<"));
-    expect(renderRow(bot({ id: "other" }))).not.toContain('data-testid="live-call-badge"');
-    expect(renderRow(bot(), true)).toContain('data-testid="live-call-badge"');
-
-    const icons = renderRow(bot(), false, "icons");
-    expect(icons).toContain('data-testid="live-call-badge"');
-    expect(icons).toContain('aria-label="Atlas · On a Live call"');
   });
 
   it("marks an idle bot waiting on a teammate with a quiet dot, never the work signals", () => {

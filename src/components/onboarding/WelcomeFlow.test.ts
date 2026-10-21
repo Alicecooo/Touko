@@ -26,7 +26,7 @@ vi.mock("react", async (original) => ({
 const local = vi.hoisted(() => ({ detect: vi.fn(), apply: vi.fn() }));
 vi.mock("@/lib/setup-import", async (original) => ({ ...(await original<typeof import("@/lib/setup-import")>()), setupImportApi: local }));
 vi.mock("@/state/store", () => ({ api: vi.fn(), useStore: () => ({ state: {}, dispatch: vi.fn() }) }));
-vi.mock("@/components/DesktopCapabilities", () => ({ useDesktopCapabilities: () => ({ capabilities: { dictation: { available: false } } }) }));
+vi.mock("@/components/DesktopCapabilities", () => ({ useDesktopCapabilities: () => ({ capabilities: {  } }) }));
 vi.mock("@/lib/analytics", () => ({ track: vi.fn(), setEmailGateDone: vi.fn() }));
 vi.mock("@/components/Avatar", () => ({ MausAvatar: () => null }));
 // Each beat has its own recipe; here only which ones the flow offers.
@@ -44,7 +44,7 @@ function render(props: Partial<Parameters<typeof WelcomeFlow>[0]> = {}) {
   fixture.index = 0;
   fixture.effects = [];
   function Capture(): ReactNode {
-    return WelcomeFlow({ bot: null, onDone: () => {}, reel: false, dictation: false, ...props });
+    return WelcomeFlow({ bot: null, onDone: () => {}, reel: false, ...props });
   }
   return renderToStaticMarkup(createElement(Capture));
 }

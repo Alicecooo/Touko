@@ -4,51 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { JsonValue } from "./schema.ts";
 
-import { cacheUntilConfigChanges,
-  changedInstanceIds,
-  customMcpServers,
-  engineLaunches,
-  DATA_DIR,
-  ensureDirs,
-  instanceConfigs,
-  isValidSshAlias,
-  loadBrowserProfileIdAliases,
-  loadConfig,
-  localVmIdleTimeoutMinutes,
-  localVmMaxInstances,
-  localVmMode,
-  parseConfigPatch,
-  parseStoredConfig,
-  persistableInstanceConfigs,
-  roomTurnTimeoutMinutes,
-  mcpCallTimeoutMinutes,
-  maxConcurrentBotThreads,
-  threadEventLogMaxBytes,
-  threadEventLogRetentionDays,
-  showToolCallsEnabled,
-  routinesInConversationEnabled,
-  saveConfig,
-  skillAuthoringEnabled,
-  sharedComputersEnabled,
-  builtInBrowserEnabled,
-  browserProfilePartitionId,
-  browserProfilePartitionTarget,
-  browserProfileReplacementConflict,
-  browserProfileRoutingConflict,
-  stripControlPlaneEnv,
-  stripWorkspaceCredentialEnv,
-  syncCredentialEnv,
-  vpsSshAlias,
-  browserEngineAttachCdpUrl,
-  withInstanceCli,
-  WORKSPACE_CREDENTIAL_ENV,
-  liveSettingsFor,
-  LIVE_IDLE_MINUTES_DEFAULT,
-  mergeOpenCodeProviderKeys,
-  openCodeProviderKeys,
-  OPENCODE_PROVIDER_KEY_LIMIT,
-  type AppConfig,
-} from "./config.ts";
+import { cacheUntilConfigChanges, changedInstanceIds, customMcpServers, engineLaunches, DATA_DIR, ensureDirs, instanceConfigs, isValidSshAlias, loadBrowserProfileIdAliases, loadConfig, localVmIdleTimeoutMinutes, localVmMaxInstances, localVmMode, parseConfigPatch, parseStoredConfig, persistableInstanceConfigs, roomTurnTimeoutMinutes, mcpCallTimeoutMinutes, maxConcurrentBotThreads, threadEventLogMaxBytes, threadEventLogRetentionDays, showToolCallsEnabled, routinesInConversationEnabled, saveConfig, skillAuthoringEnabled, sharedComputersEnabled, builtInBrowserEnabled, browserProfilePartitionId, browserProfilePartitionTarget, browserProfileReplacementConflict, browserProfileRoutingConflict, stripControlPlaneEnv, stripWorkspaceCredentialEnv, syncCredentialEnv, vpsSshAlias, browserEngineAttachCdpUrl, withInstanceCli, WORKSPACE_CREDENTIAL_ENV, mergeOpenCodeProviderKeys, openCodeProviderKeys, OPENCODE_PROVIDER_KEY_LIMIT, type AppConfig } from "./config.ts";
 
 const reloaded = (patch: object, cfg: AppConfig = {}) =>
   changedInstanceIds(engineLaunches(instanceConfigs(cfg), {}), engineLaunches(instanceConfigs({ ...cfg, ...patch } as AppConfig), {}));
@@ -99,25 +55,6 @@ describe("configuration boundaries", () => {
     for (const value of ["1", 1, "true", null]) {
       expect(() => parseConfigPatch({ context: { replayToolHistory: value } })).toThrow();
     }
-  });
-  it("keeps Fish Audio and ElevenLabs voice credentials separate", () => {
-    const parsed = parseConfigPatch({
-      tts: { provider: "fish", key: "eleven-key", fishKey: "fish-key", voice: "fish-voice" },
-    });
-    expect(parsed.tts).toEqual({
-      provider: "fish",
-      key: "eleven-key",
-      fishKey: "fish-key",
-      voice: "fish-voice",
-    });
-    expect(() => parseConfigPatch({ tts: { provider: "unknown" } })).toThrow("provider");
-  });
-
-  it("accepts only known Fish Audio speech models", () => {
-    for (const fishModel of ["s2.1-pro", "s2.1-pro-free"]) {
-      expect(parseConfigPatch({ tts: { fishModel } }).tts).toEqual({ fishModel });
-    }
-    expect(() => parseConfigPatch({ tts: { fishModel: "s1" } })).toThrow("fishModel");
   });
 
   it("defaults to three parallel threads and validates a configurable maximum of ten", () => {
@@ -1384,8 +1321,6 @@ describe("credential env preference", () => {
     "OPENAI_COMPAT_PROVIDER",
     "BOX_TOKEN",
     "OPENCODE_API_KEY",
-    "OMB_TTS_KEY",
-    "OMB_FISH_AUDIO_API_KEY",
     "OMB_OPENAI_IMAGE_KEY",
     "COMPOSIO_API_KEY",
   ] as const;
@@ -1412,32 +1347,17 @@ describe("credential env preference", () => {
       JSON.stringify({
         xai: { key: "file-xai", url: "https://api.example.test/v1" },
         opencodeGo: { apiKey: "file-ocg" },
-        tts: { key: "file-tts", fishKey: "file-fish", voice: "narrator" },
         imageGen: { key: "file-image" },
       }),
     );
     process.env.XAI_API_KEY = "env-xai";
     process.env.BOX_TOKEN = "env-box";
     process.env.OPENCODE_API_KEY = "env-ocg";
-    process.env.OMB_TTS_KEY = "env-tts";
-    process.env.OMB_FISH_AUDIO_API_KEY = "env-fish";
     process.env.OMB_OPENAI_IMAGE_KEY = "env-image";
     const cfg = loadConfig();
     expect(cfg.xai).toEqual({ key: "env-xai", url: "https://api.example.test/v1" });
     expect(cfg.opencodeGo).toEqual({ apiKey: "env-ocg" });
-    expect(cfg.tts).toEqual({ key: "env-tts", fishKey: "env-fish", voice: "narrator" });
     expect(cfg.imageGen).toEqual({ key: "env-image" });
-  });
-
-  it("uses a preset voice only when the person has not chosen one or another provider", () => {
-    process.env.OMB_TTS_DEFAULT_VOICE = " preset-voice ";
-    expect(loadConfig().tts?.voice).toBe("preset-voice");
-    writeFileSync(join(DATA_DIR, "config.json"), JSON.stringify({ tts: { voice: "chosen" } }));
-    expect(loadConfig().tts?.voice).toBe("chosen");
-    writeFileSync(join(DATA_DIR, "config.json"), JSON.stringify({ tts: { provider: "system" } }));
-    expect(loadConfig().tts?.voice).toBeUndefined();
-    writeFileSync(join(DATA_DIR, "config.json"), JSON.stringify({ tts: { provider: "elevenlabs" } }));
-    expect(loadConfig().tts?.voice).toBe("preset-voice");
   });
 
   it("saves and removes the verified domain without replacing existing settings", () => {
@@ -1490,11 +1410,10 @@ describe("credential env preference", () => {
   it("falls back to the config file when the env var is unset (dev mode)", () => {
     writeFileSync(
       join(DATA_DIR, "config.json"),
-      JSON.stringify({ xai: { key: "file-xai" }, tts: { key: "file-tts" }, imageGen: { key: "file-image" } }),
+      JSON.stringify({ xai: { key: "file-xai" }, imageGen: { key: "file-image" } }),
     );
     const cfg = loadConfig();
     expect(cfg.xai?.key).toBe("file-xai");
-    expect(cfg.tts?.key).toBe("file-tts");
     expect(cfg.imageGen?.key).toBe("file-image");
   });
 
@@ -1691,8 +1610,6 @@ describe("credential env preference", () => {
     });
     expect(process.env.XAI_API_KEY).toBe("just-saved");
     expect(process.env.COMPOSIO_API_KEY).toBe("ak_just_saved");
-    expect(process.env.OMB_TTS_KEY).toBeUndefined();
-    expect(process.env.OMB_FISH_AUDIO_API_KEY).toBeUndefined();
   });
 
   it("saves and clears the built-in Groq key without changing an operator's Groq key", () => {
@@ -1715,14 +1632,6 @@ describe("credential env preference", () => {
       expect(loadConfig().meta?.key).toBeUndefined();
       expect(process.env.META_API_KEY).toBe("meta-operator");
     } finally { vi.unstubAllEnvs(); }
-  });
-
-  it("syncCredentialEnv updates Fish Audio without replacing ElevenLabs", () => {
-    process.env.OMB_TTS_KEY = "eleven-kept";
-    process.env.OMB_FISH_AUDIO_API_KEY = "fish-old";
-    syncCredentialEnv({ tts: { fishKey: "fish-new" } });
-    expect(process.env.OMB_TTS_KEY).toBe("eleven-kept");
-    expect(process.env.OMB_FISH_AUDIO_API_KEY).toBe("fish-new");
   });
 
   it("syncCredentialEnv keeps model and provider env in step with a save", () => {
@@ -1786,12 +1695,9 @@ describe("workspace credential env strip", () => {
 
   it("covers in-process secrets and private app-state paths", () => {
     expect(WORKSPACE_CREDENTIAL_ENV).toContain("BOX_TOKEN");
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_TTS_KEY");
     expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_CLOUD_BOAT_TOKEN");
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_CLOUD_VOICE_TOKEN");
     expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_CLOUD_DECIDER_TOKEN");
     expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_CLOUD_AI_TOKEN");
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_FISH_AUDIO_API_KEY");
     expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_OPENAI_IMAGE_KEY");
     expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_BROWSER_CONNECTION");
     expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_USER_DATA");
@@ -1888,7 +1794,7 @@ describe("changedInstanceIds", () => {
   });
   it("replaces nothing for sections no driver reads", () => {
     expect(reloaded({ onboarding: { hintsSeen: ["tour.composer"] } })).toEqual([]);
-    expect(reloaded({ profile: {}, language: "de", tts: {}, features: {} })).toEqual([]);
+    expect(reloaded({ profile: {}, language: "de", features: {} })).toEqual([]);
     expect(reloaded({ composio: { apiKey: "c" }, budgets: { monthlyUsd: 5 } })).toEqual([]);
   });
   it("replaces an engine whose driver reads a saved key from the env", () => {
@@ -1920,58 +1826,6 @@ describe("customMcpServers with url entries", () => {
     expect(customMcpServers(cfg)).toEqual({
       docs: { type: "sse", url: "https://docs.example/sse", headers: { Authorization: "Bearer t" } },
       notes: { command: "npx", args: [], env: {} },
-    });
-  });
-});
-
-describe("live settings", () => {
-  it("defaults to a 5 minute idle hang-up and reading typed replies", () => {
-    expect(LIVE_IDLE_MINUTES_DEFAULT).toBe(5);
-    expect(liveSettingsFor({} as AppConfig)).toEqual({ configured: false, voice: "", readTypedReplies: true, idleMinutes: 5 });
-  });
-  it("reports saved values and never the key", () => {
-    const settings = liveSettingsFor({ live: { key: "sk-test", voice: "sol", readTypedReplies: false, idleMinutes: 12 } } as AppConfig);
-    expect(settings).toEqual({ configured: true, voice: "sol", readTypedReplies: false, idleMinutes: 12 });
-    expect(JSON.stringify(settings)).not.toContain("sk-test");
-  });
-  it("accepts idle minutes from 1 to 60 only", () => {
-    expect(() => parseConfigPatch({ live: { idleMinutes: 0 } })).toThrow();
-    expect(() => parseConfigPatch({ live: { idleMinutes: 61 } })).toThrow();
-    expect(() => parseConfigPatch({ live: { idleMinutes: 2.5 } })).toThrow();
-    expect(parseConfigPatch({ live: { idleMinutes: 60, readTypedReplies: false } })).toMatchObject({ live: { idleMinutes: 60, readTypedReplies: false } });
-  });
-  it("does not reload providers for live changes", () => {
-    expect(reloaded({ live: { idleMinutes: 3 } })).toEqual([]);
-  });
-
-  describe("saving settings from PATCH /api/live/settings", () => {
-    const path = join(DATA_DIR, "config.json");
-    let envKey: string | undefined;
-    beforeEach(() => {
-      envKey = process.env.OMB_OPENAI_LIVE_KEY;
-      delete process.env.OMB_OPENAI_LIVE_KEY;
-      mkdirSync(DATA_DIR, { recursive: true });
-      rmSync(path, { force: true });
-    });
-    afterEach(() => {
-      if (envKey === undefined) delete process.env.OMB_OPENAI_LIVE_KEY;
-      else process.env.OMB_OPENAI_LIVE_KEY = envKey;
-      rmSync(path, { force: true });
-    });
-
-    it("keeps the Live key when only settings change", () => {
-      saveConfig({ live: { key: "sk-keep" } });
-      saveConfig({ live: { idleMinutes: 9 } });
-      expect(loadConfig().live).toMatchObject({ key: "sk-keep", idleMinutes: 9 });
-    });
-
-    it("keeps a key from the desktop credential store, which reaches the harness as env", () => {
-      // the desktop leaves an empty tombstone in the file and hands the key over as env
-      saveConfig({ live: { key: "" } });
-      process.env.OMB_OPENAI_LIVE_KEY = "sk-from-keychain";
-      saveConfig({ live: { readTypedReplies: false, voice: "cedar" } });
-      expect(loadConfig().live).toEqual({ key: "sk-from-keychain", readTypedReplies: false, voice: "cedar" });
-      expect(JSON.parse(readFileSync(path, "utf8")).live).toEqual({ key: "", readTypedReplies: false, voice: "cedar" });
     });
   });
 });

@@ -149,8 +149,8 @@ export function InspectorPanel({ bot }: { bot: Bot }) {
           <Bug size={16} className="text-ink-secondary" /> {t("ui.inspector")}</span>
         <button
           onClick={() => dispatch({ type: "toggleInspector", open: false })}
-          aria-label="Close the Inspector"
-          title="Close the Inspector"
+          aria-label={t("ui.label.closeTheInspector")}
+          title={t("ui.label.closeTheInspector")}
           className="rounded-md p-1 text-ink-secondary hover:bg-raised hover:text-ink"
         >
           <X size={18} />
@@ -191,7 +191,7 @@ export function InspectorPanel({ bot }: { bot: Bot }) {
         {lens !== "run" && <span className="ml-auto text-[11px] text-ink-secondary">
           {page ? (shown < total ? `last ${shown} of ${total}` : `${shown} entries`) : "loading…"}
         </span>}
-        {lens !== "run" && <button onClick={() => managedRefresh.current()} className="rounded-md p-1 text-ink-secondary hover:bg-raised hover:text-ink" title="Reload from disk">
+        {lens !== "run" && <button onClick={() => managedRefresh.current()} className="rounded-md p-1 text-ink-secondary hover:bg-raised hover:text-ink" title={t("ui.label.reloadFromDisk")}>
           <RefreshCw size={14} />
         </button>}
       </div>

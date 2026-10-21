@@ -1,17 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { jevEndpoint } from "../decider/jev.ts";
-import { boatCredential, deciderCredential, trialCreditCredential, voiceCredential } from "./included-services.ts";
+import { boatCredential, deciderCredential, trialCreditCredential } from "./included-services.ts";
 
 const RELAY_BOAT = "https://cloud.example.test/api/cloud/services/boat/api/box/v1";
-const RELAY_VOICE = "https://cloud.example.test/api/cloud/services/voice/v1";
 // A Jev base URL: the relay's one route is <this>/v1/systemone.
 const RELAY_DECIDER = "https://cloud.example.test/api/cloud/services/decider";
 const cloud = {
   OMB_CLOUD_BOAT_URL: RELAY_BOAT,
   OMB_CLOUD_BOAT_TOKEN: "box_omb_included",
-  OMB_CLOUD_VOICE_URL: RELAY_VOICE,
-  OMB_CLOUD_VOICE_TOKEN: "omb_voice_included",
   OMB_CLOUD_DECIDER_URL: RELAY_DECIDER,
   OMB_CLOUD_DECIDER_TOKEN: "omb_decide_included",
 };
@@ -40,24 +37,6 @@ describe("Boat credential", () => {
     expect(boatCredential(undefined, { OMB_CLOUD_BOAT_URL: RELAY_BOAT })).toBeNull();
     expect(boatCredential(undefined, { OMB_CLOUD_BOAT_URL: `${RELAY_BOAT}/`, OMB_CLOUD_BOAT_TOKEN: " box_omb_included " }))
       .toEqual({ token: "box_omb_included", api: RELAY_BOAT, included: true });
-  });
-});
-
-describe("ElevenLabs credential", () => {
-  it("falls back to the included token, sent only to the relay, when there is no own key", () => {
-    expect(voiceCredential(undefined, cloud)).toEqual({ token: "omb_voice_included", api: RELAY_VOICE, included: true });
-    expect(voiceCredential(undefined, { OMB_CLOUD_VOICE_TOKEN: "omb_voice_included" })).toBeNull();
-  });
-
-  it("uses the person's own key, sent only to ElevenLabs", () => {
-    expect(voiceCredential("sk-own", cloud)).toEqual({ token: "sk-own", api: "https://api.elevenlabs.io/v1", included: false });
-    expect(voiceCredential("sk-own", { ...cloud, OMB_ELEVENLABS_API: "http://127.0.0.1:9/v1" }))
-      .toEqual({ token: "sk-own", api: "http://127.0.0.1:9/v1", included: false });
-  });
-
-  it("never mixes the two services' tokens", () => {
-    expect(voiceCredential("box_omb_included", cloud)).toMatchObject({ api: "https://api.elevenlabs.io/v1", included: false });
-    expect(boatCredential(undefined, { OMB_CLOUD_VOICE_URL: RELAY_VOICE, OMB_CLOUD_VOICE_TOKEN: "omb_voice_included" })).toBeNull();
   });
 });
 
@@ -144,15 +123,12 @@ describe("holdIncludedServices", () => {
     expect(process.env.OMB_CLOUD_AI_TOKEN).toBeUndefined();
     expect(services.trialCreditCredential()).toEqual({ token: `omb_ai_${"a".repeat(43)}`, api: "https://cloud.example.test/api/cloud/services/ai", included: true });
     expect(process.env.OMB_CLOUD_BOAT_TOKEN).toBeUndefined();
-    expect(process.env.OMB_CLOUD_VOICE_TOKEN).toBeUndefined();
     expect(process.env.OMB_CLOUD_DECIDER_TOKEN).toBeUndefined();
     expect(process.env.OMB_CLOUD_BOAT_URL).toBe(RELAY_BOAT);
     expect(process.env.OMB_CLOUD_DECIDER_URL).toBe(RELAY_DECIDER);
     expect(services.boatCredential(undefined)).toEqual({ token: "box_omb_included", api: RELAY_BOAT, included: true });
-    expect(services.voiceCredential(undefined)).toEqual({ token: "omb_voice_included", api: RELAY_VOICE, included: true });
     expect(services.deciderCredential(undefined, undefined)).toEqual({ token: "omb_decide_included", api: RELAY_DECIDER, included: true });
     expect(services.boatCredential("box_own")).toMatchObject({ token: "box_own", included: false });
-    expect(services.voiceCredential("sk-own")).toMatchObject({ token: "sk-own", included: false });
     expect(services.deciderCredential("tsk_own", undefined)).toEqual({ token: "tsk_own", api: "https://api.typesafe.ai", included: false });
   });
 });

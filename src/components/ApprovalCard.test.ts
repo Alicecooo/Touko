@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { ApprovalCard } from "./ApprovalCard";
-import { pendingApprovals, PendingApprovalPanel, spokenApprovalPrompt, type Pending } from "./PendingApproval";
+import { pendingApprovals, PendingApprovalPanel, type Pending } from "./PendingApproval";
 import type { Bot, Message } from "@/state/store";
 import { skillRequestBehavior } from "../../shared/skill-request";
 
@@ -25,33 +25,6 @@ const createRoutineOperation = {
     durationMinutes: 30,
   },
 };
-
-describe("ApprovalCard decided by voice", () => {
-  const bash = (answered: string, via?: "call"): Message => ({
-    id: "bash-card",
-    role: "bot",
-    kind: "options",
-    at: 1,
-    card: {
-      title: "Approval needed",
-      subtitle: "rm -rf build",
-      options: ["Allow", "Deny"],
-      requestId: "r1",
-      tool: "Bash",
-      answered,
-      answeredBy: { kind: "loopback", ...(via ? { via } : {}) },
-    },
-  });
-
-  it("says a card was decided by voice on a Live call", () => {
-    expect(renderToStaticMarkup(createElement(ApprovalCard, { message: bash("allow", "call") }))).toMatch(/Allowed.*by voice/);
-    expect(renderToStaticMarkup(createElement(ApprovalCard, { message: bash("deny", "call") }))).toMatch(/Denied.*by voice/);
-  });
-
-  it("says nothing extra for a tap", () => {
-    expect(renderToStaticMarkup(createElement(ApprovalCard, { message: bash("allow") }))).not.toContain("by voice");
-  });
-});
 
 describe("ApprovalCard routine proposals", () => {
   it("shows a routine card left open from before Triggers v2 as expired, with nothing to confirm", () => {
@@ -193,9 +166,9 @@ describe("ApprovalCard profile proposals", () => {
     expect(html).not.toContain("wants to update its profile");
   });
 
-  it("speaks the card's concise title, not the full diff, and shows an imperative strip label", () => {
+  it("shows an imperative strip label", () => {
     const message: Message = {
-      id: "profile-voice-card",
+      id: "profile-card",
       role: "bot",
       kind: "options",
       at: 1,
@@ -207,11 +180,6 @@ describe("ApprovalCard profile proposals", () => {
       tool: "update_profile",
       detail: message.card!.subtitle,
     };
-
-    const spoken = spokenApprovalPrompt(pending, "Mochi");
-    expect(spoken).toBe('Mochi wants to update its profile: Set up Scout?. Review the change on screen. Should I confirm it?');
-    expect(spoken).not.toContain("SOUL.md");
-    expect(spoken).not.toContain("+Be brief.");
 
     const strip = renderToStaticMarkup(createElement(PendingApprovalPanel, { pending, count: 1, index: 0 }));
     expect(strip).toContain("Confirm this profile change");
@@ -308,12 +276,6 @@ describe("ApprovalCard learned skills", () => {
     expect(markup).toContain("name: file-expense");
     expect(markup).toContain("sha256 abcdef01");
 
-    const spoken = spokenApprovalPrompt(
-      { message, requestId: "skill-request", tool: "stage_skill", detail: message.card!.subtitle },
-      "Mochi",
-    );
-    expect(spoken).toContain('Enable skill "file-expense"?');
-    expect(spoken).toContain("Should I enable it?");
   });
 
   it("labels a reviewed skill replacement as an update", () => {
@@ -348,12 +310,6 @@ describe("ApprovalCard learned skills", () => {
 
     expect(renderToStaticMarkup(createElement(ApprovalCard, { message }))).toContain("update a learned skill");
     expect(renderToStaticMarkup(createElement(ApprovalCard, { message }))).toContain("replacing the current version");
-    const spoken = spokenApprovalPrompt(
-      { message, requestId: "skill-update-request", tool: "stage_skill", detail: message.card!.subtitle },
-      "Mochi",
-    );
-    expect(spoken).toContain("Should I update it?");
-
     message.card!.answered = "allow";
     expect(renderToStaticMarkup(createElement(ApprovalCard, { message }))).toContain("Skill updated");
   });
@@ -441,16 +397,6 @@ describe("ApprovalCard tool-call kinds", () => {
     const html = renderToStaticMarkup(createElement(ApprovalCard, { message: kindMessage(undefined) }));
     expect(html).toContain("Wants to take an action");
     expect(html).not.toContain("Wants to an action");
-  });
-
-  it("speaks a verb phrase in the voice prompt too", () => {
-    const message = kindMessage("other");
-    const spoken = spokenApprovalPrompt(
-      { message, requestId: "req-kind", tool: "other", detail: message.card!.subtitle },
-      "Mochi",
-    );
-    expect(spoken).toContain("Mochi wants to take an action");
-    expect(spoken).not.toContain("wants to other");
   });
 });
 

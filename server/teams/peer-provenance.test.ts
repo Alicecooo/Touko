@@ -127,7 +127,6 @@ describe("workOrigin: only the user's own request is the user's", () => {
   const typed = { role: "user", kind: "text", text: "Build the CSV export" } as const;
   it.each([
     ["a line the person typed", typed, true],
-    ["a line the person spoke on a call", { ...typed, via: "call" as const }, true],
     ["another bot's line", { ...typed, peerAsk: { botId: "b", name: "Scout" } }, false],
     ["a line an external interface relayed", { ...typed, relayed: true }, false],
     ["a line a script sent through the local API", { ...typed, via: "api" as const }, false],

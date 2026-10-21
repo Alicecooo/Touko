@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, MousePointer2, Zap } from "lucide-react";
 import { MausAvatar } from "@/components/Avatar";
@@ -114,7 +115,7 @@ export function Automations({ playing, onCue, onEnded, label }: SceneProps) {
           <div className="relative">
             {HOURS.map((hour, i) => (
               <div key={hour} className="absolute right-1.5 -translate-y-1/2 text-[8.5px] tabular-nums text-ink-tertiary" style={{ top: i * ROW }}>
-                {hour} AM
+                {hour} {t("ui.label.am")}
               </div>
             ))}
           </div>
@@ -141,8 +142,8 @@ export function Automations({ playing, onCue, onEnded, label }: SceneProps) {
                   >
                     <MausAvatar color="green" state={busy ? "working" : "idle"} size={16} animated={!still} trackPointer={false} />
                     <div className="min-w-0">
-                      <div className="truncate text-[9.5px] font-semibold leading-tight text-ink">Weekly report</div>
-                      <div className="text-[8px] leading-tight tabular-nums text-ink-secondary">9:00 · weekly</div>
+                      <div className="truncate text-[9.5px] font-semibold leading-tight text-ink">{t("ui.label.weeklyReport")}</div>
+                      <div className="text-[8px] leading-tight tabular-nums text-ink-secondary">{t("ui.label.900Weekly")}</div>
                     </div>
                   </div>
                 </>
@@ -170,7 +171,7 @@ export function Automations({ playing, onCue, onEnded, label }: SceneProps) {
       )}
 
       <div className="absolute bottom-4 right-5 z-20 flex flex-col items-end gap-2">
-        {firing && <Receipt name="Weekly report" running={!done} tone="accent" />}
+        {firing && <Receipt name={t("ui.label.weeklyReport")} running={!done} tone="accent" />}
         {hook && <Receipt name="Webhook task" running={!hookDone} tone="warning" />}
       </div>
 

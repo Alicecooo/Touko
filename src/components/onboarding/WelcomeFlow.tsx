@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { MausAvatar } from "@/components/Avatar";
-import { useDesktopCapabilities } from "@/components/DesktopCapabilities";
 import { setEmailGateDone, track } from "@/lib/analytics";
 import { brand } from "@/lib/brand";
 import { cn } from "@/lib/cn";
@@ -14,7 +13,6 @@ import { EnginesBeat } from "./beats/EnginesBeat";
 import { HelloBeat } from "./beats/HelloBeat";
 import { ImportBeat } from "./beats/ImportBeat";
 import { MeetYourBotBeat } from "./beats/MeetYourBotBeat";
-import { PermissionsBeat } from "./beats/PermissionsBeat";
 import { QuietButton } from "./beats/shared";
 import { withViewTransition } from "./view-transition";
 import { ProgressDots } from "./ProgressDots";
@@ -25,7 +23,6 @@ const MASCOT_FOR_BEAT: Record<BeatId, MausState> = {
   reel: "curious",
   engines: "searching",
   import: "receiving",
-  permissions: "listening",
   
   
   bot: "celebrate",
@@ -39,8 +36,6 @@ function beatTitle(beat: BeatId): string | null {
       return t("onboarding.engines.title");
     case "import":
       return t("onboarding.import.title");
-    case "permissions":
-      return t("onboarding.perms.title");
     case "bot":
       return t("onboarding.bot.title");
     case "reel":
@@ -62,7 +57,6 @@ export function WelcomeFlow({
   initialBeat,
   embedded = false,
   reel = true,
-  dictation,
   entrance = "arrive",
   hosted = false,
   onOpenOrganisation,
@@ -74,7 +68,6 @@ export function WelcomeFlow({
   initialBeat?: BeatId;
   embedded?: boolean;
   reel?: boolean;
-  dictation?: boolean;
   entrance?: Motion;
   hosted?: boolean;
   onOpenOrganisation?: () => void;
@@ -83,13 +76,12 @@ export function WelcomeFlow({
   setupImport?: { client: SetupImportClient; detection?: SetupDetection } | null;
 }) {
   const { dispatch } = useStore();
-  const { capabilities } = useDesktopCapabilities();
   
   const importClient = setupImport === undefined ? (localSetupImport(hosted) ? setupImportApi : null) : setupImport?.client ?? null;
   const [detection, setDetection] = useState<SetupDetection | null>(setupImport?.detection ?? null);
   const [importResult, setImportResult] = useState<SetupImportResult | null>(null);
   const [importBusy, setImportBusy] = useState(false);
-  const beats = beatsFor({ dictation: dictation ?? capabilities.dictation.available, reel, hosted, setupImport: detection !== null,  });
+  const beats = beatsFor({ reel, hosted, setupImport: detection !== null,  });
   const [beat, setBeat] = useState<BeatId>(() => (initialBeat && beats.includes(initialBeat) ? initialBeat : "hello"));
   const [mascot, setMascot] = useState<MausState>(MASCOT_FOR_BEAT[beat]);
   const [motion, setMotion] = useState<{ kind: Motion; key: number }>({ kind: "blink", key: 0 });
@@ -255,7 +247,7 @@ export function WelcomeFlow({
               onBusy={setImportBusy}
             />
           )}
-          {beat === "permissions" && <PermissionsBeat {...beatProps} />}
+          
           
           
           {beat === "bot" && (

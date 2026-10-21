@@ -385,7 +385,6 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     delete process.env.FAKE_CODEX_INTERRUPT_GRACE_MS;
     delete process.env.OPENAI_API_KEY;
     delete process.env.BOX_TOKEN;
-    delete process.env.OMB_TTS_KEY;
     for (const name of Object.keys(CONTROL_PLANE_FIXTURE)) delete process.env[name];
     recorder?.stop();
     await instance?.dispose();
@@ -561,7 +560,6 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     process.env.FAKE_CODEX_DUMP = dump;
     process.env.OPENAI_API_KEY = "sk-should-not-leak";
     process.env.BOX_TOKEN = "box-should-not-leak";
-    process.env.OMB_TTS_KEY = "tts-should-not-leak";
     Object.assign(process.env, CONTROL_PLANE_FIXTURE);
 
     const { turnId } = await instance.adapter.sendTurn({
@@ -614,7 +612,6 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     expect(processIsAlive(seen.pid)).toBe(false);
     expect(seen.env.OPENAI_API_KEY).toBeUndefined();
     expect(seen.env.BOX_TOKEN).toBeUndefined();
-    expect(seen.env.OMB_TTS_KEY).toBeUndefined();
     for (const name of Object.keys(CONTROL_PLANE_FIXTURE)) expect(seen.env[name]).toBeUndefined();
     const methods = seen.calls.map((c: { method: string }) => c.method);
     expect(methods).toEqual(["initialize", "initialized", "config/read", "thread/start", "turn/start"]);

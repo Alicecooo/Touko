@@ -198,44 +198,38 @@ describe("persistence patches", () => {
 });
 
 describe("beat machine", () => {
-  it("lists beats for the desktop app with the reel off", () => {
-    expect(beatsFor({ dictation: true, reel: false })).toEqual(["hello", "engines", "permissions", "bot"]);
-  });
-
-  it("drops the permissions beat where there is no microphone to ask for", () => {
-    expect(beatsFor({ dictation: false, reel: false })).toEqual(["hello", "engines", "bot"]);
+  it("does not include the removed microphone permissions beat", () => {
+    expect(beatsFor({ reel: false })).toEqual(["hello", "engines", "bot"]);
   });
 
   it("slots the reel after hello when enabled", () => {
-    expect(beatsFor({ dictation: false, reel: true })).toEqual(["hello", "reel", "engines", "bot"]);
+    expect(beatsFor({ reel: true })).toEqual(["hello", "reel", "engines", "bot"]);
   });
 
   it("always ends on the bot beat", () => {
-    for (const dictation of [true, false]) {
-      for (const reel of [true, false]) {
-        expect(beatsFor({ dictation, reel }).at(-1)).toBe("bot");
-        expect(beatsFor({ dictation, reel, hosted: true }).at(-1)).toBe("bot");
-      }
+    for (const reel of [true, false]) {
+      expect(beatsFor({ reel }).at(-1)).toBe("bot");
+      expect(beatsFor({ reel, hosted: true }).at(-1)).toBe("bot");
     }
   });
 
   it("gives a hosted workspace a greeting and the bot, nothing about this computer", () => {
-    expect(beatsFor({ dictation: true, reel: true, hosted: true })).toEqual(["hello", "bot"]);
-    expect(beatsFor({ dictation: true, reel: true, hosted: false })).toEqual(["hello", "reel", "engines", "permissions", "bot"]);
+    expect(beatsFor({ reel: true, hosted: true })).toEqual(["hello", "bot"]);
+    expect(beatsFor({ reel: true, hosted: false })).toEqual(["hello", "reel", "engines", "bot"]);
   });
 
   it("puts the import step right after the engines, only when this computer has something to bring in", () => {
-    expect(beatsFor({ dictation: true, reel: false, setupImport: true })).toEqual(["hello", "engines", "import", "permissions", "bot"]);
-    expect(beatsFor({ dictation: false, reel: true, setupImport: true })).toEqual(["hello", "reel", "engines", "import", "bot"]);
-    expect(beatsFor({ dictation: true, reel: false, setupImport: false })).toEqual(beatsFor({ dictation: true, reel: false }));
-    expect(beatsFor({ dictation: true, reel: true, hosted: true, setupImport: true })).toEqual(["hello", "bot"]);
-    expect(nextBeat(beatsFor({ dictation: true, reel: false, setupImport: true }), "engines")).toBe("import");
+    expect(beatsFor({ reel: false, setupImport: true })).toEqual(["hello", "engines", "import", "bot"]);
+    expect(beatsFor({ reel: true, setupImport: true })).toEqual(["hello", "reel", "engines", "import", "bot"]);
+    expect(beatsFor({ reel: false, setupImport: false })).toEqual(beatsFor({ reel: false }));
+    expect(beatsFor({ reel: true, hosted: true, setupImport: true })).toEqual(["hello", "bot"]);
+    expect(nextBeat(beatsFor({ reel: false, setupImport: true }), "engines")).toBe("import");
     expect(flowDotsShown("import")).toBe(true);
     expect(beatWidth("import")).toBeGreaterThan(beatWidth("hello"));
   });
 
   it("walks forward and back and stops at the ends", () => {
-    const beats = beatsFor({ dictation: true, reel: false });
+    const beats = beatsFor({ reel: false });
     expect(nextBeat(beats, "hello")).toBe("engines");
     expect(nextBeat(beats, "bot")).toBeNull();
     expect(previousBeat(beats, "engines")).toBe("hello");
@@ -250,7 +244,7 @@ describe("beat machine", () => {
 
   it("shows one row of dots at a time: the reel's own scene dots replace the flow's", () => {
     expect(flowDotsShown("reel")).toBe(false);
-    for (const beat of beatsFor({ dictation: true, reel: true }).filter((id) => id !== "reel")) {
+    for (const beat of beatsFor({ reel: true }).filter((id) => id !== "reel")) {
       expect(flowDotsShown(beat)).toBe(true);
     }
   });

@@ -105,16 +105,7 @@ export async function verifyWorkspaceBackup(report: (event: unknown) => void = (
     assert.equal((await api(source, "PATCH", `/api/bots/${bot.id}/profile`, { soul })).status, 200);
     const settings = await api(source, "PUT", "/api/config", { profile: { name: "Workspace backup fixture" } });
     assert.equal(settings.status, 200, JSON.stringify(settings.body));
-    // A synthetic saved key, not a provider sign-in/probe. Config API key
-    // saves deliberately contact the provider, so seed only this owned file.
-    const configPath = join(source.info.dataDir, "config.json");
-    const savedConfig = JSON.parse(readFileSync(configPath, "utf8"));
-    savedConfig.tts = { ...savedConfig.tts, key: "fixture-voice-key" };
-    writeFileSync(configPath, JSON.stringify(savedConfig), { mode: 0o600 });
-    const destinationConfigPath = join(destination.info.dataDir, "config.json");
-    const destinationConfig = JSON.parse(readFileSync(destinationConfigPath, "utf8"));
-    destinationConfig.tts = { key: "destination-voice-key", provider: "elevenlabs", voice: "destination-voice" };
-    writeFileSync(destinationConfigPath, JSON.stringify(destinationConfig), { mode: 0o600 });
+    const destinationConfig = JSON.parse(readFileSync(join(destination.info.dataDir, "config.json"), "utf8"));
 
     // A reviewed skill and memory seed are written only into our fixture;
     // the real server must list/enable and later restore the exact content.
@@ -158,7 +149,7 @@ export async function verifyWorkspaceBackup(report: (event: unknown) => void = (
     assert.equal(download.status, 200);
     const encrypted = Buffer.from(await download.arrayBuffer());
     assert.equal(encrypted.byteLength, exported.body.bytes);
-    for (const privateText of [soul, "fixture-voice-key", "WORKSPACE_SKILL_MARKER", "Keep draft"]) assert.equal(encrypted.includes(Buffer.from(privateText)), false);
+    for (const privateText of [soul, "WORKSPACE_SKILL_MARKER", "Keep draft"]) assert.equal(encrypted.includes(Buffer.from(privateText)), false);
     record({ command: "download encrypted workspace", bytes: encrypted.length, summary: exported.body.summary });
 
     const upload = await fetch(`${destination.info.url}/api/workspace-backup/upload`, {
@@ -175,7 +166,6 @@ export async function verifyWorkspaceBackup(report: (event: unknown) => void = (
     assert.equal(preview.body.summary.bots, before.bots.length);
     const staged = join(destination.info.dataDir, ".backups", preview.body.id, "staged");
     const stagedConfig = JSON.parse(readFileSync(join(staged, "data", "config.json"), "utf8"));
-    assert.equal(Object.hasOwn(stagedConfig, "tts"), false);
     assert.equal(Object.hasOwn(stagedConfig, "instances"), false);
     const manifest = JSON.parse(readFileSync(join(staged, "manifest.json"), "utf8"));
     assert.equal(Object.hasOwn(manifest, "credentials"), false);
@@ -208,9 +198,7 @@ export async function verifyWorkspaceBackup(report: (event: unknown) => void = (
     assert.deepEqual((await api(destination, "GET", `/api/bots/${bot.id}/skills`)).body, sourceSkills);
     const restoredConfig = JSON.parse(readFileSync(join(destination.info.dataDir, "config.json"), "utf8"));
     assert.equal(restoredConfig.profile.name, "Workspace backup fixture");
-    assert.deepEqual(restoredConfig.tts, destinationConfig.tts);
     assert.deepEqual(restoredConfig.instances, destinationConfig.instances);
-    assert.equal((await api(destination, "GET", "/api/config")).body.tts.configured, true);
     const status = (await api(destination, "GET", "/api/workspace-backup/status")).body;
     assert.equal(status.lastRestoreId, preview.body.id);
     assert.ok(status.safetyCopyPath.startsWith(join(destination.info.dataDir, ".backups")));

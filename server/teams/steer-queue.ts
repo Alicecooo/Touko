@@ -4,7 +4,6 @@
 import { newId } from "../harness/contracts.ts";
 import { chatFollowups, saveChatFollowup, settleChatFollowups } from "../storage/message-db.ts";
 import { drainCoalesceHead } from "../agent/admission.ts";
-import { spokenLineFields } from "../voice/live-call-record.ts";
 import { workOriginSchema, type WorkOrigin } from "./peer-provenance.ts";
 import type { ResolvedSender, SteerQueueReason } from "../../shared/wire.ts";
 import type { BotRecord, Message } from "../storage/store.ts";
@@ -34,8 +33,6 @@ interface QueueEntry {
     sender?: ResolvedSender;
     trigger?: UsageTrigger;
     queuedAt: number;
-    via?: "call";
-    callId?: string;
   }>;
 }
 
@@ -55,16 +52,14 @@ export function restoreSteeredMessages(): void {
     if (row.status !== "pending") continue;
     const entry = queues.get(row.threadId) ?? { botId: row.ownerId, items: [] };
     if (entry.botId !== row.ownerId) throw new Error("queued task belongs to another bot");
-    const { via, callId, origin: storedOrigin, ...payload } = row.payload;
+    const { origin: storedOrigin, ...payload } = row.payload;
     const origin = workOriginSchema.safeParse(storedOrigin);
-    entry.items.push({
+    entry.items.push( {
       ...payload,
-      ...spokenLineFields(via, callId),
       ...(origin.success ? { origin: origin.data } : {}),
       messageId: row.id,
       prompt: row.payload.prompt ?? row.payload.text,
-      queuedAt: row.payload.queuedAt ?? Date.now(),
-    });
+      queuedAt: row.payload.queuedAt ?? Date.now()});
     queues.set(row.threadId, entry);
   }
 }
@@ -99,7 +94,7 @@ export function queueSteeredMessage(
   botId: string,
   threadId: string,
   text: string,
-  options: { prompt?: string; replyToId?: string; sendId?: string; dataContext?: Message["dataContext"]; reason?: SteerQueueReason; unattended?: boolean; peerAsk?: Message["peerAsk"]; origin?: WorkOrigin; sender?: ResolvedSender; trigger?: UsageTrigger; callId?: string; via?: "call" } = {},
+  options: { prompt?: string; replyToId?: string; sendId?: string; dataContext?: Message["dataContext"]; reason?: SteerQueueReason; unattended?: boolean; peerAsk?: Message["peerAsk"]; origin?: WorkOrigin; sender?: ResolvedSender; trigger?: UsageTrigger; } = {},
 ): QueuedSteer {
   const id = newId();
   const entry = queues.get(threadId) ?? { botId, items: [] };
@@ -117,9 +112,7 @@ export function queueSteeredMessage(
     ...(options.origin ? { origin: options.origin } : {}),
     sender: options.sender,
     trigger: options.trigger,
-    queuedAt: Date.now(),
-    ...spokenLineFields(options.via, options.callId),
-  };
+    queuedAt: Date.now()};
   saveChatFollowup({ id, kind: "bot", ownerId: botId, threadId, payload: item });
   entry.items.push(item);
   queues.set(threadId, entry);
@@ -194,9 +187,7 @@ export function drainSteeredMessages(
           ...(item.dataContext ? { dataContext: item.dataContext } : {}),
           queueId: item.messageId,
           peerAsk: item.peerAsk,
-          sender: item.sender,
-          ...spokenLineFields(item.via, item.callId),
-        }),
+          sender: item.sender}),
       );
     }
     const last = appended.at(-1);
@@ -226,7 +217,7 @@ function coalesceIdentity(item: QueueEntry["items"][number]): string {
   if (item.peerAsk) return `peer:${item.peerAsk.botId}:${item.unattended === true ? "unattended" : "attended"}:${JSON.stringify(item.origin ?? null)}`;
   if (item.unattended === true) return "unattended";
   const person = item.sender ? `person:${item.sender.id ?? item.sender.name}` : "person:local";
-  return item.via === "call" ? `call:${item.callId ?? ""}|${person}` : person;
+  return person;
 }
 
 export function queuedSteeredMessage(

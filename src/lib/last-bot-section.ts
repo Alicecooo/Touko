@@ -13,7 +13,7 @@ export const BOT_SETTINGS_SECTION_IDS: readonly BotSettingsSection[] = [
   "access",
   "model",
   "permissions",
-  "voice",
+  "notifications",
   "visibility",
   "history",
   "usage",

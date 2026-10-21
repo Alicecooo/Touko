@@ -41,6 +41,8 @@ const STATUS_PREFIX = /^(?:[\w-]+ ){0,2}(?:API Error|HTTP|status(?: code)?)[:\s]
 const REASON_PHRASE = /^(?:[A-Z][a-z]+ ?){1,4}\.?$/;
 
 export function plainErrorLine(raw: string): string | undefined {
+  const missingCli = /^`?(.+?)`? (?:CLI not found|isn't installed, or isn't on this app's PATH)/i.exec(raw.trim());
+  if (missingCli) return t("engineSetup.cliMissing", { cli: missingCli[1]! });
   if (!isTechnicalError(raw)) return undefined;
   const text = raw.trim();
   const rest = text.replace(STATUS_PREFIX, "").trim();

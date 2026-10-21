@@ -218,8 +218,6 @@ const dumpEnv = Object.fromEntries(
     "XAI_API_KEY",
     "GROK_AGENT",
     "BOX_TOKEN",
-    "OMB_TTS_KEY",
-    "OMB_FISH_AUDIO_API_KEY",
     "OMB_CLOUD_READY_TOKEN",
     "OMB_CLOUD_BOOTSTRAP",
     "OMB_LICENSE_KEY",

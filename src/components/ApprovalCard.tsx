@@ -1,5 +1,5 @@
 import { activeLocale } from "@/lib/i18n";
-import { useContext, useState, type ReactNode } from "react";
+import { useContext, useState } from "react";
 import { Check, ShieldCheck, Undo2, X } from "lucide-react";
 import { api, ApiError, StoreContext, type Bot, type Message, type OptionCardData } from "@/state/store";
 import { shareLearnedSkillsMode } from "@/lib/feature-flags";
@@ -55,9 +55,7 @@ const PROFILE_FIELD_LABEL: Record<ProfileRequestField, LocaleKey> = {
   description: "approval.applied.field.description",
   soul: "approval.applied.field.soul",
   cwd: "approval.applied.field.cwd",
-  notifications: "approval.applied.field.notifications",
-  speakReplies: "approval.applied.field.speakReplies",
-};
+  notifications: "approval.applied.field.notifications"};
 
 /** A routine card no one answered is from before Triggers v2 applied changes on their own: nothing can confirm it now. */
 const staleRoutineCard = (card: OptionCardData) => Boolean(card.routineRequest && !card.answered);
@@ -314,7 +312,6 @@ function CompactApprovalRow({
   showDetailInline,
   outcome,
   allowed,
-  byVoice,
   waiting,
   answeredBelow,
 }: {
@@ -324,7 +321,6 @@ function CompactApprovalRow({
   showDetailInline: boolean;
   outcome?: string;
   allowed: boolean;
-  byVoice: ReactNode;
   waiting: boolean;
   answeredBelow: boolean;
 }) {
@@ -365,7 +361,7 @@ function CompactApprovalRow({
           </span>
         )}
         <span className="shrink-0" aria-live="polite">· {outcome ?? t("approval.status.waitingAnswer")}</span>
-        {byVoice}
+        
         {detail && !showDetailInline && (
           <button
             type="button"
@@ -408,7 +404,6 @@ export function ApprovalCard({
   if (applied) return <AppliedChangeLine card={card} name={bot?.name ?? t("approval.someone")} threadId={threadId} summary={applied} />;
   const settled = card.answered;
   const expired = card.expired === true || staleRoutineCard(card);
-  const byVoice = card.answeredBy?.via === "call" ? <span className="text-ink-tertiary">· {t("approval.status.byVoice")}</span> : null;
   const isRoutineRequest = Boolean(card.routineRequest);
   const isSkillRequest = Boolean(card.skillRequest);
   const isProfileRequest = Boolean(card.profileRequest);
@@ -449,7 +444,6 @@ export function ApprovalCard({
         showDetailInline={!outbound}
         outcome={outcome}
         allowed={settled === "allow" && !expired}
-        byVoice={byVoice}
         waiting={waiting}
         answeredBelow={Boolean(card.requestId && card.tool && !card.dismissed)}
       />
@@ -506,7 +500,7 @@ export function ApprovalCard({
         {outcome ? (
           <>
             {settled === "allow" && !expired ? <Check size={14} className="text-success" /> : <X size={14} />} {outcome}
-            {byVoice}
+            
           </>
         ) : (
           <>

@@ -114,7 +114,7 @@ describe("export-transcript", () => {
         id: "m1",
         role: "bot",
         kind: "activity",
-        tool: { name: "readFile", spoken: "reading package.json", ok: true },
+        tool: { name: "readFile", ok: true },
         at: new Date("2026-09-08T12:01:00Z").getTime(),
       },
       {

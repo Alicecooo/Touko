@@ -62,8 +62,6 @@ export interface DecisionRow {
   /** the turn ran with nobody at the keyboard when this was decided */
   unattended?: boolean;
   actor?: DecisionActor;
-  /** "call": that person answered by voice on a Live call, not with a tap */
-  via?: "call";
   origin?: "output";
 }
 
@@ -94,10 +92,10 @@ export function decisionRetentionDays(configured: number | undefined, env: NodeJ
   return DEFAULT_DECISION_RETENTION_DAYS;
 }
 
-const actorScope = new AsyncLocalStorage<{ actor: DecisionActor; via?: "call" }>();
+const actorScope = new AsyncLocalStorage<{ actor: DecisionActor; }>();
 
-export function withDecisionActor<T>(actor: DecisionActor, work: () => T, via?: "call"): T {
-  return actorScope.run(via ? { actor, via } : { actor }, work);
+export function withDecisionActor<T>(actor: DecisionActor, work: () => T): T {
+  return actorScope.run({ actor }, work);
 }
 
 export function decisionFileFor(dataDir: string, at: Date): string {
@@ -118,9 +116,8 @@ async function writeDecision(dataDir: string, record: DecisionRow): Promise<void
 export function appendDecision(dataDir: string, row: Omit<DecisionRow, "at">): void {
   const scope = row.source === "user" ? actorScope.getStore() : undefined;
   const actor = row.actor ?? scope?.actor;
-  const via = row.via ?? scope?.via;
   // Redact now: the row records what was true at the moment of the decision.
-  const record = redactSecrets({ at: new Date().toISOString(), ...row, ...(actor ? { actor } : {}), ...(via ? { via } : {}) }) as DecisionRow;
+  const record = redactSecrets({ at: new Date().toISOString(), ...row, ...(actor ? { actor } : {}) }) as DecisionRow;
   const previous = writeQueues.get(dataDir) ?? Promise.resolve();
   // Appends serialize per directory, so simultaneous approvals keep their order.
   const queued = previous
@@ -259,7 +256,7 @@ export function decisionsCsv(rows: DecisionRow[]): string {
       row.summary ?? "",
       row.rule ?? "",
       row.unattended ? "yes" : "",
-      row.via === "call" ? `${actorLabel(row.actor)} (by voice)` : actorLabel(row.actor),
+      actorLabel(row.actor),
       row.threadId,
       row.requestId ?? "",
     ].map(csvCell).join(","));

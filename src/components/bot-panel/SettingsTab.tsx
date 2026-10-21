@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { Archive, AudioWaveform, Check, CheckCheck, Copy, FileCode2, FileText, History, LayoutGrid, Lock, Phone, Puzzle, Search, SlidersHorizontal, Slack, Trash2, Users, Zap, ClipboardCopy, Loader2 } from "lucide-react";
+import { Archive, Check, CheckCheck, Copy, FileCode2, FileText, History, LayoutGrid, Lock, Phone, Puzzle, Search, SlidersHorizontal, Slack, Trash2, Users, Zap, ClipboardCopy, Loader2 } from "lucide-react";
 
 import { t } from "@/lib/i18n";
 import type { LocaleKey } from "@/locales";
@@ -82,7 +82,6 @@ export function SettingsTab({ bot, derived, slackUrl, query, onQuery, onOpen, on
   const cards: Array<{ label: string | null; anchor: string; rows: SettingRow[] }> = [
     { label: t("botPanel.card.profile"), anchor: "profile", rows: [
       page("blurb", FileText, bot.description.trim() || t("botPanel.blurbHint")),
-      page("voice", AudioWaveform, t("botPanel.voiceHint")),
       inline("notify", `${t("notifications.title")} ${t("botPanel.notificationsHint")} alerts`, (
         <SwitchRow
           key="notify"

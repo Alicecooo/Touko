@@ -480,7 +480,7 @@ export function SkillsSection({ bot }: { bot: Bot }) {
                   {skill.origin !== "imported" && (
                     <button
                       aria-label={`Remove ${skill.name}`}
-                      title="Remove skill"
+                      title={t("ui.label.removeSkill")}
                       disabled={Boolean(working)}
                       onClick={() => void remove(skill)}
                       className="flex size-8 shrink-0 items-center justify-center rounded-md text-ink-secondary hover:bg-danger/10 hover:text-danger disabled:opacity-40"

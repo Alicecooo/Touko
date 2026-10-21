@@ -870,7 +870,6 @@ describe("agents-proxy MCP surface", () => {
       fromThreadId: "thread-asker-routine",
       groupId: "room-launch",
       message: "shipping at 4",
-      attachVoiceNote: false,
     });
   });
 
@@ -1895,7 +1894,7 @@ describe("agents-proxy MCP surface", () => {
     lastProfileRequestBody = null;
     const res = await callTool("propose_profile", { reason: "asked" });
     expect(res.result.isError).toBe(true);
-    expect(res.result.content[0].text).toContain("needs at least one of name, title, description, soul, cwd, notifications, or speakReplies");
+    expect(res.result.content[0].text).toContain("needs at least one of name, title, description, soul, cwd, or notifications");
     expect(lastProfileRequestBody).toBeNull();
   });
 
@@ -2444,7 +2443,7 @@ describe("tool bridge", () => {
   });
 
   it("use_tool refuses a name outside the profile in the words a direct call to it is refused with, as a failed call the model can read", async () => {
-    for (const name of ["made_up", "skill_manage", "shared_computer", "send_voice_note", "find_tool", "use_tool"]) {
+    for (const name of ["made_up", "skill_manage", "shared_computer", "find_tool", "use_tool"]) {
       // find_tool and use_tool are this proxy's own, so only the bridged form is unknown
       if (name !== "find_tool" && name !== "use_tool") {
         const direct = await plain("tools/call", { name, arguments: {} });

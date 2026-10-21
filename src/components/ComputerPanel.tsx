@@ -4,7 +4,7 @@ import { Switch } from "./SettingsPrimitives";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { waitForLocalVmReady } from "@/lib/local-vm-readiness";
-import { CalendarClock, Columns2, Box, Check, Server, Sparkles, Globe, Hand, Loader2, Maximize2, Monitor, Moon, Power, Settings, X } from "lucide-react";
+import { CalendarClock, Box, Check, Server, Sparkles, Globe, Hand, Loader2, Maximize2, Monitor, Moon, Power, Settings, X } from "lucide-react";
 import { api, ApiError, currentTaskBot, useStore, type Bot, type ConfigStatus } from "@/state/store";
 import { setAdvancedMode, useAdvancedMode } from "@/lib/interface-mode";
 import { ComputerFilesPane } from "./ComputerFilesPane";
@@ -129,10 +129,8 @@ function readPanelWidth(): number {
 
 export function ComputerPanel({
   bot: profileBot,
-  onOpenVmWorkspace,
 }: {
   bot: Bot;
-  onOpenVmWorkspace?: (botId: string) => void;
 }) {
   const { padClass, dragProps } = useCaptionChrome();
   const [panelWidth, setPanelWidth] = useState(readPanelWidth);
@@ -1576,23 +1574,6 @@ export function ComputerPanel({
             </button>
           </div>
         )}
-
-        {advanced &&
-          phase === "vm" &&
-          vmStatus?.mode === "per-bot" &&
-          window.ogb?.desktopWorkspace &&
-          onOpenVmWorkspace && (
-            <button
-              type="button"
-              onClick={() => onOpenVmWorkspace(bot.id)}
-              disabled={pending !== null}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-accent/30 bg-accent/10 py-2 text-[13px] font-medium text-ink hover:bg-accent/15 disabled:opacity-50"
-              title={t("computer.twoDesktopsTitle")}
-            >
-              <Columns2 size={14} />
-              {t("computer.twoDesktops")}
-            </button>
-          )}
 
         {signInHelp && signInHelp.place !== "browser" && signInBanner(bannerTakesControl && !control.held
           ? () => phase === "vm" || cloudPreviewReady ? void openDesktop() : void controlAction("take")

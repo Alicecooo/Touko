@@ -10,11 +10,9 @@ export interface DriverCapabilities {
 const ENVELOPE: CatalogProfile = {
   skillAuthoring: true,
   sharedComputers: true,
-  voiceNotes: true,
   cloudHome: false,
   chief: true,
-  botId: "",
-};
+  botId: ""};
 
 export function harnessCapabilityLines(from: DriverCapabilities | undefined, to: DriverCapabilities | undefined): string[] {
   if (!from || !to) return [];

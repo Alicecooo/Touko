@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, FileText, Plus, Sparkles } from "lucide-react";
+import { ChevronRight, FileText, Plus } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
@@ -23,11 +23,11 @@ import { useBotApps } from "../bot-settings/useBotApps";
 import type { BotPatch, useBotSettingsDerived } from "../bot-settings/useBotSettingsDerived";
 import { AppsCard } from "./apps-and-logins";
 import type { PageId } from "./page-registry";
-import { BotSwitch, buttonCls, Card, ColRow, LabelAction, LinkRow, NavRow, NoteRow, rowCls, Segmented, SegmentedRow } from "./rows";
+import { BotSwitch, buttonCls, Card, ColRow, LabelAction, LinkRow, NoteRow, rowCls, Segmented, SegmentedRow } from "./rows";
 
 type Derived = ReturnType<typeof useBotSettingsDerived>;
 
-export function DetailsTab({ bot, derived, overview, onOpen }: {
+export function DetailsTab({ bot, derived, onOpen }: {
   bot: Bot;
   derived: Derived;
   overview: BotOverview | null;
@@ -72,22 +72,8 @@ export function DetailsTab({ bot, derived, overview, onOpen }: {
   const routines = [...derived.botRoutines].sort((a, b) =>
     Number(b.enabled) - Number(a.enabled) || (a.nextRunAt ?? Infinity) - (b.nextRunAt ?? Infinity) || a.name.localeCompare(b.name));
   const soulOpen = editingSoul || Boolean(bot.soulDrift);
-  const setupLeft = (overview?.setup ?? []).filter((step) => !step.done).length;
-
   return (
     <div data-panel-tabpanel="details">
-      {setupLeft > 0 && (
-        <Card>
-          <NavRow
-            data-panel-page="setup"
-            icon={Sparkles}
-            title={t("botPanel.finishSetup")}
-            hint={t("botPanel.finishSetupHint", { count: setupLeft, name: bot.name })}
-            onClick={() => onOpen("setup")}
-          />
-        </Card>
-      )}
-
       <Card label={t("model.simple.model")} anchor="model">
         <div className={cn(rowCls, "block", thinkingLevels.length > 0 && "[&_[data-simple-effort]]:hidden")} data-simple-default-model>
           {/* The open thread, as the Advanced header's picker: a Cloud guest changes only their own conversation. */}

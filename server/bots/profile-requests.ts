@@ -18,11 +18,9 @@ const LABELS: Record<Exclude<(typeof PROFILE_REQUEST_FIELDS)[number], "soul" | "
   name: "Name",
   title: "Title",
   description: "Description",
-  notifications: "Notifications",
-  speakReplies: "Speak replies",
-};
+  notifications: "Notifications"};
 const PRIVATE_WORKSPACE = "its private workspace";
-const CHOOSE_ONE = "Choose at least one of name, title, description, soul, cwd, notifications, speakReplies";
+const CHOOSE_ONE = "Choose at least one of name, title, description, soul, cwd, notifications";
 const toggleText = (value: boolean | undefined): string => (value ? "on" : "off");
 const TEXT_FIELDS = ["name", "title", "description", "soul"] as const;
 
@@ -54,7 +52,7 @@ export interface ProfileRequestStore {
     },
   ): { id: string };
   patchMessage(threadId: string, messageId: string, patch: { card: OptionCardLike }): { id: string } | null;
-  patchBotProfile(id: string, patch: Partial<Pick<BotRecord, "name" | "title" | "description" | "cwd" | "soul" | "notifications" | "speakReplies" | "lastProfileRequestId">>): BotRecord | null;
+  patchBotProfile(id: string, patch: Partial<Pick<BotRecord, "name" | "title" | "description" | "cwd" | "soul" | "notifications" | "lastProfileRequestId">>): BotRecord | null;
 }
 
 export interface ProfileRequestServiceOptions {
@@ -108,7 +106,7 @@ function reasonText(value: unknown): string {
   return redactSecretsInText(trimmed);
 }
 
-/** parseBotProfilePatch accepts keys (like `voice`) a profile request must not carry: reject them first. */
+/** Reject fields outside the self-editable profile before validating allowed values. */
 function parseChanges(input: unknown): ProfileRequestChanges {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     throw new ProfileRequestError(CHOOSE_ONE);
@@ -138,7 +136,7 @@ function parseChanges(input: unknown): ProfileRequestChanges {
   for (const field of PROFILE_REQUEST_FIELDS) {
     if (field === "cwd") continue;
     const value = parsed.patch[field];
-    if (field === "notifications" || field === "speakReplies") {
+    if (field === "notifications") {
       if (value !== undefined) changes[field] = value as boolean;
       continue;
     }
@@ -179,7 +177,7 @@ export function profileCardCopy(
   for (const field of PROFILE_REQUEST_FIELDS) {
     if (field === "soul" || field === "cwd") continue;
     if (changes[field] === undefined) continue;
-    if (field === "notifications" || field === "speakReplies") {
+    if (field === "notifications") {
       lines.push(`${LABELS[field]}: ${toggleText(before[field] as boolean | undefined)} → ${toggleText(changes[field] as boolean | undefined)}`);
       continue;
     }
@@ -254,7 +252,7 @@ export class ProfileRequestService {
     const finalChanges: ProfileRequestChanges = {};
     let exactBefore = true;
     for (const field of PROFILE_REQUEST_FIELDS) {
-      if (field === "notifications" || field === "speakReplies") {
+      if (field === "notifications") {
         const value = changes[field];
         if (value === undefined || value === snapshot[field]) continue;
         before[field] = snapshot[field];

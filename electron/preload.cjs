@@ -39,7 +39,7 @@ ipcRenderer.on("app:open-settings", (_event, section) => {
 const localOrigin = process.argv.find((arg) => arg.startsWith("--omb-local-origin="))?.slice("--omb-local-origin=".length) ?? null;
 const isLocalPage = !localOrigin || location.origin === localOrigin;
 const savedServer = id => isLocalPage && typeof id === "string" && /^[\w-]{1,64}$/.test(id) ? [id] : [];
-const REMOTE_SAFE = new Set(["platform", "getCapabilities", "onCapabilitiesChanged", "applySkin", "setUnreadCount", "permStatus", "workspaces", "cloudMove", "cloudLending", "cloudPlan", "desktopNotices", "desktopAnalytics"]);
+const REMOTE_SAFE = new Set(["platform", "getCapabilities", "onCapabilitiesChanged", "applySkin", "setUnreadCount", "workspaces", "cloudMove", "cloudLending", "cloudPlan", "desktopNotices", "desktopAnalytics"]);
 function updaterOffered() {
   try { return ipcRenderer.sendSync("update:offered") === true; } catch { return false; }
 }
@@ -55,7 +55,7 @@ const COMPANY_BACKUP_CLIENT_KEYS = [
   "omb-skin", "omb-show-threads", "omb-show-run-card", "omb-send-key", "omb-color-user-bubbles", "omb-chat-width", "openmausbot.sidebarDensity",
   "openmausbot.sidebarToolsLayout",
   "openmausbot.sidebarCollapsedSections.v1", "openmausbot.sidebarSectionOrder.v1",
-  "omb-analytics-opt-out", "openmausbot.remote-voice.v1",
+  "omb-analytics-opt-out",
 ];
 if (isLocalPage && !desktopRemoteClient && process.argv.includes("--omb-company-desktop=1")) {
   ipcRenderer.on("company-backups:collect-client-state", (_event, request) => {
@@ -111,19 +111,6 @@ const bridge = {
   /** Arms exactly one display-media request from the current renderer frame. */
   beginScreenPreviewIntent: () => ipcRenderer.sendSync("screen:preview-intent"),
   screenFrame: () => ipcRenderer.invoke("screen:frame"),
-
-
-
-  onSpeechTranscript: (cb) => {
-    const handler = (_event, line) => cb(line);
-    ipcRenderer.on("speech:transcript", handler);
-    return () => ipcRenderer.removeListener("speech:transcript", handler);
-  },
-  onSpeechEnd: (cb) => {
-    const handler = (_event, info) => cb(info);
-    ipcRenderer.on("speech:end", handler);
-    return () => ipcRenderer.removeListener("speech:end", handler);
-  },
   onOpenAppSettings: (cb) => {
     appSettingsListeners.add(cb);
     queueMicrotask(() => {
@@ -142,9 +129,6 @@ const bridge = {
       return "";
     }
   },
-  /** No screen field: macOS 15+ caches that status per process, so it would lie after a grant. */
-  permStatus: () => ipcRenderer.invoke("perm:status"),
-  permRequestMic: () => ipcRenderer.invoke("perm:request-mic"),
   permOpenSettings: (pane) => ipcRenderer.invoke("perm:open-settings", pane),
   relaunch: () => ipcRenderer.invoke("desktop:relaunch"),
 
@@ -282,8 +266,7 @@ const bridge = {
       return analyticsChoice;
     },
     ...(isLocalPage ? { set: enabled => { analyticsChoice = enabled === true; return ipcRenderer.invoke("desktop-analytics:set", analyticsChoice); } } : {}),
-  },
-};
+  }};
 
 contextBridge.exposeInMainWorld(
   "ogb",

@@ -6,13 +6,11 @@ const EXCERPT_MAX_MESSAGES = 12;
 const EXCERPT_LINE_MAX_CHARS = 300;
 const ATTACHMENT_TAG = /<attached-(?:image|file)\b[^>]*\/>/g;
 
-export type ThreadTitleSource = "first-message" | "conversation" | "call";
+export type ThreadTitleSource = "first-message" | "conversation";
 
 const TITLE_PROMPT: Record<ThreadTitleSource, { ask: string; label: string }> = {
   "first-message": { ask: "Name the conversation that begins with the message below.", label: "Message:" },
-  conversation: { ask: "Name the conversation below by what it is about now.", label: "Conversation:" },
-  call: { ask: "Name the voice call below by what was asked on it.", label: "Requests:" },
-};
+  conversation: { ask: "Name the conversation below by what it is about now.", label: "Conversation:" }};
 
 export function threadTitlePrompt(text: string, source: ThreadTitleSource = "first-message"): string {
   const { ask, label } = TITLE_PROMPT[source];
@@ -55,13 +53,4 @@ export function titleConversationExcerpt(messages: readonly Message[]): string {
     }
   }
   return excerptLines(newestFirst(), EXCERPT_MAX_MESSAGES).reverse().join("\n");
-}
-
-export function callTitleExcerpt(messages: readonly Message[], callId: string): string {
-  function* spoken(): Generator<ExcerptCandidate> {
-    for (const message of messages) {
-      if (message.role === "user" && message.kind === "text" && message.callId === callId && message.text) yield { text: message.text };
-    }
-  }
-  return excerptLines(spoken()).join("\n");
 }

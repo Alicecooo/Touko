@@ -14,7 +14,6 @@ export interface ContextMessage {
   steered?: boolean;
 }
 
-/** A Live call's row (kind "call") is a record for people, never context. */
 export function isContextMessage(m: Pick<Message, "kind" | "text" | "digest" | "roomRequest">): boolean {
   return Boolean(((m.kind === "text" || m.kind === "widget") && m.text) || (m.kind === "digest" && m.digest) || m.kind === "compaction" || m.roomRequest?.phase === "result");
 }

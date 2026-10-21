@@ -84,23 +84,6 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
     ],
   },
   {
-    category: "Calls",
-    items: [
-      {
-        id: "live-call-mute",
-        description: "Mute or unmute a Live call",
-        macKeys: ["⌘", "⇧", "M"],
-        winKeys: ["Ctrl", "Shift", "M"],
-      },
-      {
-        id: "live-call-hang-up",
-        description: "Hang up a Live call",
-        macKeys: ["⌘", "⇧", "H"],
-        winKeys: ["Ctrl", "Shift", "H"],
-      },
-    ],
-  },
-  {
     category: "Management & Groups",
     items: [
       {
@@ -116,8 +99,7 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
         winKeys: ["Alt", "↑ / ↓"],
       },
     ],
-  },
-];
+  }];
 
 type Keys = Pick<ShortcutItem, "macKeys" | "winKeys">;
 const ENTER: Keys = { macKeys: ["Return"], winKeys: ["Enter"] };

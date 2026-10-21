@@ -230,11 +230,6 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
         if (typeof body.composio !== "boolean") return json(res, 400, { error: "composio must be true or false" });
         patch.composio = body.composio;
       }
-      // An admin decision, so not on the client-writable profile surface.
-      if (body.voiceNotes !== undefined) {
-        if (typeof body.voiceNotes !== "boolean") return json(res, 400, { error: "voiceNotes must be true or false" });
-        patch.voiceNotes = body.voiceNotes;
-      }
       if (body.memoryEnabled !== undefined) {
         if (typeof body.memoryEnabled !== "boolean") return json(res, 400, { error: "memoryEnabled must be true or false" });
         if (existingBot && (existingBot.busy || activeGroupTurnForBot(existingBot.id)) &&

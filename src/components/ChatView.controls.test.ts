@@ -24,7 +24,7 @@ vi.mock("@/state/store", async (importOriginal) => {
 // The real useCaptionChrome rides along: it only asks this module for the window chrome.
 vi.mock("./DesktopCapabilities", async (importOriginal) => ({
   ...await importOriginal<typeof import("./DesktopCapabilities")>(),
-  useDesktopCapabilities: () => ({ capabilities: { dictation: { available: false }, host: { packaged: true, platform: fixture.platform }, localComputer: { available: false, reasonCode: fixture.localReasonCode, message: fixture.localMessage } }, ready: true }),
+  useDesktopCapabilities: () => ({ capabilities: { host: { packaged: true, platform: fixture.platform }, localComputer: { available: false, reasonCode: fixture.localReasonCode, message: fixture.localMessage } }, ready: true }),
 }));
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }));
 vi.mock("@/lib/thread-preferences", async (importOriginal) => ({
@@ -214,18 +214,6 @@ describe("thread control placement", () => {
     fixture.advanced = true;
   });
 
-  it.each([true, false])("calls from the composer beside dictation, not the header (advanced %s)", (advanced) => {
-    fixture.advanced = advanced;
-    const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
-    const header = markup.slice(markup.indexOf("data-chathead-controls"), markup.indexOf("data-composer-row"));
-    expect(header).not.toContain("data-call-button");
-    expect(markup).not.toContain('data-call-button="header"');
-    const actions = markup.slice(markup.indexOf("data-composer-actions"));
-    expect(actions).toContain('data-call-button="composer"');
-    expect(markup.match(/data-call-button=/g)).toHaveLength(1);
-    fixture.advanced = true;
-  });
-
   it("gives the editor its own row in a narrow chat", () => {
     const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
     expect(markup).toContain("@container/composer");
@@ -356,21 +344,6 @@ describe("thread control placement", () => {
     ];
     const render = () => renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, busy: false, messages } }));
     expect(render()).toContain("Retry</button>");
-    messages.push({ id: "next", role: "user", kind: "text", at: 4, text: "A different request" });
-    expect(render()).not.toContain("Retry</button>");
-  });
-  it("keeps Retry on a failed turn after hanging up, when the call's record is the last row", () => {
-    const messages: Bot["messages"] = [
-      { id: "ask", role: "user", kind: "text", at: 1, text: "Try the new model", via: "call", callId: "c1" },
-      { id: "error", role: "bot", kind: "activity", at: 2, tool: { name: "error: outdated engine", ok: false } },
-      {
-        id: "record", role: "bot", kind: "call", at: 3, text: "Call with Pepper · 0:42",
-        call: { callId: "c1", botId: "bot", client: "ios", startedAt: 0, endedAt: 3, seconds: 42, endReason: "hung-up" },
-      },
-    ];
-    const render = () => renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, busy: false, messages } }));
-    expect(render()).toContain("Retry</button>");
-    expect(render()).toContain('data-testid="call-record"');
     messages.push({ id: "next", role: "user", kind: "text", at: 4, text: "A different request" });
     expect(render()).not.toContain("Retry</button>");
   });

@@ -1,28 +1,21 @@
 // @vitest-environment happy-dom
-// Simple mode's composer: a round + holding attach, Finish together, the thread's approval level and the call mode,
-// and a round call button in the bot's colour. Advanced mode keeps its row of buttons.
+// Simple mode's composer: a round + holding attach, Finish together and the thread's approval level.
 import { createElement } from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Bot, Group } from "@/state/store";
 import { restoreComposerDraft } from "@/lib/drafts";
-import { MAUS_COLORS } from "@/lib/mascot";
-import { onCallStartRequest } from "@/lib/call-start-request";
-import { setCallMode } from "@/lib/call-mode";
 
 const fixture = vi.hoisted(() => ({
   advanced: false,
   dispatch: vi.fn(),
-  call: null as Record<string, unknown> | null,
-  groupCall: null as Record<string, unknown> | null,
-  liveCall: null as unknown,
 }));
 const ENGINE = "claude-3f0c2b1e-9d1a-4c55-8a51-0a3a6f1e2b7c";
 vi.mock("@/state/store", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/state/store")>();
   return { ...original, useStore: () => ({
-    state: { ...original.initialState, bots: [bot, peer], liveCall: fixture.liveCall, instances: [{
+    state: { ...original.initialState, bots: [bot, peer], instances: [{
       instanceId: ENGINE, driverKind: "claudeAgent", displayName: "Claude", capabilities: { agentsMcp: true },
     }] },
     dispatch: fixture.dispatch,
@@ -31,14 +24,6 @@ vi.mock("@/state/store", async (importOriginal) => {
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }));
 vi.mock("@/lib/use-owner-or-admin", () => ({ useOwnerOrAdmin: () => true }));
 vi.mock("@/lib/interface-mode", () => ({ useAdvancedMode: () => fixture.advanced, setAdvancedMode: vi.fn() }));
-vi.mock("./CallView", () => ({ CallButton: (props: Record<string, unknown>) => {
-  fixture.call = props;
-  return null;
-} }));
-vi.mock("./GroupCallView", () => ({ GroupCallButton: (props: Record<string, unknown>) => {
-  fixture.groupCall = props;
-  return null;
-} }));
 
 import { Composer } from "./Composer";
 
@@ -71,10 +56,6 @@ function openPlus() {
 
 beforeEach(() => {
   fixture.advanced = false;
-  fixture.liveCall = null;
-  setCallMode("turns");
-  fixture.call = null;
-  fixture.groupCall = null;
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(() => {});
   for (const id of [`bot:${bot.id}:${bot.threadId}`, `group:${room.id}:${room.threadId}`]) restoreComposerDraft(id, { text: "", attachments: [] });
@@ -92,18 +73,16 @@ afterEach(() => {
 });
 
 describe("the Simple composer in a bot chat", () => {
-  it("puts attach and the approval level behind a round +, and fills the call button with the bot's colour", () => {
+  it("puts attach and the approval level behind a round +", () => {
     render({ bot });
     expect(plus()?.getAttribute("aria-label")).toBe("Add");
     expect(container.querySelector('button[aria-label="Attach a file"]')).toBeNull();
     expect(container.querySelector('[aria-label^="Ask for approval for"]')).toBeNull();
     expect(container.querySelector('[aria-label="Finish together"]')).toBeNull();
-    expect(fixture.call).toMatchObject({ bot: { id: "atlas" }, placement: "composer", fill: MAUS_COLORS.purple });
     openPlus();
     expect([...menu()!.querySelectorAll("[data-menu-key]")].map((row) => row.getAttribute("data-menu-key")))
-      .toEqual(["attach", "approval", "call:turns", "call:live"]);
+      .toEqual(["attach", "approval"]);
     expect(menu()!.textContent).toContain("Before Atlas acts");
-    expect(menu()!.textContent).toContain("Call mode");
   });
 
   it("leaves the area behind and below the composer see-through, with no solid backdrop", () => {
@@ -118,31 +97,6 @@ describe("the Simple composer in a bot chat", () => {
     click(item("attach"));
     expect(picker).toHaveBeenCalledOnce();
     expect(plus()?.getAttribute("aria-expanded")).toBe("false");
-  });
-
-  it("starts the call in the chosen mode through the call button, as its mode menu did", () => {
-    const started = vi.fn();
-    const stop = onCallStartRequest("atlas", started);
-    render({ bot });
-    openPlus();
-    click(item("call:live"));
-    expect(started).toHaveBeenCalledExactlyOnceWith("live");
-    stop();
-  });
-
-  it("offers no call while Live is the mode and its line is held on another device, as the hidden call button", () => {
-    const started = vi.fn();
-    const stop = onCallStartRequest("atlas", started);
-    setCallMode("live");
-    fixture.liveCall = { callId: "phone-call", botId: "atlas", threadId: "atlas-thread", client: "ios", voice: "marin", startedAt: 1, status: "live" };
-    render({ bot });
-    openPlus();
-    for (const key of ["call:turns", "call:live"]) {
-      expect(item(key)?.disabled, key).toBe(true);
-      click(item(key));
-    }
-    expect(started).not.toHaveBeenCalled();
-    stop();
   });
 
   it("changes this thread's approval level from the submenu", () => {
@@ -162,7 +116,6 @@ describe("the Simple composer in a group chat", () => {
   it("offers Finish together in the + menu and keeps the Goal chip in view while it is on", () => {
     render({ group: room, members: [bot, peer] });
     expect(container.querySelector('[aria-label="Finish together"]')).toBeNull();
-    expect(fixture.groupCall).toMatchObject({ group: { id: "room" }, placement: "composer", fill: "var(--color-accent)" });
     openPlus();
     expect([...menu()!.querySelectorAll("[data-menu-key]")].map((row) => row.getAttribute("data-menu-key"))).toEqual(["attach", "goal"]);
     click(item("goal"));
@@ -177,21 +130,18 @@ describe("the Simple composer in a group chat", () => {
 });
 
 describe("the Advanced composer", () => {
-  it("keeps the paperclip, the approval shield and the split call button, with no +", () => {
+  it("keeps the paperclip and approval control, with no +", () => {
     fixture.advanced = true;
     render({ bot });
     expect(plus()).toBeNull();
     expect(container.querySelector('button[aria-label="Attach a file"]')).not.toBeNull();
     expect(container.querySelector('[aria-haspopup="menu"][aria-label$="for Claude"]')).not.toBeNull();
-    expect(fixture.call).toMatchObject({ placement: "composer" });
-    expect(fixture.call?.fill).toBeUndefined();
     expect(container.querySelector("[data-composer-backdrop]")).not.toBeNull();
   });
 
-  it("keeps the room's Goal chip and its header call button", () => {
+  it("keeps the room's Goal chip", () => {
     fixture.advanced = true;
     render({ group: room, members: [bot, peer] });
     expect(container.querySelector('[aria-label="Finish together"]')?.getAttribute("aria-pressed")).toBe("false");
-    expect(fixture.groupCall).toBeNull();
   });
 });

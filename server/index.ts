@@ -46,7 +46,7 @@ import { commandReceipt } from "./agent/commands.ts";
 import { buildTurnDigest, coverageForDriver, digestPromptLine, renderDigest, toolEvidence } from "./observability/digest.ts";
 import { appendDecision, bindDecisionRetention, decisionRetentionDays, flushDecisionLog, pruneDecisions, withDecisionActor, type DecisionActor } from "./observability/decision-log.ts";
 import { inMyFolderCwd, validateBotCwd } from "./bots/bot-cwd.ts";
-import { ATTACHMENTS_DIR, attachmentExists, cleanupStaleAttachmentPartials, deleteAttachment, saveAudio, saveImage } from "./workspace/attachments.ts";
+import { ATTACHMENTS_DIR, attachmentExists, cleanupStaleAttachmentPartials, deleteAttachment, saveImage } from "./workspace/attachments.ts";
 import { messageAttachmentName, messageFileRoots } from "./storage/message-file.ts";
 import { avatarGenerationRequestSchema, generateAvatarImage, avatarImageStatus } from "./bots/avatar-image.ts";
 import { fitsOnOneLine, parseBotProfilePatch } from "./bots/bot-profile.ts";
@@ -71,7 +71,6 @@ import { DataFailure } from "./data/types.ts";
 import { isEffortLevel, type CardAnswerer, type ResolvedSender, type SignInRequestCardData, type SteerQueueReason, type WireBot, type WireGroup, type WireTask } from "../shared/wire.ts";
 import { isPersistentQuestionCard, shouldSettleRequestCard } from "../shared/ask-question.ts";
 import { parseToolScope } from "../shared/tool-scope.ts";
-import { liveCardKind, liveDecisionRefusal } from "../shared/live-approval.ts";
 import * as composio from "./integrations/composio.ts";
 import { connectorCallFromFrame, connectorRefusalText, connectorScopeRefusalText, connectorUnrecognizedText, evaluateConnectorTools } from "./integrations/connector-verdict.ts";
 import { connectorCardText } from "./integrations/connector-card-text.ts";
@@ -87,7 +86,7 @@ import { appendAboutMe, commitLearned, planLearned } from "./bots/profile-learne
 import { canAccessTeam, canReachPeer, coordinatorSupervises, livePeerRoster, livePeerRosterBlock, peerAllowed, peerName, peerRosterSystemPrompt, peerStatus, peerStatusWords, reachablePeers, resolveTeammate, roomPeerRosterSystemPrompt, roomRosterLine } from "./teams/peer-roster.ts";
 import { containerComputerAction, containerComputerFrame, containerComputerMcp, containerComputerStatus, containerExec, containerRuntimeStatus, localVmWakeAction, localVmWorkspaceExists, perBotLocalVmTarget, poolLocalVmTarget, SHARED_LOCAL_VM_TARGET, setupCommands, VM_WORKSPACE_GUEST, type LocalVmTarget, type Runtime } from "./computers/container-computer.ts";
 import { attachForTurn, saveBotAttachment } from "./bots/bot-attachment.ts";
-import { cacheUntilConfigChanges, ensureDirs, instanceConfigs, loadConfig, changedInstanceIds, engineLaunches, localVmIdleTimeoutMinutes, localVmMaxInstances, localVmMode, roomTurnTimeoutMinutes, mcpCallTimeoutMinutes, cacheKeepWarmSettings, threadEventLogMaxBytes, maxConcurrentBotThreads, threadEventLogRetentionDays, saveConfig, showToolCallsEnabled, routinesInConversationEnabled, claudeUserMcpEnabled, skillAuthoringEnabled, skillReviewEnabled, skillReviewSteps, autoRecallEnabled, captureQuietMs, roomMemoryCaptureEnabled, tidyHour, builtInBrowserEnabled, llmThreadTitlesEnabled, browserProfilePartitionTarget, stripWorkspaceCredentialEnv, PROVIDER_CREDENTIAL_ENV, persistableInstanceConfigs, type AppConfig, vpsSshAlias, DATA_DIR, customMcpServers, onConfigSaved, CLAUDE_API_INSTANCE, liveSettingsFor, openCodeProviderKeys } from "./config/config.ts";
+import { cacheUntilConfigChanges, ensureDirs, instanceConfigs, loadConfig, changedInstanceIds, engineLaunches, localVmIdleTimeoutMinutes, localVmMaxInstances, localVmMode, roomTurnTimeoutMinutes, mcpCallTimeoutMinutes, cacheKeepWarmSettings, threadEventLogMaxBytes, maxConcurrentBotThreads, threadEventLogRetentionDays, saveConfig, showToolCallsEnabled, routinesInConversationEnabled, claudeUserMcpEnabled, skillAuthoringEnabled, skillReviewEnabled, skillReviewSteps, autoRecallEnabled, captureQuietMs, roomMemoryCaptureEnabled, tidyHour, builtInBrowserEnabled, llmThreadTitlesEnabled, browserProfilePartitionTarget, stripWorkspaceCredentialEnv, PROVIDER_CREDENTIAL_ENV, persistableInstanceConfigs, type AppConfig, vpsSshAlias, DATA_DIR, customMcpServers, onConfigSaved, CLAUDE_API_INSTANCE, openCodeProviderKeys } from "./config/config.ts";
 import { sweepThreadEventLogs, type ThreadLogRetentionCandidate } from "./storage/thread-retention.ts";
 import { ComputerControl } from "./computers/computer-control.ts";
 import { augmentedPath, resetPathCache } from "./platform/env-path.ts";
@@ -129,7 +128,7 @@ import { promptWithReply, transcriptText } from "./agent/replies.ts";
 import type { DataContext } from "./data/context.ts";
 import { promptWithDataContext } from "../shared/data-context.ts";
 import { admit } from "./agent/admission.ts";
-import { drainSteeredMessages, hasQueuedSteeredMessages, isSteeredMessageQueued, onSteeredQueueChange, queuedSteerSnapshot, queuedSteeredMessage, queuedThreadPosition, queueSteeredMessage, restoreSteeredMessages } from "./teams/steer-queue.ts";
+import { drainSteeredMessages, hasQueuedSteeredMessages, onSteeredQueueChange, queuedSteerSnapshot, queuedSteeredMessage, queuedThreadPosition, queueSteeredMessage, restoreSteeredMessages } from "./teams/steer-queue.ts";
 import { drainChannelMessages, queuedChannelMessage, queueChannelMessage, restoreChannelMessages, type ChannelQueueItem } from "./teams/channel-queue.ts";
 import { acceptedSendMatch, sendFingerprint, SendSequencer } from "./agent/send-idempotency.ts";
 import { EventBus } from "./harness/bus.ts";
@@ -144,7 +143,7 @@ import type { ProviderInstance } from "./harness/contracts.ts";
 import { readyToRun, selectDefaultModelSelection, withNewBotEffort, type SelectableInstance } from "./model-catalog/default-model-selection.ts";
 import { threadModelFallback, type ThreadEngine } from "./agent/thread-model.ts";
 import { computerEngineMoveText, removedComputerInstanceIds, writeComputerEngineMoveLines } from "./computers/computer-engine-removal.ts";
-import { cancelPeerApprovalsFor, cancelPeerApprovalsForThread, dismissStalePeerCards, peerApprovalFailure, requestPeerApproval, resolvePeerComms, type ApprovalBus } from "./teams/peer-approval.ts";
+import { cancelPeerApprovalsFor, cancelPeerApprovalsForThread, dismissStalePeerCards, peerApprovalFailure, requestPeerApproval, type ApprovalBus } from "./teams/peer-approval.ts";
 import { peerDeliveryReceipt, type PeerDeliveryReceipt } from "./teams/peer-delivery.ts";
 import { createRoomAccess } from "./host/room-access.ts";
 import { createRoomJobs, parallelRoomJobsEnabled, type RoomRoundLine } from "./host/room-jobs.ts";
@@ -152,20 +151,14 @@ import { CONSENT_RULE, escapeNotes, OUTSIDE, peerLineText, peerProvenanceNote, q
 import { decideRoomPost, emptyRoomPostBudget, type RoomPostAttempt, type RoomPostBudget } from "./teams/room-post-budget.ts";
 import { pageSize, slimMessage } from "./host/message-pages.ts";
 import { mentionedBots, roomResponders, sectionKey, Store, threadTitleFrom, titleFromLlm, type BotRecord, type GroupDefaultResponder, type GroupRecord, type Message, type TaskRecord, toWireTask } from "./storage/store.ts";
-import * as tts from "./voice/tts/index.ts";
 import { createDecider, deciderReady, describeDecider } from "./decider/index.ts";
 import { decideRoomResponder, type RoomRoutingInput } from "./decider/room-routing.ts";
-import { createLiveSession, liveAttachUrl, liveHistoryFrom, LiveSessionError, type LiveBot, type LiveHistoryMessage } from "./voice/live-call.ts";
-import { LiveCallController, LiveCallSignedOutError, type LiveSocket } from "./voice/live-call-controller.ts";
-import { ProPlan } from "./usage/pro-plan.ts";
-import { recordLiveCall, spokenLineFields, titleLiveCall } from "./voice/live-call-record.ts";
-import { narrateTool, toUtterances } from "./voice/tts/speech-text.ts";
 import { turnStartLogLine } from "./agent/turn-log.ts";
 import { TurnStops, outwardActions, stoppedTurnOutcome, turnEvidence } from "./agent/turn-outcome.ts";
 import { buildRecoveryText, buildTurnContext, engineIsFresh, replaysNatively } from "./agent/turn-context.ts";
 import { Handoffs, handedStateUsable, isContextMessage, recordHanded, renderUnseen, sessionStart, unseenMessages, withUnseenMessages, type ContextMessage } from "./agent/delta-context.ts";
 import { extractReplayImages, extractTurnImages } from "./agent/turn-images.ts";
-import { callTitleExcerpt, threadTitlePrompt, type ThreadTitleSource } from "./agent/thread-title.ts";
+import { threadTitlePrompt, type ThreadTitleSource } from "./agent/thread-title.ts";
 import { TurnWatchdog } from "./agent/turn-watchdog.ts";
 import { TurnResources, type TurnOwner } from "./agent/turn-resources.ts";
 import { ensureWorkspace, workspaceLocationsPrompt, supportsWorkspaceFiles, updateMemory, appendMemoryLog, memoryLogPath, memorySystemPrompt, memorySourceLabel, searchMemoryFiles, SESSION_SEARCH_SYSTEM_PROMPT, workspaceDir } from "./workspace/workspace.ts";
@@ -291,7 +284,6 @@ import { createBotSkillsRoutes } from "./routes/bot-skills.ts";
 import { createSkillShareRoutes } from "./routes/skill-share.ts";
 import { createTeamContextRoutes } from "./routes/team-context.ts";
 import { createDeciderRoutes } from "./routes/decider.ts";
-import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts";
 import { createBrowserSiteRoutes } from "./routes/browser-sites.ts";
 import { createInternalSignInRoutes } from "./routes/sign-in.ts";
 import { createInternalThreadRoutes } from "./routes/internal-threads.ts";
@@ -318,7 +310,6 @@ import { createSetupImportRoutes } from "./routes/setup-import.ts";
 import { createComputerRoutes } from "./routes/computers.ts";
 import { createStatusRoutes } from "./routes/status.ts";
 import { findAntigravityLeftovers, removeAntigravityLeftovers } from "./drivers/antigravity-temp.ts";
-import { createLiveRoutes } from "./routes/live.ts";
 import { createNotificationRoutes } from "./routes/notifications.ts";
 import { createUsageRoutes } from "./routes/usage.ts";
 import { createBotMessageRoutes } from "./routes/bot-messages.ts";
@@ -695,19 +686,19 @@ function cardAnswererFor(auth: RequestAuth): CardAnswerer {
 
 
 
-async function answeringCardAs(auth: RequestAuth, threadId: string, requestId: string, work: () => Promise<unknown>, via?: "call"): Promise<void> {
+async function answeringCardAs(auth: RequestAuth, threadId: string, requestId: string, work: () => Promise<unknown>): Promise<void> {
   const open = (() => {
     const card = store.messagesFor(threadId).find((message) => message.card?.requestId === requestId)?.card;
     return Boolean(card && !card.answered && !card.dismissed && !card.expired);
   })();
   
   try {
-    await withDecisionActor(decisionActorFor(auth), work, via);
+    await withDecisionActor(decisionActorFor(auth), work);
   } finally {
     const message = open ? store.messagesFor(threadId).find((candidate) => candidate.card?.requestId === requestId) : undefined;
     const card = message?.card;
     if (message && card && !card.answeredBy && card.answered !== "unavailable" && (card.answered || card.dismissed)) {
-      store.patchMessage(threadId, message.id, { card: { ...card, answeredBy: { ...cardAnswererFor(auth), ...(via ? { via } : {}) } } });
+      store.patchMessage(threadId, message.id, { card: { ...card, answeredBy: { ...cardAnswererFor(auth) } } });
     }
     
   }
@@ -1199,16 +1190,12 @@ const browserCleanup: BrowserCleanupCoordinator = new BrowserCleanupCoordinator(
     return true;
   },
 });
-
-const proPlan = new ProPlan({ cloudHome: CLOUD_HOME !== null });
 utilityParentPort?.on("message", (event) => {
   const message = event?.data;
   try {
     if (applyDesktopMutationTokenMessage(message)) return;
     if (handleDesktopTrustedApprovalMessage(message)) return;
     if (browserCleanup.receive(message)) return;
-    
-    if (proPlan.receive(message)) return;
     composio.applyManagedBrokerMessage(message);
   } catch (error) {
     console.error(`[desktop-sync] rejected private parent message: ${error instanceof Error ? error.message : String(error)}`);
@@ -1547,13 +1534,8 @@ function agentsIntegration(
       // Only advertises the tools; the routes behind them refuse regardless.
       OMB_SHARED_COMPUTERS_ENABLED: "0",
       OMB_CLOUD_HOME: "0",
-      OMB_VOICE_NOTES: (() => {
-        const speaking = botForThread(botId, threadId) ?? store.bot(botId);
-        return tts.voiceReady(cfg, speaking?.voice) && speaking?.voiceNotes !== false ? "1" : "0";
-      })(),
       OMB_CHIEF_OF_STAFF: store.bot(botId)?.chiefOfStaff === true ? "1" : "0",
-      OMB_ESCALATIONS: chiefEscalationsEnabled(cfg) ? "1" : "0",
-    },
+      OMB_ESCALATIONS: chiefEscalationsEnabled(cfg) ? "1" : "0"},
   };
 }
 
@@ -4308,7 +4290,6 @@ async function waitForChatRoomMember(
 ): Promise<"run" | "skip" | "stop"> {
   const waitTool = {
     name: `${bot.name} is finishing another conversation — will reply here when free`,
-    spoken: `${bot.name} is finishing another conversation`,
   };
   let waitChip: Message | undefined;
   const availability = await waitForGroupMemberBot(bot, operation, () => {
@@ -4602,7 +4583,7 @@ function audienceChanged(): void {
 }
 // Before any revocation callback: Cloud boot can revoke sessions before routes are registered.
 const upgrades = createUpgrades();
-const desktopViewer = createDesktopViewer({
+const desktopViewer = createDesktopViewer( {live: auth => auth.kind === "loopback" || sessions.isLive(auth.session.id),
   upgrades,
   target: (id) => {
     if (id.startsWith("vps/")) {
@@ -4622,7 +4603,6 @@ const desktopViewer = createDesktopViewer({
       touch: target => localVmIdleFor(target).touch(),
     });
   },
-  live: auth => auth.kind === "loopback" || sessions.isLive(auth.session.id),
   // A control lease opens only the computer it holds, and only when that is the desktop being viewed.
   lease: (id, botId, controlLeaseId, threadId) => {
     const bot = store.bot(botId);
@@ -4630,8 +4610,7 @@ const desktopViewer = createDesktopViewer({
     const key = botComputerControlKey(bot);
     const holds = () => computerControl.ownsLease(key, controlLeaseId);
     return holds() ? holds : undefined;
-  },
-});
+  }});
 function closeSessionStreams(sessionId: string): void {
   browserLive.closeForOwner(sessionId);
   desktopViewer.closeForOwner(sessionId);
@@ -4808,58 +4787,6 @@ async function answerRequest(
     });
   }
   return outcome;
-}
-
-type CardRespondResult = { ok: true } | { ok: false; status: number; error: string };
-
-async function respondToCard(input: {
-  auth: RequestAuth;
-  threadId: string;
-  requestId: string;
-  behavior: "allow" | "deny" | "answer";
-  message?: string;
-  callId?: string;
-}): Promise<CardRespondResult> {
-  const { auth, threadId, requestId, behavior, message, callId } = input;
-  // A call outlives the request that started it: the session must still be valid.
-  if (auth.kind === "session" && !sessions.isLive(auth.session.id)) {
-    return { ok: false, status: 401, error: "The session that started this call has ended." };
-  }
-  const refusal = cardAnswerRefusal(auth, threadId, requestId, behavior);
-  if (refusal) return { ok: false, status: 403, error: refusal };
-  const bot = store.botByThread(threadId);
-  if (!bot) return { ok: false, status: 404, error: "The chat is gone." };
-  const cardMessage = store.messagesFor(threadId).find((candidate) => candidate.card?.requestId === requestId);
-  const card = cardMessage?.card;
-  const refused = liveDecisionRefusal(card);
-  if (refused) return { ok: false, status: 409, error: refused };
-  let result: CardRespondResult = { ok: true };
-  await answeringCardAs(auth, threadId, requestId, async () => {
-    if (card && resolvePeerComms(approvalBus, requestId, behavior)) return;
-    const outcome = await answerRequest(
-      threadId, botForThread(bot.id, threadId)?.modelSelection.instanceId ?? "", requestId, behavior, message,
-      { id: bot.id, name: bot.name },
-    );
-    if (outcome === "unavailable" && isPersistentQuestionCard(card) && behavior === "answer" && cardMessage) {
-      const answer = message?.trim() ?? "";
-      if (!answer) {
-        result = { ok: false, status: 400, error: "A question answer is required." };
-      } else if (auth.kind === "session" && !sessions.isLive(auth.session.id)) {
-        result = { ok: false, status: 401, error: "The session that started this call has ended." };
-      } else {
-        try {
-          await deliverLateQuestionAnswer(auth, threadId, requestId, answer, cardMessage, bot, "call", callId);
-        } catch (error) {
-          result = { ok: false, status: 409, error: error instanceof Error ? error.message : "The late answer could not be queued." };
-        }
-      }
-    } else if (outcome === "unavailable") {
-      result = { ok: false, status: 409, error: "The request is no longer open." };
-    } else if (behavior === "answer" && outcome !== "answered") {
-      result = { ok: false, status: 409, error: "The provider did not accept that answer. Try an offered option." };
-    }
-  }, "call");
-  return result;
 }
 
 function closeOpenApprovals(threadId: string): void {
@@ -6184,7 +6111,6 @@ bus.subscribe((event: RuntimeEvent) => {
         const messageId = toolMessageByItem.get(itemKey);
         let toolName = "tool";
         if (messageId) {
-          // The whole tool object is replaced, so carry `spoken` across.
           const existing = store.messagesFor(event.threadId).find((m) => m.id === messageId)?.tool;
           toolName = existing?.name ?? "tool";
           store.patchMessage(event.threadId, messageId, {
@@ -6208,7 +6134,7 @@ bus.subscribe((event: RuntimeEvent) => {
         const message = pushMessage({
           role: "bot",
           kind: "activity",
-          tool: { name, spoken: narrateTool(name) ?? undefined, summary: event.summary, input: event.input, itemId: event.itemId ?? event.eventId },
+          tool: { name, summary: event.summary, input: event.input, itemId: event.itemId ?? event.eventId },
           turnId: liveTurnId,
         });
         if (event.itemId) toolMessageByItem.set(`${event.threadId}:${event.itemId}`, message.id);
@@ -6682,7 +6608,9 @@ function openPersonCard(threadId: string): { kind: "approval" | "question" | "re
   const messages = store.messagesFor(threadId);
   for (let i = messages.length - 1; i >= 0; i--) {
     const card = messages[i]!.kind === "options" ? messages[i]!.card : undefined;
-    const kind = liveCardKind(card);
+    const kind = !card?.requestId || card.answered || card.dismissed || card.expired ? null
+      : card.skillRequest || card.routineRequest || card.profileRequest || card.modelRequest || card.teamSetupRequest || card.quotaSwitch ? "review"
+      : card.tool ? "approval" : "question";
     if (kind) return { kind, tool: card?.tool };
   }
   return undefined;
@@ -6905,10 +6833,9 @@ const roomSessions = createRoomSessions({ settings: () => cfg.context, messagesF
 const nativeCompactTokens = (instance: { driverKind: string; instanceId: string }) => instance.driverKind === "claudeAgent" ? Number(autoCompactWindow({ ...process.env, ...cfg.instances?.[instance.instanceId]?.environment })) : undefined;
 
 const loopingEngine = (threadId: string, bot = store.botByThread(threadId)) => bot ? runningTurnInstance(botForThread(bot.id, threadId), threadId)?.adapter : undefined;
-const repeats = createLoopGuard({
+const repeats = createLoopGuard( {live: (threadId) => { const bot = store.botByThread(threadId); return Boolean(bot && threadBusy(bot.id, threadId)); },
   settings: () => loopGuardSettings(cfg),
   append: (threadId, tool) => void store.appendMessage(threadId, { role: "bot", kind: "activity", tool }),
-  live: (threadId) => { const bot = store.botByThread(threadId); return Boolean(bot && threadBusy(bot.id, threadId)); },
   waiting: (threadId) => watchdog.waiting(threadId),
   canSteer: (threadId) => {
     const engine = loopingEngine(threadId);
@@ -6922,8 +6849,7 @@ const repeats = createLoopGuard({
     turnStops.stopping(threadId, liveTurnByThread.get(threadId), cause);
     routines?.failThread(threadId, `${cause.charAt(0).toUpperCase()}${cause.slice(1)}`);
     await interruptDirectThread(bot.id, threadId, cause);
-  },
-});
+  }});
 bus.subscribe((event: RuntimeEvent) => { if (!shouldIgnoreProviderEvent(event)) repeats.onEvent(event); });
 
 // Registered after the main fold, so busy is already false here; not gated on event.ok, since queued messages are the user's own words.
@@ -6969,7 +6895,7 @@ function drainQueuedSendsNow() {
   );
 }
 
-async function startOrQueueDirectMessage(botId: string, threadId: string, text: string, replyTo?: Message, sendId?: string, sender?: ResolvedSender, trigger?: UsageTrigger, via?: "call", callId?: string, dataContext?: DataContext) {
+async function startOrQueueDirectMessage(botId: string, threadId: string, text: string, replyTo?: Message, sendId?: string, sender?: ResolvedSender, trigger?: UsageTrigger, dataContext?: DataContext) {
   const decision = admit("direct", {}, {
     atCapacity: botAtThreadCapacity(botId),
     threadBusy: threadBusy(botId, threadId),
@@ -6985,12 +6911,10 @@ async function startOrQueueDirectMessage(botId: string, threadId: string, text: 
       prompt: promptWithReply(promptWithDataContext(text, dataContext), replyTo, cfg.profile?.name?.trim() || "User"),
       sender,
       trigger,
-      via,
-      callId,
     });
     return { ok: true as const, queued: true as const, queueId: queued.id, threadId, reason: decision.reason };
   }
-  const message = await startTurn(botId, text, { threadId, replyTo, sendId, sender, trigger, via, callId, dataContext });
+  const message = await startTurn(botId, text, { threadId, replyTo, sendId, sender, trigger, dataContext });
   return { ok: true as const, threadId, message };
 }
 
@@ -7029,14 +6953,12 @@ async function acceptDirectSend(
     replyTo?: Message;
     sender?: ResolvedSender;
     trigger: UsageTrigger;
-    via?: "call";
-    callId?: string;
     dataContext?: DataContext;
     personPresent: boolean;
   },
   guardedStart?: (currentAtStart: BotRecord) => Promise<DirectSendReceipt>,
 ): Promise<DirectSendReceipt> {
-  const { botId, threadId, text, sendId, replyTo, sender, trigger, via, callId, dataContext, personPresent } = input;
+  const { botId, threadId, text, sendId, replyTo, sender, trigger, dataContext, personPresent } = input;
   const refused = directSendRefusal(botId, threadId);
   if (refused) throw refused;
   return sendSequencer.run(
@@ -7128,15 +7050,13 @@ async function acceptDirectSend(
             sendId,
             ...(dataContext ? { dataContext } : {}),
             steered: true,
-            sender,
-            ...spokenLineFields(via, callId),
-          });
+            sender});
           store.setTaskAskedAt(botId, threadId, message.at);
           handoffs.steered(threadId, steerTarget, instance?.instanceId, message.id);
           return { ok: true as const, steered: true as const, threadId, message };
         }
         if (!current.busy) {
-          return startOrQueueDirectMessage(botId, threadId, text, replyTo, sendId, sender, trigger, via, callId, dataContext);
+          return startOrQueueDirectMessage(botId, threadId, text, replyTo, sendId, sender, trigger, dataContext);
         }
         const queued = queueSteeredMessage(current.id, threadId, text, {
           replyToId: replyTo?.id,
@@ -7145,12 +7065,10 @@ async function acceptDirectSend(
           prompt: promptWithReply(promptWithDataContext(text, dataContext), replyTo, cfg.profile?.name?.trim() || "User"),
           sender,
           trigger,
-          via,
-          callId,
         });
         return { ok: true as const, queued: true as const, queueId: queued.id, threadId };
       }
-      return startOrQueueDirectMessage(botId, threadId, text, replyTo, sendId, sender, trigger, via, callId, dataContext);
+      return startOrQueueDirectMessage(botId, threadId, text, replyTo, sendId, sender, trigger, dataContext);
     },
   );
 }
@@ -7162,8 +7080,6 @@ async function deliverLateQuestionAnswer(
   answer: string,
   cardMessage: Message,
   owner: BotRecord,
-  via?: "call",
-  callId?: string,
 ): Promise<{ queued: boolean }> {
   const group = store.groupByThread(threadId);
   const roomTarget = group
@@ -7226,7 +7142,7 @@ async function deliverLateQuestionAnswer(
       startGroupTurn(current.id, text, cardMessage, sendId, "chat", undefined, { threadId, sender, trigger });
       return { queued: false };
     }
-    const direct = await startOrQueueDirectMessage(owner.id, threadId, text, cardMessage, sendId, sender, trigger, via, callId);
+    const direct = await startOrQueueDirectMessage(owner.id, threadId, text, cardMessage, sendId, sender, trigger);
     return { queued: "queued" in direct && Boolean(direct.queued) };
   });
 
@@ -7444,8 +7360,6 @@ async function startTurn(
     computerSelectionContinuation?: boolean;
     replyTo?: Message;
     sendId?: string;
-    via?: "call";
-    callId?: string;
     relayed?: boolean;
     dataContext?: DataContext;
     onDispatchError?: (message: string) => void;
@@ -7542,13 +7456,8 @@ async function startTurn(
         .catch(() => undefined);
     }
   }
-
-  // Spoken words never reach the log.
-  const turnLineIds = new Set(opts?.excludeMessageIds ?? []);
-  const spoken = opts?.via === "call" || opts?.userMessage?.via === "call" ||
-    (turnLineIds.size > 0 && store.messagesFor(threadId).some((message) => turnLineIds.has(message.id) && message.via === "call"));
   console.log(turnStartLogLine({
-    botId, text: resolvedImages.text, images: turnImages.length, depth: commsDepth, card: Boolean(opts?.cardContinuation), spoken,
+    botId, text: resolvedImages.text, images: turnImages.length, depth: commsDepth, card: Boolean(opts?.cardContinuation),
   }));
   const instanceId = instance.instanceId;
   const automated = commsDepth > 0 || opts?.automationSource !== undefined
@@ -7582,9 +7491,7 @@ async function startTurn(
           ...(opts?.dataContext ? { dataContext: opts.dataContext } : {}),
           peerAsk: opts?.peerAsk,
           sender: opts?.sender,
-          ...spokenLineFields(opts?.via, opts?.callId),
-          ...(opts?.relayed ? { relayed: true } : {}),
-        });
+          ...(opts?.relayed ? { relayed: true } : {})});
   }
   const personLine = !opts?.coordination && !opts?.cardContinuation && !opts?.automationSource && !opts?.compactOnly
     && !opts?.computerSelectionContinuation && !opts?.editedMessageId && !commsDepth && !opts?.peerAsk && !userMessage.peerAsk;
@@ -11970,10 +11877,8 @@ function configStatus() {
 
     vps: { configured: Boolean(vpsSshAlias(cfg)), sshAlias: vpsSshAlias(cfg) ?? "" },
     opencodeGo: { configured: Boolean(cfg.opencodeGo?.apiKey), providerKeys: Object.keys(openCodeProviderKeys(cfg)) },
-    tts: tts.describeVoice(cfg),
     decider: describeDecider(cfg),
     imageGen: avatarImageStatus(cfg),
-    live: liveSettingsFor(cfg),
     profile: { name: cfg.profile?.name ?? "", email: cfg.profile?.email ?? "", aboutMe: cfg.profile?.aboutMe ?? "" },
     managedPolicy: managedPolicy.summary(),
     ...({}),
@@ -12021,8 +11926,7 @@ function configStatus() {
     // partitionId is read-only routing metadata: config PATCH rejects callers that try to choose it.
     browserProfiles: cfg.browserProfiles ?? [],
     signIn: { admins: cfg.signIn?.admins ?? [], members: cfg.signIn?.members ?? [] },
-    membership: workspaceMembership(),
-  };
+    membership: workspaceMembership()};
 }
 
 function configForAccess(status: ReturnType<typeof configStatus>, admin: boolean) {
@@ -12401,7 +12305,7 @@ ROUTES.push(createBotMemoryRoutes({
     broadcast({ kind: "config", ...configStatus() });
   },
 }));
-ROUTES.push(createDeciderRoutes({ decider, config: () => cfg }), createNotificationRoutes(), createUpdateCheckRoutes({ check: serverUpdateChecker({ desktopManaged: DESKTOP_MANAGED, managed: Boolean(HOSTED_WORKSPACE) }) }));
+ROUTES.push(createDeciderRoutes({ decider, config: () => cfg }), createNotificationRoutes());
 ROUTES.push(createSignInCardRoutes({ settle: settleSignIn, saveLogin: saveLoginFromCard, saveTarget: signInSaveTarget, threadVisible: (auth, threadId) => visibleTo(viewerFor(auth)).thread(threadId) }));
 ROUTES.push(createRoomHoldRoutes({
   group: (id) => store.group(id),
@@ -12640,108 +12544,12 @@ ROUTES.push(createBrowserViewerRoutes({
   restartRefusal: (session) => browserRestartRefusal(browserRuntime.interrupted(session), store.bots.filter((candidate) => candidate.busy
     && currentBrowserSession(candidate.id, candidate.browserProfile) === session).map((candidate) => ({ waitingOnBrowser: computerControl.snapshot(candidate.id).help?.place === "browser" }))),
 }));
-
-// Live calls: the client holds the WebRTC audio; the key never leaves the harness, which creates the session.
-function liveBotFor(botId: string): LiveBot {
-  const bot = store.bot(botId);
-  if (!bot) throw new LiveSessionError("That bot no longer exists.", 404);
-  return { name: bot.name, title: bot.title, description: bot.description };
-}
-function liveHistoryFor(threadId: string): LiveHistoryMessage[] {
-  return liveHistoryFrom(store.activePath(threadId));
-}
-/** A signed-out or removed person's call must not keep reaching the bot or spending the key. */
-function liveSignedIn(auth: RequestAuth): boolean {
-  return auth.kind !== "session" || sessions.isLive(auth.session.id);
-}
-/** On the bot's own engine, which already saw the requests, so nothing new reaches OpenAI. */
-function liveCallTitle(botId: string, threadId: string, excerpt: string): Promise<string | null> | null {
-  const bot = store.projectBotForTask(botId, threadId);
-  if (!bot) return null;
-  const gate = threadTitleGate(bot);
-  return gate.ok ? generateThreadTitle(gate.instance, excerpt, "call") : null;
-}
-const liveCalls = new LiveCallController({
-  store,
-  send: async ({ auth, botId, threadId, text, callId }) => {
-    if (!liveSignedIn(auth)) throw new LiveCallSignedOutError();
-    const receipt = await acceptDirectSend({
-      botId, threadId, text,
-      sendId: randomUUID().replaceAll("-", ""),
-      sender: messageSender(auth),
-      trigger: usageTriggerFor(auth),
-      via: "call",
-      callId,
-      personPresent: true,
-    });
-    if ("queued" in receipt) return { kind: "queued", queueId: receipt.queueId };
-    return { kind: receipt.steered ? "steered" : "started", messageId: receipt.message.id };
-  },
-  respond: async (input) => {
-    const result = await respondToCard(input);
-    if (result.ok) return { ok: true };
-    if (result.status === 401) throw new LiveCallSignedOutError();
-    return { ok: false, error: result.error };
-  },
-  queued: isSteeredMessageQueued,
-  signedIn: liveSignedIn,
-  personKey: (auth) => messageSender(auth)?.id,
-  activity: (botId, threadId) => {
-    const task = store.taskByThread(botId, threadId);
-    if (!task?.busy) return "idle";
-    return task.activity === "waiting-on-you" ? "waiting" : "working";
-  },
-  broadcast: (frame) => broadcast(frame, { adminOnly: true }),
-  pro: () => proPlan.liveCallsAllowed(),
-  settings: () => ({ key: cfg.live?.key ?? "", ...liveSettingsFor(cfg) }),
-  createSession: ({ key, sdp, botId, threadId, voice }) => createLiveSession({ key, sdp, voice, bot: liveBotFor(botId), history: liveHistoryFor(threadId), cloudHome: Boolean(CLOUD_HOME) }),
-  // Node's WebSocket (undici) accepts headers in its second argument.
-  openSocket: (url, key) => new WebSocket(url, { headers: { authorization: `Bearer ${key}` } } as unknown as string[]) as unknown as LiveSocket,
-  attachUrl: (sessionId) => liveAttachUrl(sessionId),
-  speakable: (text) => toUtterances(text),
-  // One "call" row per call: its id, times and length, never anything said on it.
-  recordCall: (input) => {
-    const row = recordLiveCall({
-      chatExists: (botId, threadId) => Boolean(store.taskByThread(botId, threadId)),
-      appendMessage: (threadId, message) => store.appendMessage(threadId, message),
-    }, input);
-    if (row) {
-      void titleLiveCall({
-        messagesFor: (threadId) => store.messagesFor(threadId),
-        patchMessage: (threadId, messageId, patch) => store.patchMessage(threadId, messageId, patch),
-        excerpt: callTitleExcerpt,
-        title: liveCallTitle,
-        scrub: redactSecretsInText,
-      }, { threadId: input.threadId, row });
-    }
-  },
-  log: (line) => console.log(line),
-});
-sessions.onSessionRevoked((sessionId) => liveCalls.sessionRevoked(sessionId));
 ROUTES.push(createDataRoutes({
   bot: (id) => store.bot(id),
   engine: dataEngine,
   sheets: dataSheets,
   compileChart, validateVegaLite, renderer: chartRenderer,
   exportRoots: dataExportRoots,
-}));
-ROUTES.push(createLiveRoutes({
-  calls: liveCalls,
-  resolveTarget: (botId, threadId) => {
-    const bot = store.bot(botId);
-    if (!bot) return null;
-    const target = threadId ?? bot.threadId;
-    if (store.botByThread(target)?.id !== bot.id) return null;
-    return { botId: bot.id, botName: bot.name, threadId: target };
-  },
-  settings: () => liveSettingsFor(cfg),
-  saveSettings: async (patch) => {
-    if (providerConfigBusy) throw Object.assign(new Error("Settings are already being updated. Try again in a moment."), { status: 409 });
-    saveConfig({ live: patch });
-    Object.assign(cfg, loadConfig());
-    broadcast({ kind: "config", ...configStatus() });
-    return liveSettingsFor(cfg);
-  },
 }));
 
 const toolResults = new ToolResults();
@@ -14073,10 +13881,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         if (!owner) return json(res, 403, { error: "source conversation does not belong to sender" });
         const groupId = String(body.groupId ?? "").trim();
         const message = String(body.message ?? "").trim();
-        const attachVoiceNote = body.attachVoiceNote === true;
-        if (body.attachVoiceNote !== undefined && typeof body.attachVoiceNote !== "boolean") {
-          return json(res, 400, { error: "attachVoiceNote must be true or false" });
-        }
         if (!groupId || !message) {
           return json(res, 400, { error: "post_to_room needs group_id (from list_rooms) and message" });
         }
@@ -14141,39 +13945,14 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         if (!decision.allowed) return json(res, 429, { error: decision.message });
         // Reading the mark keeps its window alive through a turn that only posts; an aged-out mark would hand the next hop to auto-approve.
         const unattended = isUnattended(poster.id, internalCapability.threadId);
-        let attachedVoiceNote = false;
-        let stagedAttachments: NonNullable<Message["attachments"]> = [];
-        let detachParkedAudio: (() => void) | undefined;
-        if (attachVoiceNote) {
-          const parkedKey = turnAttachmentKey(fromThreadId, liveTurnByThread.get(fromThreadId));
-          const parked = turnAttachmentsByTurn.get(parkedKey) ?? [];
-          const audio = parked.filter((attachment) => attachment.kind === "audio");
-          if (!audio.length) {
-            return json(res, 400, { error: "no voice note to attach — call send_voice_note in this turn first" });
-          }
-          stagedAttachments = audio.map((attachment) => ({
-            kind: "audio" as const,
-            path: attachment.path,
-            mime: attachment.mime,
-          }));
-          attachedVoiceNote = true;
-          // Unpark only after the append lands: a persistence failure must leave the clip parked.
-          detachParkedAudio = () =>
-            turnAttachmentsByTurn.set(
-              parkedKey,
-              parked.filter((attachment) => attachment.kind !== "audio"),
-            );
-        }
         const posted = store.appendMessage(room.threadId, {
           role: "bot",
           kind: "text",
           text: message,
           from: { botId: poster.id, name: poster.name, color: poster.color },
           peerPost: unattended ? { unattended: true } : {},
-          ...(attachedVoiceNote ? { attachments: stagedAttachments } : {}),
         });
         internalCapability.roomPosts = (internalCapability.roomPosts ?? 0) + 1;
-        detachParkedAudio?.();
         store.patchGroup(room.id, { unread: true });
         const chip: Omit<Message, "id" | "at"> = {
           role: "bot",
@@ -14183,7 +13962,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         };
         if (owner.group) chip.from = { botId: poster.id, name: poster.name, color: poster.color };
         store.appendMessage(fromThreadId, chip);
-        return json(res, 201, { ok: true, messageId: posted.id, roomName: room.name, attachedVoiceNote });
+        return json(res, 201, { ok: true, messageId: posted.id, roomName: room.name });
       }
       // start_thread never activates: a bot must not move what the person is looking at.
       if (method === "POST" && path === "/api/internal/threads") {
@@ -14505,39 +14284,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         // A turn stopped while the page was filled receives no answer.
         requireActiveInternalCapability();
         return json(res, 200, outcome);
-      }
-      if (method === "POST" && path === "/api/internal/voice-note") {
-        const body = await readInternalBody();
-        const text = typeof body.text === "string" ? body.text.trim() : "";
-        if (!text) return json(res, 400, { error: "text required" });
-        if (text.length > 1000) return json(res, 413, { error: "voice notes are limited to 1000 characters" });
-        // Advertisement is presentation only: re-check the capability here.
-        const voiceBot = botForThread(internalSender.id, internalCapability.threadId) ?? internalSender;
-        if (voiceBot.voiceNotes === false) {
-          return json(res, 403, { error: "voice notes are turned off for this bot" });
-        }
-        try {
-          const audio = await tts.speak(cfg, text, voiceBot.voice);
-          // Synthesis can outlive its turn: re-check before saving, so the clip never parks onto a later turn.
-          requireActiveInternalCapability();
-          const turnId = liveTurnByThread.get(internalCapability.threadId);
-          if (!turnId) {
-            return json(res, 409, { error: "this turn has not started yet or already ended" });
-          }
-          const saved = saveAudio(Buffer.from(audio.bytes), audio.mime);
-          const key = turnAttachmentKey(internalCapability.threadId, turnId);
-          const current = turnAttachmentsByTurn.get(key) ?? [];
-          current.push({ kind: "audio", path: saved.path, mime: saved.mime, text });
-          turnAttachmentsByTurn.set(key, current);
-          return json(res, 201, { attached: true });
-        } catch (error) {
-          if (error instanceof tts.NoVoiceConfigured) return json(res, 409, { error: error.message });
-          const status = (error as { status?: number }).status;
-          if (typeof status === "number" && status >= 400 && status < 500) {
-            return json(res, status, { error: error instanceof Error ? error.message : "voice note failed" });
-          }
-          throw error;
-        }
       }
       if (method === "POST" && path === "/api/internal/connectors/mcp") {
         const body = await readInternalBody();
@@ -15397,40 +15143,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       return json(res, 200, { ok: true, outcome: "stopped" });
     }
 
-    if (method === "POST" && path === "/api/tts/prepare") {
-      const body = await readBody(req);
-      return json(res, 200, {
-        ready: tts.voiceReady(cfg, typeof body.voiceId === "string" ? body.voiceId : undefined),
-        utterances: toUtterances(String(body.text ?? "")),
-      });
-    }
-    if (method === "GET" && path === "/api/tts/voices") {
-      try {
-        return json(res, 200, { voices: await tts.listVoices(cfg) });
-      } catch (e) {
-        return json(res, 200, { voices: [], error: e instanceof Error ? e.message : String(e) });
-      }
-    }
-    if (method === "POST" && path === "/api/tts/speak") {
-      const body = await readBody(req);
-      const text = String(body.text ?? "").trim();
-      if (!text) return json(res, 400, { error: "text required" });
-      // A hard ceiling, so an arbitrary local request cannot turn the hosted voice account into an unbounded billable job.
-      if (text.length > 500) return json(res, 413, { error: "voice utterances are limited to 500 characters" });
-      try {
-        const audio = await tts.speak(cfg, text, typeof body.voiceId === "string" ? body.voiceId : undefined);
-        res.writeHead(200, {
-          "content-type": audio.mime,
-          "content-length": String(audio.bytes.byteLength),
-          "cache-control": "no-store",
-        });
-        return res.end(Buffer.from(audio.bytes));
-      } catch (e) {
-        if (e instanceof tts.NoVoiceConfigured) return json(res, 409, { error: e.message });
-        return json(res, 502, { error: e instanceof Error ? e.message : String(e) });
-      }
-    }
-
     if (method === "GET" && path === "/api/connectors/catalog") {
       const { cards, source, pagination } = await composio.listToolkits(cfg);
       return json(res, 200, {
@@ -15814,7 +15526,6 @@ for (const row of chatFollowups()) {
     role: "user", kind: "text", text: row.payload.text, replyToId: row.payload.replyToId,
     sendId: row.payload.sendId, queueId: row.id, sender: row.payload.sender,
     ...(row.kind === "channel" ? { channelMode: row.payload.mode, via: row.payload.via } : {}),
-    ...(row.kind === "bot" ? spokenLineFields(row.payload.via, row.payload.callId) : {}),
   });
   const recoveredTask = row.kind !== "channel" ? store.taskByThread(row.ownerId, row.threadId) : undefined;
   const order = store.activePath(row.threadId).filter(isContextMessage).map((m) => m.id);
@@ -15928,7 +15639,6 @@ const gracefulShutdown = createGracefulShutdown({
       await Promise.all([...temporaries, browserSweep.closeAll()]);
       await browserRuntime.closeAll();
     },
-    () => liveCalls.shutdown(),
     () => flushAllProfileHistory(),
     () => flushAllMemoryJournals(),
     () => flushUsageLedger(DATA_DIR),

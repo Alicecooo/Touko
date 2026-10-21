@@ -16,7 +16,8 @@
     "src/**/*.test.tsx",
     "shared/**/*.test.ts",
     "server/**/*.test.ts",
-    "server/**/*.node-test.ts"
+    "server/**/*.node-test.ts",
+    "src/types/**/*.d.ts"
   ],
   "exclude": [
     "node_modules",

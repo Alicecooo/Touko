@@ -11,20 +11,13 @@ const browserCapabilities: DesktopCapabilities = {
     interaction: "none",
     reasonCode: "desktop-app-required",
   },
-  dictation: {
-    available: false,
-    engine: "none",
-    onDevice: false,
-    reasonCode: "desktop-app-required",
-  },
   localComputer: {
     available: false,
     support: "unsupported",
     enabled: false,
     status: "unavailable",
     reasonCode: "desktop-app-required",
-  },
-};
+  }};
 
 let cached: DesktopCapabilities | null = null;
 let cacheRevision = 0;
@@ -32,13 +25,6 @@ let cacheRevision = 0;
 export function initialDesktopCapabilities(): DesktopCapabilities {
   const platform = typeof window === "undefined" ? undefined : window.ogb?.platform;
   if (!platform) return browserCapabilities;
-  const isMac = false;
-  const dictation: DesktopCapabilities["dictation"] = {
-    available: isMac,
-    engine: "none",
-    onDevice: isMac,
-  };
-  dictation.reasonCode = "unsupported-platform";
   return {
     ...browserCapabilities,
     host: {
@@ -46,9 +32,7 @@ export function initialDesktopCapabilities(): DesktopCapabilities {
       platform: platform === "linux" || platform === "win32" ? platform : "other",
       label: platform === "linux" ? "Linux" : platform === "win32" ? "Windows" : "Desktop",
     },
-    windowChrome: platform === "win32" ? "win-caption" : "native",
-    dictation,
-  };
+    windowChrome: platform === "win32" ? "win-caption" : "native"};
 }
 
 export async function loadDesktopCapabilities(): Promise<DesktopCapabilities> {

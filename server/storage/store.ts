@@ -137,7 +137,6 @@ function redactBotAuthored<T extends Omit<Message, "id" | "at"> & { at?: number 
       detail: out.goalRun.detail ? redactSecretsInText(out.goalRun.detail) : undefined,
     };
   }
-  if (out.call?.title) out.call = { ...out.call, title: redactSecretsInText(out.call.title) };
   if (out.card) {
     const card = { ...out.card } as OptionCardData & { summary?: string };
     card.title = redactSecretsInText(card.title);
@@ -1711,19 +1710,6 @@ export class Store {
     } else this.saveBots();
     this.emit({ type: "bot", botId: id });
     return bot;
-  }
-
-  clearVoiceSelections(): BotRecord[] {
-    const changed = this.bots.filter((bot) => bot.voice !== undefined && bot.voice !== "");
-    if (!changed.length) return [];
-    const next = this.bots.map((bot) =>
-      bot.voice === undefined || bot.voice === "" ? bot : { ...bot, voice: undefined });
-    this.saveBots(next);
-    for (const bot of changed) {
-      delete bot.voice;
-      this.emit({ type: "bot", botId: bot.id });
-    }
-    return changed;
   }
 
   patchBotProfile(id: string, patch: BotProfilePatch & Partial<Pick<BotRecord, "cwd" | "lastProfileRequestId">>): BotRecord | null {

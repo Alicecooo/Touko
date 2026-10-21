@@ -21,12 +21,9 @@ export const BOT_PROFILE_PATCH_FIELDS = [
   "avatarFocusX",
   "avatarFocusY",
   "mascotBody",
-  "voice",
-  "speakReplies",
-  "replyStyle",
-] as const;
+  "replyStyle"] as const;
 
-export const profilePatchSchema = z.object({
+export const profilePatchSchema = z.object( {
   name: z
     .string({ error: "name must be a string" })
     .max(BOT_PROFILE_LIMITS.name, { error: "name must be at most 100 characters" })
@@ -59,33 +56,13 @@ export const profilePatchSchema = z.object({
   avatarFocusX: z.number({ error: "avatarFocusX must be a number from 0 to 1" }).finite().min(0).max(1).optional(),
   avatarFocusY: z.number({ error: "avatarFocusY must be a number from 0 to 1" }).finite().min(0).max(1).optional(),
   mascotBody: mascotBodySchema.optional(),
-  voice: z
-    .string({ error: "voice must be a string" })
-    .max(BOT_PROFILE_LIMITS.voice, { error: "voice must be at most 200 characters" })
-    .optional(),
-  speakReplies: z.boolean({ error: "speakReplies must be true or false" }).optional(),
-  replyStyle: z.enum(REPLY_STYLES, { error: "replyStyle must be default or conversational" }).optional(),
-});
+  replyStyle: z.enum(REPLY_STYLES, { error: "replyStyle must be default or conversational" }).optional()});
 
 export type BotProfilePatchInput = z.input<typeof profilePatchSchema>;
 
 export type BotProfilePatch = Partial<
   Pick<
-    BotRecord,
-    | "name"
-    | "title"
-    | "description"
-    | "soul"
-    | "notifications"
-    | "avatarUrl"
-    | "avatarCrop"
-    | "avatarZoom"
-    | "avatarFocusX"
-    | "avatarFocusY"
-    | "mascotBody"
-    | "voice"
-    | "speakReplies"
-    | "replyStyle"
+    BotRecord, "name" | "title" | "description" | "soul" | "notifications" | "avatarUrl" | "avatarCrop" | "avatarZoom" | "avatarFocusX" | "avatarFocusY" | "mascotBody" | "replyStyle"
   >
 >;
 

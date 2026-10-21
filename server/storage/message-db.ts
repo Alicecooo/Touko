@@ -208,8 +208,7 @@ export interface FollowupPayload {
   unattended?: boolean;
   peerAsk?: Message["peerAsk"];
   mode?: "chat" | "goal";
-  via?: "api" | "call";
-  callId?: string;
+  via?: "api";
   sender?: ResolvedSender;
   trigger?: UsageTrigger;
   origin?: WorkOrigin;

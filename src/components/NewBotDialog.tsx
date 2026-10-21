@@ -19,7 +19,7 @@ import { SkillsSection } from "./bot-settings/SkillsSection";
 import { AccessSection } from "./bot-settings/AccessSection";
 import { ModelSection } from "./bot-settings/ModelSection";
 import { PermissionsSection } from "./bot-settings/PermissionsSection";
-import { VoiceSection } from "./bot-settings/VoiceSection";
+import { NotificationsSection } from "./bot-settings/NotificationsSection";
 import { useBotSettingsDerived } from "./bot-settings/useBotSettingsDerived";
 import { BotEditorContext } from "./bot-settings/BotEditorContext";
 import { inputCls } from "./bot-settings/field";
@@ -29,12 +29,12 @@ import { SharePresetDialog } from "./SharePresetDialog";
 import { SettingRow } from "./SettingsPrimitives";
 import { Select } from "./Select";
 
-const SECTIONS = ["Identity", "Soul", "Skills", "Memory", "Routines", "Access", "Model", "Permissions", "Voice & alerts"] as const;
+const SECTIONS = ["Identity", "Soul", "Skills", "Memory", "Routines", "Access", "Model", "Permissions", "Notifications"] as const;
 type Section = typeof SECTIONS[number];
 const SECTION_KEYS: Record<Section, LocaleKey> = {
   Identity: "botSettings.sections.identity", Soul: "botSettings.sections.soul", Skills: "botSettings.sections.skills",
   Memory: "botSettings.sections.memory", Routines: "botSettings.sections.routines", Access: "botSettings.sections.access",
-  Model: "botSettings.sections.model", Permissions: "botSettings.sections.permissions", "Voice & alerts": "botSettings.sections.voice",
+  Model: "botSettings.sections.model", Permissions: "botSettings.sections.permissions", "Notifications": "notifications.title",
 };
 
 /** Companion pairing permits creation, but not reading host defaults or patching host settings. */
@@ -262,7 +262,7 @@ function DraftSection({ active, draft, defaultsMode }: { active: Section; draft:
   if (active === "Access") return <AccessSection bot={bot} derived={derived} />;
   if (active === "Model") return <ModelSection bot={bot} />;
   if (active === "Permissions") return <PermissionsSection bot={bot} derived={derived} />;
-  return <VoiceSection bot={bot} derived={derived} />;
+  return <NotificationsSection bot={bot} derived={derived} />;
 }
 
 function StartingRole({ draft, defaultsMode }: { draft: BotCreationDraft; defaultsMode: boolean }) {

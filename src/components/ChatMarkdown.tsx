@@ -351,19 +351,19 @@ export function CodeBlock({ code, lang, initialWrap = false }: CodeBlockProps) {
                 ? "bg-accent/15 text-accent font-medium"
                 : "text-ink-secondary hover:bg-raised hover:text-ink"
             }`}
-            title={wrapLines ? "Disable line wrapping" : "Wrap long lines"}
-            aria-label={wrapLines ? "Disable line wrapping" : "Wrap long lines"}
+            title={wrapLines ? t("codeBlock.disableWrap") : t("codeBlock.wrapLong")}
+            aria-label={wrapLines ? t("codeBlock.disableWrap") : t("codeBlock.wrapLong")}
             aria-pressed={wrapLines}
           >
             <WrapText size={12} aria-hidden="true" />
-            <span className="hidden sm:inline">{wrapLines ? "Unwrap" : "Wrap"}</span>
+            <span className="hidden sm:inline">{wrapLines ? t("codeBlock.unwrap") : t("codeBlock.wrap")}</span>
           </button>
           <button
             type="button"
             onClick={download}
             className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-ink-secondary hover:bg-raised hover:text-ink transition-colors"
-            title="Download snippet as file"
-            aria-label="Download snippet as file"
+            title={t("ui.label.downloadSnippetAsFile")}
+            aria-label={t("ui.label.downloadSnippetAsFile")}
           >
             <Download size={12} aria-hidden="true" />
             <span className="hidden sm:inline">{t("common.save")}</span>
@@ -372,8 +372,8 @@ export function CodeBlock({ code, lang, initialWrap = false }: CodeBlockProps) {
             type="button"
             onClick={copy}
             className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-ink-secondary hover:bg-raised hover:text-ink transition-colors"
-            title={copied === "copied" ? "Copied to clipboard" : copied === "failed" ? t("common.copyFailed") : "Copy code"}
-            aria-label={copied === "copied" ? "Code copied to clipboard" : copied === "failed" ? t("common.copyFailed") : "Copy code to clipboard"}
+            title={copied === "copied" ? t("codeBlock.copied") : copied === "failed" ? t("common.copyFailed") : t("codeBlock.copy")}
+            aria-label={copied === "copied" ? t("codeBlock.copiedAria") : copied === "failed" ? t("common.copyFailed") : t("codeBlock.copyAria")}
           >
             {copied === "failed" ? (
               <>
@@ -520,8 +520,8 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
             type="button"
             onClick={copy}
             className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-ink-secondary hover:bg-raised hover:text-ink transition-colors"
-            title={copied === "copied" ? "Copied to clipboard" : copied === "failed" ? t("common.copyFailed") : "Copy diagram source"}
-            aria-label={copied === "copied" ? "Diagram source copied to clipboard" : copied === "failed" ? t("common.copyFailed") : "Copy diagram source to clipboard"}
+            title={copied === "copied" ? t("codeBlock.copied") : copied === "failed" ? t("common.copyFailed") : t("codeBlock.copyDiagram")}
+            aria-label={copied === "copied" ? t("codeBlock.copiedDiagram") : copied === "failed" ? t("common.copyFailed") : t("codeBlock.copyDiagramAria")}
           >
             {copied === "failed" ? (
               <>
@@ -565,12 +565,12 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
 function LocalFileLink({ filePath, name, children, message }: { filePath: string; name?: string; children?: ReactNode; message?: MessageAttachmentContext }) {
   const save = useLocalFileSave(filePath, name, message);
   if (!message) {
-    return <span title="Unavailable legacy file reference" className="break-words text-ink-secondary">{children}</span>;
+    return <span title={t("ui.label.unavailableLegacyFileReference")} className="break-words text-ink-secondary">{children}</span>;
   }
   const label = save.state === "saving"
-    ? "Saving…"
+    ? t("codeBlock.saving")
     : save.state === "saved"
-      ? "Saved"
+      ? t("codeBlock.saved")
       : save.state === "failed"
         ? "Retry"
         : null;
@@ -582,7 +582,7 @@ function LocalFileLink({ filePath, name, children, message }: { filePath: string
         type="button"
         onClick={() => void save.save()}
         disabled={save.state === "saving"}
-        title="Save a copy"
+        title={t("ui.label.saveACopy")}
         className="inline-flex items-center gap-1 break-words text-start text-accent underline decoration-accent/40 hover:decoration-accent disabled:cursor-wait"
       >
         {children}
@@ -628,8 +628,8 @@ function Spoiler({ children }: { children?: ReactNode }) {
         </span>
         <button
           type="button"
-          aria-label="Reveal spoiler"
-          title="Reveal spoiler"
+          aria-label={t("ui.label.revealSpoiler")}
+          title={t("ui.label.revealSpoiler")}
           onClick={() => setRevealed(true)}
           className="absolute inset-0 rounded bg-raised/90"
         />
@@ -641,8 +641,8 @@ function Spoiler({ children }: { children?: ReactNode }) {
       {children}
       <button
         type="button"
-        aria-label="Hide spoiler"
-        title="Hide spoiler"
+        aria-label={t("ui.label.hideSpoiler")}
+        title={t("ui.label.hideSpoiler")}
         onClick={() => setRevealed(false)}
         className="ms-1 rounded px-0.5 text-[11px] text-ink-secondary hover:text-ink"
       >

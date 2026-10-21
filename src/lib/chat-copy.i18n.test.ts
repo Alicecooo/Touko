@@ -26,12 +26,6 @@ describe("live activity label", () => {
     expect(liveActivityLabel(activity("something_unknown"))).toBe("作業中");
   });
 
-  it("leaves the server's own narration alone", () => {
-    setLocale("pt-br");
-    expect(liveActivityLabel(activity("Edit", { spoken: "editando um arquivo" }))).toBe(
-      "Editando um arquivo",
-    );
-  });
 });
 
 describe("the memo key the transcript uses", () => {

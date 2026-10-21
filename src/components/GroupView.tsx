@@ -24,9 +24,6 @@ import { useAdvancedMode } from "@/lib/interface-mode";
 import { MESSAGE_ROW, MessageActions, messageActionClass } from "./MessageActions";
 import { useBotMessageMenu, userMessageMenu, type PinAction } from "./message-menu";
 import { RawMarkdownView, RawToggleAction } from "./RawMarkdownToggle";
-import { SpeakButton } from "./SpeakButton";
-import { useSpeech } from "@/lib/tts/useSpeech";
-import { localSystemVoiceActive } from "@/lib/local-voice";
 import { CancelledTurnRow } from "./CancelledTurnRow";
 import { isCancelledTranscriptRow } from "../../shared/client-cancel";
 import { roomRetryRequest } from "@/lib/room-retry";
@@ -49,9 +46,7 @@ import { SignInRequestCard } from "./SignInRequestCard";
 import { hasRoutineExecutionTask, RoutineRunCard } from "./RoutineRunCard";
 import { GoalRunCard } from "./GoalRunCard";
 import { AttachmentGallery, MessageAttachmentGallery, replyAttachmentGroup } from "./AttachmentGallery";
-import { VoiceNoteBubble, type VoiceNoteAttachment } from "./VoiceNoteBubble";
 import { OptionCard } from "./OptionCard";
-import { GroupCallOverlay, RoomHeaderCallButton } from "./GroupCallView";
 
 import { ApprovalCard } from "./ApprovalCard";
 import { QuestionCard } from "./QuestionCard";
@@ -196,28 +191,19 @@ function RoomTextMessage({
   const display = attachments?.display ?? rawText;
   const [expanded, setExpanded] = useState(false);
   const [viewRaw, setViewRaw] = useState(false);
-  const speech = useSpeech();
-  const speaking = speech.messageId === m.id && speech.status !== "idle";
   const focus = state.focusMessage;
   const focusedSearch = focus?.messageId === m.id && Boolean(focus.matchText) && focus.threadId === group.threadId;
   const collapsible = user && !expanded && (display.length > USER_COLLAPSE_CHARS || display.split("\n").length > USER_COLLAPSE_LINES);
   useEffect(() => { if (focusedSearch && collapsible) setExpanded(true); }, [focusedSearch, collapsible, focus?.nonce]);
   const simple = !useAdvancedMode();
-  const speakerBot = members.find((member) => member.id === m.from?.botId);
   const botText = rawText;
   const pin = roomPin(group, m, dispatch);
   const botMenu = useBotMessageMenu({
     text: botText,
-    botId: speakerBot?.id,
     messageId: m.id,
-    voiceId: speakerBot?.voice,
-    tts: state.config?.tts,
-    localVoice: localSystemVoiceActive(),
-    canSpeak: true,
     viewRaw,
     onToggleRaw: () => setViewRaw((raw) => !raw),
-    pin,
-  });
+    pin});
   const replyGroup = useMemo(() => !user && botText.trim() ? replyAttachmentGroup(botText, m.attachments) : null, [user, botText, m.attachments]);
   return (
     <div {...{ [MESSAGE_ROW]: "" }} className={cn("group flex w-full flex-col", user ? "items-end" : "items-start")}>
@@ -290,13 +276,7 @@ function RoomTextMessage({
             </>
           ) : (
             <MessageBoundary key={viewRaw ? "raw" : "rendered"} fallbackText={botText || t("chat.generatedImage")}>
-              {(m.attachments ?? []).some((attachment) => attachment.kind === "audio") && (
-                <div className={cn("flex flex-col", (m.text || (m.attachments ?? []).some((attachment) => attachment.kind === "image")) && "mb-2")}>
-                  {m.attachments!.filter((attachment): attachment is VoiceNoteAttachment => attachment.kind === "audio").map((note) => (
-                    <VoiceNoteBubble key={note.path} attachment={note} />
-                  ))}
-                </div>
-              )}
+              
               {!botText.trim() && <MessageAttachmentGallery text={botText} attachments={m.attachments} message={{ threadId: group.threadId, messageId: m.id }} className={m.text ? undefined : "mb-0"} eager={eager} />}
               {viewRaw && botText ? (
                 <div data-citation-source={m.id} data-citation-owner-type="group" data-citation-owner={group.id} data-citation-thread={group.threadId}><RawMarkdownView text={botText} /></div>
@@ -308,13 +288,11 @@ function RoomTextMessage({
           )}
         </div>
         {!user && (
-          <MessageActions side="bot" forceOpen={viewRaw || speaking} menu={botMenu}>
+          <MessageActions side="bot" forceOpen={viewRaw} menu={botMenu}>
             <ReplyAction onReply={() => onReply(m)} />
             {botText && <CopyButton text={botText} className={messageActionClass} />}
             {botText && viewRaw && <RawToggleAction active onToggle={() => setViewRaw(false)} className={messageActionClass} />}
-            {botText && speaking && (
-              <SpeakButton text={botText} botId={speakerBot?.id} messageId={m.id} voiceId={speakerBot?.voice} tts={state.config?.tts} localVoice={localSystemVoiceActive()} className={cn(messageActionClass, "text-accent")} />
-            )}
+            
           </MessageActions>
         )}
         <span className="self-end pb-1 text-[11px] tabular-nums text-ink-tertiary opacity-0 transition-opacity group-hover:opacity-100">
@@ -1300,7 +1278,7 @@ export function GroupView({ group }: { group: Group }) {
 
   return (
     <main className="relative flex h-full min-w-0 flex-1 flex-col bg-app">
-      <GroupCallOverlay group={group} members={members} />
+      
       {membersOpen && !remoteClient && !group.dm && (
         <ManageMembersPanel group={group} onClose={closeMembers} triggerRef={membersTriggerRef} />
       )}
@@ -1344,7 +1322,7 @@ export function GroupView({ group }: { group: Group }) {
             isGroup
           />
           {!setupPending && <ConversationTurnLimit group={group} />}
-          <RoomHeaderCallButton group={group} members={members} />
+          
           <GroupUsageChip usage={group.usage} />
           {!remoteClient && !setupPending && !group.dm && <RoomWorkingFolderChip group={group} onToggle={() => setFolderOpen((open) => !open)} />}
           {!remoteClient && !setupPending && !group.dm && <DefaultResponderSelect group={group} members={members} />}

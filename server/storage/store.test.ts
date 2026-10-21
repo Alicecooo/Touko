@@ -300,22 +300,6 @@ describe("Store", () => {
     for (const field of Object.keys(patch)) expect(wire).not.toHaveProperty(field);
   });
 
-  it("keeps a Live call row's record across a restart and scrubs a secret from its title", () => {
-    const store = new Store(selection);
-    const bot = store.createBot({}, { seedMessages: false });
-    const key = "sk-ant-" + "c".repeat(90);
-    const row = store.appendMessage(bot.threadId, {
-      role: "bot",
-      kind: "call",
-      text: "Call with Ada · 1:42",
-      call: { callId: "call-1", botId: bot.id, client: "ios", startedAt: 1_000, endedAt: 103_000, seconds: 102, endReason: "hung-up", title: `Deploy with ${key}` },
-    });
-    expect(row.call?.title).not.toContain(key);
-    const reloaded = new Store(selection).messagesFor(bot.threadId).find((message) => message.id === row.id);
-    expect(reloaded?.call).toMatchObject({ callId: "call-1", botId: bot.id, client: "ios", seconds: 102, endReason: "hung-up" });
-    expect(JSON.stringify(reloaded)).not.toContain(key);
-  });
-
   it("round-trips audio attachments with their metadata through persistence", () => {
     const store = new Store(selection);
     const bot = store.createBot({}, { seedMessages: false });
@@ -522,27 +506,6 @@ describe("Store", () => {
       text: `Hi, I'm ${bot.name}. What would you like me to do?`,
     });
     expect(bot.modelSelection).toEqual(selection());
-  });
-
-  it("clears provider-owned voice ids as one durable mutation", () => {
-    const store = new Store(selection);
-    const first = store.createBot();
-    const second = store.createBot();
-    store.patchBot(first.id, { voice: "provider-a-1" });
-    store.patchBot(second.id, { voice: "provider-a-2" });
-
-    const save = vi.spyOn(store as unknown as { saveBots(bots: BotRecord[]): void }, "saveBots");
-    save.mockImplementationOnce(() => { throw new Error("disk full"); });
-    expect(() => store.clearVoiceSelections()).toThrow("disk full");
-    expect(first.voice).toBe("provider-a-1");
-    expect(second.voice).toBe("provider-a-2");
-
-    expect(store.clearVoiceSelections().map((bot) => bot.id).sort()).toEqual([first.id, second.id].sort());
-    expect(first.voice).toBeUndefined();
-    expect(second.voice).toBeUndefined();
-    const reloaded = new Store(selection);
-    expect(reloaded.bot(first.id)?.voice).toBeUndefined();
-    expect(reloaded.bot(second.id)?.voice).toBeUndefined();
   });
 
   it("restarts with legacy bot and group migrations despite an unreadable team registry, without permitting later team writes", () => {

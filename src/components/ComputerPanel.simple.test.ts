@@ -66,7 +66,6 @@ vi.mock("./DesktopCapabilities", () => ({
       host: { platform: fixture.platform, label: "Host", session: "unknown", packaged: true, homeDir: "/Users/me" },
       windowChrome: "native",
       screenPreview: { available: false, interaction: "none" },
-      dictation: { available: false, engine: "none", onDevice: false },
       localComputer: { available: true, support: "supported", enabled: true, status: "ready" },
     },
   }),

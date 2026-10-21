@@ -8,7 +8,7 @@ vi.mock("@/state/store", async (importOriginal) => {
   return { ...original, useStore: () => ({ state: original.initialState, dispatch: vi.fn() }) };
 });
 vi.mock("./DesktopCapabilities", () => ({
-  useDesktopCapabilities: () => ({ capabilities: { dictation: { available: false } } }),
+  useDesktopCapabilities: () => ({ capabilities: {  } }),
   useCaptionChrome: () => ({}),
 }));
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }));

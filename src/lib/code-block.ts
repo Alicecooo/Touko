@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 const KNOWN_LANGUAGES: Record<string, string> = {
   js: "JavaScript",
   javascript: "JavaScript",
@@ -74,7 +75,7 @@ const KNOWN_LANGUAGES: Record<string, string> = {
 
 export function getLanguageDisplayName(lang?: string | null): string {
   if (!lang || !lang.trim()) {
-    return "Code";
+    return t("codeBlock.language");
   }
 
   const normalized = lang.trim().toLowerCase();
@@ -94,7 +95,7 @@ export function countLines(code?: string | null): number {
 }
 
 export function formatLineCount(count: number): string {
-  return count === 1 ? "1 line" : `${count} lines`;
+  return t(count === 1 ? "codeBlock.line" : "codeBlock.lines", { count });
 }
 
 const KNOWN_EXTENSIONS: Record<string, string> = {

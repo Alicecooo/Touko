@@ -20,7 +20,7 @@ vi.mock("@/state/store", async (importOriginal) => {
 });
 vi.mock("./DesktopCapabilities", async (importOriginal) => ({
   ...await importOriginal<typeof import("./DesktopCapabilities")>(),
-  useDesktopCapabilities: () => ({ capabilities: { dictation: { available: false }, host: { packaged: true, platform: "darwin" }, localComputer: { available: true } }, ready: true }),
+  useDesktopCapabilities: () => ({ capabilities: { host: { packaged: true, platform: "darwin" }, localComputer: { available: true } }, ready: true }),
   useCaptionChrome: () => ({}),
 }));
 vi.mock("@/lib/interface-mode", async (importOriginal) => ({

@@ -83,7 +83,7 @@ export function AvatarFraming({
         step={0.01}
         value={zoom}
         disabled={disabled}
-        aria-label="Zoom avatar"
+        aria-label={t("ui.label.zoomAvatar")}
         aria-valuemin={AVATAR_ZOOM_MIN}
         aria-valuemax={AVATAR_ZOOM_MAX}
         aria-valuenow={zoom}

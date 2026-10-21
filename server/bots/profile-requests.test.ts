@@ -200,36 +200,12 @@ describe("ProfileRequestService", () => {
     const { service, bot } = harness({ name: "Scout" });
     const attempt = (changes: unknown, reason: unknown = "r") =>
       () => service.propose({ botId: bot.id, threadId: bot.threadId, changes, reason });
-    expect(attempt({ voice: "alloy" })).toThrow("unsupported profile field: voice");
+    expect(attempt({ color: "blue" })).toThrow("unsupported profile field: color");
     expect(attempt({ autoApprove: true })).toThrow("unsupported profile field: autoApprove");
     expect(attempt({ soul: "x".repeat(24_001) })).toThrow("standing instructions must be at most 24000 bytes");
     expect(attempt({ name: "Kiwi" }, "")).toThrow("reason is required");
-    expect(attempt({})).toThrow("Choose at least one of name, title, description, soul, cwd, notifications, speakReplies");
+    expect(attempt({})).toThrow("Choose at least one of name, title, description, soul, cwd, notifications");
     expect(attempt({ name: "Scout" })).toThrow("Nothing would change");
-  });
-
-  it("proposes the alert and voice toggles as one-line before-and-after cards that apply on confirm", async () => {
-    const { service, store, bot } = harness({ name: "Scout" });
-    const proposed = service.propose({ botId: bot.id, threadId: bot.threadId, changes: { notifications: false }, reason: "r" });
-    expect(proposed.summary).toContain("notifications");
-    const card = store.messagesFor(bot.threadId).at(-1)!.card!;
-    expect(card.subtitle).toContain("Notifications: on → off");
-    expect(card.subtitle).toContain("Nothing runs.");
-    expect(card.subtitle).not.toContain("Changes what Scout is told");
-    expect(card.profileRequest!.before).toEqual({ notifications: true });
-    expect(service.resolve({ botId: bot.id, threadId: bot.threadId, requestId: proposed.requestId, behavior: "allow" }))
-      .toMatchObject({ claimed: true, state: "applied", fields: ["notifications"] });
-    expect(store.bot(bot.id)!.notifications).toBe(false);
-
-    const spoken = service.propose({ botId: bot.id, threadId: bot.threadId, changes: { speakReplies: true }, reason: "r" });
-    const spokenCard = store.messagesFor(bot.threadId).at(-1)!.card!;
-    expect(spokenCard.subtitle).toContain("Speak replies: off → on");
-    expect(service.resolve({ botId: bot.id, threadId: bot.threadId, requestId: spoken.requestId, behavior: "allow" }))
-      .toMatchObject({ state: "applied" });
-    expect(store.bot(bot.id)!.speakReplies).toBe(true);
-    await flushProfileHistory(bot.id);
-    expect(readHistory(bot.id).map((row) => row.field)).toEqual(["speakReplies", "notifications"]);
-    expect(readHistory(bot.id)[0].summary).toBe('speakReplies: "off" → "on"');
   });
 
   it("describes a mixed folder-and-toggle card without the instruction line, and a text-plus-toggle card with it", () => {
@@ -246,10 +222,10 @@ describe("ProfileRequestService", () => {
       rmSync(dir, { recursive: true, force: true });
     }
 
-    const spoken = service.propose({ botId: bot.id, threadId: bot.threadId, changes: { title: "Tracker", speakReplies: true }, reason: "r" });
-    expect(spoken.detail).toContain('Title: "" → "Tracker"');
-    expect(spoken.detail).toContain("Speak replies: off → on");
-    expect(spoken.detail).toContain("Changes what Scout is told on every turn. Nothing runs.");
+    const titled = service.propose({ botId: bot.id, threadId: bot.threadId, changes: { title: "Tracker", notifications: false }, reason: "r" });
+    expect(titled.detail).toContain('Title: "" → "Tracker"');
+    expect(titled.detail).toContain("Notifications: on → off");
+    expect(titled.detail).toContain("Changes what Scout is told on every turn. Nothing runs.");
   });
 
   it("fails a toggle card closed when the toggle moved after the card was prepared", () => {
