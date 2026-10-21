@@ -1,0 +1,77 @@
+# Installed dependencies and package-manager caches
+node_modules/
+.pnpm-store/
+.pnpm-cache/
+.pnpm-state/
+.npm/
+
+# Generated application bundles and release packages
+/dist/
+/dist-server/
+/dist-electron/
+/dist-native/
+/release/
+/electron/vendor/
+/electron/resources/cloudflared*
+/electron/resources/recorder-helper*
+/electron/resources/OpenMausBot Recorder.app/
+/electron/resources/speech-helper*
+/electron/resources/OpenMausBot Speech.app/
+
+# Local environments, application data and credentials
+.venv/
+venv/
+.tools/
+.runtime/
+.openmausbot/
+.mausbot/
+.codex/
+.claude/
+.omb-scratch/
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.db
+*.db-*
+
+# Compiler, editor and operating-system output
+*.tsbuildinfo
+*.log
+*.log.*
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+__pycache__/
+*.py[cod]
+.cache/
+.vite/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Disposable verification artifacts; fixed fixtures stay versioned
+/coverage/
+/.nyc_output/
+/test-results/
+/playwright-report/
+/blob-report/
+/evals/reports/runs/
+/evals/live/baselines/
+
+# Unused upstream screenshots and demo recordings; keep them local
+/docs/screenshots/
+/docs/keep-chatting/

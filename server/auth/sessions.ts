@@ -1,0 +1,438 @@
+// Pairing codes (60-bit, single use, 5 min), sessions (256-bit, only the sha256 stored) and stream tickets (EventSource cannot set headers).
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, unlinkSync } from "node:fs";
+import { dirname } from "node:path";
+import { z } from "zod";
+import { writeFileAtomic } from "../storage/atomic.ts";
+
+export type Scope = "admin" | "client";
+export const SCOPES: readonly Scope[] = ["admin", "client"];
+
+
+
+
+/** Not clamped: an invalid value falls back to the default, so a typo never becomes a policy. */
+export function daysMs(value: string | undefined, fallbackDays: number): number {
+  const days = Number(value);
+  const ok = Number.isInteger(days) && days >= 1 && days <= 3650;
+  return (ok ? days : fallbackDays) * 24 * 60 * 60_000;
+}
+/** OMB_SESSION_TTL_DAYS (default 30): a session used with half its term or less left renews for the full term. */
+export const SESSION_TTL_MS = daysMs(process.env.OMB_SESSION_TTL_DAYS, 30);
+/** OMB_SESSION_MAX_DAYS (default 180): renewal never passes this, so a stolen cookie has a bounded life. */
+export const SESSION_MAX_AGE_MS = daysMs(process.env.OMB_SESSION_MAX_DAYS, 180);
+export const SESSION_RENEW_WHEN_LEFT_MS = SESSION_TTL_MS / 2;
+
+export function cookieMaxAgeSeconds(session: { expiresAt: number }, now = Date.now()): number {
+  return Math.max(1, Math.floor((session.expiresAt - now) / 1000));
+}
+export const STREAM_TICKET_TTL_MS = 5 * 60_000;
+/** Slow-down only: a 60-bit code cannot be guessed online in five minutes, and sources are shared (NAT), so the lock stays short. */
+export const LOCKOUT = { failures: 10, windowMs: 60_000, lockMs: 60_000 } as const;
+/** A consumed code re-presented with the same client-made attempt id gets the same answer; sharing an address is not enough. */
+
+export const MAX_STREAM_TICKETS_PER_SESSION = 5;
+const LAST_SEEN_WRITE_INTERVAL_MS = 60_000;
+
+const scopeSchema = z.enum(["admin", "client"]);
+
+const sessionSchema = z.object({
+  id: z.string().min(1),
+  tokenHash: z.string().length(64),
+  label: z.string().max(80),
+  scopes: z.array(scopeSchema).min(1),
+  createdAt: z.number(),
+  lastSeenAt: z.number(),
+  expiresAt: z.number(),
+  userId: z.string().max(256).optional(),
+  email: z.string().max(320).optional(),
+  /** Set only by the internal verified-portal issuance path, never by email or pairing input. */
+  membershipAuthority: z.literal("portal").optional(),
+  /** A browser sign-in (PairingCode `browser`): accepted only as its browser's cookie, never as a bearer token. */
+  cookieOnly: z.literal(true).optional(),
+  owner: z.string().max(254).optional(),
+});
+
+const fileSchema = z.object({ version: z.literal(1), sessions: z.array(sessionSchema) });
+
+export type SessionRecord = z.infer<typeof sessionSchema>;
+
+/** What the UI may see: never the hash. */
+export interface PublicSession {
+  id: string;
+  label: string;
+  scopes: Scope[];
+  createdAt: number;
+  lastSeenAt: number;
+  expiresAt: number;
+  email?: string;
+  owner?: string;
+}
+
+
+
+
+
+
+
+const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
+
+function deviceLabel(value: string | undefined): string {
+  return (value ?? "").replace(/[\p{Cc}\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu, "").trim();
+}
+
+function sameDigest(a: string, b: string): boolean {
+  const left = Buffer.from(a, "hex");
+  const right = Buffer.from(b, "hex");
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+/** 12 symbols, rejection-sampled so every symbol is equally likely. */
+
+
+/** A credential is matched byte for byte; only a typed code is normalized. */
+
+
+/** 9 + 43 characters: the Android companion checks that length exactly. */
+
+
+
+
+
+
+
+
+function publicSession(record: SessionRecord): PublicSession {
+  const view: PublicSession = {
+    id: record.id,
+    label: record.label,
+    scopes: [...record.scopes],
+    createdAt: record.createdAt,
+    lastSeenAt: record.lastSeenAt,
+    expiresAt: record.expiresAt,
+  };
+  if (record.email) view.email = record.email;
+  if (record.owner) view.owner = record.owner;
+  return view;
+}
+
+export type EmailScopesResolver = (email: string) => readonly Scope[] | null;
+export interface SessionStoreOptions {
+  file: string;
+  now?: () => number;
+  emailScopes?: EmailScopesResolver;
+  emailScopesSnapshot?: () => EmailScopesResolver;
+  portalMembership?: boolean;
+}
+
+export class SessionRegistry {
+  private sessions: SessionRecord[] = [];
+  
+  private tickets = new Map<string, { sessionId: string; expiresAt: number }>();
+  private failures = new Map<string, { count: number; windowStart: number; lockedUntil: number }>();
+  
+  private readonly onRevoked = new Set<(sessionId: string) => void>();
+  private readonly onIssued = new Set<(session: Pick<SessionRecord, "id" | "scopes">) => void>();
+  private lastSeenWrites = new Map<string, number>();
+  private readonly now: () => number;
+  private readonly options: SessionStoreOptions;
+  private readonly openMarker: string;
+  private closed = false;
+  private adminOnly: string | null = null;
+
+  // No parameter properties: Node's strip-only TypeScript mode only erases types.
+  constructor(options: SessionStoreOptions) {
+    this.options = options;
+    this.now = options.now ?? Date.now;
+    this.openMarker = `${options.file}.open`;
+    const unclean = existsSync(this.openMarker);
+    try {
+      mkdirSync(dirname(options.file), { recursive: true, mode: 0o700 });
+      // Write the guard before accepting any persisted bearer, so an unclean restart sees it.
+      writeFileAtomic(this.openMarker, "Session registry is open.\n", { mode: 0o600 });
+      this.syncDirectory();
+    } catch {
+      throw new Error("Could not establish safe session storage.");
+    }
+    this.load(!unclean);
+    this.revalidateEmailSessions();
+  }
+
+  private load(restoreAccounts: boolean): void {
+    if (!existsSync(this.options.file)) return;
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(this.options.file, "utf8"));
+    } catch {
+      return;
+    }
+    const parsed = fileSchema.safeParse(raw);
+    if (parsed.success) this.sessions = parsed.data.sessions.filter(session => restoreAccounts || (session.email === undefined && session.userId === undefined));
+  }
+
+  private syncDirectory(): void {
+    // Windows exposes no directory fsync: no power-loss guarantee is claimed there.
+    if (process.platform === "win32") return;
+    const fd = openSync(dirname(this.options.file), "r");
+    try { fsyncSync(fd); } finally { closeSync(fd); }
+  }
+
+  /** Atomic write, owner-only, directory owner-only. */
+  private persist(): void {
+    if (this.closed) throw new Error("Session registry is closed.");
+    const dir = dirname(this.options.file);
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    writeFileAtomic(this.options.file, JSON.stringify({ version: 1, sessions: this.sessions }, null, 2) + "\n", { mode: 0o600 });
+    this.syncDirectory();
+  }
+
+  /** Call after HTTP/stream shutdown. Never remove the open marker before the reduced set is saved. */
+  close(): void {
+    if (this.closed) return;
+    try {
+      this.revalidateEmailSessions();
+      this.persist();
+      unlinkSync(this.openMarker);
+      this.closed = true;
+    } catch {
+      throw new Error("Could not safely close session storage.");
+    }
+  }
+
+  private prune(): void {
+    this.revalidateEmailSessions();
+    const now = this.now();
+    
+    
+    for (const [hash, ticket] of this.tickets) if (ticket.expiresAt <= now) this.tickets.delete(hash);
+    for (const [source, entry] of this.failures) {
+      if (entry.lockedUntil <= now && now - entry.windowStart > LOCKOUT.windowMs) this.failures.delete(source);
+    }
+    const expired = this.sessions.filter((s) => s.expiresAt <= now);
+    if (expired.length) {
+      this.sessions = this.sessions.filter((s) => s.expiresAt > now);
+      for (const s of expired) this.forget(s.id);
+      this.persist();
+    }
+  }
+
+  /** Every session opened from now on, by pairing or sign-in. */
+  onSessionIssued(listener: (session: Pick<SessionRecord, "id" | "scopes">) => void): () => void {
+    this.onIssued.add(listener);
+    return () => this.onIssued.delete(listener);
+  }
+
+  onSessionRevoked(listener: (sessionId: string) => void): () => void {
+    this.onRevoked.add(listener);
+    return () => this.onRevoked.delete(listener);
+  }
+
+  private forget(sessionId: string): void {
+    this.lastSeenWrites.delete(sessionId);
+    for (const [hash, ticket] of this.tickets) if (ticket.sessionId === sessionId) this.tickets.delete(hash);
+    for (const listener of this.onRevoked) listener(sessionId);
+  }
+
+  /** From now on nothing without admin scope is opened, redeemed, issued or accepted; the caller revokes stored sessions. */
+  requireAdmin(refusal: string): void {
+    this.adminOnly = refusal;
+  }
+
+  private personal(scopes: readonly Scope[]): boolean {
+    return this.adminOnly !== null && !scopes.includes("admin");
+  }
+
+  private refusePersonal(scopes: readonly Scope[]): void {
+    if (this.personal(scopes)) throw Object.assign(new Error(this.adminOnly!), { status: 403, code: "cloud_personal" });
+  }
+
+  
+
+  
+
+  /** Only a browser sign-in's 256-bit credential matches, so this consumes nothing and counts toward no lockout. */
+  
+
+  
+
+  failureSources(): string[] {
+    this.prune();
+    return [...this.failures.keys()];
+  }
+
+  private lockState(source: string): { locked: boolean; retryAfterMs: number } {
+    const entry = this.failures.get(source);
+    if (!entry) return { locked: false, retryAfterMs: 0 };
+    const now = this.now();
+    if (entry.lockedUntil > now) return { locked: true, retryAfterMs: entry.lockedUntil - now };
+    return { locked: false, retryAfterMs: 0 };
+  }
+
+  private recordFailure(source: string): void {
+    const now = this.now();
+    const entry = this.failures.get(source) ?? { count: 0, windowStart: now, lockedUntil: 0 };
+    if (now - entry.windowStart > LOCKOUT.windowMs) {
+      entry.count = 0;
+      entry.windowStart = now;
+    }
+    entry.count += 1;
+    if (entry.count >= LOCKOUT.failures) {
+      entry.lockedUntil = now + LOCKOUT.lockMs;
+      entry.count = 0;
+      entry.windowStart = now;
+    }
+    this.failures.set(source, entry);
+  }
+
+  
+
+  issue(input: { label: string; scopes: Scope[]; userId?: string; email?: string }): { token: string; session: PublicSession } {
+    return this.issueAccount(input);
+  }
+
+  /** Call only after consuming a verified, workspace-bound PKCE grant; no HTTP route accepts this marker as input. */
+  issuePortal(input: { email: string; grant: string; scopes: Scope[] }): { token: string; session: PublicSession } {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(input.grant) || !input.email) throw new Error("A verified portal identity is required");
+    return this.issueAccount({ label: "Hosted workspace", email: input.email, userId: `portal:${input.grant}`, scopes: input.scopes }, "portal");
+  }
+
+  private issueAccount(input: { label: string; scopes: Scope[]; userId?: string; email?: string }, membershipAuthority?: "portal"): { token: string; session: PublicSession } {
+    this.refusePersonal(input.scopes);
+    this.prune();
+    const now = this.now();
+    const token = `omb_sess_${randomBytes(32).toString("base64url")}`;
+    const record: SessionRecord = {
+      id: randomUUID(),
+      tokenHash: sha256(token),
+      label: (deviceLabel(input.label) || "Unnamed device").slice(0, 80),
+      scopes: [...new Set(input.scopes)],
+      createdAt: now,
+      lastSeenAt: now,
+      expiresAt: now + Math.min(SESSION_TTL_MS, SESSION_MAX_AGE_MS),
+    };
+    if (input.userId) record.userId = input.userId;
+    if (input.email) record.email = input.email;
+    if (membershipAuthority) record.membershipAuthority = membershipAuthority;
+    this.sessions.push(record);
+    this.lastSeenWrites.set(record.id, now);
+    this.persist();
+    for (const listener of this.onIssued) listener(record);
+    return { token, session: publicSession(record) };
+  }
+
+  attemptAllowed(source: string): { ok: true } | { ok: false; retryAfterMs: number } {
+    const lock = this.lockState(source);
+    return lock.locked ? { ok: false, retryAfterMs: lock.retryAfterMs } : { ok: true };
+  }
+
+  noteFailure(source: string): void {
+    this.recordFailure(source);
+  }
+
+  clearFailures(source: string): void {
+    this.failures.delete(source);
+  }
+
+  /** Email membership is live: losing any scope revokes the token and its streams; promotions never widen existing credentials. */
+  revalidateEmailSessions(): void {
+    if (this.closed) throw new Error("Session registry is closed.");
+    const eligible = this.sessions.filter(session => session.email !== undefined && !(this.options.portalMembership && session.membershipAuthority === "portal"));
+    if (!eligible.length) return;
+    let resolveScopes = this.options.emailScopes;
+    try {
+      if (this.options.emailScopesSnapshot) resolveScopes = this.options.emailScopesSnapshot();
+    } catch {
+      resolveScopes = undefined; // Never fall back to stale membership after a failed snapshot.
+    }
+    const revoked = eligible.filter((session) => {
+      try {
+        const allowed = resolveScopes?.(session.email!);
+        return !allowed || session.scopes.some((scope) => !allowed.includes(scope));
+      } catch {
+        return true; // missing or unreadable membership must fail closed
+      }
+    });
+    if (!revoked.length) return;
+    const ids = new Set(revoked.map((session) => session.id));
+    this.sessions = this.sessions.filter((session) => !ids.has(session.id));
+    for (const session of revoked) this.forget(session.id);
+    try {
+      this.persist();
+    } catch {
+      // Revocation holds in memory and streams close; the boot marker stops old bearers reviving after an unclean restart.
+      console.error("Could not persist email session revocation.");
+    }
+  }
+
+  authenticate(token: string | undefined): SessionRecord | null {
+    if (!token) return null;
+    this.revalidateEmailSessions();
+    const hash = sha256(token);
+    const now = this.now();
+    const record = this.sessions.find((s) => sameDigest(s.tokenHash, hash));
+    if (!record || record.expiresAt <= now || this.personal(record.scopes)) return null;
+    const lastWrite = this.lastSeenWrites.get(record.id) ?? 0;
+    if (now - lastWrite >= LAST_SEEN_WRITE_INTERVAL_MS) {
+      record.lastSeenAt = now;
+      this.lastSeenWrites.set(record.id, now);
+      this.persist();
+    }
+    return record;
+  }
+
+  /** Call only after origin and scope checks pass; never revives an expired session. */
+  renew(sessionId: string): boolean {
+    this.revalidateEmailSessions();
+    const record = this.sessions.find((s) => s.id === sessionId);
+    const now = this.now();
+    if (!record || record.expiresAt <= now) return false;
+    if (record.expiresAt - now > SESSION_RENEW_WHEN_LEFT_MS) return false;
+    const next = Math.min(now + SESSION_TTL_MS, record.createdAt + SESSION_MAX_AGE_MS);
+    if (next <= record.expiresAt) return false;
+    record.expiresAt = next;
+    record.lastSeenAt = now;
+    this.lastSeenWrites.set(record.id, now);
+    this.persist();
+    return true;
+  }
+
+  isLive(sessionId: string): boolean {
+    this.prune();
+    return this.sessions.some((s) => s.id === sessionId && !this.personal(s.scopes));
+  }
+
+  list(): PublicSession[] {
+    this.prune();
+    return this.sessions.map(publicSession);
+  }
+
+  revoke(id: string): boolean {
+    const before = this.sessions.length;
+    this.sessions = this.sessions.filter((s) => s.id !== id);
+    if (this.sessions.length === before) return false;
+    this.forget(id);
+    this.persist();
+    return true;
+  }
+
+  issueStreamTicket(sessionId: string): { ticket: string; expiresAt: number } {
+    this.prune();
+    const mine = [...this.tickets].filter(([, t]) => t.sessionId === sessionId).sort((a, b) => a[1].expiresAt - b[1].expiresAt);
+    for (const [hash] of mine.slice(0, Math.max(0, mine.length - (MAX_STREAM_TICKETS_PER_SESSION - 1)))) this.tickets.delete(hash);
+    const ticket = `omb_tick_${randomBytes(24).toString("base64url")}`;
+    const expiresAt = this.now() + STREAM_TICKET_TTL_MS;
+    this.tickets.set(sha256(ticket), { sessionId, expiresAt });
+    return { ticket, expiresAt };
+  }
+
+  redeemStreamTicket(ticket: string): SessionRecord | null {
+    this.prune();
+    const hash = sha256(ticket);
+    const entry = this.tickets.get(hash);
+    if (!entry) return null;
+    this.tickets.delete(hash);
+    const now = this.now();
+    const record = this.sessions.find((s) => s.id === entry.sessionId);
+    return record && record.expiresAt > now && !this.personal(record.scopes) ? record : null;
+  }
+}
