@@ -9,7 +9,7 @@ import { ACTION_ICON, MESSAGE_ROW, MessageActions, messageActionClass } from "@/
 import { useBotMessageMenu, userMessageMenu } from "@/components/message-menu";
 import { computerStartLine } from "@/lib/computer-start";
 import { useCaptionChrome, useDesktopCapabilities } from "@/components/DesktopCapabilities";
-import { api, currentTaskBot, useStore, formatTime, openNotificationTarget, visibleMessages, type Action, type Bot, type InstanceInfo, type Message, type AppState, awayFromMainThread, openBot } from "@/state/store";
+import { currentTaskBot, useStore, formatTime, openNotificationTarget, visibleMessages, type Action, type Bot, type InstanceInfo, type Message, type AppState, awayFromMainThread, openBot } from "@/state/store";
 import { EngineSetup } from "./EngineSetup";
 import { CHATGPT_USAGE_URL, ManageUsageLink } from "./ChatGptPlanStatus";
 import { CODEX_USAGE_URL, codexUsageLimitReached } from "../../shared/codex-usage-limit";
@@ -60,7 +60,6 @@ import { hasRoutineExecutionTask, RoutineRunCard } from "./RoutineRunCard";
 import { AttachmentGallery, collectMessageFiles, replyAttachmentGroup, splitMessageAttachments } from "./AttachmentGallery";
 import { ScreenFrame } from "./ScreenFrame";
 import { CompactionChip, DigestChip } from "./DigestChip";
-import { RenameTitle } from "./RenameTitle";
 import { BotActivityPicker } from "./TaskPicker";
 import { ChatHeaderMenu } from "./ChatMoreMenu";
 import { useChatFindRequests } from "@/lib/chat-find";
@@ -665,25 +664,10 @@ function RoutineRunRow({ message, botId }: { message: Message; botId: string }) 
 }
 
 function EmptyChat({ bot }: { bot: Bot }) {
-  const { dispatch } = useStore();
-  const advanced = useAdvancedMode();
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
       <BotAvatar bot={bot} state="idle" size={64} motion="none" motionKey={0} />
-      {!advanced ? <div className="text-[17px] font-semibold text-ink">{bot.name}</div> : <RenameTitle
-        value={bot.name}
-        onCommit={(name) => {
-          if (window.ogb?.remoteClient?.active) {
-            void api(`/api/bots/${bot.id}/profile`, { method: "PATCH", body: JSON.stringify({ name }) })
-              .then(({ bot: updated }) => dispatch({ type: "botPatched", bot: updated }))
-              .catch((cause) => dispatch({ type: "error", message: cause instanceof Error ? cause.message : String(cause) }));
-          } else {
-            dispatch({ type: "updateBot", botId: bot.id, patch: { name } });
-          }
-        }}
-        className="text-[17px] font-semibold text-ink"
-        inputClassName="rounded bg-inset px-1.5 py-0.5 text-center text-[17px] font-semibold"
-      />}
+      <div className="text-[17px] font-semibold text-ink">{bot.name}</div>
       <div className="max-w-[360px] text-[14px] text-ink-secondary">
         {bot.description || t("chat.emptyPrompt")}
       </div>
@@ -1129,59 +1113,19 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
       >
         <div data-chathead-row className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1" style={controlsShiftStyle}>
         <div data-chathead-identity className="order-2 flex min-w-0 max-w-full items-center justify-end gap-2" style={headerNoDragStyle}>
-          {advanced ? (
-            <div data-chathead-pill className={cn(CHATHEAD_PILL, "pr-1")}>
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "toggleSettings", open: true })}
-                className="flex shrink-0 items-center justify-center rounded-full"
-                title={t("chat.openProfile")}
-                aria-label={t("chat.openProfileAria", { name: bot.name })}
-              >
-                <BotAvatar
-                  bot={bot}
-                  state={stateForBot({ ...bot, messages })}
-                  size={24}
-                  motion={mascotMotion?.kind ?? "none"}
-                  motionKey={mascotMotion?.nonce ?? 0}
-                  animated={headerAnimated}
-                />
-              </button>
-              <RenameTitle
-                value={bot.name}
-                onCommit={(name) => {
-                  if (window.ogb?.remoteClient?.active) {
-                    void api(`/api/bots/${bot.id}/profile`, { method: "PATCH", body: JSON.stringify({ name }) })
-                      .then(({ bot: updated }) => dispatch({ type: "botPatched", bot: updated }))
-                      .catch((cause) => dispatch({ type: "error", message: cause instanceof Error ? cause.message : String(cause) }));
-                  } else {
-                    dispatch({ type: "updateBot", botId: bot.id, patch: { name } });
-                  }
-                }}
-                onActivate={() => dispatch({ type: "toggleSettings", open: true })}
-                showEditButton
-                className="truncate text-[14px] font-semibold text-ink"
-                editButtonClassName="size-6 rounded-full"
-                inputClassName="max-w-[220px] rounded-full bg-inset px-2 py-0.5 text-[14px] font-semibold"
-              />
-              {chiefOfStaffBadge(bot)}
-            </div>
-          ) : (
-            <button
-              type="button"
-              data-chathead-pill data-tour="bot-pill"
-              onClick={() => dispatch({ type: "toggleSettings", open: true })}
-              title={t("chat.openProfile")}
-              aria-label={t("chat.openProfileAria", { name: bot.name })}
-              className={cn(CHATHEAD_PILL, "group h-9 gap-2.5 pl-2 pr-3.5 hover:bg-raised-hover")}
-            >
-              <BotAvatar bot={bot} state={stateForBot({ ...bot, messages })} size={24}
-                motion={mascotMotion?.kind ?? "none"} motionKey={mascotMotion?.nonce ?? 0} animated={headerAnimated} />
-              <span className="min-w-0 truncate text-[14px] font-medium text-ink">{bot.name}</span>
-              {chiefOfStaffBadge(bot)}
-              <ChevronRight size={14} aria-hidden="true" className="-ml-2.5 w-0 shrink-0 text-ink-secondary opacity-0 transition-[width,margin,opacity] duration-150 group-hover:ml-0 group-hover:w-3.5 group-hover:opacity-100 group-focus-visible:ml-0 group-focus-visible:w-3.5 group-focus-visible:opacity-100" />
-            </button>
-          )}
+          <button
+            type="button"
+            data-chathead-pill data-tour="bot-pill"
+            onClick={() => dispatch({ type: "toggleSettings", open: true })}
+            title={t("chat.openProfile")}
+            aria-label={t("chat.openProfileAria", { name: bot.name })}
+            className={cn(CHATHEAD_PILL, "group h-9 gap-2.5 pl-2 pr-3.5 hover:bg-raised-hover")}
+          >
+            <BotAvatar bot={bot} state={stateForBot({ ...bot, messages })} size={24}
+              motion={mascotMotion?.kind ?? "none"} motionKey={mascotMotion?.nonce ?? 0} animated={headerAnimated} />
+            <span className="min-w-0 truncate text-[14px] font-medium text-ink">{bot.name}</span>
+            {chiefOfStaffBadge(bot)}
+          </button>
           <span role="status" className="sr-only" data-chathead-status>{bot.busy ? t("sidebar.preview.working") : ""}</span>
           {!bot.busy && bot.waitingForTeammates && <span className="truncate text-[12px] text-ink-secondary" role="status">{t("ui.teammates.working")}</span>}
           {awayFromMainThread(profile, showThreads) && (
