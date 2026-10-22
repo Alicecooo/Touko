@@ -11,10 +11,9 @@ export function SidebarRailSeparator() {
   return <div aria-hidden="true" data-sidebar-rail-separator="" className="mx-auto my-1.5 h-px w-8 shrink-0 bg-hairline/70" />;
 }
 
-export function SimpleRailFooter({ onSearch, plus, server }: {
+export function SimpleRailFooter({ onSearch, plus }: {
   onSearch: () => void;
   plus: ReactNode;
-  server: ReactNode;
 }) {
   return (
     <div data-sidebar-rail-footer="" className="flex flex-col items-center gap-0.5 px-2 pb-3 pt-2">
@@ -22,7 +21,6 @@ export function SimpleRailFooter({ onSearch, plus, server }: {
         <Search size={18} aria-hidden="true" />
       </button>
       <div className="relative flex w-full justify-center">{plus}</div>
-      {server}
       <SidebarFooterNav density="icons" rail />
       <div className="mt-1.5">
         <SidebarProfileMenu iconOnly rail />

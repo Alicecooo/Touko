@@ -21,7 +21,7 @@ vi.mock("./DesktopCapabilities", async (importOriginal) => ({
   ...await importOriginal<typeof import("./DesktopCapabilities")>(),
   useCaptionChrome: () => ({ dragProps: {}, padClass: "" }),
 }));
-vi.mock("./bot-settings/useBotSettingsDerived", () => ({ useBotSettingsDerived: () => ({ patch: vi.fn() }) }));
+vi.mock("./bot-settings/useBotSettingsDerived", () => ({ useBotSettingsDerived: () => ({ patch: vi.fn(), activeState: "idle", approvalMode: "ask", botRoutines: [], sectionName: "General" }) }));
 vi.mock("./bot-settings/useSlackManagement", () => ({ useSlackManagementUrl: () => null }));
 vi.mock("./bot-settings/MemorySection", () => ({ MemorySection: () => null }));
 vi.mock("./bot-settings/useBotOverview", () => ({
@@ -63,7 +63,7 @@ describe("Escape in the bot settings dialog", () => {
   });
 
   it("leaves the dialog open when something inside already handled the Escape", () => {
-    const section = dialog().querySelector("[data-bot-settings-section] button")!;
+    const section = dialog().querySelector("[data-panel-tab]")!;
     section.addEventListener("keydown", (event) => event.preventDefault(), { once: true });
     escape(section);
     expect(closes()).toHaveLength(0);

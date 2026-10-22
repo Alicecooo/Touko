@@ -62,7 +62,6 @@ import { ScreenFrame } from "./ScreenFrame";
 import { CompactionChip, DigestChip } from "./DigestChip";
 import { RenameTitle } from "./RenameTitle";
 import { BotActivityPicker } from "./TaskPicker";
-import { ModelPicker } from "./ModelPicker";
 import { ChatHeaderMenu } from "./ChatMoreMenu";
 import { useChatFindRequests } from "@/lib/chat-find";
 import { CitationSelectionToolbar, SentCitations } from "./CitationUI";
@@ -1215,9 +1214,6 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
             </button>
           )}
           <ThreadContextWarning bot={bot} messages={messages} />
-          {/* Simple mode keeps model selection and more actions in the bot panel. */}
-          {advanced && !remoteClient && <ModelPicker key={bot.threadId} bot={bot} threadId={bot.threadId} />}
-          
           {(advanced || remoteClient) && <ChatHeaderMenu key={`menu:${bot.threadId}`} bot={bot} />}
         </div>
         </div>
