@@ -73,7 +73,7 @@ export function DetailsTab({ bot, derived, onOpen }: {
     <div data-panel-tabpanel="details">
       <Card label={t("model.simple.model")} anchor="model">
         <div className={cn(rowCls, "block", thinkingLevels.length > 0 && "[&_[data-simple-effort]]:hidden")} data-simple-default-model>
-          {/* The open thread, as the Advanced header's picker: a Cloud guest changes only their own conversation. */}
+          {/* The open thread: a Cloud guest changes only their own conversation. */}
           <ModelPicker
             key={bot.threadId}
             bot={currentTaskBot(bot)}

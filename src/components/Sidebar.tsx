@@ -1998,7 +1998,6 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
           toggleCollapsed();
         }}
         plus={plusControl}
-        server={<DesktopWorkspaceSwitcher rail     />}
       /> : <div className={cn("pb-3 pt-2", density === "icons" ? "flex flex-col items-center gap-1 px-2" : "px-3")}>
         <SidebarFooterNav
           density={density}

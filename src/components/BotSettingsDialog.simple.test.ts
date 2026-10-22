@@ -971,7 +971,8 @@ describe("the drill-in pages", () => {
 });
 
 describe("the bot settings dialog", () => {
-  it("opens on the Simple panel without the accordion, and hands it the deep-linked section", () => {
+  it.each([false, true])("opens the shared panel and follows a deep link (advanced=%s)", (advanced) => {
+    fixture.advanced = advanced;
     const bot = makeBot();
     const simple = dialog(bot);
     const shell = ofType(simple, BotPanel)!;
@@ -984,7 +985,8 @@ describe("the bot settings dialog", () => {
     expect(ofType(dialog(bot), BotPanel)!.props.linkedSection).toBe("model");
   });
 
-  it("a stored section never moves the Simple panel", () => {
+  it.each([false, true])("a stored section never moves the panel (advanced=%s)", (advanced) => {
+    fixture.advanced = advanced;
     fixture.storeState = {
       settingsOpen: true, botSettingsSection: "model", botSettingsExpandAccordion: true,
       botSettingsSectionStored: true, botSettingsExpandRemembered: true,
@@ -992,44 +994,7 @@ describe("the bot settings dialog", () => {
     expect(ofType(dialog(makeBot()), BotPanel)!.props.linkedSection).toBeNull();
   });
 
-  it("leaves Advanced mode on the full accordion", () => {
-    fixture.advanced = true;
-    const rendered = dialog(makeBot());
-    expect(ofType(rendered, BotPanel)).toBeUndefined();
-    expect(rendered.html).toContain("Search settings");
-    for (const label of ["Overview", "Identity", "Soul", "Skills", "Memory", "Routines", "Access", "Model", "Permissions", "Notifications", "History", "Usage"]) {
-      expect(rendered.html).toContain(`>${label}</span>`);
-    }
-  });
-
-  it("a stored section opens expanded in the full view", () => {
-    fixture.advanced = true;
-    fixture.storeState = {
-      settingsOpen: true, botSettingsSection: "model", botSettingsExpandAccordion: true,
-      botSettingsSectionStored: true, botSettingsExpandRemembered: true,
-    };
-    const rowOpen = (rendered: Rendered, id: string) =>
-      (Children.toArray(find(rendered, "data-bot-settings-section", id).props.children)[0] as Node).props["aria-expanded"] === true;
-    expect(rowOpen(dialog(makeBot()), "model")).toBe(true);
-    const search = find(dialog(makeBot()), "aria-label", "Search settings");
-    change(search, "model");
-    expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "toggleSettings", open: true });
-    fixture.storeState = { ...fixture.storeState, botSettingsExpandAccordion: false, botSettingsExpandRemembered: false };
-    expect(rowOpen(dialog(makeBot()), "model")).toBe(false);
-  });
-
-  it("one click on a remembered-expanded row collapses it", () => {
-    fixture.advanced = true;
-    fixture.storeState = {
-      settingsOpen: true, botSettingsSection: "model", botSettingsExpandAccordion: true,
-      botSettingsSectionStored: true, botSettingsExpandRemembered: true,
-    };
-    const row = find(dialog(makeBot()), "data-bot-settings-section", "model");
-    click(Children.toArray(row.props.children)[0] as Node);
-    expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "toggleSettings", open: true });
-  });
-
-  it("shows Switch them too in the full Model section, and its button switches them", () => {
+  it("shows Switch them too in the shared Model section, and its button switches them", () => {
     fixture.advanced = true;
     fixture.storeState = { settingsOpen: true, botSettingsSection: "model", botSettingsExpandAccordion: true };
     const opus = { instanceId: "claude", model: "claude-opus-5-5" };
