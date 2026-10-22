@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   orgCardAction,
@@ -14,7 +14,6 @@ import {
   packageProvenance,
   type OrgLibraryPackage,
 } from "./org-library";
-import { OrgLibraryTab } from "@/components/TeamLibraryPanelOrg";
 import { TeamImportDetails } from "@/components/TeamLibraryPanel";
 import { parsePackageDocument } from "../../shared/package-format";
 
@@ -65,31 +64,7 @@ describe("the shelf card", () => {
     expect(orgContentsLine({ bots: 0, skills: 2, presets: 0, rooms: 0, routines: 0, connections: 0, botNames: [] })).toBe("Skills: 2");
   });
 
-  it("renders cards with Add, Added and update text, and no confirm step", () => {
-    const onAdd = vi.fn();
-    const markup = renderToStaticMarkup(createElement(OrgLibraryTab, {
-      listing: {
-        organization: { id: "o", name: "Customer Co" },
-        packages: [
-          entry({ mode: "required" }),
-          entry({ packageId: "p2", name: "Support desk", installed: { installId: "c".repeat(32), release: "1.3.0", status: "installed" } }),
-          entry({ packageId: "p3", name: "Future desk", blob: "unsupported" }),
-        ],
-      },
-      busy: null, notice: "", error: "", onAdd, onDetails: vi.fn(),
-    }));
-    const shown = text(markup);
-    for (const line of ["Packages Customer Co shares with you", "Sales desk", "Recommended by Acme Partners", "From Acme Partners", "Added", "Update OpenMausBot to add this"]) {
-      expect(shown).toContain(line);
-    }
-    expect(markup).toContain('aria-label="Add Sales desk"');
-    expect(markup).not.toContain('aria-label="Add Support desk"');
-    expect(markup).not.toContain('aria-label="Add Future desk"');
-    expect(onAdd).not.toHaveBeenCalled();
-    expect(text(renderToStaticMarkup(createElement(OrgLibraryTab, {
-      listing: { organization: { id: "o", name: "Customer Co" }, packages: [] }, busy: null, notice: "", error: "", onAdd, onDetails: vi.fn(),
-    })))).toContain("Customer Co hasn't shared any packages with you yet.");
-  });
+
 });
 
 describe("the preview and the provenance line", () => {

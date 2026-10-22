@@ -1359,7 +1359,6 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
   const [newTaskFolderBotId, setNewTaskFolderBotId] = useState<string | null>(null);
   const newTaskFolderBot = state.bots.find((bot) => bot.id === newTaskFolderBotId);
   const [teamLibraryOpen, setTeamLibraryOpen] = useState(false);
-  const [teamInstallUrl, setTeamInstallUrl] = useState<string | null>(null);
   const [archivedBotsOpen, setArchivedBotsOpen] = useState(false);
   const [teamFeedback, setTeamFeedback] = useState<{
     error: boolean;
@@ -1416,14 +1415,6 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
   const plusMenuRef = useRef<HTMLDivElement>(null);
   usePopoverDismiss(attentionOpen, attentionMenuRef, () => setAttentionOpen(false));
   usePopoverDismiss(plusOpen, plusMenuRef, () => setPlusOpen(false));
-
-  useEffect(() => {
-    if (remoteClient) return;
-    return window.ogb?.onPackageInstall?.((url) => {
-      setTeamInstallUrl(url);
-      setTeamLibraryOpen(true);
-    });
-  }, [remoteClient]);
 
   useEffect(() => {
     if (!teamFeedback) return;
@@ -2168,14 +2159,11 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
       {!remoteClient && teamLibraryOpen && (
         <TeamLibraryPanel
           returnFocusRef={importReturnRef}
-          initialUrl={teamInstallUrl ?? undefined}
           onClose={() => {
             setTeamLibraryOpen(false);
-            setTeamInstallUrl(null);
           }}
           onImported={(result) => {
             setTeamLibraryOpen(false);
-            setTeamInstallUrl(null);
             setTeamFeedback({
               error: false,
               text:

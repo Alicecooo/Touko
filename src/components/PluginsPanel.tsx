@@ -733,6 +733,11 @@ export function PluginsPanel() {
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-7 sm:px-7">
+          {filter !== "connected" && category === null && (
+            <div className="mb-5 pt-1">
+              <McpServersPanel embedded hideWhop={filter === "all"} />
+            </div>
+          )}
           {stale && (
             <div className="mb-3 flex items-start gap-2 rounded-xl bg-warning/10 px-3 py-2 text-[12.5px] text-warning">
               <TriangleAlert size={14} className="mt-px shrink-0" />
@@ -885,12 +890,6 @@ export function PluginsPanel() {
                 </div>
                 {allShown.map((card) => renderTile(card))}
               </AppsSection>
-            </div>
-          )}
-
-          {filter !== "connected" && category === null && (
-            <div className={cn(filter === "all" && "mt-8 border-t border-hairline/30 pt-6", filter === "mcp" && "pt-1")}>
-              <McpServersPanel embedded hideWhop={filter === "all"} />
             </div>
           )}
         </div>

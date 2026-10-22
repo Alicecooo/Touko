@@ -25,7 +25,6 @@ import { BotEditorContext } from "./bot-settings/BotEditorContext";
 import { inputCls } from "./bot-settings/field";
 import { RoutineEditor } from "./RoutinesPage";
 import { LocalComputerAutoWarning } from "./LocalComputerAutoWarning";
-import { SharePresetDialog } from "./SharePresetDialog";
 import { SettingRow } from "./SettingsPrimitives";
 import { Select } from "./Select";
 
@@ -364,15 +363,12 @@ function DraftRoutines({ draft }: { draft: BotCreationDraft }) {
 
 export function DefaultBotSettings() {
   const [open, setOpen] = useState(false);
-  const [sharing, setSharing] = useState(false);
 
     const content = <>
       <div className="flex shrink-0 gap-2">
-        <button type="button" onClick={() => setSharing(true)} className="cursor-pointer rounded-lg px-3 py-1.5 text-[13px] text-ink-secondary hover:bg-control hover:text-ink">{t("newBot.sharePreset")}</button>
         <button type="button" onClick={() => setOpen(true)} className="cursor-pointer rounded-lg bg-control px-3 py-1.5 text-[13px] text-ink hover:bg-raised-hover">{t("newBot.edit")}</button>
       </div>
       {open && <NewBotDialog defaultsMode onClose={() => setOpen(false)} />}
-      {sharing && <SharePresetDialog onClose={() => setSharing(false)} />}
     </>
 
   return <>
