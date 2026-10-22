@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, Monitor } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { brand } from "@/lib/brand";
 import { t } from "@/lib/i18n";
 
-export function DesktopWorkspaceSwitcher({ compact = false, inline = false, pill = false, rail = false }: {
-  compact?: boolean; inline?: boolean; pill?: boolean; rail?: boolean;
+export function DesktopWorkspaceSwitcher({ inline = false, pill = false }: {
+  inline?: boolean; pill?: boolean;
 }) {
   const bridge = window.ogb?.workspaces;
   const [workspace, setWorkspace] = useState<{ local: boolean; name: string } | null>(null);
   const name = brand().name;
   useEffect(() => { let active = true; void bridge?.state().then(value => { if (active) setWorkspace(value); }); return () => { active = false; }; }, [bridge]);
-  if (!bridge) return <span className="truncate text-sm font-medium text-ink">{compact || rail ? <Monitor size={18} /> : name}</span>;
+  if (!bridge) return <span className="truncate text-sm font-medium text-ink">{name}</span>;
   return <button type="button" onClick={() => void bridge.menu()} title={workspace ? `${name} · ${workspace.local ? t("serverSwitcher.thisComputer") : workspace.name}` : name} aria-label={t("serverSwitcher.switch", { app: name })}
-    className={cn("flex min-w-0 items-center gap-2 rounded-lg py-1.5 pr-2 text-sm font-medium text-ink hover:bg-raised", inline && "max-w-full", pill && "rounded-full", (compact || rail) && "justify-center")}>
-    <Monitor size={16} />{!compact && !rail && <><span className="truncate">{name}</span><ChevronDown size={13} /></>}
+    className={cn("flex min-w-0 items-center gap-2 rounded-lg py-1.5 pr-2 text-sm font-medium text-ink hover:bg-raised", inline && "max-w-full", pill && "rounded-full")}>
+    <span className="truncate">{name}</span><ChevronDown size={13} />
   </button>;
 }
