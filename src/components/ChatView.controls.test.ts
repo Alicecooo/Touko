@@ -86,13 +86,13 @@ describe("the header's right side", () => {
     fixture.advanced = true;
   });
 
-  it("keeps the computer and ⋯ in a remote client's Simple header, whose settings panel has no room for them", () => {
+  it("keeps more actions in a remote client's Simple header", () => {
     fixture.advanced = false;
     window.ogb = { remoteClient: { active: true } } as NonNullable<Window["ogb"]>;
     try {
       const { markup } = header();
       expect(markup).not.toContain("data-test-model-control");
-      expect(markup).toContain('data-tour="computer"');
+      expect(markup).not.toContain('data-tour="computer"');
       expect(markup).toContain('data-testid="chat-more"');
       const more = fixture.menus.find((menu) => menu.ariaLabel === "More")!;
       expect(more.items.map((item) => item.key)).toEqual(["find", "new-thread", "copy", "download"]);
@@ -110,11 +110,11 @@ describe("the header's right side", () => {
     fixture.advanced = true;
   });
 
-  it("leaves Advanced mode's model, computer and ⋯ exactly as they were, the inspector unlocked", () => {
+  it("keeps Advanced mode's model and more actions with the inspector available", () => {
     fixture.advanced = true;
     const { markup } = header();
     expect(markup).toContain("data-test-model-control");
-    expect(markup).toContain('data-tour="computer"');
+    expect(markup).not.toContain('data-tour="computer"');
     expect(markup).toContain('data-testid="chat-more"');
     const more = fixture.menus.find((menu) => menu.ariaLabel === "More")!;
     expect(more.items.map((item) => item.key)).toEqual(["find", "copy", "download", "activity", "inspector"]);
@@ -164,29 +164,9 @@ describe("header name", () => {
     fixture.advanced = true;
   });
 
-  it("marks the computer button live while a turn works in the browser, so a closed panel still shows it", () => {
-    const working = (computer: Bot["computer"], busy: boolean) => renderToStaticMarkup(createElement(ChatView, {
-      bot: { ...bot, computer, busy, tasks: (bot.tasks ?? []).map((task) => ({ ...task, busy })) },
-    }));
-    const button = (markup: string) => markup.match(/<button[^>]*data-tour="computer"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
-    expect(button(working("browser", true))).toContain('data-testid="computer-button-live"');
-    expect(button(working("browser", true))).toContain('aria-label="Bot&#x27;s computer, In use now"');
-    expect(button(working("browser", false))).toContain('aria-label="Bot&#x27;s computer"');
-    expect(button(working("browser", false))).not.toContain("computer-button-live");
-    expect(button(working("local", true))).not.toContain("computer-button-live");
-    const pinned = renderToStaticMarkup(createElement(ChatView, {
-      bot: { ...bot, computer: undefined, busy: true, tasks: (bot.tasks ?? []).map((task) => ({ ...task, busy: true, surface: "browser" as const })) },
-    }));
-    expect(button(pinned)).toContain('data-testid="computer-button-live"');
-  });
 
-  it("centres the bot in the header's middle column, with the controls in the last", () => {
-    const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
-    const row = markup.match(/data-chathead-row="true" class="([^"]*)"/)?.[1] ?? "";
-    expect(row).toContain("@min-[30rem]/chathead:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(max-content,1fr)]");
-    expect(markup).toMatch(/data-chathead-identity="true" class="[^"]*@min-\[30rem\]\/chathead:col-start-2[^"]*justify-self-center/);
-    expect(markup).toMatch(/data-chathead-controls="true" class="[^"]*@min-\[30rem\]\/chathead:col-start-3/);
-  });
+
+
 });
 
 describe("glass header", () => {
@@ -401,16 +381,7 @@ describe("thread control placement", () => {
     expect(markup).not.toMatch(/class="[^"]*chat-text[^"\n]*bg-bubble-user/);
   });
 
-  it("wraps the header into a name line and a chip line when the column is narrow", () => {
-    const markup = renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, busy: false } }));
-    expect(markup).toContain("@container/chathead");
-    const row = /data-chathead-row="[^"]*" class="([^"]*)"/.exec(markup)!;
-    expect(row[1].split(" ")).toContain("@max-[30rem]/chathead:flex-wrap");
-    const identity = /data-chathead-identity="[^"]*" class="([^"]*)"/.exec(markup)!;
-    expect(identity[1].split(" ")).toEqual(expect.arrayContaining(["min-w-0", "@max-[30rem]/chathead:basis-full"]));
-    const controls = /data-chathead-controls="[^"]*" class="([^"]*)"/.exec(markup)!;
-    expect(controls[1].split(" ")).toEqual(expect.arrayContaining(["shrink-0", "@max-[30rem]/chathead:ml-auto", "@max-[30rem]/chathead:flex-wrap"]));
-  });
+
 
   it("keeps the Chief of Staff badge on one line instead of stacking a word per line", () => {
     const markup = renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, busy: false, chiefOfStaff: true } }));
@@ -441,14 +412,7 @@ describe("thread control placement", () => {
     delete window.ogb;
   });
 
-  it.each([true, false])("pins a place per conversation from the composer only in Advanced (advanced: %s)", (advanced) => {
-    fixture.advanced = advanced;
-    const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
-    const pill = markup.slice(markup.indexOf("rounded-3xl bg-composer"), markup.indexOf("<textarea"));
-    expect(pill.match(/data-testid="place-chip"/g) ?? []).toHaveLength(advanced ? 1 : 0);
-    expect(markup.includes("Where this conversation works")).toBe(advanced);
-    fixture.advanced = true;
-  });
+
 });
 
 describe("screen reader announcements", () => {

@@ -13,12 +13,12 @@ describe("computer panel view persistence", () => {
     writeComputerPanelView("sprout", "browser", storage);
 
     expect(readComputerPanelView("sprout", storage)).toBe("browser");
-    expect(readComputerPanelView("another-bot", storage)).toBe("computer");
+    expect(readComputerPanelView("another-bot", storage)).toBe("browser");
   });
 
   it("falls back safely for stale values or blocked storage", () => {
-    expect(readComputerPanelView("sprout", { getItem: () => "unknown" })).toBe("computer");
-    expect(readComputerPanelView("sprout", { getItem: () => { throw new Error("blocked"); } })).toBe("computer");
+    expect(readComputerPanelView("sprout", { getItem: () => "unknown" })).toBe("browser");
+    expect(readComputerPanelView("sprout", { getItem: () => { throw new Error("blocked"); } })).toBe("browser");
 
     const setItem = vi.fn(() => { throw new Error("blocked"); });
     expect(() => writeComputerPanelView("sprout", "browser", { setItem })).not.toThrow();
@@ -29,7 +29,7 @@ describe("computer panel view persistence", () => {
     const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
     writeComputerPanelView("scout", "routines", storage);
     expect(readComputerPanelView("scout", storage)).toBe("routines");
-    expect(readComputerPanelView("other", storage)).toBe("computer");
+    expect(readComputerPanelView("other", storage)).toBe("browser");
   });
 
   it("round-trips the Data tab", () => {
@@ -43,12 +43,12 @@ describe("computer panel view persistence", () => {
 describe("computer panel view availability", () => {
 
   it("drops the tabs the current mode does not render", () => {
-    expect(resolveComputerPanelView("routines", { advanced: false })).toBe("computer");
-    expect(resolveComputerPanelView("files", { advanced: true })).toBe("computer");
+    expect(resolveComputerPanelView("routines", { advanced: false })).toBe("browser");
+    expect(resolveComputerPanelView("files", { advanced: true })).toBe("files");
   });
 
   it("keeps a view whose trigger is on the row", () => {
-    for (const view of ["computer", "browser", "data"] as const) {
+    for (const view of ["browser", "data"] as const) {
       expect(resolveComputerPanelView(view, { advanced: true })).toBe(view);
       expect(resolveComputerPanelView(view, { advanced: false })).toBe(view);
     }

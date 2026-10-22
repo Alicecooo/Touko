@@ -8,7 +8,6 @@ import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import type { LocaleKey } from "@/locales";
 import { mcpServersForBot, useMcpServers } from "@/lib/mcp-servers";
-import { placeFacts, placeViewFor, usePlaceSeat } from "@/lib/place-view";
 import { shortPath } from "@/lib/short-path";
 import { useDesktopCapabilities } from "../DesktopCapabilities";
 import { ConfirmDialog } from "../ConfirmDialog";
@@ -508,7 +507,7 @@ function RecordStepsRow({ on, browserOn, myChrome, onChange }: { on: boolean; br
   );
 }
 
-export type AccessPart = "worksOn" | "folder" | "apps" | "mcp" | "tools" | "browser" | "webhooks" | "always";
+export type AccessPart = "folder" | "apps" | "mcp" | "tools" | "browser" | "webhooks" | "always";
 
 export function AccessSection({
   bot,
@@ -535,11 +534,6 @@ export function AccessSection({
     browserEnabled,
   } = derived;
   const browserInstallable = state.config?.browserEngine?.installable === true;
-  const { capabilities } = useDesktopCapabilities();
-  const placeSeat = usePlaceSeat(state.config, capabilities.host?.platform ?? "other");
-  const worksOn = placeViewFor(placeFacts({
-    bot, place: bot.computer ?? "auto", seat: placeSeat, config: state.config, instances: state.instances,
-  }));
   // The same list the Vault tab shows: Composio's connected accounts plus the native HighLevel connection.
   const apps = useBotApps(bot);
   const inventoryReady = apps.phase === "ready";
@@ -552,21 +546,6 @@ export function AccessSection({
 
   return (
     <div className="flex flex-col gap-4">
-      {shows("worksOn") && <div className="rounded-xl bg-card p-4" data-testid="access-works-on">
-        <div className="text-[15px] font-medium text-ink">{t("access.worksOn", { name: bot.name, short: worksOn.short })}</div>
-        <ProposalStatus bot={bot} kind="owner" />
-        <button
-          type="button"
-          onClick={() => {
-            dispatch({ type: "toggleSettings", open: false });
-            dispatch({ type: "toggleComputer", open: true });
-          }}
-          className="mt-3 rounded-lg bg-control px-3 py-1.5 text-[13px] text-ink hover:bg-raised-hover"
-        >
-          {t("place.action.openComputerPanel")}
-        </button>
-      </div>}
-
       {shows("folder") && <WorkingFolder bot={bot} />}
 
       {shows("apps") && <div className="rounded-xl bg-card p-4">

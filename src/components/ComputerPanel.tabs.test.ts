@@ -23,9 +23,7 @@ vi.mock("./DesktopCapabilities", async (importOriginal) => ({
 }));
 vi.mock("@/lib/interface-mode", () => ({ useAdvancedMode: () => fixture.advanced, setAdvancedMode: () => {} }));
 vi.mock("@/lib/use-owner-or-admin", () => ({ useOwnerOrAdmin: () => true }));
-vi.mock("./CloudScreenPreview", () => ({ CloudScreenPreview: () => null }));
 vi.mock("./BrowserPanel", () => ({ BrowserPanel: () => null }));
-vi.mock("./CloudBackendPicker", () => ({ CloudBackendPicker: () => null }));
 vi.mock("./bot-settings/RoutinesSection", () => ({ RoutinesSection: () => null }));
 vi.mock("./data/DataPanel", () => ({ DataPanel: () => createElement("div", { "data-testid": "data-panel" }) }));
 vi.mock("@/state/store", async (importOriginal) => ({
@@ -117,7 +115,7 @@ describe("Computer panel tab", () => {
 
   it("stays on Data through a model change and follows a conversation change", async () => {
     await open(makeBot());
-    expect(selected()).toBe("Computer");
+    expect(selected()).toBe("Browser");
     flushSync(() => tab("Data").click());
     await settle();
     expect(selected()).toBe("Data");
@@ -128,7 +126,7 @@ describe("Computer panel tab", () => {
     expect(document.querySelector('[data-testid="data-panel"]')).not.toBeNull();
 
     await open(makeBot({ threadId: "thread-2", tasks: [{ threadId: "thread-2", title: "Second", createdAt: 2, approvalMode: "ask" }] } as Partial<Bot>));
-    expect(selected()).toBe("Computer");
+    expect(selected()).toBe("Browser");
   });
 
   it("marks the selected trigger and only that one", async () => {
@@ -137,14 +135,14 @@ describe("Computer panel tab", () => {
 
     flushSync(() => tab("Data").click());
     await settle();
-    expect(tabs().map((candidate) => candidate.getAttribute("aria-selected"))).toEqual(["false", "false", "false", "true"]);
+    expect(tabs().map((candidate) => candidate.getAttribute("aria-selected"))).toEqual(["false", "false", "true", "false"]);
   });
 
   it("keeps one Tab stop and moves it with the arrow, Home and End keys", async () => {
     await open(makeBot());
-    expect(tabStops()).toEqual(["Computer"]);
+    expect(tabStops()).toEqual(["Browser"]);
 
-    press("Computer", "ArrowRight");
+    press("Browser", "ArrowRight");
     await settle();
     expect(selected()).toBe("Routines");
     expect(tabStops()).toEqual(["Routines"]);
@@ -152,42 +150,42 @@ describe("Computer panel tab", () => {
 
     press("Routines", "ArrowLeft");
     await settle();
-    expect(selected()).toBe("Computer");
-    expect(document.activeElement).toBe(tab("Computer"));
+    expect(selected()).toBe("Browser");
+    expect(document.activeElement).toBe(tab("Browser"));
 
     // Wraps around the row's ends.
-    press("Computer", "ArrowLeft");
+    press("Browser", "ArrowLeft");
     await settle();
-    expect(selected()).toBe("Data");
-    press("Data", "ArrowRight");
+    expect(selected()).toBe("Files");
+    press("Files", "ArrowRight");
     await settle();
-    expect(selected()).toBe("Computer");
+    expect(selected()).toBe("Browser");
 
-    press("Computer", "End");
+    press("Browser", "End");
     await settle();
-    expect(selected()).toBe("Data");
-    expect(document.activeElement).toBe(tab("Data"));
-    press("Data", "Home");
+    expect(selected()).toBe("Files");
+    expect(document.activeElement).toBe(tab("Files"));
+    press("Files", "Home");
     await settle();
-    expect(selected()).toBe("Computer");
-    expect(document.activeElement).toBe(tab("Computer"));
+    expect(selected()).toBe("Browser");
+    expect(document.activeElement).toBe(tab("Browser"));
   });
 
   it("leaves the vertical arrows to the page's scrolling", async () => {
     await open(makeBot());
-    flushSync(() => tab("Computer").focus());
-    expect(press("Computer", "ArrowDown").defaultPrevented).toBe(false);
-    expect(press("Computer", "ArrowUp").defaultPrevented).toBe(false);
+    flushSync(() => tab("Browser").focus());
+    expect(press("Browser", "ArrowDown").defaultPrevented).toBe(false);
+    expect(press("Browser", "ArrowUp").defaultPrevented).toBe(false);
     await settle();
-    expect(selected()).toBe("Computer");
-    expect(document.activeElement).toBe(tab("Computer"));
+    expect(selected()).toBe("Browser");
+    expect(document.activeElement).toBe(tab("Browser"));
   });
 
   it("stops on the Files tab in Simple mode", async () => {
     fixture.advanced = false;
     await open(makeBot());
-    expect(tabLabels()).toEqual(["Computer", "Browser", "Data", "Files"]);
-    press("Computer", "End");
+    expect(tabLabels()).toEqual(["Browser", "Data", "Files"]);
+    press("Browser", "End");
     await settle();
     expect(selected()).toBe("Files");
     expect(document.activeElement).toBe(tab("Files"));
@@ -195,7 +193,7 @@ describe("Computer panel tab", () => {
 
   it("points every selected trigger at its panel and the panel back", async () => {
     await open(makeBot());
-    for (const label of ["Computer", "Routines", "Browser", "Data"]) {
+    for (const label of ["Browser", "Routines", "Data", "Files"]) {
       flushSync(() => tab(label).click());
       await settle();
       const trigger = tab(label);
@@ -207,7 +205,7 @@ describe("Computer panel tab", () => {
 
   it("puts every selected panel in the tab sequence", async () => {
     await open(makeBot());
-    for (const label of ["Computer", "Routines", "Browser", "Data"]) {
+    for (const label of ["Browser", "Routines", "Data", "Files"]) {
       flushSync(() => tab(label).click());
       await settle();
       const panel = document.getElementById(tab(label).getAttribute("aria-controls")!);

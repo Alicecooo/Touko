@@ -10,7 +10,6 @@ import type { RequestAuth } from "../auth/request-auth.ts";
 import type { RoutineManager } from "../automation/routines.ts";
 import type { SkillReview } from "../skills/skill-review.ts";
 import { isProjectEmoji, type BotRecord, type Store, type TaskRecord } from "../storage/store.ts";
-import { parseSurface } from "../computers/surface.ts";
 import type { ThreadStarters } from "../agent/thread-starters.ts";
 import { titleConversationExcerpt, type ThreadTitleSource } from "../agent/thread-title.ts";
 import type { MessagePage } from "./channels.ts";
@@ -309,14 +308,10 @@ export function createTaskRoutes(deps: TaskRouteDeps): RouteHandler {
       }
       if (body.surface !== undefined) {
         if (threadBusy(current.id, current.threadId)) return json(res, 409, { error: "Stop this thread before changing its computer destination." });
-        // Recorded as the person's, so a Works on change never sweeps it; null follows the bot's Works on again.
         if (body.surface === null) {
           patch.surface = undefined;
           patch.surfaceSource = undefined;
-        } else if (parseSurface(body.surface)) {
-          patch.surface = parseSurface(body.surface);
-          patch.surfaceSource = "user";
-        } else return json(res, 400, { error: "surface must be cloud, vm, local, browser, or null to follow the bot" });
+        } else return json(res, 400, { error: "Task placement is fixed to Auto; surface must be null." });
       }
       if (body.pinnedMessageId !== undefined) {
         if (body.pinnedMessageId === null || body.pinnedMessageId === "") patch.pinnedMessageId = undefined;

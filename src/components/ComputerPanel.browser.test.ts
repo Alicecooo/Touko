@@ -12,7 +12,7 @@ const fixture = vi.hoisted(() => {
   vi.stubGlobal("localStorage", { getItem: () => view.current });
   return { config: {} as FeatureFlagConfig & { cloudHome?: boolean }, view };
 });
-// These cover the Advanced panel; ComputerPanel.simple.test.ts covers Simple.
+// Browser installation remains available after the screen view is removed.
 vi.mock("@/lib/interface-mode", () => ({ useAdvancedMode: () => true, setAdvancedMode: () => {} }));
 vi.mock("@/state/store", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/state/store")>(),
@@ -71,20 +71,6 @@ describe("Computer panel on a narrow screen", () => {
     expect(aside[1].split(" ")).toEqual(expect.arrayContaining(["max-md:absolute", "max-md:inset-0", "max-md:z-40", "max-md:w-full!"]));
     const separator = /<div role="separator"[^>]*class="([^"]*)"/.exec(markup)!;
     expect(separator[1].split(" ")).toContain("max-md:hidden");
-  });
-});
-
-describe("Computer panel Works on", () => {
-  const places = (markup: string) => [...markup.matchAll(/<span>(Auto|Computer on a self-hosted VPS|Virtual machine|This computer|Browser|Off)<\/span>/g)].map((match) => match[1]);
-  const computerTab = (config: FeatureFlagConfig & { cloudHome?: boolean }) => {
-    fixture.view.current = "computer";
-    try { return render(config); } finally { fixture.view.current = "browser"; }
-  };
-
-  it("lists this computer and a Virtual machine on a desktop or self-hosted server", () => {
-    const markup = computerTab({});
-    expect(places(markup)).toEqual(["Auto", "Computer on a self-hosted VPS", "Virtual machine", "This computer", "Browser", "Off"]);
-    expect(markup).toContain("Choose where this bot can use a computer.</p>");
   });
 });
 

@@ -3,7 +3,7 @@ import { useAdvancedMode } from "@/lib/interface-mode";
 import { ThreadLinkContext } from "@/components/ThreadLinkMenu";
 import { useShowThreads } from "@/lib/thread-preferences";
 import { useCopyFeedback } from "@/lib/copy-text";
-import { AlertTriangle, Check, ChevronLeft, ChevronRight, Copy, Crown, Monitor, Pin, RefreshCw, Square, Reply, Webhook, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, Copy, Crown, Pin, RefreshCw, Square, Reply, Webhook, X } from "lucide-react";
 import { WorkingDots } from "@/components/WorkingIndicator";
 import { ACTION_ICON, MESSAGE_ROW, MessageActions, messageActionClass } from "@/components/MessageActions";
 import { useBotMessageMenu, userMessageMenu } from "@/components/message-menu";
@@ -246,7 +246,7 @@ function PlaceFailedRow({ place, botId, threadId, onRetry }: {
   const bot = state.bots.find((candidate) => candidate.id === botId);
   const view = placeRowViewFor(place, seat, worksOnSimpleLabel(bot?.computer, capabilities.host.platform));
   const id = view.action?.id;
-  const onClick = !id ? undefined
+  const onClick = !id || id === "watch" || id === "open-computer-panel" ? undefined
     : id === "try-again" ? onRetry
     : () => { openPlaceAction(id, { botId, threadId }, dispatch); };
   return <ErrorRow message={view.line} action={view.action && onClick ? { label: view.action.label, onClick } : null} />;
@@ -925,7 +925,7 @@ function PinnedBanner({
   );
 }
 
-const CHATHEAD_PILL = "flex min-w-0 items-center gap-2 rounded-full border border-hairline/40 bg-control/60 py-0.5 pl-1.5 text-ink";
+const CHATHEAD_PILL = "order-last flex min-w-0 items-center gap-2 rounded-full border border-hairline/40 bg-control/60 py-0.5 pl-1.5 text-ink";
 
 function chiefOfStaffBadge(bot: Bot) {
   if (!bot.chiefOfStaff) return null;
@@ -1128,8 +1128,8 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
           "pl-11 md:pl-5",
         )}
       >
-        <div data-chathead-row className="flex items-center justify-between @max-[30rem]/chathead:flex-wrap @max-[30rem]/chathead:gap-y-1 @min-[30rem]/chathead:grid @min-[30rem]/chathead:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(max-content,1fr)]">
-        <div data-chathead-identity className="flex min-w-0 items-center gap-2 @max-[30rem]/chathead:basis-full @min-[30rem]/chathead:col-start-2 @min-[30rem]/chathead:justify-self-center" style={headerNoDragStyle}>
+        <div data-chathead-row className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1" style={controlsShiftStyle}>
+        <div data-chathead-identity className="order-2 flex min-w-0 max-w-full items-center justify-end gap-2" style={headerNoDragStyle}>
           {advanced ? (
             <div data-chathead-pill className={cn(CHATHEAD_PILL, "pr-1")}>
               <button
@@ -1198,8 +1198,8 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
         </div>
         <div
           data-chathead-controls
-          className="flex shrink-0 items-center gap-2 @max-[30rem]/chathead:ml-auto @max-[30rem]/chathead:flex-wrap @max-[30rem]/chathead:justify-end @min-[30rem]/chathead:col-start-3 @min-[30rem]/chathead:justify-self-end"
-          style={controlsShiftStyle}
+          className="order-1 flex shrink-0 flex-wrap items-center justify-end gap-2"
+          style={headerNoDragStyle}
         >
           {(bot.busy || bot.waitingForTeammates) && (
             <button
@@ -1215,20 +1215,9 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
             </button>
           )}
           <ThreadContextWarning bot={bot} messages={messages} />
-          {/* Simple mode moves the model, the computer and ⋯ into the bot panel; a remote client's panel has neither. */}
+          {/* Simple mode keeps model selection and more actions in the bot panel. */}
           {advanced && !remoteClient && <ModelPicker key={bot.threadId} bot={bot} threadId={bot.threadId} />}
           
-          {(advanced || remoteClient) && <button
-            data-tour="computer"
-            onClick={() => dispatch({ type: "toggleComputer" })}
-            className={cn(
-              "relative rounded-md p-1.5 hover:bg-raised",
-              state.computerOpen ? "text-accent" : "text-ink-secondary hover:text-ink",
-            )}
-            title={t("chat.computer")} aria-label={busy && place === "browser" ? `${t("chat.computer")}, ${t("place.live")}` : t("chat.computer")}
-          >
-            <Monitor size={18} />{busy && place === "browser" && <span aria-hidden="true" className="absolute right-1 top-1 size-1.5 animate-pulse rounded-full bg-success" data-testid="computer-button-live" />}
-          </button>}
           {(advanced || remoteClient) && <ChatHeaderMenu key={`menu:${bot.threadId}`} bot={bot} />}
         </div>
         </div>
