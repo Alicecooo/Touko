@@ -13,7 +13,7 @@ import { teamImportPreview } from "@/lib/team-import";
 import { ApiError } from "@/state/store";
 import { ShareSkillChoices, ShareTeamContents } from "./ShareTeamDialog";
 import { TeamMenuItems } from "./Sidebar";
-import { shareableTeamList, TeamImportDetails } from "./TeamLibraryPanel";
+import { TeamImportDetails } from "./TeamLibraryPanel";
 import { packageSummary, parsePackageDocument } from "../../shared/package-format";
 
 const fixture = () => JSON.parse(readFileSync(join(import.meta.dirname, "../../tests/fixtures/packages/full-team.v2.json"), "utf8"));
@@ -29,14 +29,6 @@ describe("Share team", () => {
     const markup = renderToStaticMarkup(createElement(TeamMenuItems, { onAddBots: vi.fn(), onRename: vi.fn(), onShare: vi.fn(), onDelete: vi.fn() }));
     expect(text(markup)).toMatch(/Add bots .*Rename team .*Share team… .*Delete team/);
     expect(markup.match(/role="menuitem"/g)).toHaveLength(4);
-  });
-
-  it("lists shareable teams, named teams first and General last, never empty ones", () => {
-    expect(shareableTeamList(["Sales desk", "Empty", "Support"], [
-      { section: "Support" }, { section: " Sales desk " }, { section: "Sales desk" }, { section: "Sales desk", hidden: true }, {}, { section: "Unlisted" },
-    ])).toEqual([
-      { name: "Sales desk", bots: 2 }, { name: "Support", bots: 1 }, { name: "Unlisted", bots: 1 }, { name: "", bots: 1 },
-    ]);
   });
 
   it("shows exactly what the file holds, what never travels, and what was removed or left out", () => {

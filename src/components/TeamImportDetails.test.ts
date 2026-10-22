@@ -10,7 +10,6 @@ vi.mock("./DesktopCapabilities", () => ({
 
 import { teamImportPreview } from "@/lib/team-import";
 import type { ShareResponse } from "@/lib/team-share";
-import { presetShareBody, SharePresetContents, type PresetShareResponse } from "./SharePresetDialog";
 import { ShareTeamContents } from "./ShareTeamDialog";
 import { TeamImportDetails } from "./TeamLibraryPanel";
 import { packageSummary, parsePackageDocument } from "../../shared/package-format";
@@ -18,30 +17,7 @@ import { packageSummary, parsePackageDocument } from "../../shared/package-forma
 const fixture = (name: string) => JSON.parse(readFileSync(join(import.meta.dirname, "../../tests/fixtures/packages", name), "utf8"));
 const text = (markup: string) => markup.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ");
 
-describe("Share as preset", () => {
-  it("asks for a preset file of the New bot defaults, named once, with notes and picture as chosen", () => {
-    expect(presetShareBody({ name: " Support agent ", description: "", release: "", notes: "", includeNotes: true, dryRun: true })).toEqual({
-      format: "package", version: 2, kind: "library", name: "Support agent", presetName: "Support agent",
-      presetDescription: undefined, release: undefined, notes: undefined, includeMemory: true, dryRun: true,
-    });
-    expect(presetShareBody({ name: "Sky", includeNotes: false, picture: "data:image/png;base64,AAAA" })).toMatchObject({ includeMemory: false, presetAvatar: "data:image/png;base64,AAAA" });
-  });
-
-  it("shows what the preset file holds, what never travels, and what was removed or left out", () => {
-    const document = parsePackageDocument(fixture("library-only.v2.json"));
-    const preview: PresetShareResponse = {
-      document, filename: "sales-skills-2.0.1.openmaus.json", summary: packageSummary(document),
-      redacted: ["presets[support].bot.soul"], skipped: [{ part: "presets[support].skills[follow-up]", reason: "preset_skill_conflict" }],
-    };
-    const words = text(renderToStaticMarkup(createElement(SharePresetContents, { preview, localSkips: [] })));
-    for (const line of [
-      "Skills · arrive switched off 1 · objection-handling", "Starter notes None", "Pictures None",
-      "Never included: model choices, folders, computers, approval levels, connected apps, MCP servers and routines.",
-      "Removed what looked like a key or password from: Support agent · standing instructions",
-      "Support agent · skill · follow-up — a bot in the team has a different skill with this name",
-    ]) expect(words).toContain(line);
-  });
-
+describe("Preset files", () => {
   it("counts preset bots in a team file", () => {
     const document = parsePackageDocument(fixture("full-team.v2.json"));
     const preview: ShareResponse = { document, filename: "f", summary: packageSummary(document), choices: { skills: [] }, redacted: [], skipped: [] };

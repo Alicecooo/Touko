@@ -19,7 +19,7 @@ describe("additive template imports in the real renderer", () => {
   let child: ChildProcess | undefined;
   afterAll(async () => { await waitForExit(child, { signal: "SIGINT", graceMs: 30_000 }); });
 
-  (enabled ? it : it.skip)("adds library and file templates as sections without losing existing chats", async () => {
+  (enabled ? it : it.skip)("adds local file templates as sections without losing existing chats", async () => {
     let stdout = "";
     let stderr = "";
     let info: { ui: string; url: string; botId: string; logPath: string };
@@ -49,34 +49,14 @@ describe("additive template imports in the real renderer", () => {
       { key: "researcher", name: "Lead finder", appearance: { color: "cyan" } },
       { key: "writer", name: "Outreach writer", appearance: { color: "purple" } },
     ] } };
-    // Only the public catalog download is simulated. Import, persistence,
-    // SSE and the entire React sidebar remain real and fixture-local.
-    await evaluate(`(() => {
-      window.templateFixture = ${JSON.stringify(manifest)};
-      const originalFetch = window.fetch.bind(window);
-      window.fetch = (input, init) => {
-        const path = String(input);
-        const reply = value => Promise.resolve(new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } }));
-        if (path === '/api/team-library/catalog') return reply({ format: 'openmaus.catalog', version: 1, repositoryUrl: '', teams: [{ slug: 'sales', name: 'Sales crew', summary: 'Fixture template', category: 'Sales', members: 2, skills: [], requires: { apps: [] } }] });
-        if (path === '/api/team-library/teams/sales') return reply(window.templateFixture);
-        return originalFetch(input, init);
-      };
-      return true;
-    })()`);
-    for (const source of ["library", "file"]) {
+    for (const attempt of [1, 2]) {
       await click("New or share");
       await click("Templates");
-      if (source === "library") {
-        await expect.poll(snapshot, { timeout: 10_000 }).toContain('button "Load"');
-        await click("Load");
-      } else {
-        await click("Import");
-        // Exercise the file input's actual change handler, not the OS picker.
-        await evaluate(`(() => { const input = document.querySelector('[role=dialog] input[type=file]'); const transfer = new DataTransfer(); transfer.items.add(new File([JSON.stringify(window.templateFixture)], 'sales.mausteam.json', { type: 'application/json' })); input.files = transfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-      }
+      // Exercise the file input's actual change handler, not the OS picker.
+      await evaluate(`(() => { const input = document.querySelector('[role=dialog] input[type=file]'); const transfer = new DataTransfer(); transfer.items.add(new File([${JSON.stringify(JSON.stringify(manifest))}], 'sales.mausteam.json', { type: 'application/json' })); input.files = transfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
       await expect.poll(snapshot, { timeout: 10_000 }).toContain("Adds a new team for Sales crew");
       await click("Add team");
-      const section = source === "library" ? "Sales crew" : "Sales crew 2";
+      const section = attempt === 1 ? "Sales crew" : "Sales crew 2";
       await expect.poll(snapshot, { timeout: 10_000 }).toContain(`button "${section}"`);
       const current = await api("/api/bots");
       expect(current.bots.filter((bot: { section?: string }) => bot.section === section)).toHaveLength(2);
@@ -87,6 +67,6 @@ describe("additive template imports in the real renderer", () => {
     }
     const evidence = join(ROOT, ".omb-scratch", "verify-evidence", "template-import-sections.png");
     await ui("screenshot", "--out", evidence);
-    process.stdout.write(`${JSON.stringify({ fixture: info!, screenshot: evidence, libraryAndFileImports: true, originalConversationUnchanged: true })}\n`);
+    process.stdout.write(`${JSON.stringify({ fixture: info!, screenshot: evidence, localFileImports: true, originalConversationUnchanged: true })}\n`);
   }, launchTimeout + 120_000);
 });

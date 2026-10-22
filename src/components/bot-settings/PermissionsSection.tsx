@@ -190,7 +190,7 @@ export function OutboundControl({ bot, onChange, embedded = false }: { bot: Bot;
 
   return (
     <div className={embedded ? "p-4" : "rounded-xl bg-card p-4"} data-outbound-settings>
-      <div className="text-[15px] font-medium text-ink">{t("permissions.outbound.title")}</div>
+      <div className="text-[12.5px] text-ink-secondary">{t("permissions.outbound.title")}</div>
       <div className="mt-3 flex gap-1 rounded-lg bg-inset p-0.5">
         {(
           [
