@@ -1,0 +1,12 @@
+{
+  "template": null,
+  "created": { "browser": null, "cloud": null, "local": null, "off": null },
+  "updates": { "browser": 400, "cloud": 400, "local": 400, "off": 400 },
+  "pins": { "browser": 400, "cloud": 400, "local": 400, "off": 400 },
+  "restored": [
+    { "placement": null, "manualPin": null, "automaticPin": "browser", "automaticPinOwnedByServer": true },
+    { "placement": null, "manualPin": null, "automaticPin": "browser", "automaticPinOwnedByServer": true },
+    { "placement": null, "manualPin": null, "automaticPin": "browser", "automaticPinOwnedByServer": true },
+    { "placement": null, "manualPin": null, "automaticPin": "browser", "automaticPinOwnedByServer": true }
+  ]
+}

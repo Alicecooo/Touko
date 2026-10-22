@@ -25,16 +25,17 @@ export class BotCreationDraft {
 
   constructor(defaults: NewBotDefaults, readonly changed: () => void, private network: typeof api = api) {
     this.template = structuredClone(defaults);
+    this.template.profile.computer = null;
     this.routines = defaults.routines.map(routine => this.routine({ ...routine, botId: this.id }));
   }
 
   get bot(): Bot {
-    const { computer, cwd, peers, toolScope, ...profile } = this.template.profile;
+    const { computer: _computer, cwd, peers, toolScope, ...profile } = this.template.profile;
     return {
       id: this.id, threadId: this.id, name: "", title: "", description: "", soul: "",
       color: "green", notifications: true, unread: false, messages: [],
       modelSelection: { instanceId: "", model: "" }, ...profile,
-      computer: computer ?? undefined, cwd: cwd ?? undefined, peers: peers ?? undefined,
+      computer: undefined, cwd: cwd ?? undefined, peers: peers ?? undefined,
       toolScope: toolScope ?? undefined,
     };
   }
@@ -45,7 +46,7 @@ export class BotCreationDraft {
     if (acknowledgeLocalAuto !== undefined) this.consent.acknowledgeLocalAuto = acknowledgeLocalAuto;
     if (acknowledgePeerScope !== undefined) this.consent.acknowledgePeerScope = acknowledgePeerScope;
     if (autoApprove !== undefined && profile.approvalMode === undefined) profile.approvalMode = autoApprove ? "auto" : "ask";
-    this.template.profile = { ...this.template.profile, ...profile };
+    this.template.profile = { ...this.template.profile, ...profile, computer: null };
     this.changed();
   }
 

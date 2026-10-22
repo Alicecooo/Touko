@@ -68,11 +68,7 @@ vi.mock("./bot-settings/SkillsSection", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./bot-settings/SkillsSection")>()),
   useManagedSkills: () => ({ ...fixture.skills, setReviewing: () => {}, enableReviewed: () => Promise.resolve() }),
 }));
-vi.mock("./PlaceChip", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./PlaceChip")>()),
-  usePlaceViews: () => Object.fromEntries(Object.entries(fixture.places).map(([place, [policy, reachable, short]]) =>
-    [place, { policy, reachable, view: { state: reachable ? "ready" : "blocked", params: {}, short, line: `${short}.`, action: null } }])),
-}));
+
 vi.mock("./bot-settings/useBotApps", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./bot-settings/useBotApps")>()),
   useBotApps: () => fixture.apps,
@@ -736,61 +732,7 @@ describe("the browser logins", () => {
 });
 
 describe("the Computer tab", () => {
-  const places = (rendered: { nodes: Node[] }) => rendered.nodes.filter((node) => node.props["data-place-choice"] !== undefined);
-  const placeOf = (rendered: { nodes: Node[] }, value: string) => find(rendered, "data-place-choice", value);
-
-  it("offers Auto, this computer and a Computer on a self-hosted VPS, with the rarer places under More places", () => {
-    const rendered = computer(makeBot());
-    expect(rendered.html).toContain("Where Scout works");
-    expect(rendered.html).toContain("More places");
-    expect(rendered.html).toMatch(/data-place-choice="auto" aria-pressed="true"[^>]*>Auto</);
-    expect(rendered.html).toMatch(/data-place-choice="cloud" aria-pressed="false"[^>]*>Computer on a self-hosted VPS</);
-    expect(places(rendered).map((node) => [node.props["data-place-choice"], node.props.children])).toEqual([
-      ["vm", "Virtual machine"], ["browser", "Browser only"], ["off", "Off"],
-    ]);
-    expect(rendered.html).toContain("Picks the right place for each task");
-  });
-
-  it("saves each place through the bot patch, and sends nothing for the place already chosen", () => {
-    const rendered = computer(makeBot());
-    segment(rendered, "data-place-choice").onChange("cloud");
-    expect(patch).toHaveBeenLastCalledWith({ computer: "cloud" });
-    click(placeOf(rendered, "vm"));
-    expect(patch).toHaveBeenLastCalledWith({ computer: "vm" });
-    click(placeOf(rendered, "browser"));
-    expect(patch).toHaveBeenLastCalledWith({ computer: "browser", browser: true });
-    click(placeOf(rendered, "off"));
-    expect(patch).toHaveBeenLastCalledWith({ computer: "off" });
-    segment(computer(makeBot({ computer: "cloud" })), "data-place-choice").onChange("auto");
-    expect(patch).toHaveBeenLastCalledWith({ computer: null });
-    patch.mockReset();
-    click(placeOf(computer(makeBot({ computer: "off" })), "off"));
-    expect(patch).not.toHaveBeenCalled();
-  });
-
-  it("holds a place the bot cannot use with the reason on it, and leaves out one never offered", () => {
-    fixture.places.vm = [true, false, "Not ready"];
-    const blocked = computer(makeBot());
-    expect(placeOf(blocked, "vm").props).toMatchObject({ disabled: true, title: "Not ready." });
-    fixture.places.vm = [false, false, "Not offered"];
-    fixture.places.local = [false, false, "Not offered"];
-    const rendered = computer(makeBot());
-    expect(places(rendered).map((node) => node.props["data-place-choice"])).toEqual(["browser", "off"]);
-    expect(rendered.html).not.toContain('data-place-choice="local"');
-  });
-
-  it("warns before this computer for a bot that decides alone", () => {
-    fixture.derived.approvalMode = "auto";
-    const bot = makeBot();
-    segment(computer(bot), "data-place-choice").onChange("local");
-    expect(patch).not.toHaveBeenCalled();
-    const warning = ofType(computer(bot), LocalComputerAutoWarning)!;
-    expect(warning.props.open).toBe(true);
-    (warning.props.onConfirm as () => void)();
-    expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "updateBot", botId: "scout", patch: { computer: "local", acknowledgeLocalAuto: true } });
-  });
-
-  it("leads to the browser and folder pages, and opens the full view on a tab", () => {
+  it("leads to the browser and folder pages, and opens the data workspace", () => {
     const rendered = computer(makeBot());
     click(find(rendered, "data-panel-page", "browser"));
     expect(onOpen).toHaveBeenLastCalledWith("browser");
@@ -808,8 +750,6 @@ describe("the Computer tab", () => {
       [{ type: "toggleSettings", open: false }],
       [{ type: "toggleComputer", open: true }],
     ]);
-    click(find(rendered, "data-panel-action", "open-computer"));
-    expect(setItem).toHaveBeenLastCalledWith("omb-computer-panel-view:scout", "computer");
     vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => {} });
   });
 });

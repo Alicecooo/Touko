@@ -174,14 +174,8 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
           // Clients send null for Auto; the durable field is then absent.
           requestedComputer = undefined;
           patch.computer = undefined;
-        } else if (
-          typeof body.computer === "string" &&
-          ["local", "browser", "off"].includes(body.computer)
-        ) {
-          requestedComputer = body.computer;
-          patch.computer = body.computer;
         } else {
-          return json(res, 400, { error: "computer must be null (Auto), local, browser, or off" });
+          return json(res, 400, { error: "Bot placement is fixed to Auto; computer must be null." });
         }
       }
       if (normalizedSelection) patch.modelSelection = normalizedSelection;
@@ -596,14 +590,12 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
         return json(res, 409, { error: "Stop the bot and release browser control before changing its profile." });
       }
       if (profile.patch.soul !== undefined) {
-        if (freshBrowserBot) null;
       // Runtime fields keep their fail-closed order; only the profile fields commit atomically.
         const runtimePatch = { ...patch };
         for (const field of Object.keys(profile.patch)) delete runtimePatch[field];
         if (Object.keys(runtimePatch).length) store.patchBot(m[1], runtimePatch);
         bot = store.patchBotProfile(m[1], profile.patch);
       } else {
-        if (freshBrowserBot) null;
         bot = store.patchBot(m[1], patch);
       }
       if (!bot) return json(res, 404, { error: "no such bot" });

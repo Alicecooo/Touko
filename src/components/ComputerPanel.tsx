@@ -1,80 +1,19 @@
-import { boatCapableEngine, cloudEngineOf } from "@/lib/remote-desktop";
-import { canWorkOnCloud } from "../../shared/cloud-computer";
-import { Switch } from "./SettingsPrimitives";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { z } from "zod";
-import { CalendarClock, Check, Server, Sparkles, Globe, Hand, Loader2, Maximize2, Monitor, Moon, Power, Settings, X } from "lucide-react";
-import { api, ApiError, currentTaskBot, useStore, type Bot, type ConfigStatus } from "@/state/store";
-import { useAdvancedMode } from "@/lib/interface-mode";
-import { ComputerFilesPane } from "./ComputerFilesPane";
-import { effectivePlace, isComputerPlace, placeLabelKey, placeOffered } from "@/lib/place";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Globe, Settings, X } from "lucide-react";
+import { api, currentTaskBot, useStore, type Bot, type ConfigStatus } from "@/state/store";
 import { cn } from "@/lib/cn";
-import { useCaptionChrome } from "@/components/DesktopCapabilities";
-import { usePageVisible } from "@/lib/page-visible";
-import { listenLiveFrames } from "@/lib/live-events";
-import { CloudScreenPreview } from "./CloudScreenPreview";import { isActiveTurnRefusal, isRemoteScreenshotContention } from "@/lib/remote-desktop";
-import { useDesktopCapabilities } from "./DesktopCapabilities";
-import { RoutinesSection } from "./bot-settings/RoutinesSection";
-import { routineRunLabel, routineRunTone } from "@/lib/routine-display";
-import { BrowserPanel } from "./BrowserPanel";
-import { browserAvailable, browserUnavailableReason, builtInBrowserEnabled } from "@/lib/feature-flags";
-import { parseComputerHelp, transitionComputerControlLease, type ComputerControlAction } from "@/lib/computer-control";
-import { SignInBanner } from "./SignInRequestCard";
-import { LocalScreenPreview } from "./LocalScreenPreview";
-import { LinuxLocalControl } from "./LinuxLocalControl";
-import { LocalComputerAutoWarning } from "./LocalComputerAutoWarning";
-import { busyBoatView, instanceSupportsLocalComputer, localComputerDisabledReason, localComputerSelectable, persistedComputerSelectionMatches, isReadyBoatState, resolveBoatPanelAction, shouldPollCloudPreview } from "@/lib/local-computer";
-import { moveBetweenTabs, PANEL_TABS, panelTabProps, TAB_PANEL_FOCUS, tabPanelProps } from "./computer-panel-tabs";
-import { computerPanelTabs, readComputerPanelView, resolveComputerPanelView, writeComputerPanelView, type ComputerPanelView } from "@/lib/computer-panel-view";
-import { approvalModeFor } from "../../shared/approval-mode";
-import { openPlaceAction, placeBlocked, placeFacts, placeHasIssue, placeViewFor, usePlaceSeat, worksOnSimpleLabel } from "@/lib/place-view";
-import { cloudRefusal, type PlaceActionId, type PlaceFacts, type PlaceView } from "../../shared/place-view";
 import { t } from "@/lib/i18n";
-import { localizeComputerProblem } from "@/lib/computer-messages";
-import type { LocaleKey } from "@/locales";
+import { useAdvancedMode } from "@/lib/interface-mode";
+import { browserAvailable, browserUnavailableReason, builtInBrowserEnabled } from "@/lib/feature-flags";
+import { computerPanelTabs, readComputerPanelView, resolveComputerPanelView, writeComputerPanelView, type ComputerPanelView } from "@/lib/computer-panel-view";
+import { useCaptionChrome } from "./DesktopCapabilities";
+import { BrowserPanel } from "./BrowserPanel";
+import { ComputerFilesPane } from "./ComputerFilesPane";
+import { RoutinesSection } from "./bot-settings/RoutinesSection";
+import { Switch } from "./SettingsPrimitives";
+import { moveBetweenTabs, PANEL_TABS, panelTabProps, TAB_PANEL_FOCUS, tabPanelProps } from "./computer-panel-tabs";
+
 const DataPanel = lazy(() => import("./data/DataPanel").then((module) => ({ default: module.DataPanel })));
-
-class LocalizedPanelError extends Error {
-  constructor(
-    readonly key: LocaleKey,
-    readonly problem?: string | null,
-    readonly fallbackKey?: LocaleKey,
-  ) {
-    super(key);
-  }
-}
-
-function panelErrorText(error: Error | string | null): string | null {
-  if (error instanceof LocalizedPanelError) {
-    return t(error.key, error.fallbackKey ? { problem: localizeComputerProblem(error.problem) ?? t(error.fallbackKey) } : undefined);
-  }
-  return localizeComputerProblem(error instanceof Error ? error.message : error);
-}
-
-type Phase =
-  | "checking"
-  | "unconfigured"
-  | "starting"
-  | "busy-boat"
-  | "ready"
-  | "local"
-  | "local-unavailable"
-  | "auto-unavailable"
-  | "team-boat"
-  | "show-ready-boat"
-  | "show-sleeping-boat"
-  | "show-pending-boat"
-  | "cloud-new"
-  | "cloud-asleep"
-  | "browser"
-  | "off"
-  | "error";
-
-const computerControlSnapshotSchema = z.object({
-  held: z.boolean().optional().default(false),
-  helpReason: z.string().nullable().optional().default(null),
-  help: z.unknown().optional().transform(parseComputerHelp),
-}).passthrough();
 
 const PANEL_WIDTH_KEY = "omb-computer-panel-width";
 const PANEL_MIN_WIDTH = 360;
@@ -145,637 +84,51 @@ export function ComputerPanel({
     event.preventDefault();
     onResizeBy(widen);
   };
-  const { state, dispatch, flushBotPatches } = useStore();
-  const liveTask = profileBot.tasks?.find((task) => task.threadId === profileBot.threadId);
-  const livePlace = effectivePlace(profileBot, liveTask);
-  const threadBot = currentTaskBot(profileBot);
-  const connectionKey = `${profileBot.id}:${profileBot.threadId}:${livePlace}:${threadBot.modelSelection.instanceId}`;
-  const [autoSurface, setAutoSurface] = useState<{ key: string; surface: Bot["computer"] } | null>(null);
-  const autoSurfaceCurrent = autoSurface?.key === connectionKey;
-  const surfaceReady = livePlace !== "auto" || autoSurfaceCurrent;
-  const bot = { ...threadBot, computer: livePlace === "auto"
-    ? autoSurfaceCurrent ? autoSurface.surface : undefined : livePlace };
-  const viewerConnectionKey = `${bot.id}:${bot.threadId}:${bot.computer}`;
-  const viewerConnection = useRef(viewerConnectionKey);
-  viewerConnection.current = viewerConnectionKey;
-  const desktopJoin = useRef<AbortController | null>(null);
-  useEffect(() => () => desktopJoin.current?.abort(), [viewerConnectionKey]);
-  const placeLive = Boolean(bot.busy);
-  const threadPath = useCallback((suffix: string) =>
-    `/api/bots/${profileBot.id}/${suffix}?threadId=${encodeURIComponent(profileBot.threadId)}`,
-  [profileBot.id, profileBot.threadId]);
-  const canManageCloud = profileBot.computer === "cloud" && livePlace === "cloud";
-  const { capabilities, ready: capabilitiesReady } = useDesktopCapabilities();
-  const localAvailable = capabilities.localComputer.available;
-  const isLinux = capabilities.host.platform === "linux";
-  const providerSupportsLocal = instanceSupportsLocalComputer(state.instances, bot);
-  const localSelectable = placeOffered("local", state.config) && localComputerSelectable({ capabilities, providerSupportsLocal });
-  const [localAutoWarningTarget, setLocalAutoWarningTarget] = useState<string | null>(null);
-  const localDisabledReason = localComputerDisabledReason({ capabilities, providerSupportsLocal });
-  const placeSeat = usePlaceSeat(state.config, capabilities.host.platform);
-  const [phase, setPhase] = useState<Phase>("checking");
-  const [persistedComputerSelection, setPersistedComputerSelection] = useState<{
-    botId: string;
-    computer: Bot["computer"];
-    section: string;
-  } | null>(null);
-  const [resolvedComputerSelection, setResolvedComputerSelection] = useState<{
-    botId: string;
-    threadId: string;
-    computer: Bot["computer"];
-  } | null>(null);
-  const [teamComputer, setTeamComputer] = useState<{
-    id: string; name: string; botId: string; section: string;
-  } | null>(null);
-  const computerSelectionPersisted = Boolean(
-    persistedComputerSelection
-      && persistedComputerSelection.botId === bot.id
-      && persistedComputerSelection.computer === profileBot.computer
-      && persistedComputerSelection.section === (bot.section?.trim() ?? ""),
-  );
-  const computerStatusCurrent = Boolean(
-    resolvedComputerSelection
-      && resolvedComputerSelection.botId === bot.id
-      && resolvedComputerSelection.threadId === bot.threadId
-      && resolvedComputerSelection.computer === bot.computer
-      && resolvedComputerSelection.computer === bot.computer,
-  );
-  const currentTeamComputer = computerStatusCurrent && livePlace === "auto"
-    && teamComputer?.botId === bot.id && teamComputer.section === (bot.section?.trim() ?? "")
-    ? teamComputer : null;
-  const cloudPreviewReady = computerStatusCurrent && shouldPollCloudPreview({
-    computer: bot.computer,
-    phase,
-    botId: bot.id,
-    resolvedBotId: resolvedComputerSelection?.botId ?? null,
-    resolvedComputer: resolvedComputerSelection?.computer ?? null,
-  });
-  const updateComputerSelection = useCallback((patch: {
-    computer?: Bot["computer"] | null;
-    browser?: boolean;
-    acknowledgeLocalAuto?: boolean;
-  }) => {
-    // Clear in the same render as the optimistic profile change; the resolving effect waits for its PATCH.
-    setResolvedComputerSelection(null);
-    setTeamComputer(null);
-    setPhase("checking");
-    dispatch({ type: "updateBot", botId: bot.id, patch });
-  }, [bot.id, dispatch]);
-  useEffect(() => {
-    let alive = true;
-    setPersistedComputerSelection(null);
-    void flushBotPatches(bot.id).then((persistedBot) => {
-      if (!alive) return;
-      if (persistedBot && !persistedComputerSelectionMatches({
-        computer: profileBot.computer,
-        persistedBot,
-      })) return;
-      if (persistedBot && (persistedBot.section?.trim() ?? "") !== (bot.section?.trim() ?? "")) return;
-      setPersistedComputerSelection({
-        botId: bot.id,
-        computer: profileBot.computer,
-        section: bot.section?.trim() ?? "",
-      });
-    });
-    return () => {
-      alive = false;
-    };
-  }, [bot.id, profileBot.computer, bot.section, flushBotPatches]);
-  const [boatState, setBoatState] = useState<string | null>(null);
-  const [polledFrame, setPolledFrame] = useState<{ png: string; mime: string } | null>(null);
-  const [previewError, setPreviewError] = useState<Error | string | null>(null);
-  const [previewRefreshing, setPreviewRefreshing] = useState(false);
-  const [previewRetry, setPreviewRetry] = useState(0);
-  const [localFrame, setLocalFrame] = useState<string | null>(null);
-  const [pending, setPending] = useState<
-    "join" | "sleep" | "provision" | null
-  >(null);
-  const [controlPending, setControlPending] = useState(false);
-  const [viewerOpen, setViewerOpen] = useState(false);
-  const [error, setError] = useState<Error | string | null>(null);
-  const errorText = panelErrorText(error);
+  const { state, dispatch } = useStore();
+  const bot = currentTaskBot(profileBot);
   const advanced = useAdvancedMode();
   const [storedPanelView, setPanelView] = useState<ComputerPanelView>(() => readComputerPanelView(bot.id));
-  const requestedDataResult = state.dataResultFocus?.botId === bot.id ? state.dataResultFocus : undefined;
-  const [dataRequest, setDataRequest] = useState<{ id: string; requestId: number }>();
   const panelTabs = computerPanelTabs({ advanced });
   const panelView = resolveComputerPanelView(storedPanelView, { advanced });
+  const requestedDataResult = state.dataResultFocus?.botId === bot.id ? state.dataResultFocus : undefined;
+  const [dataRequest, setDataRequest] = useState<{ id: string; requestId: number }>();
   const browserAvailableHere = browserAvailable(state.config);
   const browserEnabled = builtInBrowserEnabled(state.config) && bot.browser !== false
     && (browserAvailableHere || state.config?.browserEngine?.installable === true);
-  const [retry, setRetry] = useState(0);
-  // Auto is the server's decision: never guess host-vs-cloud from desktop capabilities.
-  useEffect(() => {
-    if (livePlace !== "auto" || !computerSelectionPersisted) return;
-    const controller = new AbortController();
-    setAutoSurface(null);
-    void api(threadPath("computer"), { signal: controller.signal }).then((status) => {
-      if (controller.signal.aborted) return;
-      const surface = status.surface;
-      setAutoSurface({ key: connectionKey, surface:
-        surface === "cloud" || surface === "local" || surface === "browser" || surface === "off"
-          ? surface : undefined });
-    }).catch((cause) => {
-      if (controller.signal.aborted) return;
-      setError(cause instanceof Error ? cause : String(cause));
-      setPhase("error");
-    });
-    return () => controller.abort();
-  }, [connectionKey, livePlace, computerSelectionPersisted, threadPath, retry]);
-  const selectedInstance = state.instances.find(
-    (instance) => instance.instanceId === bot.modelSelection.instanceId,
-  );
-  const explicitPanelView = useRef(false);
-  const selectPanelView = (view: ComputerPanelView) => {
-    explicitPanelView.current = true;
+  const [error, setError] = useState<string | null>(null);
+  const chooseTab = (view: ComputerPanelView) => {
+    setError(null);
     setPanelView(view);
     writeComputerPanelView(bot.id, view);
   };
-
-  const previousPanelTarget = useRef<string | null>(null);
-  // Excludes the model and Auto's resolved surface: neither may move the tab.
-  const panelTargetKey = `${profileBot.id}:${profileBot.threadId}:${livePlace}`;
+  const requestedSignIn = state.signInFocus?.botId === bot.id ? state.signInFocus : undefined;
+  const [signInRequest, setSignInRequest] = useState<{ url: string; site: string; nonce: number }>();
+  const previousThread = useRef(bot.threadId);
   useEffect(() => {
-    const previous = previousPanelTarget.current;
-    if (previous === panelTargetKey && (explicitPanelView.current || !(bot.computer === "browser" && browserEnabled))) return;
-    if (previous !== panelTargetKey) explicitPanelView.current = false;
-    previousPanelTarget.current = panelTargetKey;
-    setPanelView(bot.computer === "browser" && browserEnabled ? "browser"
-      : previous === null ? readComputerPanelView(bot.id) : "computer");
-  }, [panelTargetKey, bot.id, bot.computer, browserEnabled]);
-
+    if (previousThread.current === bot.threadId) return;
+    previousThread.current = bot.threadId;
+    setPanelView("browser");
+    setDataRequest(undefined);
+    setSignInRequest(undefined);
+    setError(null);
+  }, [bot.threadId]);
   useEffect(() => {
     if (!requestedDataResult || requestedDataResult.consumed) return;
-    explicitPanelView.current = true;
     setDataRequest(requestedDataResult);
     setPanelView("data");
     writeComputerPanelView(bot.id, "data");
     dispatch({ type: "dataResultFocusConsumed", requestId: requestedDataResult.requestId });
   }, [bot.id, dispatch, requestedDataResult]);
 
-  const requestedSignIn = state.signInFocus?.botId === bot.id ? state.signInFocus : undefined;
-  const [signInRequest, setSignInRequest] = useState<{ url: string; site: string; nonce: number }>();
   useEffect(() => {
     if (!requestedSignIn || requestedSignIn.consumed) return;
-    const view = requestedSignIn.place === "browser" ? "browser" : "computer";
-    explicitPanelView.current = true;
+    if (requestedSignIn.place !== "browser") return;
+    const view = "browser";
     setPanelView(view);
     writeComputerPanelView(bot.id, view);
-    if (view === "browser") setSignInRequest({ url: requestedSignIn.url, site: requestedSignIn.site, nonce: requestedSignIn.requestId });
+    setSignInRequest({ url: requestedSignIn.url, site: requestedSignIn.site, nonce: requestedSignIn.requestId });
     dispatch({ type: "signInFocusConsumed", requestId: requestedSignIn.requestId });
   }, [bot.id, dispatch, requestedSignIn]);
-
-  useEffect(() => {
-    let alive = true;
-    const dv = window.ogb?.desktopViewer;
-    if (dv?.currentState) {
-      void dv
-        .currentState()
-        .then((s) => {
-          if (alive) setViewerOpen(s.open && s.contextId === bot.id);
-        })
-        .catch(() => {});
-    }
-    const off = dv?.onState((viewer) => {
-      if (viewer.contextId === bot.id) setViewerOpen(viewer.open);
-    });
-    return () => {
-      alive = false;
-      off?.();
-    };
-  }, [bot.id]);
-
-  const cloudSupported = canWorkOnCloud(cloudEngineOf(selectedInstance));
-  const botRoutines = state.routines
-    .filter((routine) => routine.botId === bot.id)
-    .sort((a, b) => Number(b.enabled) - Number(a.enabled) || (a.nextRunAt ?? Infinity) - (b.nextRunAt ?? Infinity));
-  const cloudRoutineReady = Boolean(
-    state.config?.box?.configured &&
-      boatCapableEngine(state.instances, bot.modelSelection.instanceId)?.snapshot.state === "available",
-  );
-  const activeRoutineRun = state.routineRuns.find(
-    (run) => run.botId === bot.id && ["queued", "running", "waiting"].includes(run.status),
-  );
-  useEffect(() => {
-    if (panelView !== "computer") return;
-    let alive = true;
-    setResolvedComputerSelection(null);
-    setTeamComputer(null);
-    setPhase("checking");
-    setPolledFrame(null);
-    setPreviewError(null);
-    setLocalFrame(null);
-    setError(null);
-    // The selection may be optimistic: never let it choose a provider until the PATCH confirms server state.
-    if (!computerSelectionPersisted || !surfaceReady) return;
-    if (bot.computer === undefined) {
-      setPhase("auto-unavailable");
-      return;
-    }
-
-    if (bot.computer === "off") {
-      setPhase("off");
-      return;
-    }
-    if (bot.computer === "browser") {
-      setPhase("browser");
-      return;
-    }
-    if (bot.computer === "local") {
-      if (!providerSupportsLocal) {
-        setError(new LocalizedPanelError("computer.err.localEngine"));
-      }
-      setPhase(capabilitiesReady && localAvailable && providerSupportsLocal ? "local" : "local-unavailable");
-      setResolvedComputerSelection({ botId: bot.id, threadId: bot.threadId, computer: bot.computer });
-      return;
-    }
-    if (bot.computer === "cloud" && !cloudSupported) {
-      setPhase("error");
-      return;
-    }
-    if (bot.computer !== "cloud" && !capabilitiesReady) return;
-    // Opening the panel only looks: it never creates or wakes a Boat.
-    api(threadPath("computer"))
-      .then((status) => {
-        if (!alive) return;
-        const action = resolveBoatPanelAction({
-          computer: livePlace === "cloud" ? "cloud" : undefined,
-          configured: Boolean(status.configured),
-          boatState: typeof status.box?.state === "string" ? status.box.state : null,
-          canUseCloud: cloudSupported,
-          autoLocal: false,
-          teamComputer: typeof status.teamComputer?.id === "string" && typeof status.teamComputer?.name === "string",
-          busy: profileBot.busy,
-        });
-        setResolvedComputerSelection({
-          botId: bot.id,
-          threadId: bot.threadId,
-          computer: bot.computer,
-        });
-        if (!status.configured && bot.computer === "cloud" && !status.teamComputer) {
-          setPhase("unconfigured");
-          return;
-        }
-        if (action === "team-boat") {
-          setTeamComputer({ id: status.teamComputer.id, name: status.teamComputer.name,
-            botId: bot.id, section: bot.section?.trim() ?? "" });
-          setBoatState(typeof status.box?.state === "string" ? status.box.state : status.configured ? "missing" : "unavailable");
-          setError(typeof status.problem === "string" ? status.problem : null);
-          setPhase("team-boat");
-          return;
-        }
-        if (action === "attach-ready-boat" || (bot.computer === "cloud" && action === "show-ready-boat")) {
-          setBoatState(typeof status.box?.state === "string" ? status.box.state : null);
-          setPhase("ready");
-          return;
-        }
-        setBoatState(typeof status.box?.state === "string" ? status.box.state : null);
-        setPhase(action);
-      })
-      .catch((e) => {
-        if (!alive) return;
-        setError(e.message);
-        setPhase("error");
-      });
-    return () => {
-      alive = false;
-    };
-  }, [
-    bot.id,
-    bot.threadId,
-    bot.computer,
-    bot.section,
-    retry,
-    capabilitiesReady,
-    localSelectable,
-    isLinux,
-    providerSupportsLocal,
-    selectedInstance?.driverKind,
-    cloudSupported,
-    panelView,
-    computerSelectionPersisted,
-    surfaceReady,
-    canManageCloud,
-    livePlace,
-    threadPath,
-  ]);
-
-  useEffect(() => {
-    if (phase !== "busy-boat") return;
-    let alive = true;
-    const check = () => {
-      if (!profileBot.busy && livePlace === "cloud") {
-        setRetry((n) => n + 1);
-        return;
-      }
-      api(threadPath("computer"))
-        .then((status) => {
-          if (!alive) return;
-          const state = typeof status.box?.state === "string" ? status.box.state : null;
-          setBoatState(state);
-          if (isReadyBoatState(state)) setPhase("ready");
-        })
-        .catch(() => {});
-    };
-    const timer = window.setInterval(check, 5_000);
-    return () => {
-      alive = false;
-      window.clearInterval(timer);
-    };
-  }, [phase, threadPath, profileBot.busy, livePlace]);
-
-  const pageVisible = usePageVisible();
-  const lastLiveAt = useRef(0);
-  const previewBusy = useRef(bot.busy);
-  useEffect(() => { previewBusy.current = bot.busy; }, [bot.busy]);
-  useEffect(() => {
-    lastLiveAt.current = 0;
-    if (!cloudPreviewReady) return;
-    return listenLiveFrames({
-      onFrame: (frame) => {
-        if (frame.kind !== "screen" || frame.botId !== bot.id || frame.threadId !== bot.threadId) return;
-        lastLiveAt.current = Date.now();
-        setPolledFrame({ png: frame.png, mime: frame.mime ?? "image/png" });
-        setPreviewError(null);
-        setPreviewRefreshing(false);
-      },
-    });
-  }, [cloudPreviewReady, bot.id, bot.threadId]);
-
-  useEffect(() => {
-    if (panelView !== "computer" || !cloudPreviewReady || viewerOpen || !pageVisible || pending || controlPending) return;
-    let inFlight = false;
-    let lastAttemptAt = -Infinity;
-    let retryDelay: number | null = null;
-    let contentionSince: number | null = null;
-    const controller = new AbortController();
-    setPreviewError(null);
-    setPreviewRefreshing(true);
-    const shoot = async () => {
-      if (inFlight || controller.signal.aborted) return;
-      if (Date.now() - lastAttemptAt < (retryDelay ?? (previewBusy.current ? 4000 : 30_000))) return;
-      if (previewBusy.current && Date.now() - lastLiveAt.current < 10_000) return;
-      inFlight = true;
-      retryDelay = null;
-      const startedAt = Date.now();
-      try {
-        const { png, format } = await api(threadPath("computer/screenshot"), {
-          method: "POST",
-          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(90_000)]),
-        });
-        if (!controller.signal.aborted && lastLiveAt.current <= startedAt) {
-          if (typeof png !== "string" || !png.trim()) throw new LocalizedPanelError("computer.err.emptyFrame");
-          setPolledFrame({ png, mime: format === "jpeg" ? "image/jpeg" : "image/png" });
-          setPreviewError(null);
-          setPreviewRefreshing(false);
-          contentionSince = null;
-        }
-      } catch (e) {
-        if (!controller.signal.aborted && lastLiveAt.current <= startedAt) {
-          if (e instanceof ApiError && isRemoteScreenshotContention(e)) {
-            retryDelay = 1000;
-            contentionSince ??= Date.now();
-            const prolonged = Date.now() - contentionSince >= 10_000;
-            setPreviewError(prolonged ? e : null);
-            setPreviewRefreshing(!prolonged);
-          } else {
-            contentionSince = null;
-            setPreviewRefreshing(false);
-            setPreviewError(e instanceof Error && e.name === "TimeoutError"
-              ? new LocalizedPanelError("computer.err.frameTimeout")
-              : e instanceof Error ? e : new LocalizedPanelError("computer.err.screenUnavailable"));
-          }
-        }
-      } finally {
-        inFlight = false;
-        lastAttemptAt = Date.now();
-      }
-    };
-    void shoot();
-    const timer = setInterval(shoot, 1000);
-    return () => {
-      controller.abort();
-      clearInterval(timer);
-    };
-  }, [panelView, cloudPreviewReady, threadPath, viewerOpen, pageVisible, pending, controlPending, previewRetry]);
-
-  // The first capture attempt is what makes macOS show the Screen Recording prompt (no reliable pre-grant on macOS
-  // 15+), so repeated empty frames mean denied.
-  const [localMisses, setLocalMisses] = useState(0);
-  useEffect(() => {
-    if (panelView !== "computer" || phase !== "local" || !computerStatusCurrent || !window.ogb || isLinux || !pageVisible) return;
-    let alive = true;
-    setLocalMisses(0);
-    const shoot = async () => {
-      try {
-        const url = await window.ogb!.screenFrame();
-        if (alive && url) setLocalFrame(url);
-        else if (alive) setLocalMisses((n) => n + 1);
-      } catch {
-        if (alive) setLocalMisses((n) => n + 1);
-      }
-    };
-    void shoot();
-    const timer = setInterval(shoot, bot.busy ? 3000 : 30_000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, [panelView, phase, computerStatusCurrent, isLinux, pageVisible, bot.busy, bot.id, bot.threadId]);
-
-  const frameSrc = !computerStatusCurrent ? null :
-    phase === "local" && !isLinux
-      ? localFrame
-      : cloudPreviewReady || (bot.computer === "cloud" && phase === "starting")
-        ? polledFrame && `data:${polledFrame.mime};base64,${polledFrame.png}`
-        : null;
-  const previewOpensDesktop = Boolean(
-    frameSrc &&
-      cloudPreviewReady,
-  );
-
-  const control = state.computerControl[bot.id] ?? { held: false, helpReason: null };
-  const signInHelp = control.help ?? null;
-  const signInAsker = signInHelp ? state.bots.find((candidate) => candidate.id === signInHelp.botId)?.name ?? bot.name : bot.name;
-  useEffect(() => {
-    let alive = true;
-    api(`/api/bots/${bot.id}/computer/control`)
-      .then((raw) => {
-        if (!alive) return;
-        const snap = computerControlSnapshotSchema.parse(raw);
-        dispatch({
-          type: "computerControl",
-          botId: bot.id,
-          held: snap.held === true,
-          helpReason: snap.helpReason,
-          help: snap.help,
-        });
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bot.id]);
-  const requestControl = useCallback(async (action: ComputerControlAction) => {
-    const snap = computerControlSnapshotSchema.parse(await api(`/api/bots/${bot.id}/computer/control`, {
-      method: "POST",
-      body: JSON.stringify({ action }),
-    }));
-    dispatch({
-      type: "computerControl",
-      botId: bot.id,
-      held: snap.held === true,
-      helpReason: snap.helpReason,
-      help: snap.help,
-    });
-    return snap;
-  }, [bot.id, dispatch]);
-
-  const setNativeBrowserControl = useCallback(async (): Promise<boolean> => true, []);
-
-  const transitionControl = useCallback(async (action: ComputerControlAction) => {
-    // Security: every computer surface must gate Electron's direct browser host; the server hold is bot-wide, and a
-    // shell-capable agent could otherwise bypass the server proxy while the person drives.
-    return transitionComputerControlLease({
-      action,
-      syncNativeBrowser: panelView !== "browser",
-      requestControl,
-      setNativeBrowserControl,
-    });
-  }, [panelView, requestControl, setNativeBrowserControl]);
-
-  const controlAction = useCallback(async (action: ComputerControlAction): Promise<boolean> => {
-    setControlPending(true);
-    setError(null);
-    try {
-      await transitionControl(action);
-      return true;
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-      return false;
-    } finally {
-      setControlPending(false);
-    }
-  }, [transitionControl]);
-
-  const bannerTakesControl = Boolean(signInHelp && signInHelp.place !== "browser" && signInHelp.place !== "local" &&
-    (cloudPreviewReady || currentTeamComputer));
-  const signInBanner = (takeControl?: () => void) => signInHelp && (
-    <SignInBanner
-      help={signInHelp}
-      askerName={signInAsker}
-      takeControl={takeControl && { onClick: takeControl, disabled: controlPending || pending === "join", pending: pending === "join" }}
-      onError={setError}
-    />
-  );
-
-  const openDesktop = async () => {
-    const controller = new AbortController();
-    desktopJoin.current = controller;
-    const ownsConnection = () => !controller.signal.aborted && viewerConnection.current === viewerConnectionKey;
-    setPending("join");
-    setControlPending(true);
-    setError(null);
-    let tookControl = false;
-    // Plain web opens its blank tab synchronously, inside the user gesture; the packaged app uses the Electron viewer
-    // window.
-    let fallbackTab: Window | null = null;
-    if (!window.ogb?.desktopViewer && !window.ogb?.openExternal) {
-      fallbackTab = window.open("", "_blank");
-      if (fallbackTab) fallbackTab.opener = null;
-    }
-    try {
-      if (!control.held) {
-        await transitionControl("take");
-        tookControl = true;
-      }
-      if (!ownsConnection()) throw new DOMException("The selected conversation changed", "AbortError");
-
-      let viewerUrl: string | null = null;
-      if (cloudPreviewReady) {
-        const result = await api(threadPath("computer/join"), { method: "POST", signal: controller.signal });
-        viewerUrl = result.joinUrl?.constructor === String ? String(result.joinUrl) : null;
-      }
-      if (!ownsConnection()) throw new DOMException("The selected conversation changed", "AbortError");
-      if (!viewerUrl) throw new LocalizedPanelError("computer.err.noDesktopLink");
-
-      if (window.ogb?.desktopViewer) {
-        const opened = await window.ogb.desktopViewer.open(viewerUrl, t("computer.viewerTitle", { name: bot.name }), bot.id);
-        if (!opened) throw new LocalizedPanelError("computer.err.openDesktop");
-      } else if (fallbackTab) {
-        fallbackTab.location.replace(viewerUrl);
-      } else if (window.ogb?.openExternal) {
-        const opened = await window.ogb.openExternal(viewerUrl);
-        if (!opened) throw new LocalizedPanelError("computer.err.openDesktopLink");
-      } else if (!window.open(viewerUrl, "_blank", "noopener")) {
-        throw new LocalizedPanelError("computer.err.popupBlocked");
-      }
-    } catch (e) {
-      fallbackTab?.close();
-      // Release the bot before surfacing a viewer error.
-      if (tookControl) await transitionControl("release").catch(() => {});
-      if (ownsConnection()) setError(e instanceof Error ? e : String(e));
-    } finally {
-      if (desktopJoin.current === controller) {
-        desktopJoin.current = null;
-        setPending(null);
-        setControlPending(false);
-      }
-    }
-  };
-
-  const run = (kind: "sleep" | "provision") => {
-    setPending(kind);
-    setError(null);
-    api(`/api/bots/${bot.id}/computer/${kind}`, { method: "POST" })
-      .then((result) => {
-        if (kind === "provision") {
-          setBoatState(result.container ?? null);
-          if (result.ready) {
-            if (bot.computer === "cloud") {
-              setResolvedComputerSelection({ botId: bot.id, threadId: bot.threadId, computer: bot.computer });
-            }
-            setPhase("ready");
-          }
-          else {
-            setError(result.problem ?? new LocalizedPanelError("computer.err.screenUnavailable"));
-            setPhase("error");
-          }
-        }
-        if (kind === "sleep") {
-          setResolvedComputerSelection(null);
-          setBoatState("archived");
-          setPhase(canManageCloud ? "cloud-asleep" : "show-sleeping-boat");
-        }
-      })
-      .catch((e) => {
-        setError(e.message);
-      })
-      .finally(() => setPending(null));
-  };
-
-  const startCloudComputer = () => {
-    setPending("provision");
-    setError(null);
-    setPhase("starting");
-    api(`/api/bots/${bot.id}/computer/provision`, { method: "POST" })
-      .then((result) => {
-        setBoatState(result.state ?? null);
-        setResolvedComputerSelection({ botId: bot.id, threadId: bot.threadId, computer: bot.computer });
-        setPhase("ready");
-      })
-      .catch((e) => {
-        if (isActiveTurnRefusal(e)) {
-          setPhase("busy-boat");
-          return;
-        }
-        setError(e.message);
-        setPhase("error");
-      })
-      .finally(() => setPending(null));
-  };
-
   const browserCanTurnOn = browserAvailableHere || state.config?.browserEngine?.installable === true;
   const [browserTurningOn, setBrowserTurningOn] = useState(false);
   const turnOnBrowser = async () => {
@@ -790,7 +143,7 @@ export function ComputerPanel({
         });
         dispatch({ type: "configStatus", config });
       }
-      if (profileBot.browser === false) dispatch({ type: "updateBot", botId: profileBot.id, patch: { browser: true } });
+      if (bot.browser === false) dispatch({ type: "updateBot", botId: bot.id, patch: { browser: true } });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("settings.experimental.error"));
     } finally {
@@ -800,7 +153,7 @@ export function ComputerPanel({
 
   const turnOffBrowser = () => {
     setError(null);
-    dispatch({ type: "updateBot", botId: profileBot.id, patch: { browser: false } });
+    dispatch({ type: "updateBot", botId: bot.id, patch: { browser: false } });
   };
   const browserSwitchRow = (
     <div data-testid="browser-switch-row" className="mb-3 flex items-center gap-3 rounded-xl bg-card px-3 py-2.5">
@@ -818,104 +171,10 @@ export function ComputerPanel({
     </div>
   );
 
-  const managedPolicy = state.config?.managedPolicy;
-  const busyBoat = busyBoatView(boatState, profileBot.busy === true);
-  const cloudComputer: PlaceFacts["computer"] = !computerStatusCurrent || livePlace !== "cloud" ? undefined
-    : phase === "starting" ? "starting"
-      : phase === "busy-boat" ? (busyBoat.spinner ? "starting" : busyBoat.line === "computer.cloud.asleep" ? "asleep" : "none")
-        : phase === "ready" ? "on"
-          : boatState === "archived" || boatState === "stopped" ? "asleep" : undefined;
-  const viewOf = (place: PlaceFacts["place"], refusal?: PlaceFacts["refusal"]): PlaceView => placeViewFor({
-    ...placeFacts({
-      bot, place, seat: placeSeat, config: state.config, instances: state.instances,
-      local: { ready: localSelectable, reason: localDisabledReason ?? t("computer.unavailableLocal") },
-      ...(place === "cloud" ? { computer: cloudComputer } : {}),
-      ...(place === "auto" && currentTeamComputer ? { teamComputer: currentTeamComputer.name } : {}),
-    }),
-    ...(refusal ? { refusal } : {}),
-  });
-  const cloudRefused = bot.computer === "cloud" && phase === "error" && error && !(error instanceof LocalizedPanelError)
-    ? cloudRefusal({ message: errorText ?? "", status: Number((error as { status?: unknown }).status ?? 0) || undefined }, state.config?.box?.included === true)
-    : undefined;
-  const cloudView = viewOf("cloud", cloudRefused);
-  const autoView = viewOf("auto");
-  const placeOptions = ([
-    [null, "place.auto", "computer.dest.autoDesc", Sparkles],
-    ["cloud", "place.cloud", "computer.dest.cloudDesc", Server],
-    ["local", "place.local", "computer.dest.localDesc", Monitor],
-    ["browser", "place.browser", "computer.dest.browserDesc", Globe],
-    ["off", "place.off", "computer.dest.offDesc", Power],
-  ] as const).filter(([mode]) => mode === null || mode === "off" || placeOffered(mode, state.config)).map(([mode, labelKey, descriptionKey, Icon]) => {
-    const selected = mode === null ? !profileBot.computer : profileBot.computer === mode;
-    const managedKind = mode === "local" ? "thisComputer" : mode === "cloud" ? "box" : null;
-    const managedBy = managedPolicy && managedKind && !managedPolicy.computers[managedKind] ? t("policy.managedBy", { organization: managedPolicy.organizationName }) : undefined;
-    const view = mode === null ? autoView : mode === "cloud" ? cloudView : viewOf(mode);
-    const disabled = Boolean(managedBy) || placeBlocked(view);
-    const issue = !managedBy && placeHasIssue(view);
-    const unavailableTitle = managedBy ?? (issue ? view.line : mode === "browser" ? t("computer.browserOnlyTitle") : undefined);
-    return { mode, labelKey, descriptionKey, Icon, simpleLabel: worksOnSimpleLabel(mode ?? undefined, capabilities.host.platform), selected, managedBy, disabled, unavailableTitle, view, issue };
-  });
-  const worksOnView = placeOptions.find(({ selected }) => selected)?.view ?? autoView;
-  const runPlaceAction = (id: PlaceActionId) => {
-    if (id === "start" || id === "wake") return startCloudComputer();
-    if (id === "try-again") return setRetry((n) => n + 1);
-    if (id === "turn-on-browser") return void turnOnBrowser();
-    openPlaceAction(id, { botId: profileBot.id, threadId: profileBot.threadId }, dispatch);
-  };
-  const panelOffers = (id: PlaceActionId | undefined): id is PlaceActionId => Boolean(id) && id !== "watch" && id !== "open-computer-panel"
-    && ((id !== "start" && id !== "wake") || (canManageCloud && !profileBot.busy));
-  const placeActionButton = (view: PlaceView, className = "mt-1 rounded-lg bg-control px-3 py-1.5 text-[12px] text-ink hover:bg-raised-hover") =>
-    view.action && panelOffers(view.action.id) ? (
-      <button type="button" data-testid="place-action" onClick={() => runPlaceAction(view.action!.id)} className={className}>
-        {view.action.label}
-      </button>
-    ) : null;
-  const selectPlace = (mode: (typeof placeOptions)[number]["mode"]) => {
-    if ((mode === null && profileBot.computer === undefined) || mode === profileBot.computer) return;
-    if (mode === "local" && approvalModeFor(profileBot) === "auto") {
-      setLocalAutoWarningTarget(bot.id);
-    }
-    else if (mode === "browser") updateComputerSelection({ computer: mode, browser: true });
-    else updateComputerSelection({ computer: mode });
-  };
-  const heldPin = liveTask?.surface && !liveTask.surfaceAuto && profileBot.computer !== "off"
-    && liveTask.surface !== profileBot.computer ? liveTask.surface : undefined;
-
-  const tabClass = (active: boolean) => cn(
-    "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] transition-colors @max-[28rem]/paneltabs:[&>svg]:hidden @max-[22rem]/paneltabs:px-2",
-    active ? "bg-raised text-ink shadow-sm" : "text-ink-secondary hover:text-ink",
-  );
-
-  const chooseTab = (view: ComputerPanelView) => {
-    if (view === "browser") setError(null);
-    selectPanelView(view);
-  };
-
-  const emptyState = {
-    checking: t("computer.phase.checking"),
-    starting: cloudView.line,
-    "busy-boat": cloudView.line,
-    unconfigured: cloudView.line,
-    "auto-unavailable": autoView.line,
-    "team-boat": autoView.line,
-    "show-ready-boat": t("computer.phase.showReadyBoat"),
-    "show-sleeping-boat": t("computer.phase.showSleepingBoat"),
-    "show-pending-boat": t("computer.phase.showPendingBoat"),
-    "cloud-new": cloudView.line,
-    "cloud-asleep": cloudView.line,
-    "local-unavailable": localDisabledReason ?? t("computer.phase.localUnavailable"),
-    browser: viewOf("browser").line,
-    off: viewOf("off").line,
-    error: bot.computer === "cloud" && (cloudRefused || placeBlocked(cloudView)) ? cloudView.line : t("computer.phase.error"),
-  } satisfies Record<Exclude<Phase, "ready" | "local">, string>;
 
   return (
-    <>
     <aside
-      className={cn(
-        "animate-panel-in relative flex h-full shrink-0 flex-col border-l border-hairline/40 bg-panel",
-        "max-md:absolute max-md:inset-0 max-md:z-40 max-md:w-full!",
-      )}
+      className="animate-panel-in relative flex h-full shrink-0 flex-col border-l border-hairline/40 bg-panel max-md:absolute max-md:inset-0 max-md:z-40 max-md:w-full!"
       style={{ width: panelWidth }}
     >
       <div
@@ -934,76 +193,63 @@ export function ComputerPanel({
         onPointerCancel={onResizeEnd}
         className="absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize hover:bg-accent/40 focus-visible:bg-accent/60 max-md:hidden"
       />
-      {/* ml-1.5 keeps the drag region clear of the resize handle: a later drag region in the DOM wins. */}
       <div {...dragProps} className={cn("@container/paneltabs ml-1.5 py-3 pl-2.5 pr-4", padClass)}>
         <div className="relative flex min-h-7 items-center justify-center">
-          {advanced && (
-            <button
-              onClick={() => {
-                dispatch({ type: "toggleComputer", open: false });
-                dispatch({ type: "toggleSettings", open: true, section: "access" });
-              }}
-              className="absolute left-0 top-1/2 -translate-y-1/2 rounded-md p-1 text-ink-secondary hover:bg-control hover:text-ink"
-              title={t("computer.botSettings")}
-            >
-              <Settings size={18} />
-            </button>
-          )}
-          <div className="mx-9 flex min-w-0 gap-0.5 overflow-x-auto rounded-full bg-inset p-1 [scrollbar-width:none]" data-tour="computer-tabs" data-testid="computer-tabs" role="tablist" aria-label={t("computer.tabsAria")} onKeyDown={(event) => moveBetweenTabs(event, panelTabs, chooseTab)}>
+          <button
+            type="button"
+            onClick={() => {
+              dispatch({ type: "toggleComputer", open: false });
+              dispatch({ type: "toggleSettings", open: true, section: "access" });
+            }}
+            className="absolute left-0 top-1/2 -translate-y-1/2 rounded-md p-1 text-ink-secondary hover:bg-control hover:text-ink"
+            title={t("computer.botSettings")}
+          >
+            <Settings size={18} />
+          </button>
+          <div
+            className="mx-9 flex min-w-0 gap-0.5 overflow-x-auto rounded-full bg-inset p-1 [scrollbar-width:none]"
+            data-testid="computer-tabs" role="tablist" aria-label={t("computer.tabsAria")}
+            onKeyDown={(event) => moveBetweenTabs(event, panelTabs, chooseTab)}
+          >
             {panelTabs.map((view) => {
               const { Icon, label, tour } = PANEL_TABS[view];
-              const live = !placeLive ? undefined
-                : view === "computer" && isComputerPlace(livePlace) ? "computer-tab-live"
-                : view === "browser" && livePlace === "browser" ? "browser-tab-live" : undefined;
               return (
-                <button key={view} type="button" data-tour={tour} {...panelTabProps(view, view === panelView)} title={t(label)} onClick={() => chooseTab(view)} className={tabClass(view === panelView)}>
+                <button
+                  key={view} type="button" data-tour={tour} {...panelTabProps(view, view === panelView)}
+                  title={t(label)} onClick={() => chooseTab(view)}
+                  className={cn("flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] @max-[28rem]/paneltabs:[&>svg]:hidden @max-[22rem]/paneltabs:px-2", view === panelView ? "bg-raised text-ink shadow-sm" : "text-ink-secondary hover:text-ink")}
+                >
                   <Icon size={13} /> {t(label)}
-                  {live && <span className="size-1.5 animate-pulse rounded-full bg-success" role="img" aria-label={t("place.live")} data-testid={live} />}
                 </button>
               );
             })}
           </div>
           <button
-            onClick={() => dispatch({ type: "toggleComputer", open: false })}
+            type="button" onClick={() => dispatch({ type: "toggleComputer", open: false })}
             className="absolute right-0 top-1/2 -translate-y-1/2 rounded-md p-1 text-ink-secondary hover:bg-control hover:text-ink"
-            aria-label={t("computer.close")}
-            title={t("computer.close")}
+            aria-label={t("computer.close")} title={t("computer.close")}
           >
             <X size={18} />
           </button>
         </div>
       </div>
-
       {panelView === "routines" ? (
         <div {...tabPanelProps("routines")} className={cn("min-h-0 flex-1 overflow-y-auto px-4 pb-4", TAB_PANEL_FOCUS)}>
-          <RoutinesSection key={bot.id} bot={bot} routines={botRoutines} runs={state.routineRuns} defaultRunOn={cloudRoutineReady ? "cloud" : "maus"} />
-        </div>
-      ) : panelView === "browser" && browserEnabled ? (
-        <div {...tabPanelProps("browser")} className={cn("flex min-h-0 flex-1 flex-col px-4 pb-4", TAB_PANEL_FOCUS)}>
-          {browserSwitchRow}
-          {signInHelp?.place === "browser" && <div className="-mt-1 mb-3">{signInBanner()}</div>}
-          <BrowserPanel bot={bot} signIn={signInRequest} />
-          {errorText && (
-            <div role="alert" className="mt-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">
-              {errorText}
-            </div>
-          )}
+          <RoutinesSection key={bot.id} bot={bot} routines={state.routines.filter((routine) => routine.botId === bot.id)} runs={state.routineRuns} />
         </div>
       ) : panelView === "browser" ? (
-        <div {...tabPanelProps("browser")} className={cn("flex-1 overflow-y-auto px-5 pb-5", TAB_PANEL_FOCUS)} data-testid="browser-off">
+        <div {...tabPanelProps("browser")} className={cn("flex min-h-0 flex-1 flex-col px-4 pb-4", TAB_PANEL_FOCUS)}>
           {browserSwitchRow}
-          <div className="mt-2 flex flex-col items-center gap-3 rounded-xl bg-card px-6 py-8 text-center">
-            <Globe size={22} className="text-ink-secondary" aria-hidden="true" />
-            <div className="text-[14px] font-medium text-ink">{t("computer.browserOff.title")}</div>
-            <p className="text-[12px] leading-5 text-ink-secondary">
-              {browserCanTurnOn ? t("computer.browserOff.body", { name: bot.name }) : browserUnavailableReason(state.config)}
-            </p>
-            {errorText && (
-              <div role="alert" className="w-full rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">
-                {errorText}
-              </div>
-            )}
-          </div>
+          {browserEnabled ? <BrowserPanel bot={bot} signIn={signInRequest} /> : (
+            <div className="mt-2 flex flex-col items-center gap-3 rounded-xl bg-card px-6 py-8 text-center" data-testid="browser-off">
+              <Globe size={22} className="text-ink-secondary" aria-hidden="true" />
+              <div className="text-[14px] font-medium text-ink">{t("computer.browserOff.title")}</div>
+              <p className="text-[12px] leading-5 text-ink-secondary">
+                {browserCanTurnOn ? t("computer.browserOff.body", { name: bot.name }) : browserUnavailableReason(state.config)}
+              </p>
+            </div>
+          )}
+          {error && <div role="alert" className="mt-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">{error}</div>}
         </div>
       ) : panelView === "data" ? (
         <div {...tabPanelProps("data")} className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", TAB_PANEL_FOCUS)}>
@@ -1011,370 +257,11 @@ export function ComputerPanel({
             <DataPanel key={bot.id} bot={bot} requestedCard={dataRequest} />
           </Suspense>
         </div>
-      ) : panelView === "files" ? (
+      ) : (
         <div {...tabPanelProps("files")} className={cn("flex min-h-0 flex-1 flex-col", TAB_PANEL_FOCUS)}>
           <ComputerFilesPane bot={bot} />
         </div>
-      ) : (
-      <div {...tabPanelProps("computer")} className={cn("flex-1 overflow-y-auto px-5 pb-5", TAB_PANEL_FOCUS)}>
-          <div className="mb-1.5 mt-2 flex items-center justify-between text-[13px] text-ink-secondary">
-            <span>{t("computer.screenOf", { name: bot.name })}</span>
-            {currentTeamComputer && <span className="text-[11px]">{autoView.short}</span>}
-            {phase === "local" && <span className="text-[11px]">{t("computer.badge.local")}</span>}
-            {(phase === "show-ready-boat" || phase === "show-sleeping-boat" || phase === "show-pending-boat") && (
-              <span className="text-[11px]">{t("computer.badge.autoBoat")}</span>
-            )}
-        </div>
-        <div className="relative flex aspect-[16/10] w-full items-center justify-center overflow-hidden rounded-xl bg-card">
-          {cloudPreviewReady || (bot.computer === "cloud" && phase === "starting") ? (
-            <CloudScreenPreview
-              key={`${bot.id}:${bot.threadId}:${bot.computer}`}
-              src={frameSrc}
-              name={bot.name}
-              error={panelErrorText(previewError)}
-              refreshing={previewRefreshing}
-              retry={previewRetry}
-              starting={phase === "starting"}
-              opening={pending === "join"}
-              disabled={controlPending}
-              onOpen={() => void openDesktop()}
-              onRetry={(discardFrame) => {
-                lastLiveAt.current = 0;
-                if (discardFrame) setPolledFrame(null);
-                setPreviewError(null);
-                setPreviewRefreshing(true);
-                setPreviewRetry((n) => n + 1);
-              }}
-            />
-          ) : frameSrc && previewOpensDesktop ? (
-            <button
-              type="button"
-              onClick={() => void openDesktop()}
-              disabled={controlPending || pending === "join"}
-              className="group relative flex h-full w-full cursor-pointer items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-wait"
-              aria-label={t("computer.openLiveDesktopAria", { name: bot.name })}
-              title={t("computer.openLiveDesktop")}
-            >
-              <img
-                src={frameSrc}
-                alt={t("computer.screenOf", { name: bot.name })}
-                className="h-full w-full object-contain transition group-hover:brightness-75 group-focus-visible:brightness-75"
-              />
-              <span className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded-md bg-black/70 px-2 py-1 text-[11px] font-medium text-white opacity-80 shadow-sm transition group-hover:opacity-100 group-focus-visible:opacity-100">
-                {pending === "join" ? <Loader2 size={12} className="animate-spin" /> : <Maximize2 size={12} />}
-                {t("computer.open")}
-              </span>
-            </button>
-          ) : frameSrc ? (
-            <img
-              src={frameSrc}
-              alt={t("computer.screenOf", { name: bot.name })}
-              className="h-full w-full object-contain"
-            />
-          ) : (
-            <div className="flex flex-col items-center gap-2 px-6 text-center text-ink-secondary">
-              {phase === "checking" || phase === "starting" || (phase === "busy-boat" && busyBoat.spinner) || (phase === "local" && !isLinux) ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : phase === "off" ? (
-                <Power size={22} />
-              ) : (
-                <Monitor size={22} />
-              )}
-              <span className="text-[12px]">
-                {currentTeamComputer
-                  ? autoView.line
-                  : cloudPreviewReady
-                  ? t("computer.waitingFrame")
-                  : phase === "ready"
-                    ? t("computer.autoChooseCloudOpen")
-                  : phase === "local"
-                    ? isLinux
-                      ? t("computer.linuxReady")
-                      : localMisses >= 3
-                      ? t("computer.needsScreenPerm")
-                      : t("computer.capturingLocal")
-                    : emptyState[phase]}
-              </span>
-              {currentTeamComputer && placeActionButton(autoView)}
-              {bot.computer === "cloud" && (phase === "unconfigured" || phase === "error") && cloudView.action?.id !== "add-boat-key" && placeActionButton(cloudView)}
-              {phase === "local" && !isLinux && localMisses >= 3 && (
-                <button
-                  onClick={() => window.ogb?.permOpenSettings?.("screen")}
-                  className="mt-1 rounded-lg bg-control px-3 py-1.5 text-[12px] text-ink hover:bg-raised-hover"
-                >
-                  {t("computer.openSettings")}
-                </button>
-              )}
-              {phase === "browser" && browserEnabled && (
-                <button
-                  onClick={() => selectPanelView("browser")}
-                  className="mt-1 rounded-lg bg-control px-3 py-1.5 text-[12px] text-ink hover:bg-raised-hover"
-                >
-                  {t("computer.openBrowserTab")}
-                </button>
-              )}
-              {(phase === "show-ready-boat" || phase === "show-sleeping-boat" || phase === "show-pending-boat") && (
-                <button
-                  type="button"
-                  onClick={() => updateComputerSelection({ computer: "cloud" })}
-                  className="mt-1 rounded-lg bg-control px-3 py-1.5 text-[12px] text-ink hover:bg-raised-hover"
-                >
-                  {phase === "show-sleeping-boat"
-                    ? t("computer.chooseCloudWake")
-                    : phase === "show-ready-boat"
-                      ? t("computer.chooseCloudOpen")
-                      : t("computer.chooseCloudManage")}
-                </button>
-              )}
-              {pending === null && (phase === "cloud-new" || phase === "cloud-asleep") && placeActionButton(cloudView)}
-            </div>
-          )}
-        </div>
-
-        {errorText && !cloudRefused && (
-          <div className="mt-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">
-            {errorText}
-          </div>
-        )}
-        {phase === "unconfigured" && cloudView.action?.id === "add-boat-key" && (
-          <div className="mt-3 rounded-xl bg-card p-4">
-            <></>
-          </div>
-        )}
-        {signInHelp && signInHelp.place !== "browser" && signInBanner(bannerTakesControl && !control.held
-          ? () => cloudPreviewReady ? void openDesktop() : void controlAction("take")
-          : undefined)}
-        {(cloudPreviewReady || currentTeamComputer) && control.held && (
-          <div className="mt-3 rounded-xl border border-accent/25 bg-accent/10 p-4">
-            <div className="text-[13px] leading-relaxed text-ink">
-              {t("computer.youHaveWheel")}
-              {cloudPreviewReady && ` ${t(advanced ? "computer.useOpenDesktop" : "computer.simple.useFullScreen")}`}
-            </div>
-            <button
-              onClick={() => {
-                controlAction("release");
-                void window.ogb?.desktopViewer?.close(bot.id);
-              }}
-              disabled={controlPending}
-              className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-2 text-[13px] font-medium text-white hover:brightness-110 disabled:opacity-50"
-            >
-              <Hand size={14} />
-              {t("computer.handBack")}
-            </button>
-          </div>
-        )}
-        {!advanced && cloudPreviewReady && (
-          <div className="mt-3 flex gap-2" data-testid="computer-actions">
-            {!control.held && !bannerTakesControl && (
-              <button
-                type="button"
-                onClick={() => void openDesktop()}
-                disabled={controlPending || pending === "join"}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-accent py-2 text-[13px] font-medium text-accent-ink hover:brightness-110 disabled:opacity-50"
-                title={t("computer.takeControlTitle")}
-              >
-                {pending === "join" ? <Loader2 size={14} className="animate-spin" /> : <Hand size={14} />}
-                {t("computer.takeControl")}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => void openDesktop()}
-              disabled={pending === "join" || (!control.held && controlPending)}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-control py-2 text-[13px] text-ink hover:bg-raised-hover disabled:opacity-50"
-              title={t("computer.openLiveDesktop")}
-            >
-              <Maximize2 size={14} />
-              {t("computer.fullScreen")}
-            </button>
-            {cloudPreviewReady && canManageCloud && boatState !== "archived" && (
-              <button
-                type="button"
-                onClick={() => run("sleep")}
-                disabled={pending === "sleep" || profileBot.busy}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-control px-3 py-2 text-[13px] text-ink hover:bg-raised-hover disabled:opacity-50"
-                title={t("computer.sleepTitle")}
-              >
-                {pending === "sleep" ? <Loader2 size={14} className="animate-spin" /> : <Moon size={14} />}
-                {t("computer.sleepTitle")}
-              </button>
-            )}
-          </div>
-        )}
-        {advanced && cloudPreviewReady && (
-          <div className="mt-3 flex gap-2">
-            {!control.held && !bannerTakesControl && (
-              <button
-                onClick={() =>
-                  void openDesktop()
-                }
-                disabled={controlPending || pending === "join"}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-control py-2 text-[13px] text-ink hover:bg-raised-hover disabled:opacity-50"
-                title={t("computer.takeControlTitle")}
-              >
-                {pending === "join" ? <Loader2 size={14} className="animate-spin" /> : <Hand size={14} />}
-                {t("computer.takeControl")}
-              </button>
-            )}
-            {control.held && (
-              <button
-                onClick={() => void openDesktop()}
-                disabled={pending === "join"}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-control py-2 text-[13px] text-ink hover:bg-raised-hover disabled:opacity-50"
-              >
-                {pending === "join" ? <Loader2 size={14} className="animate-spin" /> : <Monitor size={14} />}
-                {t("computer.openLiveDesktop")}
-              </button>
-            )}
-            {canManageCloud && boatState !== "archived" && (
-              <button
-                onClick={() => run("sleep")}
-                disabled={pending === "sleep" || profileBot.busy}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-control px-3 py-2 text-[13px] text-ink hover:bg-raised-hover disabled:opacity-50"
-                title={t("computer.sleepTitle")}
-              >
-                {pending === "sleep" ? <Loader2 size={14} className="animate-spin" /> : <Moon size={14} />}
-                {t("computer.sleepTitle")}
-              </button>
-            )}
-          </div>
-        )}
-
-        {phase !== "team-boat" && (bot.computer !== undefined || computerStatusCurrent) && <>
-          <LocalScreenPreview />
-          <LinuxLocalControl />
-          <></>
-        </>}
-
-        {advanced ? <>
-          <div className="mt-4 rounded-xl bg-card p-4">
-            <div className="text-[15px] font-medium text-ink">{t("computer.worksOn")}</div>
-            <p className="mt-1 text-[12px] leading-5 text-ink-secondary">
-              {t(state.config?.cloudHome ? "computer.worksOnHintCloudHome" : "computer.worksOnHint")}
-            </p>
-          <div role="group" aria-label={t("computer.destinationAria")} className="mt-3 grid auto-rows-fr grid-cols-2 gap-2">
-            {placeOptions.map(({ mode, labelKey, descriptionKey, Icon, selected, managedBy, disabled, unavailableTitle, issue, view }) => (
-              <button
-                key={mode ?? "auto"}
-                disabled={disabled}
-                title={unavailableTitle}
-                onClick={() => selectPlace(mode)}
-                type="button"
-                aria-pressed={selected}
-                className={cn(
-                  "min-w-0 rounded-lg border px-2.5 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-card",
-                  selected
-                    ? "border-accent/60 bg-accent/10 text-ink"
-                    : "border-hairline/50 bg-panel/30 text-ink-secondary",
-                  disabled
-                    ? "cursor-not-allowed"
-                    : "hover:border-accent/40 hover:bg-control/60",
-                )}
-              >
-                <span className="flex items-center gap-2 text-[12px] font-medium leading-4">
-                  {selected ? <Check size={14} className="shrink-0 text-accent" /> : <Icon size={14} className="shrink-0 text-ink-secondary" />}
-                  <span>{t(labelKey)}</span>
-                </span>
-                <span className="mt-1.5 block text-[11px] leading-4 text-ink-secondary">
-                  {managedBy ?? (issue ? view.short : t(descriptionKey))}
-                </span>
-              </button>
-            ))}
-          </div>
-          {liveTask?.surface && (
-            <p className="mt-2 text-[11.5px] leading-5 text-ink-secondary" data-testid="place-pinned-note">
-              {t("place.pinnedNote", { place: t(placeLabelKey(liveTask.surface)) })}
-            </p>
-          )}
-          <div className="mt-3 border-t border-hairline/40 pt-3 text-[11.5px] leading-5 text-ink-secondary" aria-live="polite" data-testid="place-line">
-            {worksOnView.line}
-            {placeActionButton(worksOnView, "mt-1 block font-medium text-accent hover:underline")}
-          </div>
-        </div>
-
-        <button type="button" onClick={() => selectPanelView("routines")} className="mt-4 flex w-full items-start gap-3 rounded-xl bg-card p-4 text-left hover:bg-raised">
-          <CalendarClock size={17} className="mt-0.5 shrink-0 text-accent" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[14px] font-medium text-ink">{t("computer.tab.routines")} <span className="ml-1 text-[11px] text-ink-secondary">{botRoutines.length}</span></span>
-            <span className={cn("mt-1 block truncate text-[11.5px]", activeRoutineRun ? routineRunTone(activeRoutineRun) : "text-ink-secondary")}>{activeRoutineRun ? `${activeRoutineRun.routineName} · ${routineRunLabel(activeRoutineRun)}` : t("computer.routines.openTitle")}</span>
-          </span>
-          <span className="text-ink-secondary" aria-hidden="true">→</span>
-        </button>
-        </> : (
-          <div className="mt-4 rounded-xl bg-card p-4" data-testid="where-works">
-            <div className="text-[15px] font-medium text-ink">{t("computer.simple.whereWorks", { name: bot.name })}</div>
-            <div role="group" aria-label={t("computer.destinationAria")} className="mt-3 grid grid-cols-3 gap-2">
-              {placeOptions.map(({ mode, Icon, selected, disabled, unavailableTitle, simpleLabel, issue, view }) => (
-                <button
-                  key={mode ?? "auto"}
-                  type="button"
-                  disabled={disabled}
-                  title={unavailableTitle}
-                  aria-pressed={selected}
-                  onClick={() => selectPlace(mode)}
-                  className={cn(
-                    "flex min-w-0 flex-col items-center gap-1.5 rounded-lg border px-1.5 py-2.5 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-card",
-                    selected
-                      ? "border-accent/60 bg-accent/10 text-ink"
-                      : "border-hairline/50 bg-panel/30 text-ink-secondary",
-                    disabled ? "cursor-not-allowed opacity-50" : "hover:border-accent/40 hover:bg-control/60",
-                  )}
-                >
-                  <Icon size={16} className={cn("shrink-0", selected ? "text-accent" : "text-ink-secondary")} aria-hidden="true" />
-                  <span className="w-full truncate text-[12px] font-medium leading-4">{simpleLabel}</span>
-                  {issue && <span className="w-full truncate text-[10.5px] leading-3 text-ink-secondary">{view.short}</span>}
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 text-[11.5px] leading-5 text-ink-secondary" data-testid="place-line">
-              {worksOnView.line}
-              {placeActionButton(worksOnView, "mt-1 block font-medium text-accent hover:underline")}
-            </div>
-            {heldPin && (
-              <div className="mt-2 flex items-center gap-2">
-                <p className="min-w-0 flex-1 text-[11.5px] leading-5 text-ink-secondary" data-testid="place-pinned-note">
-                  {t("place.pinnedNoteSimple", {
-                    place: placeOptions.find(({ mode }) => mode === heldPin)?.simpleLabel ?? t(placeLabelKey(heldPin)),
-                  })}
-                </p>
-                <button
-                  type="button"
-                  disabled={Boolean(bot.busy)}
-                  title={bot.busy ? t("place.busy") : undefined}
-                  onClick={() => dispatch({ type: "updateTask", botId: profileBot.id, threadId: profileBot.threadId, patch: { surface: null } })}
-                  className="shrink-0 rounded-md px-2 py-0.5 text-[11.5px] font-medium leading-5 text-accent-text transition-colors hover:bg-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent"
-                  data-testid="place-unpin"
-                >
-                  {t("place.unpinSimple", {
-                    place: placeOptions.find(({ selected }) => selected)?.simpleLabel ?? t(placeLabelKey(profileBot.computer ?? "auto")),
-                  })}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
       )}
-
     </aside>
-    <LocalComputerAutoWarning
-      open={localAutoWarningTarget !== null}
-      onCancel={() => setLocalAutoWarningTarget(null)}
-      onConfirm={() => {
-        const targetBotId = localAutoWarningTarget;
-        setLocalAutoWarningTarget(null);
-        if (!targetBotId) return;
-        if (targetBotId === bot.id) {
-          setResolvedComputerSelection(null);
-          setPhase("checking");
-        }
-        dispatch({
-          type: "updateBot",
-          botId: targetBotId,
-          patch: { computer: "local", acknowledgeLocalAuto: true },
-        });
-      }}
-    />
-    </>
   );
 }

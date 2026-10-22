@@ -501,14 +501,15 @@ export class Store {
         delete legacyComputerFields.autoStartVps;
         botsMigrated = true;
       }
-      // Local VM was removed. Drop legacy bot/task pins instead of silently
-      // remapping them to another computer provider.
-      if ((b as unknown as { computer?: string }).computer === "vm") {
+      // Every bot follows automatic placement, including profiles saved before
+      // the placement selector was removed.
+      if (b.computer !== undefined) {
         delete b.computer;
         botsMigrated = true;
       }
       for (const task of b.tasks ?? []) {
-        if ((task as unknown as { surface?: string }).surface !== "vm") continue;
+        if (task.surface === undefined || (task.surfaceSource === "auto" &&
+          (task as unknown as { surface?: string }).surface !== "vm")) continue;
         delete task.surface;
         delete task.surfaceSource;
         botsMigrated = true;
@@ -1682,6 +1683,8 @@ export class Store {
   patchBot(id: string, patch: Partial<BotRecord>): BotRecord | null {
     const bot = this.bot(id);
     if (!bot) return null;
+    // Undefined is the durable representation of automatic placement.
+    patch = { ...patch, computer: undefined };
     if (patch.connectorTools !== undefined) {
       const parsed = parseConnectorTools(patch.connectorTools);
       if (!parsed.ok) throw new Error(parsed.error);
@@ -1927,7 +1930,6 @@ export class Store {
       const keepsCloud = options.canWorkOnCloud && options.keepCloud(bot);
       let botAsk = false;
       if (botMoved) {
-        if (bot.computer === undefined && keepsCloud) patch.computer = "cloud";
         if (needsAsk(bot)) { Object.assign(patch, structuredClone(askNow)); botAsk = true; }
         patch.modelSelection = structuredClone(replacement);
       }

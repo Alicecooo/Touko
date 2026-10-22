@@ -32,7 +32,7 @@ describe("new-bot templates", () => {
 
   it("accepts bounded settings and rejects coercion and invalid model combinations", () => {
     expect(parseConfigPatch({ newBotDefaults: { profile: { notifications: false, computer: "off", mcpServers: [] } } })
-      .newBotDefaults?.profile).toEqual({ notifications: false, computer: "off", mcpServers: [] });
+      .newBotDefaults?.profile).toEqual({ notifications: false, computer: null, mcpServers: [] });
     for (const profile of [
       { notifications: "false" }, { name: "one\ntwo" }, { cloudBackend: "made-up" },
       { modelSelection: { instanceId: "codex", model: "model", effort: "low", variant: "fast" } },

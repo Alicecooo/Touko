@@ -116,8 +116,9 @@ export function openPlaceAction(
       return true;
     case "watch":
     case "open-computer-panel":
+      return false;
     case "turn-on-browser":
-      writeComputerPanelView(target.botId, id === "turn-on-browser" ? "browser" : "computer");
+      writeComputerPanelView(target.botId, "browser");
       dispatch({ type: "toggleComputer", open: true });
       return true;
     default:
