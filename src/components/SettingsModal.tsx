@@ -32,7 +32,6 @@ import { ChatWidthRow, FontRow, SidebarToolsLayoutRow } from "./AppearanceSelect
 import { setColorUserBubbles, useColorUserBubbles } from "@/lib/user-bubble-preference";
 import { RoomTurnTimeoutSettings } from "./RoomTurnTimeoutSettings";
 import { McpCallTimeoutSettings } from "./McpCallTimeoutSettings";
-import { AboutMeSettings } from "./AboutMeSettings";
 import { ThreadConcurrencySettings } from "./ThreadConcurrencySettings";
 import { AutomaticRecoverySettings } from "./AutomaticRecoverySettings";
 import { ThreadCleanupSettings } from "./ThreadCleanupSettings";
@@ -179,7 +178,6 @@ function ProfileFields() {
         placeholder="you@example.com"
         className={inputClass}
       />
-      <AboutMeSettings />
     </div>
   );
 }
@@ -624,7 +622,7 @@ export function SettingsModal() {
             <AdvancedModeRow />
 
             <></>
-            <Card title={t("settings.profile.title")} subtitle={t("settings.profile.sharedSubtitle")}>
+            <Card title={t("settings.profile.title")} subtitle={t("settings.profile.subtitle")}>
               <ProfileFields />
             </Card>
 

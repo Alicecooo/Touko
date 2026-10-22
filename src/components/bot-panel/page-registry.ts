@@ -13,7 +13,7 @@ export const TAB_LABEL: Record<PanelTab, LocaleKey> = {
 };
 
 export type PageId =
-  | "setup" | "model" | "instructions" | "approvals" | "always" | "routines" | "apps"
+  | "setup" | "model" | "instructions" | "always" | "routines" | "apps"
   | "memory" | "skills"
   | "browser" | "folder"
   | "notifications" | "blurb" | "team" | "chiefteams" | "mcp" | "tools" | "webhooks" | "visibility" | "slack"
@@ -30,7 +30,6 @@ export const PAGES: Record<PageId, PageMeta> = {
   setup: { title: "botSetup.ideas", home: "details", where: "botSettings.simple.details", keywords: "setup ideas finish" },
   model: { title: "model.simple.model", home: "details", where: "botPanel.where.model", keywords: "engine provider effort reasoning backup fallback cache warm default model" },
   instructions: { title: "botSettings.simple.instructions", home: "details", where: "botPanel.where.instructions", keywords: "soul.md soul standing instructions reply style conversational persona rules" },
-  approvals: { title: "botPanel.page.approvals", home: "details", where: "botPanel.where.beforeActs", keywords: "approve approval level auto mode full access ask custom config.toml sending daily limit outbound permissions command allowlist" },
   routines: { title: "botSettings.simple.routines", home: "details", where: "botPanel.where.routines", keywords: "schedule routines cron tasks run logs" },
   apps: { title: "botPanel.page.apps", home: "details", where: "botPanel.where.apps", keywords: "composio connected apps per-app tools grants gmail calendar read write limit vault" },
   memory: { title: "botSettings.simple.memory", home: "library", where: "botPanel.where.memories", keywords: "memory notes remember obsidian upkeep tidy topic daily logs undo" },
@@ -70,7 +69,7 @@ const SECTION_TARGET: Record<BotSettingsSection, PanelTarget> = {
   routines: { tab: "details", page: "routines" },
   access: { tab: "computer" },
   model: { tab: "details", page: "model" },
-  permissions: { tab: "details", page: "approvals" },
+  permissions: { tab: "details", anchor: "approval" },
   notifications: { tab: "settings", page: "notifications" },
   visibility: { tab: "settings", page: "visibility" },
   history: { tab: "settings", page: "history" },

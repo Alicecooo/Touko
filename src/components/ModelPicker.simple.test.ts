@@ -198,7 +198,7 @@ describe("the model picker in Simple mode", () => {
     const bottom = region(html, "data-simple-effort-band");
     expect(bottom).toContain(">Deep</button>");
     expect(bottom).not.toContain("new chats too");
-    expect(bottom).toContain("Manage AI accounts");
+    expect(bottom).not.toContain("Manage AI accounts");
   });
 
   it("lists every provider it knows: sign-ins, then API keys, then local engines", () => {
@@ -740,12 +740,7 @@ describe("the model picker in Simple mode", () => {
     expect(fixture.refreshModels).toHaveBeenCalledTimes(2);
   });
 
-  it("opens AI accounts from the bottom band", () => {
-    const opened = open(bot());
-    const manage = inside(opened).find((node) => node.props["data-simple-manage"] !== undefined)!;
-    (manage.props.onClick as () => void)();
-    expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "toggleAppSettings", open: true, section: "engines" });
-  });
+
 
   it("puts a full-width named-variants control in the band in place of the effort steps", () => {
     const variants = [{ id: "default", label: "Default" }, { id: "high", label: "High" }];

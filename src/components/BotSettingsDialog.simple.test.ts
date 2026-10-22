@@ -107,7 +107,7 @@ const { ThreadModelsLine } = await import("./ThreadModelsLine");
 const { ModelSection } = await import("./bot-settings/ModelSection");
 const { MemorySection } = await import("./bot-settings/MemorySection");
 const { AccessSection } = await import("./bot-settings/AccessSection");
-const { PermissionsSection } = await import("./bot-settings/PermissionsSection");
+const { OutboundControl } = await import("./bot-settings/PermissionsSection");
 const { RoutinesSection } = await import("./bot-settings/RoutinesSection");
 const { OverviewSection } = await import("./bot-settings/OverviewSection");
 const { RoutineEditor } = await import("./RoutinesPage");
@@ -317,7 +317,7 @@ describe("the bot panel in Simple mode", () => {
     ["overview", "settings", "overview"], ["identity", "details", undefined], ["slack", "settings", "slack"],
     ["soul", "details", "instructions"], ["skills", "library", "skills"], ["memory", "library", "memory"],
     ["routines", "details", "routines"], ["access", "computer", undefined], ["model", "details", "model"],
-    ["permissions", "details", "approvals"], ["visibility", "settings", "visibility"],
+    ["permissions", "details", undefined], ["visibility", "settings", "visibility"],
     ["history", "settings", "history"], ["usage", "settings", undefined],
   ] as const)("lands a deep link to %s on %s › %s", (section, tab, page) => {
     expect([sectionTarget(section).tab, sectionTarget(section).page]).toEqual([tab, page]);
@@ -476,17 +476,7 @@ describe("the avatar editor", () => {
 });
 
 describe("the Details tab", () => {
-  it("shows Finish setting up only while setup ideas remain", () => {
-    expect(has(details(makeBot()), "data-panel-page", "setup")).toBe(false);
-    expect(has(details(makeBot(), overviewWith([{ id: "soul", label: "Write instructions", done: true }])), "data-panel-page", "setup")).toBe(false);
-    const rendered = details(makeBot(), overviewWith([
-      { id: "soul", label: "Write instructions", done: false, section: "soul" },
-      { id: "apps", label: "Connect an app", done: false, section: "access" },
-    ]));
-    expect(rendered.html).toContain("2 ideas to make Scout more useful");
-    click(find(rendered, "data-panel-page", "setup"));
-    expect(onOpen).toHaveBeenLastCalledWith("setup");
-  });
+
 
   it("picks the model in the contained picker for the open thread, with Thinking on its own row", () => {
     fixture.derived.engine = { driverKind: "claudeAgent", capabilities: { effortLevels: ["low", "medium", "high", "max"] } };
@@ -566,16 +556,20 @@ describe("the Details tab", () => {
     expect(patch).toHaveBeenLastCalledWith({ approvalMode: "auto" });
     acts.onChange("full");
     expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "updateBot", botId: "scout", patch: { approvalMode: "full", applyToAllThreads: true } });
-    click(find(rendered, "data-panel-link", "approvals"));
-    expect(onOpen).toHaveBeenLastCalledWith("approvals");
 
     fixture.derived.approvalMode = "full";
-    expect(details(makeBot()).html).toContain("Acts without checking");
     fixture.derived.approvalMode = "edits";
     const custom = details(makeBot());
     expect(segment(custom, "data-approval-choice").value).toBe("edits");
     expect(custom.html).not.toMatch(/data-approval-choice="\w+" aria-pressed="true"/);
-    expect(custom.html).toContain("A custom setting is in use.");
+    expect(custom.html).not.toContain("A custom setting is in use.");
+  });
+
+  it("shows sending settings directly under Decide for me", () => {
+    for (const approvalMode of ["ask", "auto", "full"] as const) {
+      fixture.derived.approvalMode = approvalMode;
+      expect(Boolean(ofType(details(makeBot({ approvalMode })), OutboundControl))).toBe(approvalMode === "auto");
+    }
   });
 
   it("shows legacy Antigravity Auto as Ask without changing the saved mode", () => {
@@ -837,7 +831,7 @@ describe("the Settings tab", () => {
     const order = ["Profile", "Teamwork", "Tools", "Sharing", "Activity", ">Scout<", "Advanced mode"].map(at);
     expect(order.every((index) => index > -1)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    for (const text of ["What Scout does", "Voice", "Notifications", "Team", "Chief of Staff", "Ask me before contacting other bots",
+    for (const text of ["What Scout does", "Notifications", "Team", "Chief of Staff", "Ask me before contacting other bots",
       "MCP servers", "Tool selection", "Webhooks", "Always allowed", "Phone and email", "Overview",
       "What Scout sees", "History", "Usage for all bots", "Pin to top", "Duplicate", "Copy conversation ID",
       "Mark all conversations as read", "Archive Scout", "Delete Scout"]) expect(html).toContain(text);
@@ -848,7 +842,7 @@ describe("the Settings tab", () => {
 
   it("opens each page from its row", () => {
     const rendered = settings(makeBot());
-    for (const page of ["blurb", "voice", "team", "mcp", "tools", "webhooks", "always", "overview", "prompt", "history"]) {
+    for (const page of ["blurb", "team", "mcp", "tools", "webhooks", "always", "overview", "prompt", "history"]) {
       click(find(rendered, "data-panel-page", page));
       expect(onOpen).toHaveBeenLastCalledWith(page);
     }
@@ -936,7 +930,6 @@ describe("the drill-in pages", () => {
 
   it("renders the full sections, or the part a page needs", () => {
     expect(ofType(body("model"), ModelSection)!.props.bot).toMatchObject({ id: "scout" });
-    expect(ofType(body("approvals"), PermissionsSection)!.props.parts).toEqual(["approval", "outbound"]);
     for (const [page, parts] of [["apps", ["apps"]], ["mcp", ["mcp"]], ["tools", ["tools"]], ["webhooks", ["webhooks"]], ["always", ["always"]]] as const) {
       expect(ofType(body(page), AccessSection)!.props.parts).toEqual(parts);
     }
@@ -1004,7 +997,7 @@ describe("the bot settings dialog", () => {
     const rendered = dialog(makeBot());
     expect(ofType(rendered, BotPanel)).toBeUndefined();
     expect(rendered.html).toContain("Search settings");
-    for (const label of ["Overview", "Identity", "Soul", "Skills", "Memory", "Routines", "Access", "Model", "Permissions", "Voice &amp; alerts", "History", "Usage"]) {
+    for (const label of ["Overview", "Identity", "Soul", "Skills", "Memory", "Routines", "Access", "Model", "Permissions", "Notifications", "History", "Usage"]) {
       expect(rendered.html).toContain(`>${label}</span>`);
     }
   });

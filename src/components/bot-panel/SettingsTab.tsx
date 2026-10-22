@@ -229,7 +229,7 @@ export function SettingsTab({ bot, derived, slackUrl, query, onQuery, onOpen, on
     { key: "avatar", title: t("botPanel.avatar.edit"), where: "botSettings.simple.details", target: { tab: "details" }, keywords: "avatar look color colour body face expression picture image upload generate mascot" },
     { key: "thinking", title: t("botSettings.simple.thinking"), where: "botPanel.where.model", target: { tab: "details", anchor: "model" }, keywords: "thinking effort reasoning quick balanced deep" },
     { key: "reply", title: t("botSettings.replyStyle.title"), where: "botPanel.where.instructions", target: { tab: "details", anchor: "instructions" }, keywords: "reply style conversational" },
-    { key: "acts", title: t("botSettings.simple.beforeActs", { name }), where: "botSettings.simple.details", target: { tab: "details", anchor: "approval" }, keywords: "approval ask decide full access" },
+    { key: "acts", title: t("botSettings.simple.beforeActs", { name }), where: "botSettings.simple.details", target: { tab: "details", anchor: "approval" }, keywords: "approval ask decide full access sending outbound daily limit" },
     { key: "where", title: t("computer.simple.whereWorks", { name }), where: "computer.tab.computer", target: { tab: "computer", anchor: "where" }, keywords: "works on computer place auto this mac cloud computer browser off" },
     { key: "files", title: t("botPanel.library.files"), where: "botSettings.simple.library", target: { tab: "library", anchor: "files" }, keywords: "files pages attachments library" },
   ];

@@ -33,13 +33,12 @@ function render(bot: Bot, trustedModesAvailable = false) {
     children: createElement(PermissionsSection, { bot, derived }),
   })));
 }
-const choose = (label: string) => {
-  flushSync(() => host.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!.click());
-  const item = [...host.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')]
-    .find((button) => button.textContent?.startsWith(label));
-  if (!item) throw new Error(`No ${label} level offered`);
+const choose = (mode: "ask" | "auto" | "full") => {
+  const item = host.querySelector<HTMLButtonElement>(`[data-approval-choice="${mode}"]`);
+  if (!item) throw new Error(`No ${mode} level offered`);
   flushSync(() => item.click());
 };
+
 const dialogs = () => document.querySelectorAll('[role="alertdialog"], [role="dialog"]').length;
 
 beforeEach(() => {
@@ -58,29 +57,30 @@ afterEach(() => {
 describe("Full access in bot settings", () => {
   it.each([false, true])("applies to the bot and every thread at once, with no dialog (desktop bridge: %s)", (bridge) => {
     render(base, bridge);
-    choose("Full access");
+    choose("full");
     expect(dialogs()).toBe(0);
     expect(dispatch).toHaveBeenCalledExactlyOnceWith({
       type: "updateBot", botId: "pepper", patch: { approvalMode: "full", applyToAllThreads: true },
     });
   });
 
-  it("re-applies Full to every thread from its button, with no dialog and no desktop bridge", () => {
-    render({ ...base, approvalMode: "full" });
-    const button = [...host.querySelectorAll("button")].find((candidate) => candidate.textContent === "Apply Full access to all threads");
-    expect(button).toBeDefined();
-    flushSync(() => button!.click());
-    expect(dialogs()).toBe(0);
-    expect(dispatch).toHaveBeenCalledExactlyOnceWith({
-      type: "updateBot", botId: "pepper", patch: { approvalMode: "full", applyToAllThreads: true },
-    });
-  });
+
 
   it("still warns before Auto on this computer", () => {
     render({ ...base, computer: "local" });
-    choose("Approve for me");
+    choose("auto");
     expect(dispatch).not.toHaveBeenCalled();
     expect(dialogs()).toBe(1);
+  });
+});
+
+describe("approval settings visibility", () => {
+  it("shows outbound settings only for Decide for me and keeps three approval choices", () => {
+    for (const approvalMode of ["ask", "auto", "full"] as const) {
+      render({ ...base, approvalMode });
+      expect(host.querySelectorAll("[data-approval-choice]")).toHaveLength(3);
+      expect(host.querySelector("[data-outbound-settings]") !== null).toBe(approvalMode === "auto");
+    }
   });
 });
 
@@ -93,10 +93,10 @@ describe("PermissionsSection parts", () => {
     flushSync(() => root.render(createElement(BotEditorStore, {
       value: { state: { ...initialState, bots: [base] }, dispatch,
         flushBotPatches: async () => null, refreshInstances: async () => {}, refreshModels: async () => {} },
-      children: createElement(PermissionsSection, { bot: base, derived, parts: ["approval", "outbound"] }),
+      children: createElement(PermissionsSection, { bot: base, derived, parts: ["approval"] }),
     })));
-    expect(host.textContent).toContain("Approval level");
-    expect(host.textContent).toContain("Sending on your behalf");
+    expect(host.textContent).toContain("Before Pepper acts");
+    expect(host.textContent).not.toContain("Sending on your behalf");
     expect(host.textContent).not.toContain("Chief of Staff");
     expect(host.textContent).not.toContain("Ask me before contacting other bots");
     render(base);

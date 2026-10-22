@@ -1003,7 +1003,6 @@
   "mcp.cancel": "रद्द करें",
   "mcp.save": "सहेजें",
   "mcp.loading": "MCP सर्वर लोड हो रहे हैं…",
-  "mcp.empty.title": "अभी कोई कस्टम MCP सर्वर नहीं",
   "mcp.badge.on": "चालू",
   "mcp.badge.off": "बंद",
   "mcp.secretsSaved": "सहेजे गए सीक्रेट: {keys}",
