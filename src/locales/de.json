@@ -1010,7 +1010,6 @@
   "mcp.cancel": "Abbrechen",
   "mcp.save": "Speichern",
   "mcp.loading": "MCP-Server werden geladen…",
-  "mcp.empty.title": "Noch keine eigenen MCP-Server",
   "mcp.badge.on": "An",
   "mcp.badge.off": "Aus",
   "mcp.secretsSaved": "Gespeicherte Geheimnisse: {keys}",

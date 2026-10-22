@@ -48,12 +48,12 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Your MCP servers inside the Apps pop-up", () => {
-  it("lists each server with Test, Edit and an on/off switch, plus Paste config and Add MCP server", () => {
+  it("lists each server with Test, Edit and an on/off switch, plus Add MCP server", () => {
     const html = render(true);
     expect(html).toContain("Your MCP servers");
-    expect(html).toContain("Paste config");
+    expect(html).not.toContain("Paste config");
     expect(html).toContain("Add MCP server");
-    expect(html.match(/role="switch"/g)?.length).toBeGreaterThanOrEqual(3); // two servers + the Claude Code switch
+    expect(html.match(/role="switch"/g)).toHaveLength(2);
     expect(html).toMatch(/aria-label="Turn notes off" type="button" role="switch" aria-checked="true"/);
     expect(html).toMatch(/aria-label="Turn docs on" type="button" role="switch" aria-checked="false"/);
     expect(html).toContain('aria-label="Edit notes"');
@@ -64,7 +64,7 @@ describe("Your MCP servers inside the Apps pop-up", () => {
   it("keeps its own scroll and wording when shown on its own", () => {
     const html = render(false);
     expect(html).toContain("overflow-y-auto");
-    expect(html).toContain("Add server");
+    expect(html).toContain("Add MCP server");
   });
 
   it("offers Whop setup with no API key form or forced installation", () => {

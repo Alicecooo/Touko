@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, CheckCircle2, ClipboardPaste, FlaskConical, Globe, Loader2, LogIn, LogOut, Pencil, Plus, RefreshCw, ServerCog, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, FlaskConical, Globe, Loader2, LogIn, LogOut, Pencil, Plus, ServerCog, Trash2 } from "lucide-react";
 
 import { openExternalLink } from "@/lib/app-links";
 import { cn } from "@/lib/cn";
@@ -11,7 +11,6 @@ import { api, useStore } from "@/state/store";
 
 import { Select } from "./Select";
 import { Switch } from "./SettingsPrimitives";
-import { ClaudeCodeSwitches } from "./ClaudeCodeSwitches";
 import { WhopIcon } from "./WhopIcon";
 import { McpResultBudgetField, resultBudgetDraft, withResultBudget, type McpMessage, type McpResultBudgetDraft, type McpResultBudgetListing } from "./McpResultBudgetField";
 import { WHOP_MCP_URL, isWhopServer, whopServerName } from "@/lib/whop-integration";
@@ -212,38 +211,11 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
   const [callbackUrl, setCallbackUrl] = useState("");
   const [callbackError, setCallbackError] = useState<string | null>(null);
   const [completingSignIn, setCompletingSignIn] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
-  const [importText, setImportText] = useState("");
   const loadGeneration = useRef(0);
   const mounted = useRef(true);
   const whopServer = servers?.find((server) => isRemoteMcpListing(server) && isWhopServer(server));
   const whopConnected = Boolean(whopServer?.enabled && isRemoteMcpListing(whopServer) && whopServer.auth === "signed-in");
   useEffect(() => { if (servers !== null) onWhopConnection?.(whopConnected); }, [servers, whopConnected, onWhopConnection]);
-
-  // Paste-to-add takes the mcpServers block Claude Code, Cursor and Claude Desktop write.
-  const importServers = async () => {
-    if (!importText.trim()) return;
-    const generation = ++loadGeneration.current;
-    setBusy("import");
-    setError(null);
-    setNotice(null);
-    try {
-      const result = await api("/api/mcp/servers/import", {
-        method: "POST",
-        body: JSON.stringify({ json: importText }),
-      });
-      updateMcpServers(result.servers ?? []);
-      if (generation !== loadGeneration.current) return;
-      setServers(result.servers ?? []);
-      setNotice({ key: "mcp.imported", params: { names: (result.added ?? []).join(", ") } });
-      setImportText("");
-      setImportOpen(false);
-    } catch (cause) {
-      if (generation === loadGeneration.current) setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      if (generation === loadGeneration.current) setBusy(null);
-    }
-  };
 
   const load = useCallback(() => {
     const generation = ++loadGeneration.current;
@@ -607,97 +579,25 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
       className={embedded ? "" : "min-h-0 flex-1 overflow-y-auto px-6 pb-7 pt-5 sm:px-8"}
     >
       <div className={embedded ? "" : "mx-auto max-w-[840px]"}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-[1_1_280px]">
-            <h3 id="mcp-servers-title" className="text-[15px] font-semibold text-ink">{t("mcp.title")}</h3>
-            <p className="mt-1 max-w-[610px] break-words text-[12.5px] leading-relaxed text-ink-secondary">
-              {t("mcp.subtitle")}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void load()}
-              disabled={busy !== null}
-              className="rounded-lg p-2 text-ink-secondary transition-colors hover:bg-raised hover:text-ink disabled:opacity-40"
-              aria-label={t("mcp.refreshAria")}
-            >
-              <RefreshCw size={16} className={cn(busy === "load" && "animate-spin")} />
-            </button>
-            <button
-              type="button"
-              disabled={busy !== null || restricted}
-              title={restricted && policy ? t("policy.managedBy", { organization: policy.organizationName }) : undefined}
-              onClick={() => {
-                setImportOpen((open) => !open);
-                setError(null);
-                setNotice(null);
-              }}
-              className="ui-button"
-            >
-              <ClipboardPaste size={14} /> {t("mcp.import")}
-            </button>
-            <button
-              type="button"
-              disabled={busy !== null || (restricted && !policy?.mcp.allowlist.length)}
-              title={restricted && policy ? t("policy.managedBy", { organization: policy.organizationName }) : undefined}
-              onClick={() => {
-                setEditing("new");
-                setDraft(EMPTY_DRAFT);
-                setError(null);
-                setNotice(null);
-              }}
-              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12.5px] font-medium text-white disabled:opacity-40"
-            >
-              <Plus size={14} /> {t(embedded ? "apps.mcp.add" : "mcp.addServer")}
-            </button>
-          </div>
+        <h3 id="mcp-servers-title" className="sr-only">{t("mcp.title")}</h3>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            disabled={busy !== null || (restricted && !policy?.mcp.allowlist.length)}
+            title={restricted && policy ? t("policy.managedBy", { organization: policy.organizationName }) : undefined}
+            onClick={() => {
+              setEditing("new");
+              setDraft(EMPTY_DRAFT);
+              setError(null);
+              setNotice(null);
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12.5px] font-medium text-white disabled:opacity-40"
+          >
+            <Plus size={14} /> {t("apps.mcp.add")}
+          </button>
         </div>
 
         {restricted && policy && <p role="status" className="mt-3 text-[12.5px] leading-relaxed text-ink-secondary">{t("policy.mcpRestricted", { organization: policy.organizationName })}</p>}
-        <ClaudeCodeSwitches />
-
-        {importOpen && (
-          <div className="mt-4 rounded-2xl border border-hairline/60 bg-card p-4 sm:p-5">
-            <div className="text-[14px] font-medium text-ink">{t("mcp.import")}</div>
-            <p className="mt-1 text-[12px] leading-relaxed text-ink-secondary">{t("mcp.importHint")}</p>
-            <textarea
-              autoFocus
-              aria-label={t("mcp.import")}
-              value={importText}
-              onChange={(event) => setImportText(event.target.value)}
-              spellCheck={false}
-              rows={8}
-              placeholder={'{\n  "mcpServers": {\n    "notes": { "command": "npx", "args": ["-y", "@example/notes-mcp"], "env": { "NOTES_TOKEN": "…" } },\n    "docs": { "type": "http", "url": "https://mcp.example.com/mcp", "headers": { "Authorization": "Bearer …" } }\n  }\n}'}
-              className="mt-3 w-full resize-y rounded-lg border border-hairline/60 bg-raised px-3 py-2.5 font-mono text-[12px] leading-relaxed text-ink outline-none focus:border-accent"
-            />
-            <div className="mt-3 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                disabled={busy === "import"}
-                onClick={() => {
-                  setImportOpen(false);
-                  setImportText("");
-                }}
-                className="rounded-lg px-3 py-2 text-[12.5px] text-ink-secondary hover:text-ink"
-              >
-                {t("common.cancel")}
-              </button>
-              <button
-                type="button"
-                disabled={busy !== null || !importText.trim()}
-                onClick={() => void importServers()}
-                className="rounded-lg bg-accent px-3 py-2 text-[12.5px] font-medium text-accent-ink disabled:opacity-40"
-              >
-                {t("mcp.importAction")}
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="mt-4 rounded-xl border border-hairline/50 bg-raised/35 px-4 py-3 text-[12px] leading-relaxed text-ink-secondary">
-          {t("mcp.trustNotice")}
-        </div>
 
         {error && <div role="alert" className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-[12px] text-danger">{typeof error === "string" ? error : t(error.key, error.params)}</div>}
         {notice && <div role="status" className="mt-3 rounded-lg bg-success/10 px-3 py-2 text-[12px] text-success">{t(notice.key, {
@@ -871,13 +771,7 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
 
         {servers === null ? (
           <div className="flex items-center justify-center gap-2 py-24 text-[13px] text-ink-secondary"><Loader2 size={14} className="animate-spin" /> {t("mcp.loading")}</div>
-        ) : visibleServers?.length === 0 && !editing ? (
-          <div className="mt-5 flex min-h-32 flex-col items-center justify-center rounded-2xl border border-dashed border-hairline/60 text-center">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-raised text-ink-secondary"><ServerCog size={21} /></div>
-            <div className="mt-3 text-[14px] font-medium text-ink">{t("mcp.empty.title")}</div>
-            <div className="mt-1 max-w-sm text-[12.5px] text-ink-secondary">{t("mcp.empty.desc")}</div>
-          </div>
-        ) : (
+        ) : visibleServers?.length === 0 && !editing ? null : (
           <div className="mt-5 space-y-3">
             {visibleServers?.map((server) => {
               const whop = isRemoteMcpListing(server) && isWhopServer(server);

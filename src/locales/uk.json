@@ -1408,7 +1408,6 @@
   "mcp.cancel": "Скасувати",
   "mcp.save": "Зберегти",
   "mcp.loading": "Завантажуємо MCP-сервери…",
-  "mcp.empty.title": "Власних MCP-серверів ще немає",
   "mcp.badge.on": "Увімк.",
   "mcp.badge.off": "Вимк.",
   "mcp.secretsSaved": "Секрети збережено: {keys}",

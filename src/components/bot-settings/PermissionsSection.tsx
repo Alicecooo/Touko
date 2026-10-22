@@ -7,15 +7,16 @@ import { t } from "@/lib/i18n";
 import { useStore, type Bot } from "@/state/store";
 import type { ApprovalMode } from "../../../shared/approval-mode";
 import { DEFAULT_OUTBOUND_POLICY, type OutboundPolicy } from "../../../shared/outbound";
-import { ApprovalModeSelector } from "../ApprovalModeSelector";
+import { approvalModeOptionsFor } from "../ApprovalModeSelector";
 import { LocalComputerAutoWarning } from "../LocalComputerAutoWarning";
 import { Switch } from "../SettingsPrimitives";
 import { ManagedTeamsSettings } from "./ManagedTeamsSettings";
 import { ProposalStatus } from "./ProposalStatus";
 import type { useBotSettingsDerived } from "./useBotSettingsDerived";
 import { useBotEditor } from "./BotEditorContext";
+import { Segmented } from "../bot-panel/rows";
 
-export type PermissionsPart = "chief" | "peers" | "approval" | "outbound";
+export type PermissionsPart = "chief" | "peers" | "approval";
 
 export function PermissionsSection({
   bot,
@@ -32,6 +33,9 @@ export function PermissionsSection({
   const displaySectionName = sectionName === "General" ? t("botAccess.teams.general") : sectionName;
   const [localAutoWarning, setLocalAutoWarning] = useState<string | null>(null);
   const shows = (part: PermissionsPart) => !parts || parts.includes(part);
+  const displayedApprovalMode = engine?.driverKind === "antigravityAgent" && approvalMode === "auto" ? "ask" : approvalMode;
+  const autoOffered = approvalModeOptionsFor(engine?.driverKind ?? "", trustedModesAvailable)
+    .some((option) => option.mode === "auto");
   const applyFullEverywhere = () =>
     dispatch({ type: "updateBot", botId: bot.id, patch: { approvalMode: "full", applyToAllThreads: true } });
   const setApprovalMode = (mode: ApprovalMode) => {
@@ -120,32 +124,25 @@ export function PermissionsSection({
       </div>}
 
       {shows("approval") && <div className="rounded-xl bg-card p-4">
-        <div className="text-[15px] font-medium text-ink">{t("permissions.approval.title")}</div>
-        <div className="mt-0.5 text-[13px] text-ink-secondary">
-          {draft ? t("permissions.approval.draft") : t("permissions.approval.help")}
-        </div>
+        <div className="text-[15px] font-medium text-ink">{t("botSettings.simple.beforeActs", { name: bot.name })}</div>
         <ProposalStatus bot={bot} kind="owner" />
         <div className="mt-3">
-          <ApprovalModeSelector
-            approvalMode={bot.approvalMode}
-            autoApprove={bot.autoApprove}
-            providerName={engine?.displayName ?? bot.name}
-            driverKind={engine?.driverKind ?? ""}
-            onSelect={setApprovalMode}
-            menuDirection="down"
-            wide
-            disabled={Boolean(bot.busy)}
-            trustedModesAvailable={trustedModesAvailable}
+          <Segmented
+            attr="data-approval-choice"
+            label={t("botSettings.simple.beforeActs", { name: bot.name })}
+            value={displayedApprovalMode}
+            onChange={setApprovalMode}
+            options={[
+              { value: "ask", label: t("botSettings.simple.ask"), disabled: Boolean(bot.busy) },
+              { value: "auto", label: t("botSettings.simple.decide"), disabled: Boolean(bot.busy) || !autoOffered },
+              { value: "full", label: t("botSettings.simple.full"), disabled: Boolean(bot.busy) },
+            ]}
           />
         </div>
-        {!draft && approvalMode === "full" && <button
-          type="button" disabled={Boolean(bot.busy)}
-          className="mt-3 text-[13px] text-accent hover:underline disabled:opacity-40"
-          onClick={applyFullEverywhere}
-        >{t("permissions.approval.applyFull")}</button>}
+        {!draft && displayedApprovalMode === "auto" && <div className="mt-4 border-t border-hairline/40 pt-4">
+          <OutboundControl key={bot.id} bot={bot} onChange={(outbound) => patch({ outbound })} embedded />
+        </div>}
       </div>}
-
-      {!draft && shows("outbound") && <OutboundControl key={bot.id} bot={bot} onChange={(outbound) => patch({ outbound })} />}
       <LocalComputerAutoWarning
         open={localAutoWarning !== null}
         onCancel={() => setLocalAutoWarning(null)}
@@ -160,7 +157,7 @@ export function PermissionsSection({
   );
 }
 
-function OutboundControl({ bot, onChange }: { bot: Bot; onChange: (policy: OutboundPolicy) => void }) {
+export function OutboundControl({ bot, onChange, embedded = false }: { bot: Bot; onChange: (policy: OutboundPolicy) => void; embedded?: boolean }) {
   const policy = bot.outbound ?? DEFAULT_OUTBOUND_POLICY;
   const [today, setToday] = useState<number | null>(null);
   const [capDraft, setCapDraft] = useState(String(policy.dailyCap));
@@ -192,11 +189,8 @@ function OutboundControl({ bot, onChange }: { bot: Bot; onChange: (policy: Outbo
   };
 
   return (
-    <div className="rounded-xl bg-card p-4">
+    <div className={embedded ? "p-4" : "rounded-xl bg-card p-4"} data-outbound-settings>
       <div className="text-[15px] font-medium text-ink">{t("permissions.outbound.title")}</div>
-      <div className="mt-0.5 text-[13px] text-ink-secondary">
-        {t("permissions.outbound.help")}
-      </div>
       <div className="mt-3 flex gap-1 rounded-lg bg-inset p-0.5">
         {(
           [

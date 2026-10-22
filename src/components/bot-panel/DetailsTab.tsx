@@ -15,6 +15,8 @@ import type { EffortLevel } from "../../../shared/wire";
 import type { ReplyStyle } from "../../../shared/reply-style";
 import { approvalModeOptionsFor } from "../ApprovalModeSelector";
 import { LocalComputerAutoWarning } from "../LocalComputerAutoWarning";
+import { OutboundControl } from "../bot-settings/PermissionsSection";
+import { useBotEditor } from "../bot-settings/BotEditorContext";
 import { ModelPicker } from "../ModelPicker";
 import { RoutineEditor } from "../RoutinesPage";
 import { SoulField } from "../SoulField";
@@ -34,6 +36,7 @@ export function DetailsTab({ bot, derived, onOpen }: {
   onOpen: (page: PageId) => void;
 }) {
   const { state, dispatch } = useStore();
+  const { draft } = useBotEditor();
   const [editingSoul, setEditingSoul] = useState(false);
   const [localAutoWarning, setLocalAutoWarning] = useState<{ botId: string; patch: BotPatch } | null>(null);
   const [editingRoutine, setEditingRoutine] = useState<Routine | "new" | null>(null);
@@ -56,12 +59,6 @@ export function DetailsTab({ bot, derived, onOpen }: {
     }
     patch({ approvalMode: mode });
   };
-  const customMode = displayedApprovalMode === "edits" || displayedApprovalMode === "custom";
-  const actsHint = customMode
-    ? <span data-approval-custom>{t("botSettings.simple.customMode")}</span>
-    : t(displayedApprovalMode === "auto" ? "botSettings.simple.decideHint"
-      : displayedApprovalMode === "full" ? "botSettings.simple.fullHint" : "botSettings.simple.askHint");
-
   const effortLevels = engine?.capabilities?.modelVariants ? [] : engine?.capabilities?.effortLevels ?? [];
   const thinkingLevels = effortLevels.length > 0 ? simpleEffortLevels(effortLevels, bot.modelSelection.effort) : [];
   const chooseEffort = (level: EffortLevel) => {
@@ -163,9 +160,8 @@ export function DetailsTab({ bot, derived, onOpen }: {
               { value: "full", label: t("botSettings.simple.full"), tooltip: t("botSettings.simple.fullHint"), disabled: Boolean(bot.busy) },
             ]}
           />
-          <div className="mx-0.5 text-[12.5px] leading-[1.35] text-ink-secondary">{actsHint}</div>
         </ColRow>
-        <LinkRow data-panel-link="approvals" onClick={() => onOpen("approvals")}>{t("botPanel.moreApprovals")}</LinkRow>
+        {!draft && displayedApprovalMode === "auto" && <OutboundControl key={bot.id} bot={bot} onChange={(outbound) => patch({ outbound })} embedded />}
       </Card>
 
       <Card

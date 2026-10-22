@@ -11,7 +11,6 @@ import { IdentitySection } from "../bot-settings/IdentitySection";
 import { ManagedTeamsSettings } from "../bot-settings/ManagedTeamsSettings";
 import { ModelSection } from "../bot-settings/ModelSection";
 import { OverviewSection } from "../bot-settings/OverviewSection";
-import { PermissionsSection } from "../bot-settings/PermissionsSection";
 import { PromptPreview } from "../bot-settings/PromptPreview";
 import { ProposalStatus } from "../bot-settings/ProposalStatus";
 import { RoutinesSection } from "../bot-settings/RoutinesSection";
@@ -25,7 +24,7 @@ import type { useBotSettingsDerived } from "../bot-settings/useBotSettingsDerive
 import { BrowserLogins } from "./apps-and-logins";
 import { teamNames, useBotActions } from "./bot-actions";
 import { useOpenComputer } from "./ComputerTab";
-import { PAGES, sectionTarget, setupTarget, type PageId, type PanelTarget } from "./page-registry";
+import { sectionTarget, setupTarget, type PageId, type PanelTarget } from "./page-registry";
 import { buttonCls, Card, ItemRow, LinkRow, NavRow, NoteRow, rowCls } from "./rows";
 
 type Derived = ReturnType<typeof useBotSettingsDerived>;
@@ -216,22 +215,6 @@ export function PageBody({ page, ...context }: PageContext & { page: PageId }): 
           <SoulSection bot={bot} patch={derived.patch} />
           <Card>
             <NavRow data-panel-page="history" icon={History} title={t("botPanel.earlierVersions")} hint={t("botPanel.earlierVersionsHint")} onClick={() => onOpen("history")} />
-          </Card>
-        </>
-      );
-    case "approvals":
-      return (
-        <>
-          <PermissionsSection bot={bot} derived={derived} parts={["approval", "outbound"]} />
-          <Card>
-            <NavRow
-              data-panel-page="always"
-              icon={Check}
-              title={t(PAGES.always.title)}
-              hint={t("botPanel.alwaysHint")}
-              value={bot.alwaysAllow?.length || t("botPanel.none")}
-              onClick={() => onOpen("always")}
-            />
           </Card>
         </>
       );

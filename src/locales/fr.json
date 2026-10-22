@@ -1003,7 +1003,6 @@
   "mcp.cancel": "Annuler",
   "mcp.save": "Enregistrer",
   "mcp.loading": "Chargement des serveurs MCP…",
-  "mcp.empty.title": "Aucun serveur MCP personnalisé pour l'instant",
   "mcp.badge.on": "Activé",
   "mcp.badge.off": "Désactivé",
   "mcp.secretsSaved": "Secrets enregistrés : {keys}",
