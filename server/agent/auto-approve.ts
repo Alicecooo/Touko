@@ -1,6 +1,6 @@
 // Nothing here decides whether an action is safe: each level is the provider's own permission mode passed through, and a
 // request reaching this process is one the provider left for a person. The app's own grants are Full access, the person's
-// exact saved commands and remembered MCP read tools, and Approve for me's web search. A bot's question always reaches a human.
+// remembered MCP read tools, and Approve for me's web search. A bot's question always reaches a human.
 
 // Nothing here decides whether an action is safe: each level is the provider's own permission mode passed through, and a
 // request reaching this process is one the provider left for a person. The app's own grants are Full access, the person's
@@ -72,11 +72,10 @@ function bareToolName(tool: string): string {
   return tool.replace(/^mcp__[^_]+__/, "").toLowerCase();
 }
 
-/** The decision log's "which rule": `full-access` and `command-allowlist` are user grants, `web-search` Approve for me's own,
+/** The decision log's "which rule": `full-access` is a user grant, `web-search` Approve for me's own,
  * `native-approval` a card the provider's reviewer left, `explicit-approval-block` a sandbox widening only Full may answer. */
 export type AutoVerdictSource =
   | "full-access"
-  | "command-allowlist"
   | "tool-allowlist"
   | "web-search"
   | "native-approval"
@@ -97,8 +96,6 @@ export function autoVerdict(
   context?: {
     /** The provider asks to widen its sandbox rather than perform one action; only explicit Full may answer. */
     requiresExplicitApproval?: boolean;
-    /** Exact bot/provider/folder/command match against the person's saved rules. */
-    commandAllowed?: boolean;
     /** Exact provider/server/tool/config match against a person's saved MCP read grant. */
     toolAllowed?: boolean;
   },
@@ -110,7 +107,6 @@ export function autoVerdict(
   if (mode === "full") return { approve: `approved ${tool} (full access)`, source: "full-access" };
   if (context?.requiresExplicitApproval) return { approve: null, source: "explicit-approval-block" };
   if (isOutboundTool(tool)) return { approve: null, source: "outbound-guard" };
-  if (context?.commandAllowed) return { approve: `approved ${tool} (saved command)`, source: "command-allowlist" };
   if (context?.toolAllowed) return { approve: `approved ${tool} (always allowed)`, source: "tool-allowlist" };
   if (mode === "auto" && WEB_SEARCH.has(bareToolName(tool))) {
     return { approve: `approved ${tool} (web search)`, source: "web-search" };
@@ -125,8 +121,7 @@ export function undeliveredApprovalTool(
   source: AutoVerdictSource,
 ): FailedTurnTool | { name: string; ok: false } {
   if (outcome !== "rejected") return failedTurnTool("could not deliver approval to the provider; retry the task after reconnecting.");
-  const grant = source === "command-allowlist" ? "the saved command permission"
-    : source === "tool-allowlist" ? "the saved tool permission" : "Full access";
+  const grant = source === "tool-allowlist" ? "the saved tool permission" : "Full access";
   return { name: `The provider rejected this action despite ${grant}.`, ok: false };
 }
 

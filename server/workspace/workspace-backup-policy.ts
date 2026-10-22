@@ -5,7 +5,7 @@ import { parseStoredConfig } from "../config/config.ts";
 // Connection sections stay on the destination whole: a restored URL must never redirect an API key kept from that device.
 const PORTABLE_CONFIG_KEYS = [
   "profile", "language", "budgets", "billing", "rooms", "threads",
-  "localVm", "features", "browserProfiles",
+  "features", "browserProfiles",
 ] as const;
 
 export function portableWorkspaceConfig(value: unknown): Record<string, unknown> {
@@ -34,7 +34,6 @@ export function restoredWorkspaceConfig(portable: unknown, destination: unknown)
 }
 
 export function excludedWorkspaceAuthPath(path: string): boolean {
-  if (/^command-allowlist\.json(?:$|\.\d+\.[0-9a-f-]+\.tmp$)/.test(path)) return true;
   if (/^mcp-oauth\.json(?:$|\.\d+\.[0-9a-f-]+\.tmp$)/.test(path)) return true;
   // Saved website logins and their key never leave the computer they were saved on.
   if (/^(?:logins\.json\.enc|logins-key)(?:$|\.\d+\.[0-9a-f-]+\.tmp$)/.test(path)) return true;

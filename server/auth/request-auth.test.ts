@@ -251,9 +251,6 @@ describe("resolveRequestAuth", () => {
     );
     expect(connectorRefresh.auth).toBeNull();
     expect(connectorRefresh.status).toBe(403);
-    for (const path of ["/api/desktop-viewer/vps/bot-1", "/api/desktop-viewer/local/shared/websockify"]) {
-      expect(resolveRequestAuth(request({ host: "127.0.0.1:8799" }, "GET"), options(path)).status).toBe(403);
-    }
     expect(resolveRequestAuth(
       request({ host: "127.0.0.1:8799" }, "POST"),
       options("/api/internal/coordinate-bots"),
@@ -531,7 +528,7 @@ describe("a browser on this machine is not the owner", () => {
 
   it("refuses a self-hosted server's browser on loopback, reads included, and says how to sign in", () => {
     for (const headers of [page, navigation, socket, ownUi]) {
-      for (const [method, path] of [["GET", "/api/bots"], ["GET", "/api/config"], ["GET", "/api/auth/session"], ["POST", "/api/auth/sessions"], ["GET", "/api/desktop-viewer/local/shared/websockify"]]) {
+      for (const [method, path] of [["GET", "/api/bots"], ["GET", "/api/config"], ["GET", "/api/auth/session"], ["POST", "/api/auth/sessions"]]) {
         const refused = check(headers, path, method);
         expect(refused.auth, `${method} ${path}`).toBeNull();
         expect(refused.status).toBe(401);
@@ -551,7 +548,6 @@ describe("a browser on this machine is not the owner", () => {
     const owner = { "x-openmausbot-desktop-owner": "owner-token-123" };
     expect(check({ ...ownUi, ...owner }, "/api/bots", "GET", desktop).auth?.kind).toBe("loopback");
     expect(check({ ...ownUi, ...owner }, "/api/bots/bot-1", "PATCH", desktop).auth?.kind).toBe("loopback");
-    expect(check({ ...socket, origin: "http://127.0.0.1:8799", ...owner }, "/api/desktop-viewer/local/shared/websockify", "GET", desktop).auth?.kind).toBe("loopback");
     for (const headers of [ownUi, page, socket, { ...ownUi, "x-openmausbot-desktop-owner": "owner-token-999" }]) {
       expect(check(headers, "/api/bots", "GET", desktop).status, JSON.stringify(headers)).toBe(401);
     }

@@ -293,7 +293,6 @@ describe("a command the floor cannot read", () => {
       const full = autoVerdict("full", "Bash");
       expect(full.approve).toBeTruthy();
       expect(heldAtSafetyFloor(event, full)).toEqual({ approve: null, source: "safety-floor" });
-      expect(heldAtSafetyFloor(event, autoVerdict("ask", "Bash", { commandAllowed: true }))).toEqual({ approve: null, source: "safety-floor" });
       // a verdict that already leaves it to a person is left alone
       const card = autoVerdict("ask", "Bash");
       expect(heldAtSafetyFloor(event, card)).toBe(card);

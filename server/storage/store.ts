@@ -144,10 +144,6 @@ function redactBotAuthored<T extends Omit<Message, "id" | "at"> & { at?: number 
     if (typeof card.summary === "string") card.summary = redactSecretsInText(card.summary);
     if (typeof card.held === "string") card.held = redactSecretsInText(card.held);
     if (typeof card.answeredText === "string") card.answeredText = redactSecretsInText(card.answeredText);
-    if (card.commandAllowlist && (
-      redactSecretsInText(card.commandAllowlist.command) !== card.commandAllowlist.command ||
-      redactSecretsInText(card.commandAllowlist.cwd) !== card.commandAllowlist.cwd
-    )) delete card.commandAllowlist;
     if (card.questionRequest) {
       card.questionRequest = {
         ...card.questionRequest,
@@ -499,9 +495,22 @@ export class Store {
           botsMigrated = true;
         }
       }
-      if (b.cloudBackend !== undefined) b.cloudBackend = "vps";
-      if (b.autoStartVps !== undefined && b.autoStartVps !== true && b.autoStartVps !== false) {
-        delete b.autoStartVps;
+      const legacyComputerFields = b as BotRecord & { cloudBackend?: unknown; autoStartVps?: unknown };
+      if (legacyComputerFields.cloudBackend !== undefined || legacyComputerFields.autoStartVps !== undefined) {
+        delete legacyComputerFields.cloudBackend;
+        delete legacyComputerFields.autoStartVps;
+        botsMigrated = true;
+      }
+      // Local VM was removed. Drop legacy bot/task pins instead of silently
+      // remapping them to another computer provider.
+      if ((b as unknown as { computer?: string }).computer === "vm") {
+        delete b.computer;
+        botsMigrated = true;
+      }
+      for (const task of b.tasks ?? []) {
+        if ((task as unknown as { surface?: string }).surface !== "vm") continue;
+        delete task.surface;
+        delete task.surfaceSource;
         botsMigrated = true;
       }
       if (b.managedSections !== undefined && (!b.chiefOfStaff || !Array.isArray(b.managedSections) ||

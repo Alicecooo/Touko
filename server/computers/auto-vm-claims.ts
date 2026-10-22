@@ -19,7 +19,6 @@ export interface AutoVmClaimSlot {
   /** Dispatch mounted the computer tools without claiming, so the gate fires the claim on the first screen call. */
   lazy?: boolean;
   label?: string;
-  localVm?: boolean;
   pendingReason?: string;
   boxId?: string;
   startsComputer?: true;

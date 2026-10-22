@@ -127,41 +127,33 @@ export function busyBoatView(boatState: string | null, busy: boolean): {
 export function shouldPollCloudPreview(
   {
     computer,
-    cloudBackend,
     phase,
     botId,
     resolvedBotId,
     resolvedComputer,
-    resolvedCloudBackend,
   }: {
     computer: Bot["computer"];
-    cloudBackend: NonNullable<Bot["cloudBackend"]>;
     phase: string;
     botId: string;
     resolvedBotId: string | null;
     resolvedComputer: Bot["computer"] | null;
-    resolvedCloudBackend: Bot["cloudBackend"] | null;
   },
 ): boolean {
   return computer === "cloud"
     && phase === "ready"
     && resolvedBotId === botId
-    && resolvedComputer === "cloud"
-    && resolvedCloudBackend === cloudBackend;
+    && resolvedComputer === "cloud";
 }
 
 /** Provider work only once the settled server bot confirms the destination and backend this render expects. */
 export function persistedComputerSelectionMatches({
   computer,
-  cloudBackend,
   persistedBot,
 }: {
   computer: Bot["computer"];
-  cloudBackend: NonNullable<Bot["cloudBackend"]>;
-  persistedBot: Pick<Bot, "computer" | "cloudBackend">;
+  persistedBot: Pick<Bot, "computer">;
 }): boolean {
-  return persistedBot.computer === computer
-    && (persistedBot.cloudBackend ?? "vps") === cloudBackend;
+  return persistedBot.computer === computer;
 }
 
 export function autoSelectsLocalComputer({

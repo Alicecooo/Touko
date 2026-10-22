@@ -5,7 +5,6 @@ import { useStore, visibleMessages, currentTaskBot, type Bot, type Group, type M
 import { cn } from "@/lib/cn";
 import { useMenuMotion } from "./MenuMotion";
 import { activeLocale, t } from "@/lib/i18n";
-import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
 import { useAdvancedMode } from "@/lib/interface-mode";
 import { imeComposing, sendKeyLabel, sendsMessage, useSendKey } from "@/lib/send-key";
 import { draftRevision, appendDraftAttachments, changeDraftAttachmentPending, forgetFailedComposerSend, markDraftEdited, prependComposerDraft, recoverFailedComposerSend, rememberFailedComposerSend, replaceDraftAttachment, restoredSendId, restoredRequestText, useComposerDraft, useComposerChannelMode, useDraftAttachmentPending, useFailedComposerSends, type ComposerSendSnapshot, type FailedComposerSend } from "@/lib/drafts";
@@ -17,7 +16,6 @@ import { splitTranscriptCitations, type CitationAttachment } from "@/lib/citatio
 import { LocalComputerAutoWarning } from "./LocalComputerAutoWarning";
 import { PlaceChip } from "./PlaceChip";
 import { ApprovalModeSelector } from "./ApprovalModeSelector";
-import { CommandAllowlistDialog } from "./CommandAllowlistDialog";
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
 import { appendPastedText, handoffAttachmentImagePreview, clipboardHasImages, clipboardImageFiles, composeMessage, dataContextFor, composerShouldRefocus, composerTakesFocusOnOpen, imageAttachmentFromFile, replyTargetTakesFocus, intakeFiles, isLongPaste, optimisticImageAttachment, pasteAttachment, releaseAttachmentImagePreview, type Attachment, type PasteAttachment } from "@/lib/composer-attachments";
 import { normalizeState } from "@/lib/mascot";
@@ -65,7 +63,6 @@ export function Composer({
   const bot = profile ? currentTaskBot(profile) : undefined;
   const locked = setupLocked || Boolean(bot?.awaitingThreadSnapshot);
   const { state, dispatch } = useStore();
-  const ownerOrAdmin = useOwnerOrAdmin();
   const { threads, currentBotId } = useThreadRefs();
   const { capabilities } = useDesktopCapabilities();
   const advanced = useAdvancedMode();
@@ -408,7 +405,6 @@ export function Composer({
     threadId: string;
   } | null>(null);
   const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
-  const [commandAllowlistTarget, setCommandAllowlistTarget] = useState<{ botId: string; botName: string; threadId: string } | null>(null);
   const modeBot = group ? undefined : bot;
   const approvalEngine = modeBot
     ? state.instances.find((instance) => instance.instanceId === modeBot.modelSelection.instanceId)
@@ -635,7 +631,6 @@ export function Composer({
     onSelect: setApprovalMode,
     disabled: Boolean(modeBot.busy),
     trustedModesAvailable: trustedThreadAccess,
-    onManageCommandAllowlist: ownerOrAdmin === true ? () => setCommandAllowlistTarget({ botId: modeBot.id, botName: modeBot.name, threadId: modeBot.threadId }) : undefined,
   } : undefined;
 
   return (
@@ -974,10 +969,10 @@ export function Composer({
         
         
         
-        {hasContent && !locked && (
+        {!locked && (
           <button
             onClick={send}
-            disabled={attachmentPending}
+            disabled={!hasContent || attachmentPending}
             aria-label={
               busy && canSteer
                   ? t("composer.send.steer")
@@ -993,7 +988,7 @@ export function Composer({
                     : `${t("chat.send")} (${sendLabel})`
             }
             className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-full text-white",
+              "flex size-8 shrink-0 items-center justify-center rounded-full text-white disabled:cursor-not-allowed disabled:opacity-40",
               busy && !canSteer
                   ? "bg-raised text-ink-secondary hover:bg-raised-hover"
                   : "bg-accent hover:brightness-110",
@@ -1008,11 +1003,6 @@ export function Composer({
         </div>
       </div>
       <div className="pointer-events-auto">
-      {commandAllowlistTarget && <CommandAllowlistDialog
-        key={`${commandAllowlistTarget.botId}:${commandAllowlistTarget.threadId}`}
-        {...commandAllowlistTarget}
-        onClose={() => setCommandAllowlistTarget(null)}
-      />}
       <LocalComputerAutoWarning
         open={approvalWarning?.mode === "auto"}
         onCancel={() => setApprovalWarning(null)}

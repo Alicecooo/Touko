@@ -173,17 +173,6 @@ const bridge = {
       return () => ipcRenderer.removeListener("desktop-viewer:state", handler);
     },
   },
-  desktopWorkspace: {
-    open: (input) => ipcRenderer.invoke("desktop-workspace:open", input),
-    layout: (items) => ipcRenderer.invoke("desktop-workspace:layout", items),
-    setInteractive: (contextId) => ipcRenderer.invoke("desktop-workspace:set-interactive", contextId),
-    close: (contextId) => ipcRenderer.invoke("desktop-workspace:close", contextId),
-    onState: (cb) => {
-      const handler = (_event, state) => cb(state);
-      ipcRenderer.on("desktop-workspace:state", handler);
-      return () => ipcRenderer.removeListener("desktop-workspace:state", handler);
-    },
-  },
   pickFolder: (current) => ipcRenderer.invoke("desktop:pick-folder", current),
   
   /** ipcRenderer wraps a main-process throw in "Error invoking remote method"; the bubble shows the text verbatim. */

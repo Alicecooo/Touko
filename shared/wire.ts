@@ -4,7 +4,6 @@
 import type { DataBroadcast } from "./data-surface.ts";
 import type { ApprovalMode } from "./approval-mode.ts";
 import type { ToolScope } from "./tool-scope.ts";
-import type { CommandAllowlistCandidate } from "./command-allowlist.ts";
 import type { TurnDigest } from "./digest.ts";
 import type { BotAvatarCrop } from "./bot-avatar.ts";
 import type { MascotBodyId } from "./mascot-bodies.ts";
@@ -45,11 +44,8 @@ export interface ModelSelection {
   variant?: string;
 }
 
-/** Which cloud computer backs computer: "cloud"; absent means Boat. */
-export type CloudBackend = "box" | "vps";
-
 /** A place a bot can act. `cloud` covers both cloud backends. */
-export type Surface = "cloud" | "vm" | "local" | "browser";
+export type Surface = "cloud" | "local" | "browser";
 
 export const MAUS_COLOR_NAMES = [
   "green", "blue", "red", "orange", "purple", "cyan", "pink",
@@ -290,9 +286,6 @@ export interface WireBot {
   /** where the bot works ("Works on"). Unset = auto. */
   computer?: Surface | "off";
   /** Which cloud computer backs computer: "cloud"; absent means Boat. */
-  cloudBackend?: CloudBackend;
-  /** Auto mode may prepare/start this bot's managed VPS container. */
-  autoStartVps?: boolean;
   /** where NEW tasks run their shell tools; absent = home folder. */
   cwd?: string;
   /** Auto mode: the bot approves its own tool permissions. */
@@ -553,7 +546,6 @@ export interface OptionCardData {
   /** the provider can remember an allow for the rest of its session. */
   allowSession?: boolean;
   /** Exact native command offered for an owner/admin to remember. */
-  commandAllowlist?: CommandAllowlistCandidate;
   /** Local actions never share remembered grants with cloud/tool approvals. */
   approvalScope?: "local-computer";
   /** The bot's change applied without a person (a change to the bot itself,
@@ -830,9 +822,8 @@ export type ServerFrame =
   | { kind: "webhook.deleted"; webhookId: string }
   | { kind: "runtime"; event: RuntimeEvent }
   | { kind: "screen"; botId: string; threadId: string; png: string; mime?: string }
-  /** A bot's computer is being set up or woken for a turn; the chat shows
-   * one progress line until its first screen frame. `place` names a cloud
-   * computer (absent: a Local VM). */
+  /** A bot's cloud computer is being set up or woken for a turn; the chat shows
+   * one progress line until its first screen frame. */
   | { kind: "computer"; botId: string; state: "provisioning" | "waking"; place?: "cloud" }
   | { kind: "computer-control"; botId: string; held: boolean; helpReason: string | null; help?: ComputerHelpRef | null }
   /** A bot's data sheet changed. Whole sheet each time. */

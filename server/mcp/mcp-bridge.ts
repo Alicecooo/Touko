@@ -94,7 +94,7 @@ export interface BridgeOptions {
   args: string[];
   env?: NodeJS.ProcessEnv;
   label: string;
-  /** docker's ssh connection helper takes no ConnectTimeout/ServerAlive options, so a dropped VPS wedges silently without this. */
+  /** Keep long-lived transports from wedging silently when their connection drops. */
   liveness?: BridgeLiveness;
   gate?: { url: string; token: string };
 }

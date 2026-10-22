@@ -67,7 +67,6 @@ export interface BotMessageRouteDeps {
   
   
   cardAnswerRefusal(auth: RequestAuth, threadId: string, requestId: string, behavior: string): string | null;
-  commandRememberRefusal(auth: RequestAuth, threadId: string, requestId: string, behavior: string): string | null;
   requestBehavior(value: unknown): Behavior | null;
   requestedTaskBot(botId: string, rawThreadId: unknown): BotRecord;
   botForThread(botId: string, threadId: string): BotRecord | null;
@@ -92,7 +91,7 @@ export interface BotMessageRouteDeps {
   sendSkillResolution(res: ServerResponse, result: SkillResolution): boolean;
   answerRequest(
     threadId: string, instanceId: string, requestId: string, behavior: Behavior, message?: string,
-    decidedFor?: { id: string; name: string }, always?: boolean, rememberCommand?: boolean,
+    decidedFor?: { id: string; name: string }, always?: boolean,
   ): Promise<RequestOutcome>;
   deliverLateQuestionAnswer(auth: RequestAuth, threadId: string, requestId: string, answer: string, cardMessage: Message, owner: BotRecord): Promise<{ queued: boolean }>;
   interruptDirectThread(botId: string, threadId: string): Promise<void>;
@@ -120,7 +119,7 @@ const guardedSendSchema = z.object({
 }).strict();
 
 export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler {
-  const {store, registry, handoffs, directTurnDispatchClaims, groupSpeakers, desktopManaged: DESKTOP_MANAGED, cloudHome: CLOUD_HOME, DirectSendRefused, acceptDirectSend, directSendRefusal, startTurn, usageTriggerFor, messageSender, cardAnswerRefusal, commandRememberRefusal, requestBehavior, requestedTaskBot, botForThread, threadBusy, botAtThreadCapacity, parksBehindCoordination, activeGroupTurnForBot, runningTurnInstance, engineSteersImages, resolveReplyTarget, turnSelection, policyModelRefusal, clearUnattended, drainQueuedSends, answeringCardAs, resolveAndSendTrust, resolveAndSendTeamSetup, resolveAndSendRoutine, resolveAndSendProfile, resolveAndSendModel, resolveSkillRequest, sendSkillResolution, answerRequest, deliverLateQuestionAnswer, interruptDirectThread, cancelDirectTurnDispatch, revokeInternalCapabilitiesForThread, cancelGroupTurnOperations, closeOpenApprovals, harnessCardOutcome} = deps;
+  const {store, registry, handoffs, directTurnDispatchClaims, groupSpeakers, desktopManaged: DESKTOP_MANAGED, cloudHome: CLOUD_HOME, DirectSendRefused, acceptDirectSend, directSendRefusal, startTurn, usageTriggerFor, messageSender, cardAnswerRefusal, requestBehavior, requestedTaskBot, botForThread, threadBusy, botAtThreadCapacity, parksBehindCoordination, activeGroupTurnForBot, runningTurnInstance, engineSteersImages, resolveReplyTarget, turnSelection, policyModelRefusal, clearUnattended, drainQueuedSends, answeringCardAs, resolveAndSendTrust, resolveAndSendTeamSetup, resolveAndSendRoutine, resolveAndSendProfile, resolveAndSendModel, resolveSkillRequest, sendSkillResolution, answerRequest, deliverLateQuestionAnswer, interruptDirectThread, cancelDirectTurnDispatch, revokeInternalCapabilitiesForThread, cancelGroupTurnOperations, closeOpenApprovals, harnessCardOutcome} = deps;
   const pinnedClientThread = pinnedClientThreadGuard(store);
   /** widget -> sendId of a press on its way in: a second tap before acceptance must not send a second answer. */
   const pressesInFlight = new Map<string, string | undefined>();
@@ -384,10 +383,6 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
       if (!behavior) return json(res, 400, { error: "behavior must be allow, deny, or answer" });
       const refusal = cardAnswerRefusal(auth, bot.threadId, String(body.requestId), behavior);
       if (refusal) return json(res, 403, { error: refusal });
-      if (body.rememberCommand === true) {
-        const refusal = commandRememberRefusal(auth, bot.threadId, String(body.requestId), behavior);
-        if (refusal) return json(res, 403, { error: refusal });
-      }
       return await answeringCardAs(auth, bot.threadId, String(body.requestId), async () => {
         if (resolveAndSendTrust(res, bot.threadId, String(body.requestId), behavior)) return;
         if (await resolveAndSendTeamSetup(res, {
@@ -428,7 +423,7 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
         const pending = store.messagesFor(bot.threadId).find((message) => message.card?.requestId === requestId);
         const dismissed = dismissQuestionCard(store, bot.threadId, pending, body);
         if (dismissed) return json(res, dismissed.status, dismissed.body);
-        const outcome = await answerRequest(bot.threadId, bot.modelSelection.instanceId, requestId, behavior, body.message, { id: bot.id, name: bot.name }, body.always === true, body.rememberCommand === true);
+        const outcome = await answerRequest(bot.threadId, bot.modelSelection.instanceId, requestId, behavior, body.message, { id: bot.id, name: bot.name }, body.always === true);
         if (outcome === "unavailable" && isPersistentQuestionCard(pending?.card) && behavior === "answer") {
           if (!pending) return json(res, 404, { error: "this question is no longer available" });
           const answer = typeof body.message === "string" ? body.message.trim() : "";
@@ -453,10 +448,6 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
       const requestId = String(body.requestId);
       const refusal = cardAnswerRefusal(auth, threadId, requestId, behavior);
       if (refusal) return json(res, 403, { error: refusal });
-      if (body.rememberCommand === true) {
-        const refusal = commandRememberRefusal(auth, threadId, requestId, behavior);
-        if (refusal) return json(res, 403, { error: refusal });
-      }
       return await answeringCardAs(auth, threadId, requestId, async () => {
         if (resolveAndSendTrust(res, threadId, requestId, behavior)) return;
         const skillCard = store.messagesFor(threadId).find(
@@ -547,7 +538,7 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
         }
         if (!owner && !pending) return json(res, 404, { error: "nothing is waiting on an answer in this conversation" });
         const requestOwner = owner ? botForThread(owner.id, threadId) : null;
-        const outcome = await answerRequest(threadId, requestOwner?.modelSelection.instanceId ?? "", requestId, behavior, body.message, owner ? { id: owner.id, name: owner.name } : undefined, body.always === true, body.rememberCommand === true);
+        const outcome = await answerRequest(threadId, requestOwner?.modelSelection.instanceId ?? "", requestId, behavior, body.message, owner ? { id: owner.id, name: owner.name } : undefined, body.always === true);
         if (outcome === "unavailable" && isPersistentQuestionCard(pending?.card) && behavior === "answer") {
           if (!pending?.card) return json(res, 404, { error: "this question is no longer available" });
           const answer = typeof body.message === "string" ? body.message.trim() : "";

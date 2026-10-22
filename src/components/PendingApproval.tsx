@@ -8,7 +8,6 @@ import { SkillRequestPreview } from "@/components/SkillRequestPreview";
 import { APPROVAL_CODE_CHIP, toolLabel } from "./ApprovalCard";
 import { outboundSummary } from "@/lib/approval-summary";
 import { reviewedSkillSha256 } from "../../shared/skill-request";
-import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
 
 interface ApprovalLabels {
   [tool: string]: LocaleKey;
@@ -20,7 +19,6 @@ export interface Pending {
   tool: string;
   allowKey?: string;
   allowSession?: boolean;
-  commandAllowlist?: { command: string; cwd: string; providerInstanceId: string };
   detail: string;
   held?: string;
   heldCode?: string;
@@ -49,7 +47,6 @@ export function pendingApprovals(messages: Message[]): Pending[] {
       tool: m.card!.tool!,
       allowKey: m.card!.allowKey,
       allowSession: m.card!.allowSession,
-      commandAllowlist: m.card!.commandAllowlist,
       detail: m.card!.subtitle,
       held: m.card!.held,
       heldCode: m.card!.heldCode,
@@ -98,7 +95,7 @@ function rowText(pending: Pending, botName?: string): { line: string; inline?: s
   const outbound = card ? outboundSummary(card) : undefined;
   if (outbound) return { line: outbound.headline };
   if (isDurable(pending)) return { line: label(pending) };
-  const detail = firstLine(pending.commandAllowlist?.command ?? pending.detail);
+  const detail = firstLine(pending.detail);
   if (!botName) return { line: label(pending), inline: detail || undefined };
   if (COMMAND_TOOLS.has(pending.tool)) return { line: t("approval.compact.wantsToRun", { name: botName }), inline: detail || undefined };
   return { line: t("approval.card.namedWantsTo", { name: botName, action: toolLabel(pending.tool) }), inline: detail || undefined };
@@ -199,7 +196,7 @@ export const PendingApprovalPanel = memo(function PendingApprovalPanel({
           }
           className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-3xl bg-inset px-4 py-3 font-mono text-[12px] leading-relaxed text-ink"
         >
-          {pending.commandAllowlist?.command ?? pending.detail}
+          {pending.detail}
         </pre>
         {pending.message.card?.skillRequest && (
           <SkillRequestPreview request={pending.message.card.skillRequest} />
@@ -225,18 +222,16 @@ export function PendingApprovalActions({
   part?: "primary" | "more";
 }) {
   const { dispatch } = useStore();
-  const ownerOrAdmin = useOwnerOrAdmin();
   const isRoutineRequest = isRoutineApproval(pending);
   const isSkillRequest = isSkillApproval(pending);
   const isProfileRequest = isProfileApproval(pending);
   const isTeamSetup = Boolean(pending.message.card?.teamSetupRequest);
   const isSuggestion = Boolean(pending.message.card?.teamSetupRequest?.suggestion);
   const durableRequest = isRoutineRequest || isSkillRequest || isProfileRequest || isTeamSetup;
-  const canRememberCommand = ownerOrAdmin === true && !durableRequest && !pending.allowKey && Boolean(pending.commandAllowlist);
   const reviewedSha256 = pending.message.card?.skillRequest
     ? reviewedSkillSha256(pending.message.card.skillRequest)
     : undefined;
-  const decide = (behavior: "allow" | "deny", always = false, rememberCommand = false) =>
+  const decide = (behavior: "allow" | "deny", always = false) =>
     dispatch({
       type: "decideRequest",
       threadId,
@@ -246,7 +241,6 @@ export function PendingApprovalActions({
       reviewedSha256: behavior === "allow" ? reviewedSha256 : undefined,
       alwaysAllow: always && bot && pending.allowKey ? { botId: bot.id, key: pending.allowKey } : undefined,
       always: always && !pending.allowKey && pending.allowSession ? true : undefined,
-      rememberCommand: rememberCommand || undefined,
     });
 
   const showPrimary = part !== "more";
@@ -254,9 +248,7 @@ export function PendingApprovalActions({
   const always = durableRequest ? null
     : bot && pending.allowKey
       ? { name: t("approval.action.alwaysAllow"), hint: t("approval.action.stopAsking", { name: bot.name, key: pending.allowKey }), run: () => decide("allow", true) }
-      : canRememberCommand && pending.commandAllowlist
-        ? { name: t("approval.action.alwaysAllowCommand"), hint: t("approval.action.alwaysAllowCommandHint", { cwd: pending.commandAllowlist.cwd }), run: () => decide("allow", false, true) }
-        : !pending.allowKey && pending.allowSession
+      : !pending.allowKey && pending.allowSession
           ? { name: t("approval.action.alwaysAllowSession"), hint: t("approval.action.alwaysAllowSessionHint"), run: () => decide("allow", true) }
           : null;
   const more = showMore && !durableRequest ? [

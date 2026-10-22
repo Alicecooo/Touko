@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
 
-import type { BotVisibility, CardAnswerer, CloudBackend, ConnectorToolGrant, EffortLevel, InstalledPackageMetadata, ServerFrame, GroupThreadUsage, SteerQueueReason, WireGroup, OptionCardData as WireOptionCard } from "../../shared/wire";
+import type { BotVisibility, CardAnswerer, ConnectorToolGrant, EffortLevel, InstalledPackageMetadata, ServerFrame, GroupThreadUsage, SteerQueueReason, WireGroup, OptionCardData as WireOptionCard } from "../../shared/wire";
 import { movesThreadToTop } from "../../shared/wire";
 import { DATA_ROUTES, type DataSheet, type DataTable } from "../../shared/data-surface";
 import type { NotificationLogEntry } from "../../shared/notification";
@@ -83,7 +83,6 @@ export interface OptionCardData extends Pick<WireOptionCard, "fixedOptions" | "w
   heldCode?: string;
   allowKey?: string;
   allowSession?: boolean;
-  commandAllowlist?: { command: string; cwd: string; providerInstanceId: string };
   approvalScope?: "local-computer";
   autoApplied?: boolean;
   undone?: boolean;
@@ -245,7 +244,7 @@ export interface Task {
   unread?: boolean;
   lastReadMessageId?: string;
   pinnedMessageId?: string;
-  surface?: "cloud" | "vm" | "local" | "browser";
+  surface?: "cloud" | "local" | "browser";
   surfaceAuto?: true;
   openedBy?: ThreadOpener;
   closedBy?: ThreadCloser;
@@ -303,9 +302,7 @@ export interface Bot {
   activity?: "working" | "waiting-on-you" | "idle" | "no-signal" | "dead" | "parked.computer";
   turnStartedAt?: number | null;
   modelSelection: ModelSelection;
-  computer?: "cloud" | "vm" | "local" | "browser" | "off";
-  cloudBackend?: CloudBackend;
-  autoStartVps?: boolean;
+  computer?: "cloud" | "local" | "browser" | "off";
   cwd?: string;
   autoApprove?: boolean;
   approvalMode?: ApprovalMode;
@@ -425,7 +422,7 @@ export type { BrowserEngineSummary, BrowserProfile, ConfigStatus, ManagedPolicyS
 // A section left out here is wiped from state.config whenever a config frame lands.
 export type ConfigStatusFrame = Pick<
   ConfigStatus,
-  "xai" | "mistral" | "cerebras" | "groq" | "meta" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "fleet" | "composio" | "box" | "vps" | "rooms" | "mcp" | "threads" | "automaticRecovery" | "cacheKeepWarm" | "localVm" | "opencodeGo" | "decider" | "imageGen" | "profile" | "language" | "features" | "onboarding" | "browserEngine" | "browserProfiles" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
+  "xai" | "mistral" | "cerebras" | "groq" | "meta" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "fleet" | "composio" | "box" | "rooms" | "mcp" | "threads" | "automaticRecovery" | "cacheKeepWarm" | "opencodeGo" | "decider" | "imageGen" | "profile" | "language" | "features" | "onboarding" | "browserEngine" | "browserProfiles" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
 >;
 
 export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
@@ -442,13 +439,11 @@ export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
     fleet: frame.fleet,
     composio: frame.composio,
     box: frame.box,
-    vps: frame.vps,
     rooms: frame.rooms,
     mcp: frame.mcp,
     threads: frame.threads,
     automaticRecovery: frame.automaticRecovery,
     cacheKeepWarm: frame.cacheKeepWarm,
-    localVm: frame.localVm,
     opencodeGo: frame.opencodeGo,
     decider: frame.decider,
     imageGen: frame.imageGen,
@@ -611,8 +606,6 @@ export interface AppState {
   appSettingsCloudLink: number;
   appSettingsPhonePairing: number;
 
-  welcomeOpen: boolean;
-  tourOpen: boolean;
   botSettingsSection: BotSettingsSection;
   botSettingsExpandAccordion: boolean;
   botSettingsSectionStored: boolean;
@@ -810,7 +803,6 @@ export type Action =
       reviewedSha256?: string;
       alwaysAllow?: { botId: string; key: string };
       always?: boolean;
-      rememberCommand?: boolean;
       onError?: (message: string) => void;
     }
  | { type: "newTask"; botId: string; projectId?: string; cwd?: string; onCreated?: () => void; onError?: (message: string) => void }
@@ -864,8 +856,6 @@ export type Action =
  | { type: "focusMessageConsumed"; nonce: number }
  | { type: "unreadDividerDone"; threadId: string }
  | { type: "toggleAppSettings"; open?: boolean; section?: AppSettingsSection; cloudLink?: boolean; phonePairing?: boolean }
- | { type: "toggleWelcome"; open?: boolean }
- | { type: "toggleTour"; open?: boolean }
  | {
       type: "updateBot";
       botId: string;
@@ -1630,19 +1620,6 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     }
 
-    case "toggleTour": {
-      const open = action.open ?? !state.tourOpen;
-      return { ...state, tourOpen: open, appSettingsOpen: open ? false : state.appSettingsOpen };
-    }
-    case "toggleWelcome": {
-      const open = action.open ?? !state.welcomeOpen;
-      return {
-        ...state,
-        welcomeOpen: open,
-        appSettingsOpen: open ? false : state.appSettingsOpen,
-        
-      };
-    }
     case "updateBot": {
       const mascotChanged =
         Object.prototype.hasOwnProperty.call(action.patch, "color") ||
@@ -2000,8 +1977,6 @@ export const initialState: AppState = {
   appSettingsCloudLink: 0,
   appSettingsPhonePairing: 0,
 
-  welcomeOpen: false,
-  tourOpen: false,
   botSettingsSection: "overview",
   botSettingsExpandAccordion: false,
   botSettingsSectionStored: false,
@@ -2674,7 +2649,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 message: action.message,
                 reviewedSha256: action.reviewedSha256,
                 always: action.always,
-                rememberCommand: action.rememberCommand,
               }),
             });
           void waitForExecutionSettings(executionBotsBeforeAction, action.threadId)
@@ -2781,8 +2755,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             notifications: source.notifications,
             modelSelection: source.modelSelection,
             computer: source.computer,
-            cloudBackend: source.cloudBackend,
-            autoStartVps: source.autoStartVps,
             avatarUrl: source.avatarUrl,
             avatarCrop: source.avatarCrop,
             avatarZoom: source.avatarZoom,

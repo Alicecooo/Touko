@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { Check, ListChecks } from "lucide-react";
+import { Check } from "lucide-react";
 
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
 import { cn } from "@/lib/cn";
@@ -27,7 +27,6 @@ export function ApprovalModeSelector({
   disabled = false,
   trustedModesAvailable = true,
   trustedModesNotice,
-  onManageCommandAllowlist,
 }: {
   approvalMode?: ApprovalMode;
   autoApprove?: boolean;
@@ -40,7 +39,6 @@ export function ApprovalModeSelector({
   disabled?: boolean;
   trustedModesAvailable?: boolean;
   trustedModesNotice?: string;
-  onManageCommandAllowlist?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const motion = useMenuMotion(open);
@@ -75,23 +73,8 @@ export function ApprovalModeSelector({
   }, [open]);
 
   const CurrentIcon = current.Icon;
-  const triggerDisabled = disabled && !onManageCommandAllowlist;
+  const triggerDisabled = disabled;
   const modesDisabled = disabled || requiresLocalDesktop;
-  const allowlistAction = onManageCommandAllowlist && (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={() => {
-        setOpen(false);
-        triggerRef.current?.focus();
-        onManageCommandAllowlist();
-      }}
-      className="flex items-center gap-3 border-t border-hairline/20 px-4 py-3 text-left text-[14px] text-ink hover:bg-raised-hover"
-    >
-      <ListChecks size={18} className="shrink-0 opacity-80" />
-      {t("commandAllowlist.title")}
-    </button>
-  );
   return (
     <div className={cn("relative flex items-center", wide && "w-full")} ref={wrapperRef}>
       <button
@@ -181,11 +164,9 @@ export function ApprovalModeSelector({
                       </span>
                     </span>
                   </button>
-                  {option.mode === "full" && allowlistAction}
                 </Fragment>
               );
             })}
-            {!visibleOptions.some((option) => option.mode === "full") && allowlistAction}
             {!trustedModesAvailable && (trustedModesNotice || driverKind === "codex" || requiresLocalDesktop) && (
               <div className="border-t border-hairline/20 px-4 py-2.5 text-[11.5px] leading-snug text-ink-secondary">
                 {trustedModesNotice ?? t("approvalMode.customLocalOnlyDot")}

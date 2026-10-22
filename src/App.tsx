@@ -2,10 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Menu } from "lucide-react";
 import { openBot, StoreProvider, useStore } from "@/state/store";
 import { useShowThreads } from "@/lib/thread-preferences";
-import { useWelcomeViewer, WelcomeGate } from "@/components/onboarding/WelcomeGate";
-import { spotlightsQuiet } from "@/lib/onboarding";
-import { FirstConversationTour } from "@/components/onboarding/FirstConversationTour";
-import { GuidedTour } from "@/components/onboarding/GuidedTour";
 import { ThreadRefsProvider } from "@/components/ThreadRefs";
 import { initAnalytics } from "@/lib/analytics";
 import { parseComputerHelp } from "@/lib/computer-control";
@@ -243,17 +239,12 @@ function Application() {
   useEffect(() => {
     initAnalytics();
   }, []);
-  const viewer = useWelcomeViewer();
   return (
     <DesktopCapabilitiesProvider>
       <StoreProvider>
         <ThreadRefsProvider>
           <Shell />
         </ThreadRefsProvider>
-        <WelcomeGate viewer={viewer} />
-        <GuidedTour />
-        
-        <FirstConversationTour quiet={spotlightsQuiet(viewer)} />
       </StoreProvider>
     </DesktopCapabilitiesProvider>
   );

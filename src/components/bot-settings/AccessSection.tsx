@@ -11,7 +11,6 @@ import { mcpServersForBot, useMcpServers } from "@/lib/mcp-servers";
 import { placeFacts, placeViewFor, usePlaceSeat } from "@/lib/place-view";
 import { shortPath } from "@/lib/short-path";
 import { useDesktopCapabilities } from "../DesktopCapabilities";
-import { CloudBackendPicker } from "../CloudBackendPicker";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { Switch } from "../SettingsPrimitives";
 import { ProposalStatus } from "./ProposalStatus";
@@ -509,44 +508,6 @@ function RecordStepsRow({ on, browserOn, myChrome, onChange }: { on: boolean; br
   );
 }
 
-export function cloudPreferenceShown(bot: Pick<Bot, "computer">, config: { cloudHome?: boolean } | null | undefined): boolean {
-  return (!bot.computer || bot.computer === "cloud") && !config?.cloudHome;
-}
-
-export function CloudPreference({ bot, patch }: { bot: Bot; patch: ReturnType<typeof useBotSettingsDerived>["patch"] }) {
-  const { state } = useStore();
-  if (!cloudPreferenceShown(bot, state.config)) return null;
-  return (
-    <>
-      {!bot.computer && (
-        <div className="mt-3 rounded-lg bg-inset px-3 py-2.5 text-[11.5px] leading-relaxed text-ink-secondary">
-          <span className="font-medium text-ink">{t("botAccess.cloud.autoTitle")}</span>{" "}
-          {t("botAccess.cloud.autoDescription")}
-        </div>
-      )}
-      <CloudBackendPicker
-        value={bot.cloudBackend ?? "vps"}
-        onChange={(backend) => patch({ cloudBackend: backend })}
-      />
-      {!bot.computer && bot.cloudBackend === "vps" && (
-        <div className="mt-3 flex items-center justify-between gap-4 rounded-lg bg-inset px-3 py-2.5">
-          <div className="min-w-0">
-            <div className="text-[13px] text-ink">{t("botAccess.cloud.startVps")}</div>
-            <div className="mt-0.5 text-[11.5px] text-ink-secondary">
-              {t("botAccess.cloud.startVpsDescription")}
-            </div>
-          </div>
-          <Switch
-            checked={Boolean(bot.autoStartVps)}
-            aria-label={t("botAccess.cloud.startVps")}
-            onClick={() => patch({ autoStartVps: !bot.autoStartVps })}
-          />
-        </div>
-      )}
-    </>
-  );
-}
-
 export type AccessPart = "worksOn" | "folder" | "apps" | "mcp" | "tools" | "browser" | "webhooks" | "always";
 
 export function AccessSection({
@@ -604,7 +565,6 @@ export function AccessSection({
         >
           {t("place.action.openComputerPanel")}
         </button>
-        <CloudPreference bot={bot} patch={patch} />
       </div>}
 
       {shows("folder") && <WorkingFolder bot={bot} />}
