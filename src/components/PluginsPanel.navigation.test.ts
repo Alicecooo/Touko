@@ -41,9 +41,9 @@ vi.mock("@/state/store", () => ({
   }),
 }));
 vi.mock("./McpServersPanel", () => ({
-  McpServersPanel: ({ embedded, whopCard }: { embedded?: boolean; whopCard?: boolean }) => whopCard
+  McpServersPanel: ({ embedded, whopCard, showContent = true }: { embedded?: boolean; whopCard?: boolean; showContent?: boolean }) => whopCard
     ? createElement("div", { "data-whop-card": true }, "Connect Whop")
-    : createElement("div", { "data-embedded": String(Boolean(embedded)) }, "MCP inventory"),
+    : showContent ? createElement("div", { "data-embedded": String(Boolean(embedded)) }, "MCP inventory") : null,
 }));
 vi.mock("@/lib/analytics", () => ({ track: fixture.track }));
 vi.mock("./Avatar", () => ({ BotAvatar: ({ bot }: { bot: Bot }) => createElement("span", { "data-avatar": bot.id }) }));
@@ -406,15 +406,14 @@ describe("Apps pop-up", () => {
     expect(html).not.toContain('role="tab"');
   });
 
-  it("filters with chips, keeping the MCP chip on the store's surface", () => {
+  it("filters connected apps and returns from a server deep link", () => {
     const initial = render();
     expect(chip(initial.nodes, "all").props["aria-pressed"]).toBe(true);
-    chip(initial.nodes, "mcp").props.onClick!();
-    expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "togglePlugins", open: true, surface: "mcp" });
+    chip(initial.nodes, "connected").props.onClick!();
+    expect(fixture.overrides.get(16)).toBe("connected");
 
     fixture.surface = "mcp";
     const mcp = render();
-    expect(chip(mcp.nodes, "mcp").props["aria-pressed"]).toBe(true);
     expect(mcp.html).toContain("MCP inventory");
     expect(mcp.html).not.toContain("data-app-tile");
     chip(mcp.nodes, "connected").props.onClick!();
@@ -424,7 +423,7 @@ describe("Apps pop-up", () => {
   it("drops a selected category when a filter is chosen, so the MCP section comes back", () => {
     fixture.overrides.set(20, "Design");
     expect(render().html).not.toContain("MCP inventory");
-    chip(render().nodes, "mcp").props.onClick!();
+    chip(render().nodes, "all").props.onClick!();
     expect(fixture.overrides.get(20)).toBeNull();
     expect(render().html).toContain("MCP inventory");
   });
@@ -468,9 +467,8 @@ describe("Apps pop-up", () => {
     expect(fixture.overrides.get(20)).toBe("Productivity");
   });
 
-  it("pairs the search with an MCP servers pill and puts the connected count, with app icons, in the header", () => {
+  it("puts the connected count, with app icons, in the header", () => {
     const { html, nodes: tree } = render();
-    expect(chip(tree, "mcp").props["aria-pressed"]).toBe(false);
     const indicator = chip(tree, "connected");
     expect(indicator.props["aria-pressed"]).toBe(false);
     expect(html).toContain("1 connected");

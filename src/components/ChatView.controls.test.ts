@@ -125,8 +125,8 @@ describe("the header's right side", () => {
 });
 
 describe("header name", () => {
-  it("renames only from the bot's settings in Simple mode: no pencil, and the whole pill opens them", () => {
-    fixture.advanced = false;
+  it.each([false, true])("opens the bot panel without an inline rename entry (advanced=%s)", advanced => {
+    fixture.advanced = advanced;
     const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
     expect(markup).not.toContain('aria-label="Rename Pepper"');
     const pill = markup.match(/<button[^>]*data-chathead-pill="true"[^>]*>([\s\S]*?)<\/button>/);
@@ -134,16 +134,6 @@ describe("header name", () => {
     expect(pill?.[1]).toContain(">Pepper</span>");
     expect(pill?.[0]).toContain("rounded-full");
     fixture.advanced = true;
-  });
-
-  it("keeps the rename pencil in Advanced mode, inside the same pill as the avatar and name", () => {
-    fixture.advanced = true;
-    const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
-    const start = markup.indexOf('<div data-chathead-pill="true"');
-    expect(start).toBeGreaterThan(-1);
-    const pill = markup.slice(start, markup.indexOf("data-chathead-controls"));
-    expect(pill).toContain('aria-label="Open Pepper&#x27;s profile"');
-    expect(pill).toContain("Rename Pepper");
   });
 
   it("draws no working dots in the header pill, keeping one width, while a status still tells a screen reader", () => {

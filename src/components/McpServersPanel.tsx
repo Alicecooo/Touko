@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, CheckCircle2, FlaskConical, Globe, Loader2, LogIn, LogOut, Pencil, Plus, ServerCog, Trash2 } from "lucide-react";
 
 import { openExternalLink } from "@/lib/app-links";
@@ -187,8 +188,11 @@ function draftFor(server: McpServerListing): McpDraft {
   };
 }
 
-export function McpServersPanel({ embedded = false, whopCard = false, hideWhop = false, refreshKey = 0, onWhopConnection }: {
+export function McpServersPanel({ embedded = false, whopCard = false, hideWhop = false, refreshKey = 0, onWhopConnection, actionContainer, showContent = true, onAddServer }: {
   embedded?: boolean;
+  actionContainer?: HTMLElement | null;
+  showContent?: boolean;
+  onAddServer?: () => void;
   whopCard?: boolean;
   hideWhop?: boolean;
   refreshKey?: number;
@@ -572,30 +576,36 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
 
   const visibleServers = servers?.filter((server) => !hideWhop || !isRemoteMcpListing(server) || !isWhopServer(server));
 
+  const addButton = (
+    <button
+      type="button"
+      disabled={busy !== null || (restricted && !policy?.mcp.allowlist.length)}
+      title={restricted && policy ? t("policy.managedBy", { organization: policy.organizationName }) : undefined}
+      aria-expanded={editing === "new"}
+      onClick={() => {
+        onAddServer?.();
+        setEditing("new");
+        setDraft(EMPTY_DRAFT);
+        setError(null);
+        setNotice(null);
+      }}
+      className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full bg-accent px-2.5 text-[12px] font-medium text-white disabled:opacity-40"
+    >
+      <Plus size={12} /> {t("apps.mcp.add")}
+    </button>
+  );
+
   return (
-    <section
+    <>
+    {actionContainer && createPortal(addButton, actionContainer)}
+    {showContent && <section
       data-mcp-servers
       aria-labelledby="mcp-servers-title"
-      className={embedded ? "" : "min-h-0 flex-1 overflow-y-auto px-6 pb-7 pt-5 sm:px-8"}
+      className={embedded ? cn((servers === null || restricted || error || notice || editing || visibleServers?.length) && "mb-5") : "min-h-0 flex-1 overflow-y-auto px-6 pb-7 pt-5 sm:px-8"}
     >
       <div className={embedded ? "" : "mx-auto max-w-[840px]"}>
         <h3 id="mcp-servers-title" className="sr-only">{t("mcp.title")}</h3>
-        <div className="flex justify-end">
-          <button
-            type="button"
-            disabled={busy !== null || (restricted && !policy?.mcp.allowlist.length)}
-            title={restricted && policy ? t("policy.managedBy", { organization: policy.organizationName }) : undefined}
-            onClick={() => {
-              setEditing("new");
-              setDraft(EMPTY_DRAFT);
-              setError(null);
-              setNotice(null);
-            }}
-            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12.5px] font-medium text-white disabled:opacity-40"
-          >
-            <Plus size={14} /> {t("apps.mcp.add")}
-          </button>
-        </div>
+        {actionContainer === undefined && <div className="flex justify-end">{addButton}</div>}
 
         {restricted && policy && <p role="status" className="mt-3 text-[12.5px] leading-relaxed text-ink-secondary">{t("policy.mcpRestricted", { organization: policy.organizationName })}</p>}
 
@@ -855,6 +865,7 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
           </div>
         )}
       </div>
-    </section>
+    </section>}
+    </>
   );
 }

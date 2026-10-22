@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronRight, Loader2, RefreshCw, Search, Server, TriangleAlert, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Loader2, RefreshCw, Search, TriangleAlert, X } from "lucide-react";
 import { api, useStore, type Bot, type InstanceInfo } from "@/state/store";
 import { cn } from "@/lib/cn";
 import { glassPopupFrameStyle } from "@/lib/glass-popup";
@@ -296,6 +296,8 @@ export function PluginsPanel() {
   const [category, setCategory] = useState<string | null>(null);
   // Appended after the older state so tests that seed state by call order keep their indices.
   const [highLevelConnected, setHighLevelConnected] = useState<boolean | null>(null);
+  const [mcpActionContainer, setMcpActionContainer] = useState<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const polls = useRef(new Map<string, () => void>());
   const statusGenerations = useRef(new Map<string, number>());
@@ -682,17 +684,7 @@ export function PluginsPanel() {
                 className="min-w-0 flex-1 bg-transparent text-[14px] text-ink placeholder:text-ink-secondary focus:outline-none"
               />
             </label>
-            <button
-              type="button"
-              data-apps-filter="mcp"
-              aria-pressed={filter === "mcp"}
-              onClick={() => chooseFilter(filter === "mcp" ? "all" : "mcp")}
-              className={cn(pill, "h-9 border border-hairline/40 px-3.5", filter === "mcp" ? "bg-ink text-app" : "text-ink hover:bg-raised")}
-            >
-              <Server size={14} aria-hidden="true" />
-              <span className="hidden sm:inline">{t("apps.filter.mcp")}</span>
-              <span className="sr-only sm:hidden">{t("apps.filter.mcp")}</span>
-            </button>
+            <div ref={setMcpActionContainer} className="flex shrink-0 items-center" />
           </div>
           <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("apps.categoriesAria")}>
             <button
@@ -732,12 +724,20 @@ export function PluginsPanel() {
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-7 sm:px-7">
-          {filter !== "connected" && category === null && (
-            <div className="mb-5 pt-1">
-              <McpServersPanel embedded hideWhop={filter === "all"} />
-            </div>
-          )}
+        <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto px-5 pb-7 sm:px-7">
+          <div className={filter !== "connected" && category === null ? "pt-1" : undefined}>
+            <McpServersPanel
+              embedded
+              hideWhop={filter === "all"}
+              showContent={filter !== "connected" && category === null}
+              actionContainer={mcpActionContainer}
+              onAddServer={() => {
+                chooseFilter("all");
+                setSearch("");
+                contentRef.current?.scrollTo({ top: 0 });
+              }}
+            />
+          </div>
           {stale && (
             <div className="mb-3 flex items-start gap-2 rounded-xl bg-warning/10 px-3 py-2 text-[12.5px] text-warning">
               <TriangleAlert size={14} className="mt-px shrink-0" />
