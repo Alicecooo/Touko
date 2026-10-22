@@ -37,7 +37,7 @@ function engineFacts(instance: InstanceInfo | undefined, model: string | undefin
 }
 
 export function placeFacts(input: {
-  bot: Pick<Bot, "name" | "modelSelection" | "toolScope" | "cloudBackend">;
+  bot: Pick<Bot, "name" | "modelSelection" | "toolScope">;
   place: PlaceFacts["place"];
   seat: PlaceSeat;
   config: (FeatureFlagConfig & Pick<ConfigStatus, "box">) | null | undefined;
@@ -54,7 +54,6 @@ export function placeFacts(input: {
     bot: bot.name,
     plan: seat.plan,
     boat: config?.box?.configured ? (config.box.included ? "included" : "own-key") : "none",
-    backend: "vps",
     engine: engineFacts(instance, bot.modelSelection.model),
     toolsAllowComputer: canUseMcpServer(bot.toolScope, "computer"),
     browserOn: builtInBrowserEnabled(config) && browserAvailable(config),
@@ -77,7 +76,7 @@ export function placeRowViewFor(row: PlaceRow, seat: PlaceSeat, worksOnLabel?: s
 
 export function placeBlocked(view: PlaceView): boolean {
   return view.state === "cc-cannot" || view.state === "cc-on-my-cloud" || view.state === "browser-off" || view.state === "browser-cannot"
-    || view.state === "vm-cannot" || view.state === "local-unavailable";
+    || view.state === "local-unavailable";
 }
 
 export function placeHasIssue(view: PlaceView): boolean {
@@ -108,10 +107,6 @@ export function openPlaceAction(
     case "sign-in": appSettings("engines"); return true;
     case "manage-computers": appSettings("computer"); return true;
     case "add-boat-key": appSettings("computer"); return true;
-    case "open-vm-settings":
-      window.sessionStorage?.setItem("openmausbot.settings.section", "computer");
-      appSettings("computer");
-      return true;
     case "open-team-map": dispatch({ type: "showTeamMap" }); return true;
     
     
@@ -133,7 +128,6 @@ export function openPlaceAction(
 export const SIMPLE_PLACE_LABEL = {
   auto: "vm.dest.auto",
   cloud: "place.cloud",
-  vm: "vm.dest.vm",
   browser: "vm.dest.browser",
   off: "vm.dest.off",
 } as const satisfies Record<string, LocaleKey>;

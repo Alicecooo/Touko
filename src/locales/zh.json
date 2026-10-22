@@ -3899,7 +3899,6 @@
   "place.view.auto.short": "自动选择",
   "place.view.auto.lineMyCloud": "使用内置浏览器。在单聊中，任务需要桌面应用时会自动启动 VPS 电脑。",
   "place.view.auto.lineDesktop": "依任务需要，使用内置浏览器、这台电脑上的私人桌面，或这台电脑的屏幕。",
-  "place.view.auto.lineLinux": "使用内置浏览器，任务需要桌面时可使用已运行的虚拟机。",
   "place.view.autoTeam.short": "共享",
   "place.view.autoTeam.line": "使用团队共用的 VPS 电脑 {computer}。",
   "place.view.ccCannot.short": "此模型不支持",

@@ -367,7 +367,7 @@ describe("Store", () => {
     expect(reloaded.taskByThread(bot.id, personMismatch.threadId)).toMatchObject({ surface: "local", surfaceSource: "user" });
     expect(reloaded.taskByThread(bot.id, legacyMismatch.threadId)).toMatchObject({ surface: "local" });
     expect(reloaded.taskByThread(bot.id, legacyMismatch.threadId)?.surfaceSource).toBeUndefined();
-    expect(reloaded.taskByThread(bot.id, autoMatch.threadId)).toMatchObject({ surface: "vm" });
+    expect(reloaded.taskByThread(bot.id, autoMatch.threadId)).not.toHaveProperty("surface");
     expect(reloaded.taskByThread(bot.id, autoMismatch.threadId)!.surface).toBeUndefined();
   });
 
@@ -992,30 +992,29 @@ describe("Store", () => {
     expect(reloaded.projectBotForTask(bot.id, sibling.threadId)?.approvalMode).toBe("full");
   });
 
-  it("migrates legacy cloud backends to self-hosted VPS while preserving an absent selection", () => {
+  it("discards legacy VPS fields and VM pins", () => {
     const store = new Store(selection);
     const boat = store.createBot();
     const vps = store.createBot();
-    const invalid = store.createBot();
-    const absent = store.createBot();
-    const raw: BotRecord[] = JSON.parse(readFileSync(join(DATA_DIR, "bots.json"), "utf8"));
+    const raw: Array<BotRecord & { cloudBackend?: string; autoStartVps?: boolean }> = JSON.parse(readFileSync(join(DATA_DIR, "bots.json"), "utf8"));
     raw.find((bot) => bot.id === boat.id)!.cloudBackend = "box";
     raw.find((bot) => bot.id === vps.id)!.cloudBackend = "vps";
-    (raw.find((bot) => bot.id === invalid.id) as unknown as { cloudBackend: string }).cloudBackend = "daytona";
-    delete raw.find((bot) => bot.id === absent.id)!.cloudBackend;
+    raw.find((bot) => bot.id === vps.id)!.autoStartVps = true;
+    raw.find((bot) => bot.id === vps.id)!.computer = "vm" as BotRecord["computer"];
+    raw.find((bot) => bot.id === vps.id)!.tasks = [{ threadId: "legacy-vm", title: "Legacy", surface: "vm" as BotRecord["computer"] } as BotRecord["tasks"][number]];
     writeFileSync(join(DATA_DIR, "bots.json"), JSON.stringify(raw));
 
     const reloaded = new Store(selection);
-    expect(reloaded.bot(boat.id)?.cloudBackend).toBe("vps");
-    expect(reloaded.bot(vps.id)?.cloudBackend).toBe("vps");
-    expect(reloaded.bot(invalid.id)?.cloudBackend).toBe("vps");
-    expect(reloaded.bot(absent.id)?.cloudBackend).toBeUndefined();
+    expect(reloaded.bot(boat.id)).not.toHaveProperty("cloudBackend");
+    expect(reloaded.bot(vps.id)).not.toHaveProperty("cloudBackend");
+    expect(reloaded.bot(vps.id)).not.toHaveProperty("autoStartVps");
+    expect(reloaded.bot(vps.id)?.computer).toBeUndefined();
+    expect(reloaded.bot(vps.id)?.tasks?.[0]).not.toHaveProperty("surface");
 
-    const saved: BotRecord[] = JSON.parse(readFileSync(join(DATA_DIR, "bots.json"), "utf8"));
-    expect(saved.find((bot) => bot.id === boat.id)?.cloudBackend).toBe("vps");
-    expect(saved.find((bot) => bot.id === vps.id)?.cloudBackend).toBe("vps");
-    expect(saved.find((bot) => bot.id === invalid.id)).toHaveProperty("cloudBackend", "vps");
-    expect(saved.find((bot) => bot.id === absent.id)).not.toHaveProperty("cloudBackend");
+    const saved: Array<BotRecord & { cloudBackend?: string; autoStartVps?: boolean }> = JSON.parse(readFileSync(join(DATA_DIR, "bots.json"), "utf8"));
+    expect(saved.find((bot) => bot.id === boat.id)).not.toHaveProperty("cloudBackend");
+    expect(saved.find((bot) => bot.id === vps.id)).not.toHaveProperty("cloudBackend");
+    expect(saved.find((bot) => bot.id === vps.id)).not.toHaveProperty("autoStartVps");
   });
 
   it("migrates legacy browser profile references without collapsing case-distinct accounts", () => {

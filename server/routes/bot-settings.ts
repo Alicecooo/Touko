@@ -1,15 +1,12 @@
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode.ts";
 import { botAvatarUrlFromStoredPath } from "../../shared/bot-avatar.ts";
-import type { CommandAllowlistResponse } from "../../shared/command-allowlist.ts";
 import type { WireBot } from "../../shared/wire.ts";
 import { deleteAttachment, saveImage } from "../workspace/attachments.ts";
 import { avatarGenerationRequestSchema, avatarGenerationStateMatches, generateAvatarImage, snapshotAvatarGenerationState } from "../bots/avatar-image.ts";
 import { parseBotProfilePatch } from "../bots/bot-profile.ts";
-import { commandAllowlistCandidate, type CommandAllowlistStore } from "../agent/command-allowlist.ts";
 import type { AppConfig } from "../config/config.ts";
 import type { ModelSelection } from "../harness/contracts.ts";
 import type { createApprovalModeSupport } from "../agent/harness-capabilities.ts";
-import type { ProviderRegistry } from "../harness/registry.ts";
 import type { hostedModelPolicy } from "../deployment/hosted-models.ts";
 import { profileSnapshot } from "../bots/profile-revision.ts";
 import { recordProfileChange } from "../bots/profile-versions.ts";
@@ -22,9 +19,6 @@ import { pinnedClientThreadGuard } from "./pinned-client-thread.ts";
 export interface BotSettingsRouteDeps {
   store: Store;
   cfg: AppConfig;
-  registry: Pick<ProviderRegistry, "get">;
-  commandAllowlist: Pick<CommandAllowlistStore, "add" | "remove">;
-  commandAllowlistDrivers: ReadonlySet<string>;
   cloudHome: boolean;
   cloudOwnerProfileFields: readonly ("name" | "title" | "description" | "soul" | "notifications")[];
   hostedModels: ReturnType<typeof hostedModelPolicy>;
@@ -40,21 +34,19 @@ export interface BotSettingsRouteDeps {
   checkedModelSelection(raw: unknown, current?: { selection: ModelSelection; busy: boolean }, requireAvailableModel?: boolean): ModelSelectionCheck;
   engineSwitchNeedsAsk(mode: ApprovalMode, from: ModelSelection, to: ModelSelection): boolean;
   readCursor(threadId: string): { lastReadMessageId?: string };
-  canManageCommandAllowlist(auth: RequestAuth): boolean;
-  commandAllowlistResponse(bot: BotRecord): CommandAllowlistResponse;
   cardAnswerRefusal(auth: RequestAuth, threadId: string, requestId: string, behavior: string): string | null;
 }
 
 export function createBotSettingsRoutes(deps: BotSettingsRouteDeps): RouteHandler {
   const {
-    store, cfg, registry, commandAllowlist,
-    commandAllowlistDrivers: COMMAND_ALLOWLIST_DRIVERS, cloudHome: CLOUD_HOME, cloudOwnerProfileFields: CLOUD_OWNER_PROFILE_FIELDS,
+    store, cfg,
+    cloudHome: CLOUD_HOME, cloudOwnerProfileFields: CLOUD_OWNER_PROFILE_FIELDS,
     hostedModels, supportsApprovalMode, directTurnBots, broadcast, wireBot, cloudOwnerSession, storedAvatarExists,
     requestedTaskBot, threadBusy, activeGroupTurnForBot, checkedModelSelection, engineSwitchNeedsAsk, readCursor,
-    canManageCommandAllowlist, commandAllowlistResponse, cardAnswerRefusal,
+    cardAnswerRefusal,
   } = deps;
   const pinnedClientThread = pinnedClientThreadGuard(store);
-  return async ({ req, res, url, path, method, auth, json, readBody }) => {
+  return async ({ req, res, path, method, auth, json, readBody }) => {
     let m: RegExpMatchArray | null = null;
     const requirePinnedClientThread = pinnedClientThread(auth, req);
     m = path.match(/^\/api\/bots\/([\w-]+)\/avatar\/generate$/);
@@ -162,27 +154,6 @@ export function createBotSettingsRoutes(deps: BotSettingsRouteDeps): RouteHandle
       const visible = wireBot(bot);
       broadcast({ kind: "bot", bot: visible });
       return json(res, 200, { bot: visible });
-    }
-    m = path.match(/^\/api\/bots\/([\w-]+)\/command-allowlist(?:\/([\w-]+))?$/);
-    if (m && ["GET", "POST", "DELETE"].includes(method)) {
-      if (!canManageCommandAllowlist(auth)) return json(res, 403, { error: "Only the owner or an admin can manage command permissions." });
-      const bot = requestedTaskBot(m[1], url.searchParams.get("threadId") ?? undefined);
-      if (method === "GET" && !m[2]) return json(res, 200, commandAllowlistResponse(bot));
-      if (method === "POST" && !m[2]) {
-        const candidate = commandAllowlistCandidate(await readBody(req));
-        if (!candidate) return json(res, 400, { error: "Enter an exact command without secret values, an absolute working folder, and a provider." });
-        const instance = registry.get(candidate.providerInstanceId);
-        if (!instance || !COMMAND_ALLOWLIST_DRIVERS.has(instance.driverKind)) {
-          return json(res, 400, { error: "This provider does not supply structured command approvals." });
-        }
-        commandAllowlist.add(bot.id, candidate);
-        return json(res, 200, commandAllowlistResponse(bot));
-      }
-      if (method === "DELETE" && m[2]) {
-        commandAllowlist.remove(bot.id, m[2]);
-        return json(res, 200, commandAllowlistResponse(bot));
-      }
-      return json(res, 405, { error: "Unsupported command allowlist operation" });
     }
     m = path.match(/^\/api\/bots\/([\w-]+)\/always-allow$/);
     if (m && method === "POST") {

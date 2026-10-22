@@ -12,7 +12,6 @@ import { useDesktopCapabilities } from "../DesktopCapabilities";
 import { LocalComputerAutoWarning } from "../LocalComputerAutoWarning";
 import { usePlaceViews } from "../PlaceChip";
 import { screenFramePreview } from "../ScreenFrame";
-import { CloudPreference, cloudPreferenceShown } from "../bot-settings/AccessSection";
 import type { BotPatch, useBotSettingsDerived } from "../bot-settings/useBotSettingsDerived";
 import type { PageId } from "./page-registry";
 import { Card, chipCls, ColRow, LinkRow, NavRow, Segmented } from "./rows";
@@ -127,11 +126,6 @@ export function ComputerTab({ bot, derived, onOpen }: { bot: Bot; derived: Deriv
               : listed ? worksOn.line : `${worksOnSimpleLabel(bot.computer, platform)}: ${worksOn.line}`}
           </div>
         </ColRow>
-        {cloudPreferenceShown(bot, state.config) && (
-          <div className="px-3.5 pb-3.5 [&>.bg-inset]:bg-transparent [&>.bg-inset]:px-0.5">
-            <CloudPreference bot={bot} patch={patch} />
-          </div>
-        )}
       </Card>
 
       <Card label={t("botPanel.onThisComputer")} anchor="on-computer">

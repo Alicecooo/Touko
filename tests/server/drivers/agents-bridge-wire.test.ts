@@ -71,20 +71,20 @@ const FULL = "skills+shared+escalations";
  * exceed this by more than 2%, and may not undercut it by more than 2%
  * either: lock a saving in by lowering the number. A Chief's list is longer
  * than another bot's only by the Chief-only names in find_tool's description. */
-const BUDGET_BASELINE: Record<string, number> =   {
-    "default": 14684,
-    "shared": 14724,
-    "skills": 14711,
-    "skills+shared": 14751,
-    "non-chief": 14573,
-    "shared+non-chief": 14613,
-    "skills+non-chief": 14600,
-    "skills+shared+non-chief": 14640,
-    "skills+shared+cloud-home": 14749,
-    "skills+shared+non-chief+cloud-home": 14638,
-    "skills+shared+escalations": 14769,
-    "default+legacy-switches": 14684
-  };
+const BUDGET_BASELINE: Record<string, number> = {
+  "default": 14388,
+  "shared": 14428,
+  "skills": 14415,
+  "skills+shared": 14455,
+  "non-chief": 14277,
+  "shared+non-chief": 14317,
+  "skills+non-chief": 14304,
+  "skills+shared+non-chief": 14344,
+  "skills+shared+cloud-home": 14495,
+  "skills+shared+non-chief+cloud-home": 14384,
+  "skills+shared+escalations": 14473,
+  "default+legacy-switches": 14388
+};
 
 type RpcAnswer = { id: number; result?: { tools?: unknown[]; content?: Array<{ text: string }>; isError?: boolean }; error?: { code: number; message: string } };
 
@@ -241,7 +241,7 @@ describe("agents proxy tools/list golden with the tool bridge on", () => {
     }
     // So a bot that is not a Chief is not told the Chief-only tools exist.
     const nonChief = Object.keys(PROFILES).filter((name) => PROFILES[name]!.OMB_CHIEF_OF_STAFF === "0");
-    expect(nonChief).toHaveLength(6);
+    expect(nonChief).toHaveLength(5);
     for (const name of nonChief) {
       for (const tool of CHIEF_ONLY_TOOLS) expect(wires[name], `${name}: ${tool}`).not.toContain(tool);
       const chiefTwin = name === "non-chief" ? "default" : name.replace("+non-chief", "");

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { JsonValue } from "./schema.ts";
 
-import { cacheUntilConfigChanges, changedInstanceIds, customMcpServers, engineLaunches, DATA_DIR, ensureDirs, instanceConfigs, isValidSshAlias, loadBrowserProfileIdAliases, loadConfig, localVmIdleTimeoutMinutes, localVmMaxInstances, localVmMode, parseConfigPatch, parseStoredConfig, persistableInstanceConfigs, roomTurnTimeoutMinutes, mcpCallTimeoutMinutes, maxConcurrentBotThreads, threadEventLogMaxBytes, threadEventLogRetentionDays, showToolCallsEnabled, routinesInConversationEnabled, saveConfig, skillAuthoringEnabled, sharedComputersEnabled, builtInBrowserEnabled, browserProfilePartitionId, browserProfilePartitionTarget, browserProfileReplacementConflict, browserProfileRoutingConflict, stripControlPlaneEnv, stripWorkspaceCredentialEnv, syncCredentialEnv, vpsSshAlias, browserEngineAttachCdpUrl, withInstanceCli, WORKSPACE_CREDENTIAL_ENV, mergeOpenCodeProviderKeys, openCodeProviderKeys, OPENCODE_PROVIDER_KEY_LIMIT, type AppConfig } from "./config.ts";
+import { cacheUntilConfigChanges, changedInstanceIds, customMcpServers, engineLaunches, DATA_DIR, ensureDirs, instanceConfigs, loadBrowserProfileIdAliases, loadConfig, parseConfigPatch, parseStoredConfig, persistableInstanceConfigs, roomTurnTimeoutMinutes, mcpCallTimeoutMinutes, maxConcurrentBotThreads, threadEventLogMaxBytes, threadEventLogRetentionDays, showToolCallsEnabled, routinesInConversationEnabled, saveConfig, skillAuthoringEnabled, sharedComputersEnabled, builtInBrowserEnabled, browserProfilePartitionId, browserProfilePartitionTarget, browserProfileReplacementConflict, browserProfileRoutingConflict, stripControlPlaneEnv, stripWorkspaceCredentialEnv, syncCredentialEnv, browserEngineAttachCdpUrl, withInstanceCli, WORKSPACE_CREDENTIAL_ENV, mergeOpenCodeProviderKeys, openCodeProviderKeys, OPENCODE_PROVIDER_KEY_LIMIT, type AppConfig } from "./config.ts";
 
 const reloaded = (patch: object, cfg: AppConfig = {}) =>
   changedInstanceIds(engineLaunches(instanceConfigs(cfg), {}), engineLaunches(instanceConfigs({ ...cfg, ...patch } as AppConfig), {}));
@@ -393,15 +393,10 @@ describe("configuration boundaries", () => {
     expect(parseStoredConfig(JSON.parse(JSON.stringify(once)))).toEqual(once);
   });
 
-  it("accepts only a simple VPS SSH config alias and exposes no credentials", () => {
-    expect(isValidSshAlias("production-vps")).toBe(true);
-    expect(isValidSshAlias("prod; reboot")).toBe(false);
-    expect(() => parseConfigPatch({ vps: { sshAlias: "prod; reboot" } })).toThrow("vps.sshAlias");
-    expect(parseConfigPatch({ vps: { sshAlias: "production-vps" } })).toEqual({
-      vps: { sshAlias: "production-vps" },
-    });
-    expect(vpsSshAlias({ vps: { sshAlias: "production-vps" } })).toBe("production-vps");
-    expect(vpsSshAlias({ vps: { sshAlias: "-bad" } })).toBeNull();
+  it("drops legacy VPS and Local VM configuration", () => {
+    expect(parseStoredConfig({ vps: { sshAlias: "production-vps" }, localVm: { mode: "per-bot" } })).toEqual({});
+    expect(parseConfigPatch({ vps: { sshAlias: "production-vps" } })).toEqual({});
+    expect(parseConfigPatch({ localVm: { mode: "per-bot" } })).toEqual({});
   });
 
   it("validates browserEngine.attachCdpUrl as a bare CDP port or an http(s)/ws(s) URL, and forwards it only when configured", () => {
@@ -477,30 +472,6 @@ describe("configuration boundaries", () => {
     expect(() => parseConfigPatch({ mcp: { callTimeoutMinutes: 10, surprise: 1 } })).toThrow("mcp");
   });
 
-  it("preserves shared Local VM behavior by default and accepts bounded per-bot mode", () => {
-    expect(localVmMode({})).toBe("shared");
-    expect(localVmMaxInstances({})).toBe(2);
-    expect(parseConfigPatch({ localVm: { mode: "per-bot", maxInstances: 4 } })).toEqual({
-      localVm: { mode: "per-bot", maxInstances: 4 },
-    });
-    expect(parseConfigPatch({ localVm: { maxInstances: 5 } })).toEqual({
-      localVm: { maxInstances: 5 },
-    });
-    expect(parseConfigPatch({ localVm: { mode: "per-bot", maxInstances: 8 } })).toEqual({
-      localVm: { mode: "per-bot", maxInstances: 8 },
-    });
-    expect(localVmMode({ localVm: { mode: "per-bot" } })).toBe("per-bot");
-    expect(localVmMaxInstances({ localVm: { maxInstances: 3 } })).toBe(3);
-  });
-
-  it("accepts pool mode with the same bounded seat count", () => {
-    expect(parseConfigPatch({ localVm: { mode: "pool", maxInstances: 4 } })).toEqual({
-      localVm: { mode: "pool", maxInstances: 4 },
-    });
-    expect(localVmMode({ localVm: { mode: "pool" } })).toBe("pool");
-    expect(localVmMode({})).toBe("shared");
-  });
-
   it("keeps skill authoring on by default with an explicit opt-out, and the browser off by default", () => {
     expect(skillAuthoringEnabled({})).toBe(true);
     expect(skillAuthoringEnabled({ features: {} })).toBe(true);
@@ -571,30 +542,8 @@ describe("configuration boundaries", () => {
     expect(showToolCallsEnabled({ features: { showToolCalls: true } })).toBe(true);
   });
 
-  it.each([0, 1.5, 9, "2", null])("rejects an invalid per-bot VM limit: %j", (maxInstances) => {
-    expect(() => parseConfigPatch({ localVm: { maxInstances } })).toThrow("localVm.maxInstances");
-  });
-
-  it("keeps the 8-hour Local VM idle timeout by default and accepts a bounded override", () => {
-    expect(localVmIdleTimeoutMinutes({})).toBe(480);
-    expect(localVmIdleTimeoutMinutes({ localVm: { mode: "per-bot" } })).toBe(480);
-    expect(parseStoredConfig({ localVm: { mode: "per-bot", maxInstances: 3 } })).toMatchObject({
-      localVm: { mode: "per-bot", maxInstances: 3 },
-    });
-    for (const idleTimeoutMinutes of [5, 30, 1_440]) {
-      expect(parseConfigPatch({ localVm: { idleTimeoutMinutes } })).toEqual({ localVm: { idleTimeoutMinutes } });
-      expect(localVmIdleTimeoutMinutes({ localVm: { idleTimeoutMinutes } })).toBe(idleTimeoutMinutes);
-    }
-    expect(parseStoredConfig({ localVm: { idleTimeoutMinutes: 30 } })).toMatchObject({ localVm: { idleTimeoutMinutes: 30 } });
-  });
-
-  it.each([0, 4, 1.5, 1_441, "30", null])("rejects an invalid Local VM idle timeout: %j", (idleTimeoutMinutes) => {
-    expect(() => parseConfigPatch({ localVm: { idleTimeoutMinutes } })).toThrow("localVm.idleTimeoutMinutes");
-    expect(() => parseStoredConfig({ localVm: { idleTimeoutMinutes } })).toThrow("localVm.idleTimeoutMinutes");
-  });
-
-  it.each(["one-per-bot", "windows", 1, null])("rejects an invalid Local VM mode: %j", (mode) => {
-    expect(() => parseConfigPatch({ localVm: { mode } })).toThrow("localVm.mode");
+  it("drops legacy Local VM settings while reading stored configuration", () => {
+    expect(parseStoredConfig({ language: "en", localVm: { mode: "per-bot", maxInstances: 3 } })).toEqual({ language: "en" });
   });
 });
 

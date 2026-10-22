@@ -33,9 +33,9 @@ function loadEnvironmentIdInChild(dataDir: string): Promise<string> {
   });
 }
 
-function importComputerProvidersInChild(dataDir: string): Promise<void> {
-  const vpsUrl = new URL("../computers/vps-computer.ts", import.meta.url).href;
-  const source = `await import(${JSON.stringify(vpsUrl)});`;
+function importLocalComputerInChild(dataDir: string): Promise<void> {
+  const localComputerUrl = new URL("../computers/local-computer.ts", import.meta.url).href;
+  const source = `await import(${JSON.stringify(localComputerUrl)});`;
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
@@ -105,11 +105,11 @@ describe("environment identity", () => {
     expect(() => loadEnvironmentId(unreadableDir)).toThrow(/Cannot read the existing environment identity/);
   });
 
-  it("does not create the data directory merely by importing computer providers", async () => {
+  it("does not create the data directory merely by importing local computer support", async () => {
     const parent = mkdtempSync(join(tmpdir(), "omb-provider-import-"));
     dirs.push(parent);
     const dataDir = join(parent, "not-created-yet");
-    await importComputerProvidersInChild(dataDir);
+    await importLocalComputerInChild(dataDir);
     expect(existsSync(dataDir)).toBe(false);
   });
 

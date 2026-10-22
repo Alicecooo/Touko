@@ -393,8 +393,6 @@ function mutatingPublicRoute(method: string, path: string): boolean {
     upper === "GET" &&
     /^\/api\/bots\/[\w-]+\/connector-cards\/[\w-]+\/status$/.test(path)
   ) return true;
-  // Hands out a desktop's VNC password and control.
-  if (path.startsWith("/api/desktop-viewer/")) return true;
   // Drives a bot's browser: a WebSocket upgrade is a GET, but what it carries is input.
   if (/^\/api\/bots\/[\w-]+\/browser\/stream$/.test(path)) return true;
   if (["GET", "HEAD", "OPTIONS"].includes(upper)) return false;

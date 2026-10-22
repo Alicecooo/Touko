@@ -36,7 +36,7 @@ const request = (session, url) => new Promise((resolve) => session.hooks.request
 
 test("the app window's own requests to the server carry the owner header on http and WebSocket alike", async () => {
   const { defaultSession, setToken } = install();
-  for (const url of [`http://127.0.0.1:${SERVER_PORT}/api/bots`, `ws://127.0.0.1:${SERVER_PORT}/api/desktop-viewer/local/shared/websockify`]) {
+  for (const url of [`http://127.0.0.1:${SERVER_PORT}/api/bots`, `ws://127.0.0.1:${SERVER_PORT}/api/bots/bot-1/browser/stream`]) {
     assert.equal((await sendHeaders(defaultSession, url))["X-OpenMausBot-Desktop-Owner"], "a".repeat(43), url);
   }
   for (const url of [`http://127.0.0.1:${SERVER_PORT + 1}/`, `https://127.0.0.1:${SERVER_PORT}/`, "https://example.com/", `http://localhost:${SERVER_PORT}/`, "not a url"]) {

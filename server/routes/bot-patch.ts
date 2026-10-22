@@ -11,7 +11,6 @@ import { parseVisibility } from "../bots/bot-visibility.ts";
 import type { BrowserLive } from "../browser/browser-live.ts";
 import type { BrowserRuntime } from "../browser/browser-runtime.ts";
 import type { CacheKeepWarm } from "../agent/cache-keepwarm.ts";
-import { cloudBackendChangeError } from "../computers/cloud-backend.ts";
 import * as composio from "../integrations/composio.ts";
 import type { AppConfig } from "../config/config.ts";
 import type { ModelSelection } from "../harness/contracts.ts";
@@ -43,7 +42,6 @@ export interface BotPatchRouteDeps {
   hostedModels: ReturnType<typeof hostedModelPolicy>;
   supportsApprovalMode: ReturnType<typeof createApprovalModeSupport>;
   routines(): RoutineManager | null;
-  activeVpsThreads: { has(botId: string): boolean };
   /** Full access comes only from the workspace policy. */
   hostedWorkspace: boolean;
   hostedFullAccessRefusal: string;
@@ -70,7 +68,7 @@ export interface BotPatchRouteDeps {
 }
 
 export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
-  const {store, cfg, registry, sessions, browserRuntime, browserLive, memoryUpkeep, cacheKeepWarm, hostedModels, supportsApprovalMode, activeVpsThreads, hostedWorkspace: HOSTED_WORKSPACE, hostedFullAccessRefusal: HOSTED_FULL_ACCESS_REFUSAL, desktopManaged: DESKTOP_MANAGED, maxWorkspaceBots: MAX_WORKSPACE_BOTS, broadcast, wireBot, publicGroupState, audienceChanged, storedAvatarExists, requestedTaskBot, threadBusy, activeGroupTurnForBot, checkedModelSelection, engineSwitchNeedsAsk, currentBrowserSession, interruptAllDirectThreads, cancelGroupTurnOperations, revokeInternalCapabilitiesForThread, runningTurnInstance, closeOpenApprovals, forgetTemporaryBrowser} = deps;
+  const {store, cfg, registry, sessions, browserRuntime, browserLive, memoryUpkeep, cacheKeepWarm, hostedModels, supportsApprovalMode, hostedWorkspace: HOSTED_WORKSPACE, hostedFullAccessRefusal: HOSTED_FULL_ACCESS_REFUSAL, desktopManaged: DESKTOP_MANAGED, maxWorkspaceBots: MAX_WORKSPACE_BOTS, broadcast, wireBot, publicGroupState, audienceChanged, storedAvatarExists, requestedTaskBot, threadBusy, activeGroupTurnForBot, checkedModelSelection, engineSwitchNeedsAsk, currentBrowserSession, interruptAllDirectThreads, cancelGroupTurnOperations, revokeInternalCapabilitiesForThread, runningTurnInstance, closeOpenApprovals, forgetTemporaryBrowser} = deps;
   const pinnedClientThread = pinnedClientThreadGuard(store);
   return async ({ req, res, path, method, auth, json, readBody }) => {
     let m: RegExpMatchArray | null = null;
@@ -166,7 +164,7 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
           else section = trimmed;
         }
       }
-      for (const key of ["unread", "cloudBackend", "color", "mascotExpression", "mascotBody", "pinned", "hidden"] as const) {
+      for (const key of ["unread", "color", "mascotExpression", "mascotBody", "pinned", "hidden"] as const) {
         if (body[key] !== undefined) patch[key] = body[key];
       }
       const computerSpecified = Object.prototype.hasOwnProperty.call(body, "computer");
@@ -178,12 +176,12 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
           patch.computer = undefined;
         } else if (
           typeof body.computer === "string" &&
-          ["cloud", "vm", "local", "browser", "off"].includes(body.computer)
+          ["local", "browser", "off"].includes(body.computer)
         ) {
           requestedComputer = body.computer;
           patch.computer = body.computer;
         } else {
-          return json(res, 400, { error: "computer must be null (Auto), cloud, vm, local, browser, or off" });
+          return json(res, 400, { error: "computer must be null (Auto), local, browser, or off" });
         }
       }
       if (normalizedSelection) patch.modelSelection = normalizedSelection;
@@ -322,19 +320,8 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
           patch.browserProfile = requestedProfile;
         } else return json(res, 400, { error: "browserProfile must name an existing browser profile" });
       }
-      if (body.cloudBackend !== undefined && body.cloudBackend !== "vps") {
-        return json(res, 400, { error: "cloudBackend must be vps" });
-      }
-      if (body.autoStartVps !== undefined) {
-        if (typeof body.autoStartVps !== "boolean") return json(res, 400, { error: "autoStartVps must be true or false" });
-        patch.autoStartVps = body.autoStartVps;
-      }
       if (body.chiefOfStaff !== undefined && typeof body.chiefOfStaff !== "boolean") {
         return json(res, 400, { error: "chiefOfStaff must be true or false" });
-      }
-      if (body.cloudBackend !== undefined) {
-        const backendError = cloudBackendChangeError(Boolean(existingBot?.busy), activeVpsThreads.has(m[1]));
-        if (backendError) return json(res, 409, { error: backendError });
       }
       if (body.cwd !== undefined) {
         const checked = validateBotCwd(body.cwd);

@@ -39,7 +39,6 @@ export interface OverviewFacts {
     | "description"
     | "soul"
     | "computer"
-    | "cloudBackend"
     | "cwd"
     | "autoApprove"
     | "approvalMode"
@@ -194,8 +193,6 @@ function computerReach(computer: BotRecord["computer"], cloudHome = false): stri
   switch (computer) {
     case "cloud":
       return "Computer preference: cloud computer.";
-    case "vm":
-      return `Computer preference: Local VM${unavailable}.`;
     case "local":
       return `Computer preference: this computer${unavailable}.`;
     case "browser":

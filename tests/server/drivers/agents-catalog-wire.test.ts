@@ -60,20 +60,20 @@ const TEAMWORK_TOOLS = ["list_room_targets", "coordinate_bots", "assignment_stat
 const FULL = "skills+shared+escalations";
 
 /** Bytes when the budget was last set; a profile may move at most 2% either way (lower it to lock in a win). */
-const BUDGET_BASELINE: Record<string, number> =   {
-    "default": 54116,
-    "shared": 55861,
-    "skills": 56935,
-    "skills+shared": 58680,
-    "non-chief": 44349,
-    "shared+non-chief": 46094,
-    "skills+non-chief": 47168,
-    "skills+shared+non-chief": 48913,
-    "skills+shared+cloud-home": 57735,
-    "skills+shared+non-chief+cloud-home": 47968,
-    "skills+shared+escalations": 59540,
-    "default+legacy-switches": 54116
-  };
+const BUDGET_BASELINE: Record<string, number> = {
+  "default": 52765,
+  "shared": 54510,
+  "skills": 55584,
+  "skills+shared": 57329,
+  "non-chief": 42998,
+  "shared+non-chief": 44743,
+  "skills+non-chief": 45817,
+  "skills+shared+non-chief": 47562,
+  "skills+shared+cloud-home": 57369,
+  "skills+shared+non-chief+cloud-home": 47602,
+  "skills+shared+escalations": 58189,
+  "default+legacy-switches": 52765
+};
 
 const RPC_PREFIX = '{"jsonrpc":"2.0","id":1,"result":';
 
@@ -203,7 +203,7 @@ describe("agents proxy tools/list golden", () => {
     expect(profile).not.toHaveProperty("ownThreadCreation");
   });
 
-  it("shows a Cloud home's bots no Local VM and no this computer, and every other server both", () => {
+  it("omits this computer from Cloud homes and removes the VM tool everywhere", () => {
     type SelectTool = Tool & { inputSchema: { properties: { surface: { enum: string[]; description: string } } } };
     const select = (wire: string) => toolsOf(wire).find((tool) => tool.name === "select_computer") as SelectTool;
     const cloudHome = Object.keys(PROFILES).filter((name) => name.endsWith("+cloud-home"));
@@ -211,9 +211,9 @@ describe("agents proxy tools/list golden", () => {
     for (const name of cloudHome) {
       const desktop = wires[name.slice(0, -"+cloud-home".length)]!;
       const names = toolsOf(wires[name]!).map((tool) => tool.name);
-      expect(names).toEqual(toolsOf(desktop).map((tool) => tool.name).filter((tool) => tool !== "vm_exec"));
-      expect(select(desktop).inputSchema.properties.surface.enum).toEqual(["auto", "cloud", "vm", "local", "browser"]);
-      expect(toolsOf(desktop).map((tool) => tool.name)).toContain("vm_exec");
+      expect(names).toEqual(toolsOf(desktop).map((tool) => tool.name));
+      expect(select(desktop).inputSchema.properties.surface.enum).toEqual(["auto", "cloud", "local", "browser"]);
+      expect(toolsOf(desktop).map((tool) => tool.name)).not.toContain("vm_exec");
       const surface = select(wires[name]!).inputSchema.properties.surface;
       expect(surface.enum).toEqual(["auto", "cloud", "browser"]);
       expect(surface.description).not.toMatch(/\b(?:vm|local) =/);
@@ -223,7 +223,7 @@ describe("agents proxy tools/list golden", () => {
   it("shows only a Chief of Staff the Chief-only tools, and for_bot_id on another bot's profile or model", () => {
     type SchemaTool = Tool & { description: string; inputSchema: { properties: Record<string, unknown> } };
     const nonChief = Object.keys(PROFILES).filter((name) => PROFILES[name]!.env.OMB_CHIEF_OF_STAFF === "0");
-    expect(nonChief).toHaveLength(6);
+    expect(nonChief).toHaveLength(5);
     for (const name of nonChief) {
       const chiefTools = toolsOf(wires[name === "non-chief" ? "default" : name.replace("+non-chief", "")]!) as SchemaTool[];
       const tools = new Map((toolsOf(wires[name]!) as SchemaTool[]).map((tool) => [tool.name, tool]));

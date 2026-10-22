@@ -7,7 +7,7 @@ import type { EffortLevel } from "../../shared/wire.ts";
 import type { DriverKind, InstanceId, ModelVariantOption, RuntimeEventListener, ThreadId, TurnId } from "../../shared/runtime-events.ts";
 import type { ProviderIcon } from "../../shared/provider-icon.ts";
 
-export type { CloudBackend, EffortLevel, ModelSelection } from "../../shared/wire.ts";
+export type { EffortLevel, ModelSelection } from "../../shared/wire.ts";
 export type {
   DriverKind, InstanceId, ModelVariantOption, ModelVariantState, RuntimeEvent,
   RuntimeEventBase, RuntimeEventListener, ThreadId, TurnId,

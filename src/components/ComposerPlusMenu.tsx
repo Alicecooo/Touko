@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { Check, ListChecks, Paperclip, Plus, Target } from "lucide-react";
+import { Check, Paperclip, Plus, Target } from "lucide-react";
 import { approvalModeFor } from "../../shared/approval-mode";
 import { approvalModeOptions, approvalModeOptionsFor, approvalModeSelectionRequiresLocalDesktop, shownApprovalMode } from "@/lib/approval-mode-options";
 import { cn } from "@/lib/cn";
@@ -51,7 +51,7 @@ function approvalItem(name: string, choice: ApprovalChoice): SidebarMenuItem {
     subtitle: current.label,
     note: choice.disabled ? t("approvalMode.busy") : localOnly ? t("approvalMode.customLocalOnlyDot") : undefined,
     icon: <CurrentIcon size={16} />,
-    disabled: Boolean(choice.disabled) && !choice.onManageCommandAllowlist,
+    disabled: Boolean(choice.disabled),
     onSelect: () => {},
     submenu: [
       ...approvalModeOptionsFor(choice.driverKind, trusted).map((option): SidebarMenuItem => {
@@ -67,13 +67,6 @@ function approvalItem(name: string, choice: ApprovalChoice): SidebarMenuItem {
           onSelect: () => choice.onSelect(option.mode),
         };
       }),
-      ...(choice.onManageCommandAllowlist ? [{
-        key: "approval:allowlist",
-        separatorBefore: true,
-        label: t("commandAllowlist.title"),
-        icon: <ListChecks size={16} />,
-        onSelect: choice.onManageCommandAllowlist,
-      } satisfies SidebarMenuItem] : []),
     ],
   };
 }

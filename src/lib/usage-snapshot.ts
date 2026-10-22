@@ -3,7 +3,7 @@
 
 import { engineReady } from "@/components/EngineLibrary";
 import { analyticsEnabled, track } from "@/lib/analytics";
-import { allow, APP, CONNECTORS_MODE, DECIDER, EDITION, engineForDriver, LOCAL_VM_MODE, TRIAL_CREDIT, type EventProps, type KeyProvider, type PropValue } from "@/lib/analytics-allowlist";
+import { allow, APP, CONNECTORS_MODE, DECIDER, EDITION, engineForDriver, TRIAL_CREDIT, type EventProps, type KeyProvider, type PropValue } from "@/lib/analytics-allowlist";
 import { hasActiveConnection, type ConnectorStatus } from "@/lib/connector-status";
 import { addedServers } from "@/lib/openai-compat-endpoints";
 import type { Routine } from "@/lib/routines";
@@ -16,7 +16,7 @@ const DAY_KEY = "omb-analytics-snapshot-day";
 export interface UsageInput {
   config: ConfigStatus;
   instances: readonly InstanceInfo[];
-  bots: ReadonlyArray<Pick<Bot, "computer" | "cloudBackend" | "hidden">>;
+  bots: ReadonlyArray<Pick<Bot, "computer" | "hidden">>;
   groups: ReadonlyArray<Pick<Group, "dm">>;
   sections?: readonly string[];
   /** null while the routine list is not loaded. */
@@ -91,9 +91,7 @@ export function buildUsageSnapshot(input: UsageInput): EventProps {
   const props: Record<string, PropValue | undefined> = {
     key_providers: keys,
     key_count: keys.length,
-    bots_cloud_vps: tally(bots, (bot) => bot.computer === "cloud" && bot.cloudBackend === "vps"),
     bots: bots.length,
-    bots_local_vm: place("vm"),
     bots_this_computer: place("local"),
     bots_browser: place("browser"),
     bots_off: place("off"),
@@ -109,8 +107,6 @@ export function buildUsageSnapshot(input: UsageInput): EventProps {
     trial_credit: allow(instances.find((instance) => instance.trialCredit !== undefined)?.trialCredit ?? "none", TRIAL_CREDIT),
     ...appFacts(input.apps),
     connectors_mode: allow(config.composio?.mode?.replace("-", "_"), CONNECTORS_MODE),
-    local_vm_mode: allow(config.localVm?.mode?.replace("-", "_"), LOCAL_VM_MODE),
-    vps_configured: config.vps?.configured === true,
     decider: config.decider?.enabled ? allow(config.decider.provider, DECIDER) : "off",
     decider_included: config.decider?.included === true,
     ...memberFacts(input.sessions),

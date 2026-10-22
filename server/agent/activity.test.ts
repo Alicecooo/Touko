@@ -61,7 +61,7 @@ const decision = (row: Partial<DecisionRow> & Pick<DecisionRow, "at">) => {
     botName: "Scout",
     tool: "Bash",
     decision: "auto-approved",
-    source: "command-allowlist",
+    source: "full-access",
     ...row,
   };
   appendFileSync(join(dataDir, "decisions.ndjson"), JSON.stringify(full) + "\n");

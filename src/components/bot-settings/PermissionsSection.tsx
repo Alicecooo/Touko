@@ -4,12 +4,10 @@ import { Crown } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
-import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
 import { useStore, type Bot } from "@/state/store";
 import type { ApprovalMode } from "../../../shared/approval-mode";
 import { DEFAULT_OUTBOUND_POLICY, type OutboundPolicy } from "../../../shared/outbound";
 import { ApprovalModeSelector } from "../ApprovalModeSelector";
-import { CommandAllowlistDialog } from "../CommandAllowlistDialog";
 import { LocalComputerAutoWarning } from "../LocalComputerAutoWarning";
 import { Switch } from "../SettingsPrimitives";
 import { ManagedTeamsSettings } from "./ManagedTeamsSettings";
@@ -30,11 +28,9 @@ export function PermissionsSection({
 }) {
   const { patch, engine, canCoordinate, approvalMode, trustedModesAvailable, sectionName, currentChief } = derived;
   const { state, dispatch } = useStore();
-  const ownerOrAdmin = useOwnerOrAdmin();
   const { draft } = useBotEditor();
   const displaySectionName = sectionName === "General" ? t("botAccess.teams.general") : sectionName;
   const [localAutoWarning, setLocalAutoWarning] = useState<string | null>(null);
-  const [commandAllowlistTarget, setCommandAllowlistTarget] = useState<{ botId: string; botName: string } | null>(null);
   const shows = (part: PermissionsPart) => !parts || parts.includes(part);
   const applyFullEverywhere = () =>
     dispatch({ type: "updateBot", botId: bot.id, patch: { approvalMode: "full", applyToAllThreads: true } });
@@ -140,7 +136,6 @@ export function PermissionsSection({
             wide
             disabled={Boolean(bot.busy)}
             trustedModesAvailable={trustedModesAvailable}
-            onManageCommandAllowlist={!draft && ownerOrAdmin === true ? () => setCommandAllowlistTarget({ botId: bot.id, botName: bot.name }) : undefined}
           />
         </div>
         {!draft && approvalMode === "full" && <button
@@ -148,18 +143,8 @@ export function PermissionsSection({
           className="mt-3 text-[13px] text-accent hover:underline disabled:opacity-40"
           onClick={applyFullEverywhere}
         >{t("permissions.approval.applyFull")}</button>}
-        {!draft && ownerOrAdmin === true && <button
-          type="button"
-          className="mt-3 block text-[13px] text-accent hover:underline"
-          onClick={() => setCommandAllowlistTarget({ botId: bot.id, botName: bot.name })}
-        >{t("commandAllowlist.manage")}</button>}
       </div>}
 
-      {commandAllowlistTarget && <CommandAllowlistDialog
-        key={`command-allowlist:${commandAllowlistTarget.botId}`}
-        {...commandAllowlistTarget}
-        onClose={() => setCommandAllowlistTarget(null)}
-      />}
       {!draft && shows("outbound") && <OutboundControl key={bot.id} bot={bot} onChange={(outbound) => patch({ outbound })} />}
       <LocalComputerAutoWarning
         open={localAutoWarning !== null}

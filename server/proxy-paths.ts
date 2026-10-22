@@ -26,8 +26,6 @@ export const SPAWNED_PROXIES = {
   harnessMcp: resolveProxy("mcp/harness-mcp-proxy"),
   localComputer: resolveProxy("computers/local-computer-proxy"),
   permission: resolveProxy("agent/permission-proxy"),
-  containerMcp: resolveProxy("computers/container-mcp"),
-  vpsContainerMcp: resolveProxy("computers/vps-container-mcp"),
   agents: resolveProxy("drivers/agents-proxy"),
   dweb: resolveProxy("drivers/dweb-proxy"),
   connectors: resolveProxy("integrations/connector-proxy"),

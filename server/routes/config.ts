@@ -5,28 +5,23 @@ import type { BrowserCleanupCoordinator, BrowserCleanupRequest } from "../browse
 import { finalizeBrowserCleanupMutation, requireBrowserCleanupAcknowledged } from "../browser/browser-lifecycle-cleanup.ts";
 import type { BrowserLive } from "../browser/browser-live.ts";
 import type { BrowserRuntime } from "../browser/browser-runtime.ts";
-import { vpsAliasResourceChangeError } from "../computers/cloud-backend.ts";
 import * as composio from "../integrations/composio.ts";
-import { browserProfilePartitionTarget, browserProfileReplacementConflict, builtInBrowserEnabled, changedInstanceIds, engineLaunches, loadConfig, localVmMode, mergeOpenCodeProviderKeys, parseConfigPatch, saveConfig, syncCredentialEnv, vpsSshAlias, type AppConfig } from "../config/config.ts";
+import { browserProfilePartitionTarget, browserProfileReplacementConflict, builtInBrowserEnabled, changedInstanceIds, engineLaunches, loadConfig, mergeOpenCodeProviderKeys, parseConfigPatch, saveConfig, syncCredentialEnv, type AppConfig } from "../config/config.ts";
 import type { InstanceConfigMap, ModelSelection } from "../harness/contracts.ts";
 import { deciderIncludedHere, deciderPatchKey, deciderSavePatch, deciderSharedKeyUsable, type Decider } from "../decider/index.ts";
 import type { ProviderRegistry } from "../harness/registry.ts";
 import { HOSTED_PROVIDER_SETTINGS_ERROR } from "../deployment/hosted-models.ts";
 import { forgetKey } from "../security/key-rejections.ts";
-import type { ComputerIdleTimer } from "../computers/computer-idle.ts";
 import { PROVIDER_KEY_KINDS } from "../model-catalog/provider-key-check.ts";
 import type { SessionRegistry } from "../auth/sessions.ts";
 import { parseSkillMd } from "../skills/skills.ts";
 import type { Store } from "../storage/store.ts";
-import * as vps from "../computers/vps-computer.ts";
 import { PASS, type RouteHandler } from "./table.ts";
 
 export interface BusyFlag {
   get(): boolean;
   set(busy: boolean): void;
 }
-
-export type RemoteComputerProvider = "box" | "vps";
 
 export type ModelSelectionCheck = { ok: true; selection: ModelSelection } | { ok: false; status: number; error: string };
 
@@ -51,18 +46,7 @@ export interface ConfigRouteDeps {
   
   
   providerConfigs(): InstanceConfigMap;
-  localVmIdleMs(): number;
-  localVmIdles: { values(): Iterable<Pick<ComputerIdleTimer, "setIdleMs">> };
-  localVmActiveThreads: { readonly size: number };
-  localVmLifecycleBusy: { readonly size: number };
-  localVmImageBusy: Pick<BusyFlag, "get">;
-  localVmModeChangeBusy: Pick<BusyFlag, "set">;
   providerConfigBusy: BusyFlag;
-  computerProviderConfigTransitions: Pick<Set<RemoteComputerProvider>, "add" | "delete">;
-  
-  managedComputerOwners(): Array<{botId: string; name: string; inUse: boolean}>;
-  providerOperationConflict(provider: RemoteComputerProvider): string | null;
-  perBotLocalVmCountForModeChange(): Promise<number | null>;
   checkedModelSelection(raw: unknown, current?: { selection: ModelSelection; busy: boolean }, requireAvailableModel?: boolean): ModelSelectionCheck;
   policyModelRefusal(instance: { instanceId: string; driverKind: string }): string | undefined;
   browserSessionSpec(binaryPath: string, session: string, profile: string | undefined): { command: string; env: Record<string, string> };
@@ -76,7 +60,7 @@ export interface ConfigRouteDeps {
 }
 
 export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
- const {store,cfg,registry,sessions,browserCleanup,browserLive,browserRuntime,usedBrowserSessions,closeBrowser,browserEngineSwitched,decider,hostedModels,providerConfigs,localVmIdleMs,localVmIdles,localVmActiveThreads,localVmLifecycleBusy,localVmImageBusy,localVmModeChangeBusy,providerConfigBusy,computerProviderConfigTransitions,managedComputerOwners,providerOperationConflict,perBotLocalVmCountForModeChange,checkedModelSelection,policyModelRefusal,browserSessionSpec,configStatus,configForAccess,resyncOpenCodeProviderKeys,revokeEngineCapabilities,reloadProviders,broadcast,drainQueuedSends}=deps;
+ const {store,cfg,registry,sessions,browserCleanup,browserLive,browserRuntime,usedBrowserSessions,closeBrowser,browserEngineSwitched,decider,hostedModels,providerConfigs,providerConfigBusy,checkedModelSelection,policyModelRefusal,browserSessionSpec,configStatus,configForAccess,resyncOpenCodeProviderKeys,revokeEngineCapabilities,reloadProviders,broadcast,drainQueuedSends}=deps;
   
   return async ({ req, res, url, path, method, auth, json, readBody }) => {
     // API keys are never echoed back: booleans only.
@@ -178,38 +162,8 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
       
       
       
-      const currentVpsAlias = vpsSshAlias(cfg);
-      const nextVpsAlias = patch.vps === undefined
-        ? currentVpsAlias
-        : vpsSshAlias({ ...cfg, vps: patch.vps });
-      const changingVpsAlias = patch.vps !== undefined && nextVpsAlias !== currentVpsAlias;
-      const transitioningProviders: RemoteComputerProvider[] = [
-        ...([]),
-        ...(changingVpsAlias ? ["vps" as const] : []),
-      ];
       providerConfigBusy.set(true);
-      const changingLocalVmMode = patch.localVm?.mode !== undefined && patch.localVm.mode !== localVmMode(cfg);
-      if (changingLocalVmMode) localVmModeChangeBusy.set(true);
       try {
-        for (const provider of transitioningProviders) {
-          const conflict = providerOperationConflict(provider);
-          if (conflict) return json(res, 409, { error: conflict });
-        }
-        for (const provider of transitioningProviders) computerProviderConfigTransitions.add(provider);
-
-        if (changingVpsAlias && currentVpsAlias) {
-          const inventory = await vps.listManagedVpsComputers(
-            { vps: { sshAlias: currentVpsAlias } },
-            managedComputerOwners(),
-          );
-          if (!inventory.available) {
-            return json(res, 503, {
-              error: `${inventory.problem ?? "VPS computer inventory is unavailable"}. Keep the current SSH config alias and retry`,
-            });
-          }
-          const resourceError = vpsAliasResourceChangeError(inventory.instances.length);
-          if (resourceError) return json(res, 409, { error: resourceError });
-        }
 
         
         
@@ -222,24 +176,6 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
         
         
 
-        if (changingLocalVmMode) {
-          if (localVmActiveThreads.size > 0 || localVmLifecycleBusy.size > 0 || localVmImageBusy.get()) {
-            return json(res, 409, { error: "stop Local VM turns and setup actions before changing the Local VM isolation mode" });
-          }
-          if (localVmMode(cfg) === "per-bot" && patch.localVm?.mode === "shared") {
-            const existing = await perBotLocalVmCountForModeChange();
-            if (existing === null) {
-              return json(res, 409, {
-                error: "start the container runtime and delete every per-bot VM before switching to shared mode",
-              });
-            }
-            if (existing > 0) {
-              return json(res, 409, {
-                error: `delete the ${existing} per-bot Local VM${existing === 1 ? "" : "s"} before switching to shared mode`,
-              });
-            }
-          }
-        }
       const requestedComposioKey = patch.composio?.apiKey;
       if (requestedComposioKey !== undefined) {
         if (requestedComposioKey.trim()) {
@@ -280,10 +216,6 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
       const browsing = switchingBrowserEngine ? store.bots.find((bot) => bot.busy && bot.browser !== false) : undefined;
       if (browsing) return json(res, 409, { error: `stop ${browsing.name}'s turn before switching the browser` });
       // Observed again after the awaits: catches an operation that already held a claim.
-      for (const provider of transitioningProviders) {
-        const conflict = providerOperationConflict(provider);
-        if (conflict) return json(res, 409, { error: conflict });
-      }
       // Only the named keys change; merged with no await before the save.
       if (patch.opencodeGo?.providerKeys) {
         const merged = mergeOpenCodeProviderKeys(cfg, patch.opencodeGo.providerKeys);
@@ -356,9 +288,6 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
       for (const key of resetKeys) if (key) forgetKey(key);
       // A saved key reaches an engine through the environment its status read uses, often with no reload.
       registry.forgetSnapshots();
-      if (patch.localVm?.idleTimeoutMinutes !== undefined) {
-        for (const idle of localVmIdles.values()) idle.setIdleMs(localVmIdleMs());
-      }
       let browserReferenceCleanupError: unknown = null;
       if (patch.signIn !== undefined) {
         sessions.revalidateEmailSessions();
@@ -433,8 +362,6 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
       );
       return json(res, 200, finalized.value);
       } finally {
-        for (const provider of transitioningProviders) computerProviderConfigTransitions.delete(provider);
-        if (changingLocalVmMode) localVmModeChangeBusy.set(false);
         providerConfigBusy.set(false);
       }
     }

@@ -7,7 +7,6 @@ import { undeliveredApprovalTool } from "./auto-approve.ts";
 describe("undeliveredApprovalTool", () => {
   it("names the grant the provider refused", () => {
     expect(undeliveredApprovalTool("rejected", "full-access")).toEqual({ name: "The provider rejected this action despite Full access.", ok: false });
-    expect(undeliveredApprovalTool("rejected", "command-allowlist")).toEqual({ name: "The provider rejected this action despite the saved command permission.", ok: false });
     expect(undeliveredApprovalTool("rejected", "tool-allowlist")).toEqual({ name: "The provider rejected this action despite the saved tool permission.", ok: false });
     // any other grant reads as Full access, as it did in the fold
     expect(undeliveredApprovalTool("rejected", "web-search").name).toBe("The provider rejected this action despite Full access.");

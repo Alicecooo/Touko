@@ -1150,20 +1150,6 @@ export function ModelPicker({
             ) : (
               <div className="px-4 py-5 text-[13px] text-ink-secondary">{t("model.noProviders")}</div>
             )}
-            <div className="flex shrink-0 border-t border-hairline/40">
-              <button type="button" onClick={() => {
-                setOpen(false);
-                dispatch({ type: "toggleAppSettings", open: true, section: "engines" });
-              }} className="flex-1 px-4 py-2 text-left text-[12px] text-ink-secondary hover:bg-control/60 hover:text-ink">
-                {t("settings.engines.title")}
-              </button>
-              {window.ogb?.remoteClient?.active !== true && (
-                <button type="button" data-model-add-api-keys onClick={openApiKeys} className="flex shrink-0 items-center gap-1.5 px-4 py-2 text-[12px] text-ink-secondary hover:bg-control/60 hover:text-ink">
-                  <KeyRound size={12} aria-hidden="true" />
-                  {apiKeysLabel(pickerInstances)}
-                </button>
-              )}
-            </div>
           </div>
           </>
           )}
