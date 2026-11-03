@@ -1127,13 +1127,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
         mcpServers.agents = { ...turn.integrations.agents, alwaysLoad: true };
         allowed.push("mcp__agents");
       }
-      if (turn.integrations?.browser) {
-        // Behind tool search, the first browser action costs a ToolSearch model step.
-        mcpServers.browser = turn.preloadBrowserTools
-          ? { ...turn.integrations.browser, alwaysLoad: true }
-          : { ...turn.integrations.browser };
-        allowed.push("mcp__browser");
-      }
+
       for (const name of ["data", "highlevel"] as const) {
         if (turn.integrations?.[name]) { mcpServers[name] = { ...turn.integrations[name] }; allowed.push(`mcp__${name}`); }
       }
@@ -2066,7 +2060,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
         customMcp: true,
           computerMcp: true,
           composioMcp: true,
-          browserMcp: true,
+
           dataMcp: true, highlevelMcp: true,
           images: true,
           nativeImageInput: true,

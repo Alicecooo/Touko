@@ -1,59 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  browserIsThePlace,
-  cloudPlaceRefusal,
-  computerSkippedNote,
-  computerToolsRefusal,
-  parseSurface,
-  placeUnavailable,
-  resolveSurface,
-  surfaceOfComputerKind,
-  surfacePrompt,
-} from "./surface.ts";
-
-describe("browserIsThePlace", () => {
-  it("is true only where the conversation works on the built-in browser", () => {
-    expect(browserIsThePlace(resolveSurface({ destination: "browser", browserOn: true }))).toBe(true);
-    expect(browserIsThePlace(resolveSurface({ destination: undefined, pinnedSurface: "browser", browserOn: true }))).toBe(true);
-    expect(browserIsThePlace(resolveSurface({ destination: undefined, browserOn: true }))).toBe(false);
-    expect(browserIsThePlace(resolveSurface({ destination: "browser", browserOn: false }))).toBe(false);
-    expect(browserIsThePlace(resolveSurface({ destination: "local", browserOn: true }))).toBe(false);
-    expect(browserIsThePlace(resolveSurface({ destination: "off", browserOn: true }))).toBe(false);
-  });
-});
+import { cloudPlaceRefusal, computerSkippedNote, computerToolsRefusal, parseSurface, placeUnavailable, resolveSurface, surfaceOfComputerKind, surfacePrompt } from "./surface.ts";
 
 describe("resolveSurface", () => {
-  it("browser destination mounts only the built-in browser", () => {
-    expect(resolveSurface({ destination: "browser", browserOn: true })).toEqual({
-      computer: "off",
-      browser: true,
-      pinned: null,
-      note: "",
-    });
-  });
-
-  it("browser destination with the browser switched off mounts nothing and says so", () => {
-    const plan = resolveSurface({ destination: "browser", browserOn: false });
-    expect(plan.computer).toBe("off");
-    expect(plan.browser).toBe(false);
-    expect(plan.note).toMatch(/switched off in App Settings/);
-    expect(plan.note).toMatch(/no browser and no computer/);
-  });
 
   it("a computer destination mounts only that computer: one place per turn", () => {
     for (const destination of ["cloud", "local"] as const) {
-      expect(resolveSurface({ destination, browserOn: true })).toEqual({ computer: destination, browser: false, pinned: null, note: "" });
-      expect(resolveSurface({ destination, browserOn: false })).toMatchObject({ computer: destination, browser: false });
+      expect(resolveSurface({ destination,  })).toEqual({ computer: destination, browser: false, pinned: null, note: "" });
+      expect(resolveSurface({ destination,  })).toMatchObject({ computer: destination, browser: false });
     }
   });
 
   it("Off mounts no computer and no browser, and says which setting did it", () => {
-    const plan = resolveSurface({ destination: "off", browserOn: true });
+    const plan = resolveSurface({ destination: "off",  });
     expect(plan).toMatchObject({ computer: "off", browser: false, pinned: null });
     expect(plan.note).toMatch(/"Works on" setting is Off/);
-    expect(plan.note).toMatch(/no computer and no built-in browser/);
-    expect(resolveSurface({ destination: "off", browserOn: false })).toEqual(plan);
+
+    expect(resolveSurface({ destination: "off",  })).toEqual(plan);
     expect(surfacePrompt({ computer: null, browser: false }, { note: plan.note })).toBe(plan.note);
   });
 
@@ -68,40 +31,21 @@ describe("resolveSurface", () => {
   });
 
   it("Off is the one setting a conversation pin cannot override", () => {
-    expect(resolveSurface({ destination: "off", pinnedSurface: "browser", browserOn: true }))
-      .toMatchObject({ computer: "off", browser: false, pinned: null });
-    expect(resolveSurface({ destination: "off", pinnedSurface: "cloud", browserOn: true }))
+
+    expect(resolveSurface({ destination: "off", pinnedSurface: "cloud",  }))
       .toMatchObject({ computer: "off", browser: false, pinned: null });
   });
 
   it("a conversation pin wins over the bot's default, whatever that default is", () => {
-    expect(resolveSurface({ destination: "cloud", pinnedSurface: "browser", browserOn: true }))
-      .toEqual({ computer: "off", browser: true, pinned: "browser", note: "" });
+
     for (const destination of ["browser", undefined] as const) {
       for (const pin of ["cloud", "local"] as const) {
-        expect(resolveSurface({ destination, pinnedSurface: pin, browserOn: true }))
+        expect(resolveSurface({ destination, pinnedSurface: pin,  }))
           .toEqual({ computer: pin, browser: false, pinned: pin, note: "" });
       }
     }
   });
 
-  it("keeps an unavailable browser pin instead of silently moving to another computer", () => {
-    for (const destination of [undefined, "local", "cloud", "browser"] as const) {
-      expect(resolveSurface({ destination, pinnedSurface: "browser", browserOn: false }))
-        .toMatchObject({ computer: "off", browser: false, pinned: "browser",
-          note: expect.stringMatching(/No computer is mounted instead/) });
-    }
-  });
-
-  it("Auto without a pin leaves the computer to the dispatch and keeps the browser as its fallback", () => {
-    expect(resolveSurface({ destination: undefined, browserOn: true })).toEqual({
-      computer: undefined,
-      browser: true,
-      pinned: null,
-      note: "",
-    });
-    expect(resolveSurface({ destination: undefined, browserOn: false })).toMatchObject({ computer: undefined, browser: false });
-  });
 });
 
 describe("surfacePrompt", () => {
@@ -201,8 +145,8 @@ describe("surfacePrompt", () => {
 });
 
 describe("surface parsing", () => {
-  it("accepts only the four surfaces off the wire", () => {
-    expect(parseSurface("browser")).toBe("browser");
+  it("rejects the removed browser surface", () => {
+    expect(parseSurface("browser")).toBeUndefined();
     expect(parseSurface("cloud")).toBe("cloud");
     expect(parseSurface("box")).toBeUndefined();
     expect(parseSurface(42)).toBeUndefined();
@@ -270,7 +214,4 @@ describe("placeUnavailable", () => {
     expect(cause("room")).toBe("Scout's cloud computer didn't start.");
   });
 
-  it("keeps the whole cause: no row cuts it", () => {
-    const long = `${"x".repeat(400)}.`;
-  });
 });

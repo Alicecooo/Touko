@@ -4,7 +4,7 @@
 // required on first use, and only when a token exists.
 import type { LoginBots, LoginPlace, LoginSummary, OnePasswordStatus, OnePasswordVault } from "../../shared/logins.ts";
 import { loginMatchesHost, loginSite, loginUsableBy, normalizeLoginHost } from "../../shared/logins.ts";
-import type { FillCandidate } from "./login-fill.ts";
+import type { LoginCandidate } from "./login-candidate.ts";
 import { parseTotpKey } from "./totp.ts";
 
 export interface OnePasswordItemFields {
@@ -18,7 +18,6 @@ export interface OnePasswordClient {
   loginItems(vaultId: string): Promise<Array<{ id: string; title: string; urls: string[] }>>;
   fields(vaultId: string, itemIds: string[]): Promise<Map<string, OnePasswordItemFields>>;
 }
-
 
 interface SdkField { id: string; title: string; fieldType: string; value: string }
 interface SdkClient {
@@ -57,7 +56,6 @@ export async function sdkOnePasswordClient(sdk: OnePasswordSdk, token: string, v
     },
   };
 }
-
 
 /** One item's website hosts on one site. */
 interface Entry extends LoginPlace {
@@ -223,7 +221,7 @@ export class OnePasswordLogins {
     return this.usable(botId).map((entry) => ({ site: entry.site, hosts: [...entry.hosts], exactHost: false, username: entry.username }));
   }
 
-  candidates(pageHost: string, botId: string): FillCandidate[] {
+  candidates(pageHost: string, botId: string): LoginCandidate[] {
     const token = this.token();
     if (!token) return [];
     return this.usable(botId).filter((entry) => loginMatchesHost(entry, pageHost)).map((entry) => ({

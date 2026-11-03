@@ -13,7 +13,6 @@ export type {
   RuntimeEventBase, RuntimeEventListener, ThreadId, TurnId,
 } from "../../shared/runtime-events.ts";
 
-
 export type ProviderErrorCode =
   | "missing_cli"
   | "invalid_credentials"
@@ -44,7 +43,6 @@ export class TurnNotStartedError extends Error {
     this.turnId = turnId;
   }
 }
-
 
 /** Variants are opaque provider IDs, not the cross-engine effort enum. */
 export function isModelVariant(value: unknown): value is string {
@@ -116,8 +114,7 @@ export interface SendTurnInput {
   systemVolatile?: string;
   /** The message tags teammates, so digest-based delivery must not suppress the mentions note even when it is unchanged. */
   mentionTurn?: boolean;
-  /** The bot will likely browse, so a driver may load browser tools up front rather than behind tool search. */
-  preloadBrowserTools?: boolean;
+
   /** Per-bot integrations the driver may hand to the agent as tools. */
   integrations?: {
     /** A harness-owned stdio bridge to Composio, so connection requests become trusted chat cards. */
@@ -135,8 +132,7 @@ export interface SendTurnInput {
     hooks?: { url: string; token: string };
     /** Peer-agent MCP proxy (list_bots / coordinate_bots); the harness owns turns, permissions and recursion limits. */
     agents?: { command: string; args: string[]; env: Record<string, string> };
-    /** The built-in browser's MCP proxy: one tab per bot, in its own persistent partition. */
-    browser?: { command: string; args: string[]; env: Record<string, string> };
+
     /** The Data tools' MCP proxy: DuckDB on this bot's own database. */
     data?: { command: string; args: string[]; env: Record<string, string> };
     /** The HighLevel CRM tools' MCP proxy: the harness holds the tokens and the per-bot verdict. */
@@ -189,8 +185,7 @@ export interface ProviderAdapter {
     computerMcp?: boolean;
     /** The driver mounts integrations.composio. */
     composioMcp?: boolean;
-    /** The driver can mount the built-in browser MCP. */
-    browserMcp?: boolean;
+
     /** The driver can mount the Data tools MCP. */
     dataMcp?: boolean;
     /** The driver can mount the HighLevel CRM tools MCP. */

@@ -5,8 +5,7 @@ import { parseStoredConfig } from "../config/config.ts";
 // Connection sections stay on the destination whole: a restored URL must never redirect an API key kept from that device.
 const PORTABLE_CONFIG_KEYS = [
   "profile", "language", "budgets", "billing", "rooms", "threads",
-  "features", "browserProfiles",
-] as const;
+  "features", ] as const;
 
 export function portableWorkspaceConfig(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid workspace configuration in backup.");

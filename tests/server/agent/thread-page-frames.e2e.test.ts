@@ -68,7 +68,7 @@ describe("transcript pages on bot and room frames", () => {
     mkdirSync(data, { recursive: true });
     // one deliberately unknown driver: no engine CLI runs, nothing answers
     writeFileSync(join(data, "config.json"), JSON.stringify({
-      features: { browser: false },
+      features: {  },
       instances: { ghost: { driver: "not-a-real-driver", displayName: "Ghost" } },
     }));
     const port = await freePortBlock([0, 1]);

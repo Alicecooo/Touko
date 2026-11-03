@@ -1,16 +1,16 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { Globe, Settings, X } from "lucide-react";
-import { api, currentTaskBot, useStore, type Bot, type ConfigStatus } from "@/state/store";
+import { Settings, X } from "lucide-react";
+import { currentTaskBot, useStore, type Bot } from "@/state/store";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import { useAdvancedMode } from "@/lib/interface-mode";
-import { browserAvailable, browserUnavailableReason, builtInBrowserEnabled } from "@/lib/feature-flags";
+
 import { computerPanelTabs, readComputerPanelView, resolveComputerPanelView, writeComputerPanelView, type ComputerPanelView } from "@/lib/computer-panel-view";
 import { useCaptionChrome } from "./DesktopCapabilities";
-import { BrowserPanel } from "./BrowserPanel";
+
 import { ComputerFilesPane } from "./ComputerFilesPane";
 import { RoutinesSection } from "./bot-settings/RoutinesSection";
-import { Switch } from "./SettingsPrimitives";
+
 import { moveBetweenTabs, PANEL_TABS, panelTabProps, TAB_PANEL_FOCUS, tabPanelProps } from "./computer-panel-tabs";
 
 const DataPanel = lazy(() => import("./data/DataPanel").then((module) => ({ default: module.DataPanel })));
@@ -92,25 +92,20 @@ export function ComputerPanel({
   const panelView = resolveComputerPanelView(storedPanelView, { advanced });
   const requestedDataResult = state.dataResultFocus?.botId === bot.id ? state.dataResultFocus : undefined;
   const [dataRequest, setDataRequest] = useState<{ id: string; requestId: number }>();
-  const browserAvailableHere = browserAvailable(state.config);
-  const browserEnabled = builtInBrowserEnabled(state.config) && bot.browser !== false
-    && (browserAvailableHere || state.config?.browserEngine?.installable === true);
-  const [error, setError] = useState<string | null>(null);
+
   const chooseTab = (view: ComputerPanelView) => {
-    setError(null);
+
     setPanelView(view);
     writeComputerPanelView(bot.id, view);
   };
-  const requestedSignIn = state.signInFocus?.botId === bot.id ? state.signInFocus : undefined;
-  const [signInRequest, setSignInRequest] = useState<{ url: string; site: string; nonce: number }>();
+
   const previousThread = useRef(bot.threadId);
   useEffect(() => {
     if (previousThread.current === bot.threadId) return;
     previousThread.current = bot.threadId;
-    setPanelView("browser");
+    setPanelView("files");
     setDataRequest(undefined);
-    setSignInRequest(undefined);
-    setError(null);
+
   }, [bot.threadId]);
   useEffect(() => {
     if (!requestedDataResult || requestedDataResult.consumed) return;
@@ -119,58 +114,6 @@ export function ComputerPanel({
     writeComputerPanelView(bot.id, "data");
     dispatch({ type: "dataResultFocusConsumed", requestId: requestedDataResult.requestId });
   }, [bot.id, dispatch, requestedDataResult]);
-
-  useEffect(() => {
-    if (!requestedSignIn || requestedSignIn.consumed) return;
-    if (requestedSignIn.place !== "browser") return;
-    const view = "browser";
-    setPanelView(view);
-    writeComputerPanelView(bot.id, view);
-    setSignInRequest({ url: requestedSignIn.url, site: requestedSignIn.site, nonce: requestedSignIn.requestId });
-    dispatch({ type: "signInFocusConsumed", requestId: requestedSignIn.requestId });
-  }, [bot.id, dispatch, requestedSignIn]);
-  const browserCanTurnOn = browserAvailableHere || state.config?.browserEngine?.installable === true;
-  const [browserTurningOn, setBrowserTurningOn] = useState(false);
-  const turnOnBrowser = async () => {
-    if (browserTurningOn) return;
-    setBrowserTurningOn(true);
-    setError(null);
-    try {
-      if (!builtInBrowserEnabled(state.config)) {
-        const config: ConfigStatus = await api("/api/config", {
-          method: "PATCH",
-          body: JSON.stringify({ features: { browser: true } }),
-        });
-        dispatch({ type: "configStatus", config });
-      }
-      if (bot.browser === false) dispatch({ type: "updateBot", botId: bot.id, patch: { browser: true } });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("settings.experimental.error"));
-    } finally {
-      setBrowserTurningOn(false);
-    }
-  };
-
-  const turnOffBrowser = () => {
-    setError(null);
-    dispatch({ type: "updateBot", botId: bot.id, patch: { browser: false } });
-  };
-  const browserSwitchRow = (
-    <div data-testid="browser-switch-row" className="mb-3 flex items-center gap-3 rounded-xl bg-card px-3 py-2.5">
-      <Globe size={15} className="shrink-0 text-ink-secondary" aria-hidden="true" />
-      <div className="min-w-0 flex-1">
-        <div className="text-[13px] font-medium text-ink">{t("computer.browserSwitch.title", { name: bot.name })}</div>
-        {!browserCanTurnOn && <div className="text-[11.5px] text-ink-secondary">{browserUnavailableReason(state.config)}</div>}
-      </div>
-      <Switch
-        checked={browserEnabled}
-        disabled={browserTurningOn || (!browserEnabled && !browserCanTurnOn)}
-        aria-label={t("computer.browserSwitch.title", { name: bot.name })}
-        onClick={() => (browserEnabled ? turnOffBrowser() : void turnOnBrowser())}
-      />
-    </div>
-  );
-
 
   return (
     <aside
@@ -236,20 +179,6 @@ export function ComputerPanel({
       {panelView === "routines" ? (
         <div {...tabPanelProps("routines")} className={cn("min-h-0 flex-1 overflow-y-auto px-4 pb-4", TAB_PANEL_FOCUS)}>
           <RoutinesSection key={bot.id} bot={bot} routines={state.routines.filter((routine) => routine.botId === bot.id)} runs={state.routineRuns} />
-        </div>
-      ) : panelView === "browser" ? (
-        <div {...tabPanelProps("browser")} className={cn("flex min-h-0 flex-1 flex-col px-4 pb-4", TAB_PANEL_FOCUS)}>
-          {browserSwitchRow}
-          {browserEnabled ? <BrowserPanel bot={bot} signIn={signInRequest} /> : (
-            <div className="mt-2 flex flex-col items-center gap-3 rounded-xl bg-card px-6 py-8 text-center" data-testid="browser-off">
-              <Globe size={22} className="text-ink-secondary" aria-hidden="true" />
-              <div className="text-[14px] font-medium text-ink">{t("computer.browserOff.title")}</div>
-              <p className="text-[12px] leading-5 text-ink-secondary">
-                {browserCanTurnOn ? t("computer.browserOff.body", { name: bot.name }) : browserUnavailableReason(state.config)}
-              </p>
-            </div>
-          )}
-          {error && <div role="alert" className="mt-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">{error}</div>}
         </div>
       ) : panelView === "data" ? (
         <div {...tabPanelProps("data")} className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", TAB_PANEL_FOCUS)}>

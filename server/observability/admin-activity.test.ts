@@ -3,24 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  activityCsv,
-  activityEntries,
-  adminActivityFileFor,
-  appendAdminAction,
-  auditValues,
-  botAuditSnapshot,
-  botChangeRows,
-  changedPaths,
-  configChangeRows,
-  flushAdminActivity,
-  parseActivityWhat,
-  pruneAdminActivity,
-  readAdminActivityRange,
-  sharedSignIn,
-  signInListsOf,
-  type AdminActionRow,
-} from "./admin-activity.ts";
+import { activityCsv, activityEntries, adminActivityFileFor, appendAdminAction, auditValues, botAuditSnapshot, botChangeRows, changedPaths, configChangeRows, flushAdminActivity, parseActivityWhat, pruneAdminActivity, readAdminActivityRange, sharedSignIn, signInListsOf, type AdminActionRow } from "./admin-activity.ts";
 import { bindDecisionRetention, DEFAULT_DECISION_RETENTION_DAYS, type DecisionRow } from "./decision-log.ts";
 import { removeTempDir } from "../../tests/support/environment/process-cleanup.ts";
 
@@ -40,8 +23,8 @@ const BOSS = { kind: "session" as const, sessionId: "s1", label: "Boss's laptop"
 
 describe("what a row records", () => {
   it("names the paths that changed, never a secret's value", () => {
-    const before = { anthropic: { key: "sk-ant-old-secret-value-1234567890" }, features: { browser: true }, profile: { name: "A" } };
-    const after = { anthropic: { key: "sk-ant-new-secret-value-0987654321" }, features: { browser: false }, profile: { name: "A" }, decisions: { retentionDays: 365 } };
+    const before = { anthropic: { key: "sk-ant-old-secret-value-1234567890" }, features: {  }, profile: { name: "A" } };
+    const after = { anthropic: { key: "sk-ant-new-secret-value-0987654321" }, features: {  }, profile: { name: "A" }, decisions: { retentionDays: 365 } };
     expect(changedPaths(before, after)).toEqual(["anthropic.key", "decisions.retentionDays", "features.browser"]);
     const rows = configChangeRows(before, after);
     expect(rows.map((row) => [row.category, row.action, row.changed])).toEqual([

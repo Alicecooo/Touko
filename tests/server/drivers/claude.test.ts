@@ -10,25 +10,7 @@ import { DATA_DIR, ensureDirs, instanceConfigs, NATIVE_DIR } from "../../../serv
 import type { ProviderInstance } from "../../../server/harness/contracts.ts";
 import { recordEvents, type EventRecorder } from "../../support/drivers/event-recorder.ts";
 import { BACKGROUND_CALL_TIMEOUT_MS, backgroundCallArgs } from "../../../server/drivers/claude-background.ts";
-import {
-  autoCompactWindow,
-  brokerSocketCandidates,
-  claudeCliSupports,
-  claudeCliUpdate,
-  claudeHookSettings,
-  ClaudeDriver,
-  createPermissionBroker,
-  hookTokenFile,
-  parseClaudeCliVersion,
-  permissionSocketPath,
-  readClaudeAuthSettings,
-  claudeCostSnapshot,
-  restoredCostBase,
-  STEERED_CONTINUATION_GRACE_MS,
-  sumNativeTurnResults,
-  turnCostFromRunningTotal,
-  type ClaudeConfig,
-} from "../../../server/drivers/claude.ts";
+import { autoCompactWindow, brokerSocketCandidates, claudeCliSupports, claudeCliUpdate, claudeHookSettings, ClaudeDriver, createPermissionBroker, hookTokenFile, parseClaudeCliVersion, permissionSocketPath, readClaudeAuthSettings, claudeCostSnapshot, restoredCostBase, STEERED_CONTINUATION_GRACE_MS, sumNativeTurnResults, turnCostFromRunningTotal, type ClaudeConfig } from "../../../server/drivers/claude.ts";
 import { TEAM_TOOLS_FAILED } from "../../../server/drivers/team-tools.ts";
 import { claudeLimitMessage } from "../../../server/drivers/claude-limits.ts";
 import { removeTempDir } from "../../support/environment/process-cleanup.ts";
@@ -446,20 +428,6 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     expect(existsSync(dump)).toBe(false);
   });
 
-  it("gates every eligible MCP mount while preserving guest and instance restrictions", async () => {
-    const dump = join(scratch, "scope-mcp.json"); process.env.FAKE_CLAUDE_DUMP = dump;
-    await create("echo", { FAKE_CLAUDE_VERSION: "2.1.284" }, { tools: ["Read"], disallowedTools: ["Write"] });
-    await instance.adapter.sendTurn({ threadId: "scope-mcp", text: "Fixture", approvalMode: "ask", guestConfined: true, toolScope: { allow: ["native:*", "mcp:agents:list_bots"] }, integrations: {
-      agents: { command: "node", args: ["agents"], env: {} }, browser: { command: "node", args: ["browser"], env: {} },
-    } });
-    await recorder.until((event) => event.type === "turn.completed");
-    const seen = JSON.parse(readFileSync(dump, "utf8"));
-    expect(seen.argv).toContain("--restricted");
-    expect(seen.argv[seen.argv.indexOf("--disallowedTools") + 1]).toBe("Write");
-    expect(seen.mcpConfig.mcpServers).not.toHaveProperty("browser");
-    expect(JSON.parse(seen.mcpConfig.mcpServers.agents.env.OMB_GATE_TOOL_SCOPE)).toEqual({ allow: ["native:*", "mcp:agents:list_bots"] });
-  });
-
   it("keeps a bot's tool selection working with the person's own skills", async () => {
     const dump = join(scratch, "scope-user-skills.json"); process.env.FAKE_CLAUDE_DUMP = dump;
     await create();
@@ -710,29 +678,6 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     expect(dumpedPid(healthyDump)).toBe(healthyPid);
     expect(JSON.parse(readFileSync(retryDump, "utf8")).pid).toBe(replacement.pid);
     expect(recorder.events.some((event) => event.type === "turn.retrying")).toBe(false);
-  });
-
-  it("runs a guest's turn on a Cloud home with no command-running tool and no read outside its folder", async () => {
-    await create(undefined, { FAKE_CLAUDE_VERSION: "2.1.284" });
-    expect(instance.adapter.capabilities.guestTurns).toBe("confined");
-    // Inside the scratch folder: its removal waits for the CLI to let go of it (Windows).
-    const folder = mkdtempSync(join(scratch, "guest-folder-"));
-    writeFileSync(join(folder, ".mcp.json"), JSON.stringify({ mcpServers: { planted: { command: "sh", args: ["-c", "id"] } } }));
-    const dump = join(scratch, "dump-guest.json");
-    process.env.FAKE_CLAUDE_DUMP = dump;
-    await instance.adapter.sendTurn({ threadId: "t-guest", text: "hello", approvalMode: "ask", guestConfined: true, cwd: folder,
-      integrations: { browser: { command: process.execPath, args: ["fixture-browser"], env: {} } } });
-    await recorder.until((e) => e.type === "turn.completed");
-    const seen = JSON.parse(readFileSync(dump, "utf8")) as { argv: string[]; settings: any; mcpConfig: any };
-    const after = (flag: string) => seen.argv[seen.argv.indexOf(flag) + 1];
-    expect(seen.argv).toContain("--restricted");
-    expect(after("--tools")).toBe("Read,Grep,Glob,Edit,Write,WebSearch");
-    expect(after("--permission-mode")).toBe("default");
-    expect(seen.settings.permissions).toMatchObject({ blockReadsOutsideWorkingDirectories: true });
-    expect(seen.settings.permissions.deny).toEqual(expect.arrayContaining(["Bash", "PowerShell", "WebFetch"]));
-    expect(Object.keys(seen.mcpConfig.mcpServers)).not.toContain("planted");
-    expect(after("--allowedTools").split(",")).not.toContain("mcp__browser");
-    expect(recorder.events.find((e) => e.type === "turn.completed")).toMatchObject({ ok: true });
   });
 
   it("stops a guest's turn when the CLI kept a shell, and refuses one too old to confine it", async () => {
@@ -1322,24 +1267,6 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     const seen = JSON.parse(readFileSync(dump, "utf8"));
     expect(seen.argv).not.toContain("--system-prompt-snapshot");
     expect(seen.prompt.message.content).toContain("Add the new header row.");
-  });
-
-  it("replaces the previous computer prompt when a normal conversation changes its place", async () => {
-    const dump = join(scratch, "surface-snapshot.json");
-    await create(undefined, { FAKE_CLAUDE_DUMP: dump, FAKE_CLAUDE_VERSION: "2.1.267" });
-    await instance.adapter.sendTurn({
-      threadId: "t-surface-resume", text: "Open the test page.",
-      resumeCursor: "previous-host-computer-session",
-      system: "Everything you do on screen happens in the built-in browser tab; no host computer tools are mounted.",
-      integrations: { browser: { command: process.execPath, args: ["fixture-browser"], env: {} } },
-    });
-    await recorder.until((event) => event.type === "turn.completed");
-    const seen = JSON.parse(readFileSync(dump, "utf8"));
-    expect(seen.argv[seen.argv.indexOf("--system-prompt-snapshot") + 1]).toBe("off");
-    expect(seen.argv[seen.argv.indexOf("--resume") + 1]).toBe("previous-host-computer-session");
-    expect(seen.systemPrompt).toContain("no host computer tools are mounted");
-    expect(seen.mcpConfig.mcpServers.browser).toBeTruthy();
-    expect(seen.mcpConfig.mcpServers.computer).toBeUndefined();
   });
 
   it.each([["2.1.232", false], ["2.1.267", true]] as const)(

@@ -569,7 +569,7 @@ const failedLines = async (f: any, threadId: string) => (await f.messages(thread
   .filter((message: any) => message.kind === "activity" && String(message.tool?.name ?? "").startsWith("error:"));
 
 const browserPlace = async (f: any) => {
-  expect((await f.api("PATCH", "/api/config", { features: { browser: true } })).status).toBe(200);
+  expect((await f.api("PATCH", "/api/config", { features: {  } })).status).toBe(200);
   expect((await f.api("PATCH", `/api/bots/${f.clive.id}`, { computer: "browser" })).status).toBe(200);
 };
 

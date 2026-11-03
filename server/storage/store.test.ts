@@ -8,14 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { soulFile, soulHash } from "../bots/bot-folder.ts";
 import { flushProfileHistory, readHistory, recordProfileChange } from "../bots/profile-versions.ts";
 import { DATA_DIR } from "../config/config.ts";
-import {
-  beginMemoryTurn,
-  endMemoryTurn,
-  flushMemoryJournal,
-  journalFile,
-  journalMemoryWrite,
-  resetMemoryJournalState,
-} from "../memory/memory-journal.ts";
+import { beginMemoryTurn, endMemoryTurn, flushMemoryJournal, journalFile, journalMemoryWrite, resetMemoryJournalState } from "../memory/memory-journal.ts";
 import type { ModelSelection } from "../harness/contracts.ts";
 import * as mdb from "./message-db.ts";
 import { peerAllowKey } from "../teams/peer-approval-key.ts";
@@ -437,7 +430,7 @@ describe("Store", () => {
       failReceipts();
       expect(append).toThrow("fixture receipt failure");
       expect(store.messagesFor(threadId)).toEqual(before);
-      expect(mdb.readThread(threadId, "/nonexistent").messages).toEqual(before);
+      expect(mdb.readThread(threadId).messages).toEqual(before);
       expect(changes).not.toHaveBeenCalled();
       allowReceipts();
       const message = append();
@@ -449,7 +442,7 @@ describe("Store", () => {
       failReceipts();
       expect(patch).toThrow("fixture receipt failure");
       expect(store.messagesFor(threadId).at(-1)?.text).toBe("Recorded work");
-      expect(mdb.readThread(threadId, "/nonexistent").messages.at(-1)?.text).toBe("Recorded work");
+      expect(mdb.readThread(threadId).messages.at(-1)?.text).toBe("Recorded work");
       expect(changes).not.toHaveBeenCalled();
       allowReceipts();
       expect(patch()?.text).toBe("Updated evidence");
@@ -1017,77 +1010,9 @@ describe("Store", () => {
     expect(saved.find((bot) => bot.id === vps.id)).not.toHaveProperty("autoStartVps");
   });
 
-  it("migrates legacy browser profile references without collapsing case-distinct accounts", () => {
-    const store = new Store(selection);
-    const first = store.createBot();
-    const duplicate = store.createBot();
-    const caseVariant = store.createBot();
-    const configFile = join(DATA_DIR, "config.json");
-    const botsFile = join(DATA_DIR, "bots.json");
-    writeFileSync(configFile, JSON.stringify({
-      browserProfiles: [
-        { id: "Work", name: "Primary" },
-        { id: "Work", name: "Duplicate" },
-        { id: "work", name: "Lowercase variant" },
-      ],
-    }));
-    const bots: BotRecord[] = JSON.parse(readFileSync(botsFile, "utf8"));
-    bots.find((bot) => bot.id === first.id)!.browserProfile = "Work";
-    bots.find((bot) => bot.id === duplicate.id)!.browserProfile = "Work";
-    bots.find((bot) => bot.id === caseVariant.id)!.browserProfile = "work";
-    writeFileSync(botsFile, JSON.stringify(bots));
 
-    const reloaded = new Store(selection);
-    expect(reloaded.bot(first.id)?.browserProfile).toBe("work-2");
-    expect(reloaded.bot(duplicate.id)?.browserProfile).toBe("work-2");
-    expect(reloaded.bot(caseVariant.id)?.browserProfile).toBe("work");
 
-    const persisted: BotRecord[] = JSON.parse(readFileSync(botsFile, "utf8"));
-    expect(persisted.find((bot) => bot.id === first.id)?.browserProfile).toBe("work-2");
-    expect(persisted.find((bot) => bot.id === duplicate.id)?.browserProfile).toBe("work-2");
-    expect(persisted.find((bot) => bot.id === caseVariant.id)?.browserProfile).toBe("work");
 
-    const reloadedAgain = new Store(selection);
-    expect(reloadedAgain.bot(first.id)?.browserProfile).toBe("work-2");
-    expect(reloadedAgain.bot(duplicate.id)?.browserProfile).toBe("work-2");
-    expect(reloadedAgain.bot(caseVariant.id)?.browserProfile).toBe("work");
-  });
-
-  it("keeps explicit suffix browser references stable across legacy migration", () => {
-    const store = new Store(selection);
-    const upper = store.createBot();
-    const canonical = store.createBot();
-    const suffixed = store.createBot();
-    const configFile = join(DATA_DIR, "config.json");
-    const botsFile = join(DATA_DIR, "bots.json");
-    writeFileSync(configFile, JSON.stringify({
-      browserProfiles: [
-        { id: "Work", name: "Uppercase" },
-        { id: "work", name: "Canonical" },
-        { id: "work-2", name: "Explicit suffix" },
-      ],
-    }));
-    const bots: BotRecord[] = JSON.parse(readFileSync(botsFile, "utf8"));
-    bots.find((bot) => bot.id === upper.id)!.browserProfile = "Work";
-    bots.find((bot) => bot.id === canonical.id)!.browserProfile = "work";
-    bots.find((bot) => bot.id === suffixed.id)!.browserProfile = "work-2";
-    writeFileSync(botsFile, JSON.stringify(bots));
-
-    const reloaded = new Store(selection);
-    expect(reloaded.bot(upper.id)?.browserProfile).toBe("work-3");
-    expect(reloaded.bot(canonical.id)?.browserProfile).toBe("work");
-    expect(reloaded.bot(suffixed.id)?.browserProfile).toBe("work-2");
-
-    const persisted: BotRecord[] = JSON.parse(readFileSync(botsFile, "utf8"));
-    expect(persisted.find((bot) => bot.id === upper.id)?.browserProfile).toBe("work-3");
-    expect(persisted.find((bot) => bot.id === canonical.id)?.browserProfile).toBe("work");
-    expect(persisted.find((bot) => bot.id === suffixed.id)?.browserProfile).toBe("work-2");
-
-    const reloadedAgain = new Store(selection);
-    expect(reloadedAgain.bot(upper.id)?.browserProfile).toBe("work-3");
-    expect(reloadedAgain.bot(canonical.id)?.browserProfile).toBe("work");
-    expect(reloadedAgain.bot(suffixed.id)?.browserProfile).toBe("work-2");
-  });
 
   it("migrates unambiguous legacy peer grants without guessing duplicate names", () => {
     const store = new Store(selection);
@@ -1616,22 +1541,6 @@ describe("Store", () => {
     expect(new Store(selection).messagesFor(bot.threadId)).toHaveLength(0);
     expect(existsSync(skillState)).toBe(false);
     expect(store.deleteBot(bot.id)).toBe(false);
-  });
-  it("migrates a pre-branching flat transcript file", () => {
-    const store = new Store(selection);
-    // seedMessages:false: a legacy thread's history is only in the JSON file, and any DB rows would take precedence.
-    const bot = store.createBot({}, { seedMessages: false });
-    const legacy = [
-      { id: "m1", role: "bot", kind: "text", text: "hello", at: 1 },
-      { id: "m2", role: "user", kind: "text", text: "hi", at: 2 },
-    ];
-    writeFileSync(join(DATA_DIR, `messages-${bot.threadId}.json`), JSON.stringify(legacy));
-
-    const reloaded = new Store(selection);
-    const messages = reloaded.messagesFor(bot.threadId);
-    expect(messages.map((m) => m.parentId)).toEqual([null, "m1"]);
-    expect(reloaded.activeLeaf(bot.threadId)).toBe("m2");
-    expect(reloaded.activePath(bot.threadId).map((m) => m.id)).toEqual(["m1", "m2"]);
   });
 });
 

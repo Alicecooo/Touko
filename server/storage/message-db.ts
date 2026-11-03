@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -370,72 +370,31 @@ export interface ThreadRows {
   activeLeafId: string | null;
 }
 
-export function readThread(threadId: string, legacyFile: string): ThreadRows {
+export function readThread(threadId: string): ThreadRows {
   const rows = db()
     .prepare("SELECT json FROM messages WHERE thread_id = ? ORDER BY rowid")
     .all(threadId) as Array<{ json: string }>;
-  if (rows.length) {
-    const state = db()
-      .prepare("SELECT active_leaf_id FROM thread_state WHERE thread_id = ?")
-      .get(threadId) as { active_leaf_id: string | null } | undefined;
-    return { messages: rows.map(rowToMessage), activeLeafId: state?.active_leaf_id ?? null };
-  }
-  return importLegacy(threadId, legacyFile);
+  const state = db()
+    .prepare("SELECT active_leaf_id FROM thread_state WHERE thread_id = ?")
+    .get(threadId) as { active_leaf_id: string | null } | undefined;
+  return { messages: rows.map(rowToMessage), activeLeafId: state?.active_leaf_id ?? null };
 }
 
 export interface ThreadTailRows extends ThreadRows {
-  hasMore?: boolean;
+  hasMore: boolean;
 }
 
-export function readThreadTail(threadId: string, legacyFile: string, limit: number): ThreadTailRows {
+export function readThreadTail(threadId: string, limit: number): ThreadTailRows {
   const rows = db()
     .prepare("SELECT json FROM messages WHERE thread_id = ? ORDER BY rowid DESC LIMIT ?")
     .all(threadId, limit + 1) as Array<{ json: string }>;
-  if (rows.length) {
-    const hasMore = rows.length > limit;
-    if (hasMore) rows.length = limit;
-    rows.reverse();
-    const state = db()
-      .prepare("SELECT active_leaf_id FROM thread_state WHERE thread_id = ?")
-      .get(threadId) as { active_leaf_id: string | null } | undefined;
-    return { messages: rows.map(rowToMessage), activeLeafId: state?.active_leaf_id ?? null, hasMore };
-  }
-  return importLegacy(threadId, legacyFile);
-}
-
-function importLegacy(threadId: string, legacyFile: string): ThreadRows {
-  let messages: Message[] = [];
-  let activeLeafId: string | null = null;
-  let raw: unknown;
-  try {
-    raw = JSON.parse(readFileSync(legacyFile, "utf8"));
-  } catch {
-    return { messages, activeLeafId };
-  }
-  if (Array.isArray(raw)) messages = raw as Message[];
-  else if (raw && typeof raw === "object") {
-    messages = ((raw as { messages?: Message[] }).messages ?? []) as Message[];
-    activeLeafId = (raw as { activeLeafId?: string | null }).activeLeafId ?? null;
-  }
-  const insert = db().prepare(UPSERT_MESSAGE);
-  db().exec("BEGIN");
-  try {
-    for (const message of messages) {
-      insert.run(threadId, message.id, message.at, message.role, message.kind, message.text ?? null, JSON.stringify(message));
-    }
-    setActiveLeaf(threadId, activeLeafId);
-    db().exec("COMMIT");
-  } catch (error) {
-    db().exec("ROLLBACK");
-    throw error;
-  }
-  try {
-    renameSync(legacyFile, `${legacyFile}.imported`);
-    try {
-      chmodSync(`${legacyFile}.imported`, 0o600);
-    } catch {}
-  } catch {}
-  return { messages, activeLeafId };
+  const hasMore = rows.length > limit;
+  if (hasMore) rows.length = limit;
+  rows.reverse();
+  const state = db()
+    .prepare("SELECT active_leaf_id FROM thread_state WHERE thread_id = ?")
+    .get(threadId) as { active_leaf_id: string | null } | undefined;
+  return { messages: rows.map(rowToMessage), activeLeafId: state?.active_leaf_id ?? null, hasMore };
 }
 
 export function insertMessage(threadId: string, message: Message): void {

@@ -3,25 +3,25 @@ import { describe, expect, it, vi } from "vitest";
 import { readComputerPanelView, resolveComputerPanelView, writeComputerPanelView } from "./computer-panel-view";
 
 describe("computer panel view persistence", () => {
-  it("restores the browser for the same bot after the expanded workspace closes", () => {
+  it("restores the files tab for the same bot after the expanded workspace closes", () => {
     const values = new Map<string, string>();
     const storage = {
       getItem: (key: string) => values.get(key) ?? null,
       setItem: (key: string, value: string) => values.set(key, value),
     };
 
-    writeComputerPanelView("sprout", "browser", storage);
+    writeComputerPanelView("sprout", "files", storage);
 
-    expect(readComputerPanelView("sprout", storage)).toBe("browser");
-    expect(readComputerPanelView("another-bot", storage)).toBe("browser");
+    expect(readComputerPanelView("sprout", storage)).toBe("files");
+    expect(readComputerPanelView("another-bot", storage)).toBe("files");
   });
 
   it("falls back safely for stale values or blocked storage", () => {
-    expect(readComputerPanelView("sprout", { getItem: () => "unknown" })).toBe("browser");
-    expect(readComputerPanelView("sprout", { getItem: () => { throw new Error("blocked"); } })).toBe("browser");
+    expect(readComputerPanelView("sprout", { getItem: () => "unknown" })).toBe("files");
+    expect(readComputerPanelView("sprout", { getItem: () => { throw new Error("blocked"); } })).toBe("files");
 
     const setItem = vi.fn(() => { throw new Error("blocked"); });
-    expect(() => writeComputerPanelView("sprout", "browser", { setItem })).not.toThrow();
+    expect(() => writeComputerPanelView("sprout", "files", { setItem })).not.toThrow();
   });
 
   it("remembers a bot's routines tab without changing another bot's view", () => {
@@ -29,7 +29,7 @@ describe("computer panel view persistence", () => {
     const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
     writeComputerPanelView("scout", "routines", storage);
     expect(readComputerPanelView("scout", storage)).toBe("routines");
-    expect(readComputerPanelView("other", storage)).toBe("browser");
+    expect(readComputerPanelView("other", storage)).toBe("files");
   });
 
   it("round-trips the Data tab", () => {
@@ -43,12 +43,12 @@ describe("computer panel view persistence", () => {
 describe("computer panel view availability", () => {
 
   it("drops the tabs the current mode does not render", () => {
-    expect(resolveComputerPanelView("routines", { advanced: false })).toBe("browser");
+    expect(resolveComputerPanelView("routines", { advanced: false })).toBe("files");
     expect(resolveComputerPanelView("files", { advanced: true })).toBe("files");
   });
 
   it("keeps a view whose trigger is on the row", () => {
-    for (const view of ["browser", "data"] as const) {
+    for (const view of ["files", "data"] as const) {
       expect(resolveComputerPanelView(view, { advanced: true })).toBe(view);
       expect(resolveComputerPanelView(view, { advanced: false })).toBe(view);
     }

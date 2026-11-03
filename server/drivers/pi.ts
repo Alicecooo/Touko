@@ -95,7 +95,7 @@ export function buildMcpServers(turn: SendTurnInput): Record<string, unknown> | 
       env: { ...NODE_ENV_FLAG, DWEB_URL: turn.integrations.dweb.url },
     };
   }
-  if (turn.integrations?.browser) servers.browser = { ...turn.integrations.browser };
+
   for (const name of ["data", "highlevel"] as const) if (turn.integrations?.[name]) servers[name] = { ...turn.integrations[name] };
   for (const [name, server] of Object.entries(turn.integrations?.custom ?? {})) servers[name] = { ...server, scope: "custom" };
   for (const [name, server] of Object.entries(servers)) {
@@ -1077,7 +1077,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
           computerMcp: true,
           composioMcp: true,
           customMcp: true,
-          browserMcp: true,
+
           dataMcp: true, highlevelMcp: true,
           localComputerMcp: true,
           images: true,

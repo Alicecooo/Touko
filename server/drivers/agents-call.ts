@@ -41,7 +41,7 @@ export function toolCallContextFromEnv(env: NodeJS.ProcessEnv): ToolCallContext 
 }
 
 const SIGN_IN_PLACES: Record<string, string> = {
-  browser: "your built-in browser",
+
   local: "this computer",
   cloud: "the cloud computer",
 };
@@ -300,8 +300,8 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
     };
   }
   if (name === "select_computer") {
-    if (args.surface !== undefined && (typeof args.surface !== "string" || !["auto", "cloud", "vm", "local", "browser"].includes(args.surface))) {
-      return { text: "Choose auto, cloud, vm, local or browser; omit surface to inspect connected choices.", isError: true };
+    if (args.surface !== undefined && (typeof args.surface !== "string" || !["auto", "cloud", "vm", "local"].includes(args.surface))) {
+      return { text: "Choose auto, cloud, vm, local ; omit surface to inspect connected choices.", isError: true };
     }
     const result = await api("/api/internal/computer/select", args.surface === undefined ? undefined : {
       method: "POST", body: JSON.stringify({ surface: args.surface }),
@@ -504,14 +504,7 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
       text: `The person was asked to sign in to ${r.site ?? site} on ${SIGN_IN_PLACES[String(r.place)] ?? "the place you work"}. Your turn ends now: say in one short line that you are waiting for them, then stop. OpenMausBot resumes you when they finish or decline. Never ask for the password or a code in chat.`,
     };
   }
-  if (name === "fill_login") {
-    const username = typeof args.username === "string" ? args.username.trim().slice(0, 512) : "";
-    const r = await api("/api/internal/fill-login", {
-      method: "POST",
-      body: JSON.stringify({ fromBotId: BOT_ID, fromThreadId: THREAD_ID, ...(username ? { username } : {}), ...(args.submit === false ? { submit: false } : {}) }),
-    });
-    return { text: typeof r.text === "string" && r.text ? r.text : "fill_login did not answer. Call request_sign_in instead.", ...(r.ok === true ? {} : { isError: true }) };
-  }
+
   if (name === "propose_profile") {
     if ((args.notifications !== undefined && typeof args.notifications !== "boolean")) {
       return { text: "propose_profile notifications must be true or false.", isError: true };

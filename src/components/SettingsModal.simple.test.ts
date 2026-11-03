@@ -9,7 +9,7 @@ import { SECTIONS, SIMPLE_HIDDEN_SECTIONS, SIMPLE_PAGES, SettingsModal, revealSe
 const fixture = vi.hoisted(() => ({
   section: "general" as AppSettingsSection,
   advancedMode: false,
-  config: { features: { browser: false }, browserEngine: { kind: "bundled", installable: true }, composio: { mode: "self" } } as Record<string, unknown>,
+  config: { features: {  },  composio: { mode: "self" } } as Record<string, unknown>,
   api: vi.fn(),
   dispatch: vi.fn(),
   switches: [] as ComponentProps<typeof Switch>[],
@@ -51,11 +51,9 @@ vi.mock("./ApiKeys", () => ({
   OpenCodeProviderKeys: marker("opencodeProviderKeys"),
   VpsConnection: marker("vps"),
 }));
-vi.mock("./CustomDomainSettings", () => ({ CustomDomainSettings: () => null }));
+vi.mock("./CustomDomainSettings", () => ({ CustomDomainSettings: marker("companion") }));
 vi.mock("./ConnectedWorkspacesSettings", () => ({ ConnectedWorkspacesSettings: marker("desktopWorkspaces") }));
-vi.mock("./LocalComputerSection", () => ({ LocalComputerSection: marker("computer") }));
 vi.mock("./OrganizationSettings", () => ({ OrganizationSettings: marker("organization") }));
-vi.mock("./PeopleSection", () => ({ PeopleSection: marker("people") }));
 vi.mock("./ActivitySection", () => ({ ActivitySection: marker("activity") }));
 vi.mock("./UsageSection", () => ({ UsageSection: marker("usage") }));
 vi.mock("./WorkspaceBackupSettings", () => ({ WorkspaceBackupSettings: marker("backups") }));
@@ -68,7 +66,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   fixture.section = "general";
   fixture.advancedMode = false;
-  fixture.config = { features: { browser: false }, browserEngine: { kind: "bundled", installable: true }, composio: { mode: "self" } };
+  fixture.config = { features: {  },  composio: { mode: "self" } };
   fixture.switches = [];
   fixture.ownerOrAdmin = null;
   fixture.api.mockResolvedValue({});
@@ -127,14 +125,13 @@ describe("Settings in Simple mode", () => {
     expect(html).toContain("More providers for OpenCode bots");
   });
 
-  it("groups server domains, saved servers, the virtual machine, browser and logins", () => {
+  it("groups server domains, saved servers and logins", () => {
     fixture.section = "companion";
     const html = render();
     expect(currentPage(html)).toBe("computers");
-    expect(blocks(html)).toEqual(["companion", "desktopWorkspaces", "computer", "browser", "logins"]);
+    expect(blocks(html)).toEqual(["companion", "desktopWorkspaces", "logins"]);
     const headings = [...html.matchAll(/<h3[^>]*>([^<]+)<\/h3>/g)].map((match) => match[1]);
-    expect(headings).toEqual(["Servers and domains", "Servers", "Virtual machine", "Built-in browser", "Logins"]);
-    expect(html).toContain('aria-label="Enable the built-in browser"');
+    expect(headings).toEqual(["Servers and domains", "Servers", "Logins"]);
   });
 
   it("shows Organization on Account in the desktop app", () => {
@@ -144,13 +141,13 @@ describe("Settings in Simple mode", () => {
     expect(blocks(html)).toEqual(["organization"]);
   });
 
-  it("adds People and Activity to Account for a hosted workspace's admins in a browser", () => {
+  it("shows Activity on Account for workspace admins in a browser", () => {
     vi.stubGlobal("window", {});
     fixture.ownerOrAdmin = true;
-    fixture.section = "people";
+    fixture.section = "activity";
     const html = render();
     expect(pages(html)).toEqual(["general", "appearance", "ai", "computers", "account"]);
-    expect(blocks(html)).toEqual(["people", "activity"]);
+    expect(blocks(html)).toEqual(["activity"]);
   });
 
   it("keeps a connected server client's reduced set: Appearance, and Computers with Remote access and Servers", () => {
@@ -178,7 +175,7 @@ describe("Settings in Simple mode", () => {
     fixture.section = section;
     const html = render();
     expect(currentPage(html)).toBe(page);
-    expect(blocks(html)).toContain(section === "remote" ? "companion" : section);
+    expect(blocks(html)).toContain(section === "remote" || section === "computer" ? "companion" : section);
   });
 
   it.each<[AppSettingsSection, string]>([
@@ -204,44 +201,5 @@ describe("Settings in Simple mode", () => {
     revealSettingsBlock(scroller, "engines", 0);
     expect(scroller.scrollTop).toBe(0);
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("the built-in browser switch", () => {
-  const browserSwitch = () => fixture.switches.find((props) => props["aria-label"] === "Enable the built-in browser");
-
-  it.each([false, true])("writes features.browser from Computers (advanced: %s)", async (advanced) => {
-    fixture.advancedMode = advanced;
-    fixture.section = "computer";
-    const html = render();
-    if (advanced) {
-      expect(html.indexOf('aria-label="Enable the built-in browser"')).toBeLessThan(html.indexOf("MARKER:computer;"));
-    } else {
-      expect(html.indexOf("MARKER:computer;")).toBeLessThan(html.indexOf('aria-label="Enable the built-in browser"'));
-    }
-    const toggle = browserSwitch()!;
-    expect(toggle.checked).toBe(false);
-    toggle.onClick!({} as never);
-    await vi.waitFor(() => expect(fixture.dispatch).toHaveBeenCalledWith({ type: "configStatus", config: {} }));
-    expect(fixture.api).toHaveBeenCalledWith("/api/config", {
-      method: "PATCH",
-      body: JSON.stringify({ features: { browser: true } }),
-    });
-  });
-
-  it("is no longer on Experimental, which keeps skill drafting", () => {
-    fixture.advancedMode = true;
-    fixture.section = "experimental";
-    const html = render();
-    expect(html).not.toContain('aria-label="Enable the built-in browser"');
-    expect(html).toContain("Bots may write their own skills");
-    expect(browserSwitch()).toBeUndefined();
-  });
-
-  it("is found by searching for the browser under Local VM in Advanced", () => {
-    const computer = SECTIONS.find((entry) => entry.id === "computer")!;
-    const experimental = SECTIONS.find((entry) => entry.id === "experimental")!;
-    expect(computer.keywords).toContain("browser");
-    expect(experimental.keywords).not.toContain("browser");
   });
 });

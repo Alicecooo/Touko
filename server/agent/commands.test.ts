@@ -50,14 +50,14 @@ describe("runCommand", () => {
         throw new Error("boom");
       }),
     ).toThrow("boom");
-    expect(readThread("t1", "/nonexistent").messages).toEqual([]);
+    expect(readThread("t1").messages).toEqual([]);
     expect(commandReceipt("digest.append", "t1:turn-2")).toBeNull();
     const retried = runCommand({ kind: "digest.append", key: "t1:turn-2" }, () => {
       insertMessage("t1", msg("m1", "done"));
       return "ok";
     });
     expect(retried).toBe("ok");
-    expect(readThread("t1", "/nonexistent").messages.map((m) => m.text)).toEqual(["done"]);
+    expect(readThread("t1").messages.map((m) => m.text)).toEqual(["done"]);
   });
 
   it("survives a restart", () => {
@@ -92,7 +92,7 @@ describe("runCommand nesting", () => {
       insertMessage("nested", msg("complete", "kept"));
       return "outer completed";
     });
-    expect(readThread("nested", "/nonexistent").messages.map(message => message.id)).toEqual(["complete"]);
+    expect(readThread("nested").messages.map(message => message.id)).toEqual(["complete"]);
     expect(commandReceipt("inner", "one")).toBeNull();
     expect(commandReceipt("outer", "one")?.result).toBe("outer completed");
   });
@@ -105,7 +105,7 @@ describe("runCommand nesting", () => {
       appendMessage("t9", msg("d1", "[digest] one"));
       return "ok";
     });
-    expect(readThread("t9", "/nonexistent").messages.map((m) => m.text)).toEqual(["[digest] one"]);
+    expect(readThread("t9").messages.map((m) => m.text)).toEqual(["[digest] one"]);
     expect(commandReceipt("digest.append", "t9:turn-1")).not.toBeNull();
     expect(() =>
       runCommand({ kind: "digest.append", key: "t9:turn-2" }, () => {
@@ -113,7 +113,7 @@ describe("runCommand nesting", () => {
         throw new Error("late failure");
       }),
     ).toThrow("late failure");
-    expect(readThread("t9", "/nonexistent").messages.map((m) => m.text)).toEqual(["[digest] one"]);
+    expect(readThread("t9").messages.map((m) => m.text)).toEqual(["[digest] one"]);
     expect(commandReceipt("digest.append", "t9:turn-2")).toBeNull();
   });
 });

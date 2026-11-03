@@ -71,9 +71,7 @@ export function createBotCreateRoutes(deps: BotCreateRouteDeps): RouteHandler {
       if (settings.avatarUrl && !storedAvatarExists(settings.avatarUrl)) {
         return json(res, 400, { error: "avatarUrl must reference an existing stored image" });
       }
-      if (settings.browserProfile && settings.browserProfile !== "guest" && !(cfg.browserProfiles ?? []).some(profile => profile.id === settings.browserProfile)) {
-        return json(res, 400, { error: "browserProfile must name an existing browser profile" });
-      }
+
       if (settings.mcpServers?.some(name => mcpServerNameError(name) !== null) || (settings.mcpServers?.length ?? 0) > MAX_MCP_SERVERS) {
         return json(res, 400, { error: "Invalid MCP server selection" });
       }

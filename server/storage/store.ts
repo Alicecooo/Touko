@@ -8,7 +8,7 @@ import { ensureSections, readSections, changeEmptySection } from "../teams/secti
 import { removeBotFolder, soulFile, soulHash, writeSoulMirror } from "../bots/bot-folder.ts";
 import type { BotProfilePatch } from "../bots/bot-profile.ts";
 import { peerAllowKey, type PeerAction } from "../teams/peer-approval-key.ts";
-import { DATA_DIR, EVENTS_DIR, NATIVE_DIR, loadBrowserProfileIdAliases } from "../config/config.ts";
+import { DATA_DIR, EVENTS_DIR, NATIVE_DIR } from "../config/config.ts";
 import * as mdb from "./message-db.ts";
 import { forgetBotMemoryJournal, journalFile } from "../memory/memory-journal.ts";
 import { runCommand, type Command } from "../agent/commands.ts";
@@ -313,8 +313,6 @@ function tightenRegistryFile(file: string): void {
   } catch {
   }
 }
-const messagesFile = (threadId: string) => join(DATA_DIR, `messages-${threadId}.json`);
-
 const COLORS: MausColor[] = [
   "green",
   "blue",
@@ -468,7 +466,7 @@ export class Store {
     }
     this.rememberSections([...this.bots, ...this.groups].map((record) => record.section));
     let botsMigrated = false;
-    const browserProfileAliases = loadBrowserProfileIdAliases();
+
     const chiefSectionsSeen = new Set<string>();
     let groupsMigrated = false;
     for (const b of this.bots) {
@@ -488,12 +486,10 @@ export class Store {
           console.warn(`[bot-folder] could not create SOUL.md for ${b.id}: ${(e as Error).message}`);
         }
       }
-      if (b.browserProfile) {
-        const browserProfile = browserProfileAliases.get(b.browserProfile);
-        if (browserProfile && browserProfile !== b.browserProfile) {
-          b.browserProfile = browserProfile;
-          botsMigrated = true;
-        }
+      if (b.browserProfile !== undefined || b.browser !== undefined || b.recordBrowserSteps !== undefined || b.computer === "browser") {
+        delete b.browserProfile; delete b.browser; delete b.recordBrowserSteps;
+        if (b.computer === "browser") b.computer = "off";
+        botsMigrated = true;
       }
       const legacyComputerFields = b as BotRecord & { cloudBackend?: unknown; autoStartVps?: unknown };
       if (legacyComputerFields.cloudBackend !== undefined || legacyComputerFields.autoStartVps !== undefined) {
@@ -732,15 +728,7 @@ export class Store {
     }
     if (botsMigrated) this.saveBots();
     if (clearModelCopies) writeFileAtomic(THREAD_MODEL_COPIES_CLEARED, "Threads follow their bot's model; the copies older builds made are cleared.\n", { mode: 0o600 });
-    const knownThreads = new Set([
-      ...this.bots.flatMap((b) => [b.threadId, ...(b.tasks ?? []).map((task) => task.threadId)]),
-      ...this.groups.flatMap((group) => [group.threadId, ...(group.tasks ?? []).map((task) => task.threadId)]),
-    ]);
-    for (const threadId of knownThreads) {
-      const legacyFile = messagesFile(threadId);
-      if (existsSync(legacyFile)) mdb.readThread(threadId, legacyFile);
-    }
-    // After the transcript migration, so each stamp sees its thread's newest message.
+    // Repair timestamps from the durable SQLite transcript after loading the roster.
     this.repairThreadUpdatedAts();
     if (fillAskedAts) this.fillTaskAskedAts();
     // After the roster loads, so identity resolution sees which opener ids are live.
@@ -1060,8 +1048,6 @@ export class Store {
     this.threads.delete(threadId);
     if (!dbAlreadyDeleted) mdb.deleteThread(threadId);
     for (const file of [
-      messagesFile(threadId),
-      `${messagesFile(threadId)}.imported`,
       join(EVENTS_DIR, `${threadId}.ndjson`),
       join(NATIVE_DIR, `${threadId}.ndjson`),
     ]) {
@@ -1264,7 +1250,7 @@ export class Store {
   private thread(threadId: string): ThreadState {
     const t = this.threads.get(threadId);
     if (t) return t;
-    return this.cacheThread(threadId, mdb.readThread(threadId, messagesFile(threadId)));
+    return this.cacheThread(threadId, mdb.readThread(threadId));
   }
 
   private cacheThread(threadId: string, rows: mdb.ThreadRows): ThreadState {
@@ -1285,14 +1271,12 @@ export class Store {
     return this.thread(threadId).messages;
   }
 
-  /** Legacy rows without a parentId chain only on a full load, so a bounded page missing that context falls back to one. */
   messagesTail(threadId: string, limit: number): { messages: Message[]; hasMore: boolean; activeLeafId: string | null } {
     let state = this.threads.get(threadId);
     if (!state) {
-      const tail = mdb.readThreadTail(threadId, messagesFile(threadId), limit);
-      const legacyRows = tail.hasMore !== undefined && tail.messages.some((m) => m.parentId === undefined);
-      if (tail.hasMore !== true || legacyRows) {
-        state = this.cacheThread(threadId, legacyRows ? mdb.readThread(threadId, messagesFile(threadId)) : tail);
+      const tail = mdb.readThreadTail(threadId, limit);
+      if (!tail.hasMore) {
+        state = this.cacheThread(threadId, tail);
       } else {
         return {
           messages: tail.messages,

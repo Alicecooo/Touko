@@ -94,7 +94,7 @@ const { LibraryTab } = await import("./bot-panel/LibraryTab");
 const { ComputerTab } = await import("./bot-panel/ComputerTab");
 const { SettingsTab } = await import("./bot-panel/SettingsTab");
 const { PageBody, SetupPage } = await import("./bot-panel/pages");
-const { AppsCard, BrowserLogins } = await import("./bot-panel/apps-and-logins");
+const { AppsCard,  } = await import("./bot-panel/apps-and-logins");
 const { botLibraryItems, memoryEntries } = await import("./bot-panel/library-items");
 const { PAGES, sectionTarget } = await import("./bot-panel/page-registry");
 const { openBotSettings } = await import("./bot-panel/panel-link");
@@ -477,7 +477,6 @@ describe("the avatar editor", () => {
 
 describe("the Details tab", () => {
 
-
   it("picks the model in the contained picker for the open thread, with Thinking on its own row", () => {
     fixture.derived.engine = { driverKind: "claudeAgent", capabilities: { effortLevels: ["low", "medium", "high", "max"] } };
     const bot = makeBot({ modelSelection: { instanceId: "claude", model: "claude-opus-5-5", effort: "medium" } });
@@ -689,39 +688,6 @@ describe("the Apps card", () => {
       [{ type: "toggleSettings", open: false }],
       [{ type: "togglePlugins", open: true, surface: "apps" }],
     ]);
-  });
-});
-
-describe("the browser logins", () => {
-  const logins = (bot: Bot, onOpenBrowser = vi.fn(), browserEnabled = true) =>
-    capture(() => BrowserLogins({ bot, browserEnabled, onOpenBrowser }));
-
-  it("lists the sites the bot's own browser is signed in to, and explains the browsers it cannot list", async () => {
-    const { SignedInSites } = await import("./SignedInSites");
-    expect(logins(makeBot()).nodes.some((node) => node.type === SignedInSites)).toBe(false);
-    fixture.ownerOrAdmin = true;
-    const own = logins(makeBot());
-    expect(ofType(own, SignedInSites)!.props).toMatchObject({ bare: true, target: { bot: "scout" }, sharedBy: ["Scout"], disabled: false });
-    expect(own.html).toContain("Sign in once in Scout&#x27;s browser and it stays signed in.");
-
-    fixture.storeState = {
-      ...fixture.storeState,
-      config: { browserProfiles: [{ id: "team", name: "Team" }] },
-      bots: [makeBot({ browserProfile: "team" }), makeBot({ id: "nova", name: "Nova", browserProfile: "team" })],
-    };
-    expect(ofType(logins(makeBot({ browserProfile: "team" })), SignedInSites)!.props.sharedBy).toEqual(["Scout", "Nova"]);
-    const temporary = logins(makeBot({ browserProfile: "guest" }));
-    expect(ofType(temporary, SignedInSites)).toBeUndefined();
-    expect(temporary.html).toContain("Temporary sessions keep logins only while this server is running");
-    const off = logins(makeBot(), vi.fn(), false);
-    expect(ofType(off, SignedInSites)).toBeUndefined();
-    expect(off.html).toContain("Scout&#x27;s browser is off.");
-  });
-
-  it("opens the bot's browser from Add login", () => {
-    const onOpenBrowser = vi.fn();
-    click(find(logins(makeBot(), onOpenBrowser), "data-panel-action", "add-login"));
-    expect(onOpenBrowser).toHaveBeenCalled();
   });
 });
 

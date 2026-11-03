@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { resolveAgentBrowserBinary } from "../../server/browser/browser-engine.ts";
+import { resolveQaBrowser as resolveAgentBrowserBinary } from "../../scripts/dev/qa-browser-runtime.ts";
 import { waitForExit } from "../support/environment/process-cleanup.ts";
 import { canonicalJson, parsePackageDocument } from "../../shared/package-format.ts";
 import { runControlOmb } from "../../scripts/dev/isolated-environment.ts";

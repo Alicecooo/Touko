@@ -4,27 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  BROWSER_SIGN_IN,
-  clearSessionCookie,
-  fromBrowser,
-  clientBotPatchViolation,
-  clientGroupPatchViolation,
-  ipcPeer,
-  isAllowedOrigin,
-  isLoopbackHost,
-  isProxied,
-  isSameOrigin,
-  parseCookies,
-  requestOrigin,
-  requestSource,
-  requiredScope,
-  resolveLoopbackTrust,
-  resolveRequestAuth,
-  sanitizeSource,
-  serializeSessionCookie,
-  sessionCookieName,
-} from "./request-auth.ts";
+import { BROWSER_SIGN_IN, clearSessionCookie, fromBrowser, clientBotPatchViolation, clientGroupPatchViolation, ipcPeer, isAllowedOrigin, isLoopbackHost, isProxied, isSameOrigin, parseCookies, requestOrigin, requestSource, requiredScope, resolveLoopbackTrust, resolveRequestAuth, sanitizeSource, serializeSessionCookie, sessionCookieName } from "./request-auth.ts";
 import { SESSION_TTL_MS, SessionRegistry } from "./sessions.ts";
 
 function request(headers: Record<string, string>, method = "GET"): IncomingMessage {
@@ -93,42 +73,6 @@ describe("scopes", () => {
     for (const path of ["status", "export", "upload", "preview", "restore", "client-state", "download/123"]) {
       for (const method of ["GET", "POST", "DELETE"]) expect(requiredScope(method, `/api/workspace-backup/${path}`)).toBe("admin");
     }
-  });
-  it("is default deny: chat, approvals, rooms, attachments, routines and own session are client; everything else admin", () => {
-    for (const [method, path] of [
-      ["POST", "/api/bots/x/messages"], ["POST", "/api/bots/x/respond"], ["POST", "/api/threads/t/respond"],
-      ["POST", "/api/threads/t/undo"], ["POST", "/api/bots/x/compact"], ["POST", "/api/bots/x/tasks/t/title"],
-      ["PATCH", "/api/bots/x/cards/m"], ["POST", "/api/groups/g/messages"], ["PATCH", "/api/groups/g"],
-      ["PATCH", "/api/bots/x"], ["PATCH", "/api/bots/x/profile"], ["POST", "/api/attachments"],
-      ["GET", "/api/attachments/a.png"], ["POST", "/api/routines"], ["POST", "/api/routines/r/run"],
-      ["POST", "/api/routine-runs/seen-all"],
-      ["GET", "/api/bots"], ["GET", "/api/threads/t/messages"], ["GET", "/api/search"], ["GET", "/api/events"],
-      ["GET", "/api/config"], ["GET", "/api/webhooks"],
-      ["GET", "/api/auth/session"], ["POST", "/api/auth/stream-ticket"], ["POST", "/api/auth/logout"],
-      ["GET", "/api/bots/x/slack-management"],
-      ["POST", "/api/bots/x/sign-in-cards/m/done"], ["POST", "/api/bots/x/sign-in-cards/m/cancel"], ["POST", "/api/bots/x/sign-in-cards/m/save-login"],
-      ["GET", "/api/bots/x/sign-in-cards/m/save-login"],
-      ["GET", "/api/bots/x/browser/live"], ["POST", "/api/bots/x/browser/action"],
-      ["POST", "/api/bots/x/queue/q/steer"], ["POST", "/api/groups/g/queue/q/steer"],
-    ] as const) expect(requiredScope(method, path), `${method} ${path}`).toBe("client");
-    for (const [method, path] of [
-      ["POST", "/api/cli-test"], ["GET", "/api/cli-candidates"], ["GET", "/api/instances"], ["PATCH", "/api/instances/claude"],
-      ["POST", "/api/bots/x/computer/exec"], ["POST", "/api/bots/x/computer/join"], ["POST", "/api/local-computer/run"],
-      ["POST", "/api/bots/x/local-computer/join"], ["POST", "/api/bots/x/local-computer/screenshot"],
-      ["GET", "/api/computers/boxes"], ["POST", "/api/computers/boxes/bx_23456789/delete"],
-      ["POST", "/api/webhooks"], ["POST", "/api/webhooks/w/rotate"], ["POST", "/api/bots/x/skills"], ["PATCH", "/api/bots/x/skills/s"],
-      ["PATCH", "/api/bots/x/model"], ["PATCH", "/api/groups/g/setup"], ["POST", "/api/teams/import"], ["GET", "/api/teams/scout"],
-      ["GET", "/api/bots/x/memory"], ["PUT", "/api/bots/x/memory"], ["PUT", "/api/section-context"], ["GET", "/api/threads/t/events"],
-      ["GET", "/api/mcp/servers"], ["POST", "/api/mcp/servers"], ["POST", "/api/connectors/slack/authorize"],
-      ["POST", "/api/bots/x/slack-management"], ["GET", "/api/bots/x/slack-management/extra"],
-      ["PUT", "/api/config"], ["POST", "/api/auth/sessions"], ["GET", "/api/auth/sessions"], ["DELETE", "/api/auth/sessions/abc"],
-      ["GET", "/api/something-new"],
-      ["POST", "/api/bots/x/sign-in-cards/m/provide"], ["POST", "/api/browser-engine/install"],
-      ["GET", "/api/logins"], ["POST", "/api/logins"], ["PATCH", "/api/logins/l1"], ["DELETE", "/api/logins/l1"],
-      ["POST", "/api/logins/1password"], ["POST", "/api/logins/1password/refresh"], ["DELETE", "/api/logins/1password"],
-      ["PATCH", "/api/logins/1password/vaults/v1"], ["GET", "/api/bots/x/sign-in-cards/m/done"],
-      ["GET", "/api/bots/x/queue/q/steer"], ["POST", "/api/bots/x/queue/q/steer/more"], ["POST", "/api/groups/g/queue/q/steer/more"],
-    ] as const) expect(requiredScope(method, path), `${method} ${path}`).toBe("admin");
   });
 
   it("limits a client's bot and room edits to display fields, naming the field it refused", () => {

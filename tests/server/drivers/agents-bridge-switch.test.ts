@@ -12,23 +12,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { afterAll, describe, expect, it, vi } from "vitest";
-import {
-  AGENTS_PROXY_ENV,
-  BRIDGED_THREADS_MAX,
-  TOOL_BRIDGE_ENV,
-  agentsProxyLaunch,
-  agentsToolBridgeEnabled,
-  agentsToolBridgeEnv as decide,
-  agentsToolBridgeRefusal as refusal,
-  applyAgentsBridge,
-  bridgedAgents,
-  bridgedToolTitle,
-  claudeManagedPolicyFiles,
-  engineBridgeRefusal,
-  turnEngine,
-  type BridgeEngine,
-  type EngineHost,
-} from "../../../server/drivers/agents-bridge-switch.ts";
+import { AGENTS_PROXY_ENV, BRIDGED_THREADS_MAX, TOOL_BRIDGE_ENV, agentsProxyLaunch, agentsToolBridgeEnabled, agentsToolBridgeEnv as decide, agentsToolBridgeRefusal as refusal, applyAgentsBridge, bridgedAgents, bridgedToolTitle, claudeManagedPolicyFiles, engineBridgeRefusal, turnEngine, type BridgeEngine, type EngineHost } from "../../../server/drivers/agents-bridge-switch.ts";
 import { removeTempDir } from "../../support/environment/process-cleanup.ts";
 import { instanceConfigs, parseConfigPatch, parseStoredConfig } from "../../../server/config/config.ts";
 import { BRIDGE_HOT_TOOL_NAMES, FIND_TOOL, USE_TOOL, agentsToolBridged } from "../../../server/drivers/agents-bridge.ts";
@@ -83,7 +67,7 @@ describe("the agents tool bridge switch", () => {
 
   it("is a saved setting like the other feature flags: kept by a patch and by the stored file, a boolean only", () => {
     expect(parseConfigPatch({ features: { agentsToolBridge: true } })).toEqual({ features: { agentsToolBridge: true } });
-    expect(parseStoredConfig({ features: { agentsToolBridge: true, browser: true } })).toEqual({ features: { agentsToolBridge: true, browser: true } });
+    expect(parseStoredConfig({ features: { agentsToolBridge: true,  } })).toEqual({ features: { agentsToolBridge: true,  } });
     expect(agentsToolBridgeEnabled(parseStoredConfig({ features: { agentsToolBridge: true } }), {})).toBe(true);
     expect(() => parseConfigPatch({ features: { agentsToolBridge: "yes" } })).toThrow("features.agentsToolBridge");
     // the other flags are still read beside it, and an unknown one still drops

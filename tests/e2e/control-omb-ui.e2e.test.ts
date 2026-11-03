@@ -1,7 +1,7 @@
 // Drives the real <App/> through `control-omb ui` and reads outcomes from the
-// accessibility tree. Needs the pinned agent-browser binary: runs when one
-// resolves (tools directory, OMB_AGENT_BROWSER_PATH or PATH) or OMB_UI_E2E=1
-// asks for the verified download; otherwise skipped.
+// accessibility tree. Uses an external agent-browser CLI selected through
+// OMB_QA_AGENT_BROWSER_PATH or PATH. OMB_UI_E2E=1 requires it; otherwise skipped
+// when unavailable. No browser is downloaded by this test.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { resolveAgentBrowserBinary } from "../../server/browser/browser-engine.ts";
+import { resolveQaBrowser as resolveAgentBrowserBinary } from "../../scripts/dev/qa-browser-runtime.ts";
 import { removeTempDir, waitForExit } from "../support/environment/process-cleanup.ts";
 import { runControlOmb } from "../../scripts/dev/isolated-environment.ts";
 import { UI_TOOLS_DIR } from "../../scripts/dev/isolated-browser-controller.ts";
@@ -21,11 +21,10 @@ const forced = process.env.OMB_UI_E2E === "1";
 const binary = resolveAgentBrowserBinary({ dataDir: UI_TOOLS_DIR, env: process.env });
 const enabled = forced || Boolean(binary);
 if (!enabled) {
-  console.log(`skipping control-omb ui e2e: no agent-browser binary resolves (looked in ${UI_TOOLS_DIR}, OMB_AGENT_BROWSER_PATH and PATH); set OMB_UI_E2E=1 to install the pinned release`);
+  console.log("skipping control-omb ui e2e: configure an external CLI using OMB_QA_AGENT_BROWSER_PATH or PATH");
 }
 const run = enabled ? it : it.skip;
-// A forced run may still have Chrome for Testing to download even when
-// agent-browser is cached.
+// Forced UI runs may need extra time for an externally managed browser to start.
 const LAUNCH_TIMEOUT_MS = forced ? 600_000 : 180_000;
 
 // Synthetic provider outcomes exercise the UI, not the commands themselves.

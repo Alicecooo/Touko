@@ -1,11 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { LoginBots } from "../../shared/logins.ts";
-import { fillLogin, type FillCandidate } from "./login-fill.ts";
+
 import { loginFields, OnePasswordLogins, onePasswordProblem, sdkOnePasswordClient } from "./onepassword.ts";
-import { FakeLoginPage, LOGIN_FORM } from "../../tests/support/browser/fake-login-page.ts";
+
 import { fakeOnePasswordSdk } from "../../tests/support/auth/fake-onepassword-sdk.ts";
-import { parseTotpKey, totpCode } from "./totp.ts";
+import { parseTotpKey } from "./totp.ts";
 
 // Obvious fakes only; no network.
 const TOKEN = "ops_fake-service-account-token";
@@ -34,9 +34,6 @@ function setup(options: { token?: string | null; fail?: () => Error | null; now?
   const source = new OnePasswordLogins({ token: () => token, grants: () => grants, connect: (value) => sdkOnePasswordClient(sdk, value, "9.9.9"), now: options.now });
   return { source, calls, setToken: (value: string | null) => { token = value; } };
 }
-
-let page: FakeLoginPage | null = null;
-afterEach(() => { page?.close(); page = null; });
 
 describe("the 1Password SDK adapter", () => {
   it("reads a Login item's username, password and one-time-password field, by id first, then by type and title", () => {
@@ -104,38 +101,6 @@ describe("1Password logins", () => {
     expect(source.list().find((row) => row.site === "example.net")?.bots).toEqual(["quill"]);
     expect(source.hasVault("v2")).toBe(true);
     expect(source.hasVault("v9")).toBe(false);
-  });
-
-  it("is filled through the same path as a saved login: same origin rule, same TOTP, nothing back to the bot", async () => {
-    const { source } = setup();
-    await source.refresh();
-    const now = 1_700_000_010_000;
-    page = new FakeLoginPage("https://accounts.example.com/login", `${LOGIN_FORM}<input name="otp" autocomplete="one-time-code">`);
-    const remembered: string[] = [];
-    const saved: FillCandidate = { id: "local", site: "example.org", hosts: ["other.example.org"], exactHost: true, username: "local", source: "settings", secrets: async () => ({ password: "fake-local", totp: null }) };
-    const fill = () => fillLogin({
-      submit: false,
-      candidates: async (host) => [...[saved].filter((login) => login.hosts.includes(host)), ...source.candidates(host, "pepper")],
-      available: async () => [{ ...saved }, ...source.sitesFor("pepper")],
-    }, {
-      engine: (args) => page!.engine(args), insertText: (text) => page!.insertText(text), press: (key) => page!.press(key), click: (selector) => page!.click(selector),
-      remember: (value) => { remembered.push(value); }, now: () => now, sleep: async () => undefined,
-    });
-    const outcome = await fill();
-    expect(outcome).toMatchObject({ ok: true, filled: ["username", "password", "code"] });
-    expect(outcome.text).toContain("for alice@example.com (from 1Password) on accounts.example.com.");
-    expect(page.field("#password").value).toBe(VAULT_PASSWORD);
-    expect(page.field("input[name=otp]").value).toBe(totpCode(parseTotpKey(KEY)!, now));
-    expect(remembered).toEqual(expect.arrayContaining([VAULT_PASSWORD, totpCode(parseTotpKey(KEY)!, now)]));
-    expect(JSON.stringify(outcome)).not.toContain(VAULT_PASSWORD);
-    expect(JSON.stringify(page.engineCalls)).not.toContain(VAULT_PASSWORD);
-
-    page.navigate("https://crm.example.org.evil.test/login", LOGIN_FORM);
-    const typed = page.typed.length;
-    const refused = await fill();
-    expect(refused.ok).toBe(false);
-    expect(refused.text).toContain("No saved login for crm.example.org.evil.test.");
-    expect(page.typed).toHaveLength(typed);
   });
 
   it("refuses a token 1Password does not accept, in words, without keeping anything", async () => {

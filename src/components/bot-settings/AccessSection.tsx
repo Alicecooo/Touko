@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { browserUnavailableReason } from "@/lib/feature-flags";
+
 import { ChevronDown, ChevronRight, FolderOpen, Plus } from "lucide-react";
 
 import { api, useStore, type Bot } from "@/state/store";
@@ -486,28 +486,7 @@ function ConnectorToolsGrants({
   );
 }
 
-function RecordStepsRow({ on, browserOn, myChrome, onChange }: { on: boolean; browserOn: boolean; myChrome: boolean; onChange: (on: boolean) => void }) {
-  return (
-    <div className="mt-3 flex items-center justify-between gap-4 border-t border-hairline/40 pt-3">
-      <div>
-        <div className="text-[13.5px] font-medium text-ink">{t("botAccess.recordSteps.title")}</div>
-        <div className="mt-0.5 text-[12.5px] text-ink-secondary">
-          {!browserOn ? t("botAccess.recordSteps.needsBrowser") : on ? t("botAccess.recordSteps.on") : t("botAccess.recordSteps.off")}
-          {browserOn && on && myChrome ? ` ${t("botAccess.recordSteps.myChrome")}` : ""}
-        </div>
-      </div>
-      <Switch
-        checked={on && browserOn}
-        aria-label={t("botAccess.recordSteps.title")}
-        disabled={!browserOn}
-        onClick={() => onChange(!on)}
-        className="disabled:cursor-not-allowed"
-      />
-    </div>
-  );
-}
-
-export type AccessPart = "folder" | "apps" | "mcp" | "tools" | "browser" | "webhooks" | "always";
+export type AccessPart = "folder" | "apps" | "mcp" | "tools" | "webhooks" | "always";
 
 export function AccessSection({
   bot,
@@ -526,14 +505,9 @@ export function AccessSection({
     connectedAppsConfigured,
     connectedAppsEnabled,
     connectorGrantState,
-    canUseBrowser,
-    desktopBrowser,
-    browserBlockedOnWindows,
-    browserFeature,
-    browserAllowed,
-    browserEnabled,
+
   } = derived;
-  const browserInstallable = state.config?.browserEngine?.installable === true;
+
   // The same list the Vault tab shows: Composio's connected accounts plus the native HighLevel connection.
   const apps = useBotApps(bot);
   const inventoryReady = apps.phase === "ready";
@@ -607,49 +581,6 @@ export function AccessSection({
 
       {shows("mcp") && <McpServersCard bot={bot} patch={patch} />}
       {shows("tools") && <ToolSelectionCard key={bot.id} bot={bot} engineKind={derived.engine?.driverKind} />}
-
-      {shows("browser") && <div className="rounded-xl bg-card p-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-[15px] font-medium text-ink">{t("botAccess.browser.title")}</div>
-            <div className="mt-0.5 text-[13px] text-ink-secondary">
-              {!desktopBrowser
-                ? browserBlockedOnWindows && !browserInstallable
-                  ? t("botAccess.browser.windowsUnavailable")
-                  : browserUnavailableReason(state.config)
-                : !browserFeature
-                  ? t("botAccess.browser.disabledInSettings")
-                  : !canUseBrowser
-                    ? t("botAccess.browser.modelUnsupported")
-                    : bot.computer === "off"
-                      ? t("botAccess.browser.off")
-                      : browserEnabled
-                        ? t("botAccess.browser.enabled")
-                        : t("botAccess.browser.disabled")}
-            </div>
-            <ProposalStatus bot={bot} kind="owner" />
-          </div>
-          <Switch
-            checked={browserEnabled && bot.computer !== "off"}
-            aria-label={t("botAccess.browser.allow")}
-            disabled={
-              bot.computer === "off" ||
-              (!browserEnabled && ((!desktopBrowser && !browserInstallable) || !browserFeature || !canUseBrowser))
-            }
-            onClick={() => patch({ browser: !browserAllowed })}
-            title={bot.computer === "off" ? t("botAccess.browser.offShort") : undefined}
-            className="disabled:cursor-not-allowed"
-          />
-        </div>
-        {!draft && (
-          <RecordStepsRow
-            on={bot.recordBrowserSteps === true}
-            browserOn={browserEnabled && bot.computer !== "off"}
-            myChrome={state.config?.browserEngine?.myChrome === true && (state.config?.browserProfiles ?? []).some((profile) => profile.id === bot.browserProfile && profile.browser === "chrome")}
-            onChange={(recordBrowserSteps) => patch({ recordBrowserSteps })}
-          />
-        )}
-      </div>}
 
       {!draft && shows("webhooks") && <div className="rounded-xl bg-card p-4">
         <div className="text-[15px] font-medium text-ink">{t("botAccess.webhooks.title")}</div>

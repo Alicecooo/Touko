@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -33,7 +33,6 @@ import { Store, type Message } from "./store.ts";
 import type { ModelSelection } from "../harness/contracts.ts";
 
 const selection = (): ModelSelection => ({ instanceId: "claude", model: "claude-sonnet-5" });
-const legacy = (threadId: string) => join(DATA_DIR, `messages-${threadId}.json`);
 const msg = (id: string, text: string, extra: Partial<Message> = {}): Message => ({
   id,
   role: "user",
@@ -57,43 +56,9 @@ describe("message-db", () => {
     updateMessage("t1", msg("m1", "hello, edited"));
 
     closeMessageDb();
-    const thread = readThread("t1", legacy("t1"));
+    const thread = readThread("t1");
     expect(thread.messages.map((m) => m.text)).toEqual(["hello, edited", "world"]);
     expect(thread.activeLeafId).toBe("m2");
-  });
-
-  it("imports a legacy JSON thread file exactly once", () => {
-    writeFileSync(
-      legacy("t2"),
-      JSON.stringify({ activeLeafId: "b", messages: [msg("a", "from json"), msg("b", "second")] }),
-    );
-    const imported = readThread("t2", legacy("t2"));
-    expect(imported.messages.map((m) => m.id)).toEqual(["a", "b"]);
-    expect(imported.activeLeafId).toBe("b");
-    expect(existsSync(legacy("t2"))).toBe(false);
-    expect(existsSync(`${legacy("t2")}.imported`)).toBe(true);
-
-    deleteThread("t2");
-    expect(readThread("t2", legacy("t2")).messages).toEqual([]);
-  });
-
-  it("imports a pre-branching flat array file", () => {
-    writeFileSync(legacy("t3"), JSON.stringify([msg("a", "one"), msg("b", "two")]));
-    const imported = readThread("t3", legacy("t3"));
-    expect(imported.messages).toHaveLength(2);
-    expect(imported.activeLeafId).toBeNull();
-  });
-
-  it("migrates known legacy transcripts at Store startup so search sees unopened tasks", () => {
-    const initial = new Store(selection);
-    const bot = initial.createBot({}, { seedMessages: false });
-    closeMessageDb();
-    for (const suffix of ["", "-wal", "-shm"]) rmSync(join(DATA_DIR, `messages.db${suffix}`), { force: true });
-    writeFileSync(legacy(bot.threadId), JSON.stringify([msg("old", "find this unopened legacy conversation")]));
-
-    new Store(selection);
-    expect(searchMessages("unopened legacy")).toMatchObject([{ threadId: bot.threadId, messageId: "old" }]);
-    expect(existsSync(`${legacy(bot.threadId)}.imported`)).toBe(true);
   });
 
   it("stores transcripts with owner-only permissions", () => {
@@ -107,7 +72,7 @@ describe("message-db", () => {
     insertMessage("t4", msg("m1", "gone soon"));
     setActiveLeaf("t4", "m1");
     deleteThread("t4");
-    const thread = readThread("t4", legacy("t4"));
+    const thread = readThread("t4");
     expect(thread.messages).toEqual([]);
     expect(thread.activeLeafId).toBeNull();
   });
@@ -119,11 +84,11 @@ describe("message-db", () => {
     }
     deleteThreads(["b1", "b2", "never-existed"]);
     for (const id of ["b1", "b2"]) {
-      const thread = readThread(id, legacy(id));
+      const thread = readThread(id);
       expect(thread.messages).toEqual([]);
       expect(thread.activeLeafId).toBeNull();
     }
-    expect(readThread("keep", legacy("keep")).messages).toHaveLength(1);
+    expect(readThread("keep").messages).toHaveLength(1);
     expect(() => deleteThreads([])).not.toThrow();
   });
 
@@ -332,25 +297,19 @@ describe("message-db", () => {
     expect(searchMessages("spoke")[0].from).toBe("Scout");
   });
 
-  it("readThreadTail reads only the newest rows at the SQL boundary, and still imports a legacy file in full", () => {
+  it("readThreadTail reads only the newest rows at the SQL boundary", () => {
     for (let i = 0; i < 5; i++) insertMessage("tail", msg(`m${i}`, `text ${i}`));
     setActiveLeaf("tail", "m4");
 
-    const page = readThreadTail("tail", legacy("tail"), 2);
+    const page = readThreadTail("tail", 2);
     expect(page.messages.map((m) => m.id)).toEqual(["m3", "m4"]);
     expect(page.hasMore).toBe(true);
     expect(page.activeLeafId).toBe("m4");
 
-    expect(readThreadTail("tail", legacy("tail"), 5).hasMore).toBe(false);
-    const roomy = readThreadTail("tail", legacy("tail"), 50);
+    expect(readThreadTail("tail", 5).hasMore).toBe(false);
+    const roomy = readThreadTail("tail", 50);
     expect(roomy.messages).toHaveLength(5);
     expect(roomy.hasMore).toBe(false);
-
-    writeFileSync(legacy("tail-legacy"), JSON.stringify([msg("a", "one"), msg("b", "two"), msg("c", "three")]));
-    const imported = readThreadTail("tail-legacy", legacy("tail-legacy"), 1);
-    expect(imported.messages.map((m) => m.id)).toEqual(["a", "b", "c"]);
-    expect(imported.hasMore).toBeUndefined();
-    expect(existsSync(legacy("tail-legacy"))).toBe(false);
   });
 
   it("Store round-trips branching through the DB across a restart", () => {

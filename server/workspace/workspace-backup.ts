@@ -746,12 +746,6 @@ function prepareRestore(dataDir: string, id: string, manifest: Manifest): string
   });
   if (existsSync(join(prepared, "delegations.json"))) writeJson(join(prepared, "delegations.json"), {});
   if (existsSync(join(prepared, "browser-cleanups.json"))) writeJson(join(prepared, "browser-cleanups.json"), []);
-  for (const entry of manifest.entries) {
-    if (/^messages-[^/]+\.json$/.test(entry.path)) changeJson(entry.path, (value) => {
-      if (Array.isArray(value)) for (const message of value) paths.message(message);
-      else if (record(value) && Array.isArray(value.messages)) for (const message of value.messages) paths.message(message);
-    });
-  }
   const dbPath = join(prepared, "messages.db");
   if (existsSync(dbPath)) {
     const db = new DatabaseSync(dbPath);

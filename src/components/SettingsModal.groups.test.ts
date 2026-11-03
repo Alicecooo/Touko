@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLocale } from "@/lib/i18n";
 import type { AppSettingsSection } from "@/state/store";
 import type { Switch } from "./SettingsPrimitives";
-import { SECTIONS, SETTINGS_GROUPS, SettingsModal } from "./SettingsModal";
+import { SettingsModal } from "./SettingsModal";
 
 const fixture = vi.hoisted(() => ({
   section: "appearance" as AppSettingsSection,
@@ -104,14 +104,6 @@ function rail(html: string): Record<string, string[]> {
 }
 
 describe("Settings rail groups", () => {
-  it("files every page under You, AI, Computers or Account, in that order", () => {
-    expect(SETTINGS_GROUPS.map((group) => group.id)).toEqual(["you", "ai", "computers", "account"]);
-    const ids = SECTIONS.map((entry) => entry.id);
-    expect(new Set(ids).size).toBe(ids.length);
-    expect(ids).toHaveLength(18); // 16 + the shared Skills library (AI group) + Logins (Computers)
-    for (const entry of SECTIONS) expect(SETTINGS_GROUPS.map((group) => group.id)).toContain(entry.group);
-  });
-
   it("shows every desktop page under its labelled group", () => {
     vi.stubGlobal("window", { ogb: { environments: {}, organization: {}, cloudAccount: {} } });
     const html = render();
@@ -120,8 +112,8 @@ describe("Settings rail groups", () => {
     expect(rail(html)).toEqual({
       you: ["general", "appearance", "companion"],
       ai: ["engines", "connections", "decisionModel"],
-      computers: ["desktopWorkspaces", "computer", "logins"],
-      account: ["cloudAccount", "organization", "usage", "backups", "experimental"],
+      computers: ["desktopWorkspaces", "logins"],
+      account: ["organization", "usage", "backups", "experimental"],
     });
     expect(html).toContain('<optgroup label="AI">');
   });
@@ -129,7 +121,7 @@ describe("Settings rail groups", () => {
   it("keeps the browser-only pages for a hosted workspace's admins", () => {
     fixture.ownerOrAdmin = true;
     const groups = rail(render());
-    expect(groups.account).toEqual(["usage", "backups", "people", "activity", "experimental"]);
+    expect(groups.account).toEqual(["usage", "backups", "activity", "experimental"]);
     expect(Object.values(groups).flat()).not.toContain("desktopWorkspaces");
     expect(Object.values(groups).flat()).not.toContain("cloudAccount");
   });

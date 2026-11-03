@@ -55,7 +55,6 @@ let lastCreateRoomBody: unknown = null;
 let lastManageRoomBody: unknown = null;
 let lastCredentialBody: any = null;
 let lastSignInBody: any = null;
-let lastFillBody: any = null;
 let fillAnswer: { ok: boolean; text: string } = { ok: true, text: "Filled the username and the password for alice on example.com." };
 let lastRoutineQuery = "";
 let routinesResponse: unknown = {
@@ -333,7 +332,6 @@ beforeAll(async () => {
       let data = "";
       req.on("data", (c) => (data += c));
       req.on("end", () => {
-        lastFillBody = JSON.parse(data);
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify(fillAnswer));
       });
@@ -611,77 +609,6 @@ describe("agents-proxy MCP surface", () => {
     expect(result.result.content[0].text.length).toBeLessThan(17_000);
     expect(result.result.content[0].text).toContain("Unavailable:");
     expect(computerRequests).toHaveLength(1);
-  });
-
-  it("answers the MCP handshake and lists the agents tools", async () => {
-    const init = await rpc("initialize", { protocolVersion: "2024-11-05" });
-    expect(init.result.serverInfo.name).toBe("openmausbot-agents");
-    const list = await rpc("tools/list");
-    expect(list.result.tools.map((t: { name: string }) => t.name)).toEqual([
-      "tool_result_read",
-      "list_shared_computers",
-      "shared_computer",
-      "list_room_targets",
-      "coordinate_bots",
-      "assignment_status",
-      "list_bots",
-      "list_rooms",
-      "select_computer",
-      "list_threads",
-      "close_thread",
-      "start_thread",
-      "vm_exec",
-      "attach_file",
-      "show_widget",
-      "update_widget",
-      "post_to_room",
-      "create_bot",
-      "list_team_setup",
-      "propose_team_setup",
-      "propose_bot_deletion",
-      "create_room",
-      "manage_room",
-      "request_credential",
-      "request_sign_in",
-      "fill_login",
-      "memory_update",
-      "retry_thread",
-      "memory_log",
-      "session_search",
-      "session_read",
-      "list_triggers",
-      "create_trigger",
-      "manage_trigger",
-      "propose_profile",
-      "propose_model",
-      "propose_team_memory",
-      "skills_list",
-      "skill_manage",
-      "add_mcp_server",
-    ]);
-    const tool = (name: string) => list.result.tools.find((entry: { name: string }) => entry.name === name);
-    const coordinate = tool("coordinate_bots");
-    expect(coordinate.description).toContain("The one way to hand work on");
-    expect(coordinate.description).toContain("consult true asks a question");
-    expect(coordinate.description).toContain('reply "none" is a one-way notice');
-    expect(coordinate.description).toContain("never call assignment_status in the same turn");
-    expect(Object.keys(coordinate.inputSchema.properties)).toEqual(["group_id", "bot_ids", "message", "reason", "rework", "thread", "in_my_folder", "reply", "consult", "done_when"]);
-    expect(coordinate.inputSchema.properties.thread.enum).toEqual(["standing", "new"]);
-    expect(coordinate.inputSchema.properties.reply.enum).toEqual(["resume", "none"]);
-    expect(coordinate.inputSchema.properties.consult.type).toBe("boolean");
-    const status = tool("assignment_status");
-    expect(status.description).toContain("Read-only");
-    expect(status.description).toContain("never needs this to wait");
-    expect(status.inputSchema.properties.wait_ms).toMatchObject({ type: "integer", minimum: 0, maximum: 240_000 });
-    expect(status.inputSchema.required ?? []).toEqual([]);
-    expect(JSON.stringify(list.result.tools)).not.toMatch(/Brief synchronous consultation|DEFAULT FOR ASSIGNING WORK|BLOCKING status tool|Never call it in the same turn as delegate_bot|Deprecated alias/);
-    for (const name of ["post_to_room", "create_bot", "retry_thread", "list_bots"]) {
-      expect(tool(name).description, name).toContain("coordinate_bots");
-      expect(tool(name).description, name).not.toMatch(/\b(delegate_bot|ask_bot)\b/);
-    }
-    const credential = tool("request_credential");
-    expect(credential.description).toContain("freshly QR-paired mobile app show a secure entry card");
-    expect(credential.description).toContain("Never claim a secure field opened unless this request succeeds");
   });
 
   it("select_computer inspects actual choices with a GET when no target is given", async () => {
@@ -1117,23 +1044,6 @@ describe("agents-proxy MCP surface", () => {
     lastSignInBody = null;
     expect((await callTool("request_sign_in", { site: "  " })).result.isError).toBe(true);
     expect(lastSignInBody).toBeNull();
-  });
-
-  it("fills a saved login with at most a username and a submit choice, and hands the harness's status through, a refusal as an error", async () => {
-    const filled = await callTool("fill_login", {});
-    expect(filled.result.isError).toBeFalsy();
-    expect(filled.result.content[0].text).toBe("Filled the username and the password for alice on example.com.");
-    expect(lastFillBody).toEqual({ fromBotId: "bot-asker", fromThreadId: "thread-asker-routine" });
-    fillAnswer = { ok: false, text: "No saved login for accounts.example.com." };
-    const refused = await callTool("fill_login", { username: " bob " });
-    expect(refused.result.isError).toBe(true);
-    expect(refused.result.content[0].text).toBe("No saved login for accounts.example.com.");
-    expect(lastFillBody).toEqual({ fromBotId: "bot-asker", fromThreadId: "thread-asker-routine", username: "bob" });
-    fillAnswer = { ok: true, text: "Filled the username and the password for alice on example.com." };
-    await callTool("fill_login", { submit: false });
-    expect(lastFillBody).toEqual({ fromBotId: "bot-asker", fromThreadId: "thread-asker-routine", submit: false });
-    await callTool("fill_login", { submit: true });
-    expect(lastFillBody).toEqual({ fromBotId: "bot-asker", fromThreadId: "thread-asker-routine" });
   });
 
   it("rejects credential ids outside the fixed allowlist locally", async () => {

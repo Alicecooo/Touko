@@ -15,8 +15,8 @@ protocols:
 # stranded on its installed version.
 publish:
   - provider: github
-    owner: milind-soni
-    repo: OpenMausBot
+    owner: Alicecooo
+    repo: Touko
 
 directories:
   buildResources: build
@@ -67,7 +67,7 @@ extraResources:
     to: licenses/models-dev-LICENSE.txt
   - from: third_party/opencode/LICENSE
     to: licenses/opencode-LICENSE.txt
-  # Code adapted from T3 Code (MIT): the bots' browser egress gate, the Antigravity runtime, citations.
+  # Code adapted from T3 Code (MIT): the Antigravity runtime and citations.
   - from: third_party/t3-code/LICENSE
     to: licenses/t3-code-LICENSE.txt
   # The 1Password SDK and its WebAssembly core (MIT; saved logins from
@@ -92,8 +92,6 @@ win:
   extraResources:
     - from: dist-native/cloudflared/win32-x64/cloudflared.exe
       to: cloudflared/cloudflared.exe
-    - from: dist-native/browser/win32-x64
-      to: browser-engine
     - from: dist-native/duckdb/win32-x64/node_modules
       to: duckdb/node_modules
     # CUA driver and SDK for Windows — must live outside ASAR for native modules
@@ -118,9 +116,8 @@ nsis:
   perMachine: false
   shortcutName: Touko
   # Versioned, like the .dmg. The README's /latest/download/ button needs a
-  # STABLE filename, so ship a second copy named OpenMausBot-setup.exe on the
-  # release — the same trick as OpenMausBot.dmg beside OpenMausBot-${version}.dmg.
-  artifactName: OpenMausBot-${version}-setup.${ext}
+  # STABLE filename, so ship a second copy named Touko-setup.exe on the release.
+  artifactName: Touko-${version}-setup.${ext}
 
 linux:
   target:
@@ -145,28 +142,20 @@ linux:
       to: cua-linux-x64
     - from: dist-native/cloudflared/linux-x64/cloudflared
       to: cloudflared/cloudflared
-    - from: dist-native/browser/linux-x64
-      to: browser-engine
     - from: dist-native/duckdb/linux-x64/node_modules
       to: duckdb/node_modules
-    - from: build/linux-openmausbot-browser.apparmor
-      to: openmausbot-browser.apparmor
   desktop:
     entry:
-      Name: OpenMausBot
+      Name: Touko
       Comment: Your own team of AI bots, in a chat app
       Keywords: AI;Agents;Chat;Productivity;
 
 deb:
   packageCategory: utils
   priority: optional
-  # Add the narrow browser policy's parser without replacing Electron's
-  # default shared-library dependencies.
-  fpm: ["--depends", "apparmor"]
   # dpkg can preserve legacy directory modes during an upgrade. This
   # idempotent hook repairs only the exact package-owned CUA path.
   afterInstall: build/linux-after-install.sh
-  afterRemove: build/linux-after-remove.sh
 
 # Static AppImage runtime: Ubuntu 24.04 can launch it without legacy FUSE 2.
 toolsets:
