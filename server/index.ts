@@ -37,14 +37,14 @@ import { HELD_NOTE, approvalHeldNote, approvalHeldReason, approvalModeForOrigin,
 import { bindSafetyFloor, denyAtSafetyFloor, heldAtSafetyFloor, safetyFloorOn } from "./agent/safety-floor-gate.ts";
 import { providerMcpTool, providerToolAllowKey } from "./agent/provider-tool-allow.ts";
 import { claudeAccountInfo } from "./auth/claude-accounts.ts";
-import { BrowserCleanupCoordinator, requireBrowserCleanupAcknowledged, type BrowserCleanupWireRequest } from "./browser/browser-lifecycle-cleanup.ts";
+
 import * as checkpoints from "./agent/checkpoints.ts";
 import { commandReceipt } from "./agent/commands.ts";
 import { buildTurnDigest, coverageForDriver, digestPromptLine, renderDigest, toolEvidence } from "./observability/digest.ts";
 import { appendDecision, bindDecisionRetention, decisionRetentionDays, flushDecisionLog, pruneDecisions, withDecisionActor, type DecisionActor } from "./observability/decision-log.ts";
 import { inMyFolderCwd, validateBotCwd } from "./bots/bot-cwd.ts";
 import { ATTACHMENTS_DIR, attachmentExists, cleanupStaleAttachmentPartials, deleteAttachment, saveImage } from "./workspace/attachments.ts";
-import { messageAttachmentName, messageFileRoots } from "./storage/message-file.ts";
+import { messageFileRoots } from "./storage/message-file.ts";
 import { avatarGenerationRequestSchema, generateAvatarImage, avatarImageStatus } from "./bots/avatar-image.ts";
 import { fitsOnOneLine, parseBotProfilePatch } from "./bots/bot-profile.ts";
 import { routeDirectTurn } from "./agent/turn-route.ts";
@@ -65,7 +65,7 @@ import { createDataRoutes } from "./data/routes.ts";
 import { DataSheetRegistry } from "./data/sheet.ts";
 import { DataFailure } from "./data/types.ts";
 
-import { isEffortLevel, type CardAnswerer, type ResolvedSender, type SignInRequestCardData, type SteerQueueReason, type WireBot, type WireGroup, type WireTask } from "../shared/wire.ts";
+import { isEffortLevel, type CardAnswerer, type ResolvedSender, type SteerQueueReason, type WireBot, type WireGroup, type WireTask } from "../shared/wire.ts";
 import { isPersistentQuestionCard, shouldSettleRequestCard } from "../shared/ask-question.ts";
 import { parseToolScope } from "../shared/tool-scope.ts";
 import * as composio from "./integrations/composio.ts";
@@ -82,7 +82,7 @@ import type { CaptureTurn, RoomLine } from "./memory/memory-capture.ts";
 import { appendAboutMe, commitLearned, planLearned } from "./bots/profile-learned.ts";
 import { canAccessTeam, canReachPeer, coordinatorSupervises, livePeerRoster, livePeerRosterBlock, peerAllowed, peerName, peerRosterSystemPrompt, peerStatus, peerStatusWords, reachablePeers, resolveTeammate, roomPeerRosterSystemPrompt, roomRosterLine } from "./teams/peer-roster.ts";
 import { attachForTurn, saveBotAttachment } from "./bots/bot-attachment.ts";
-import { cacheUntilConfigChanges, ensureDirs, instanceConfigs, loadConfig, changedInstanceIds, engineLaunches, roomTurnTimeoutMinutes, mcpCallTimeoutMinutes, cacheKeepWarmSettings, threadEventLogMaxBytes, maxConcurrentBotThreads, threadEventLogRetentionDays, saveConfig, showToolCallsEnabled, routinesInConversationEnabled, claudeUserMcpEnabled, skillAuthoringEnabled, skillReviewEnabled, skillReviewSteps, autoRecallEnabled, captureQuietMs, roomMemoryCaptureEnabled, tidyHour, builtInBrowserEnabled, llmThreadTitlesEnabled, browserProfilePartitionTarget, stripWorkspaceCredentialEnv, PROVIDER_CREDENTIAL_ENV, persistableInstanceConfigs, type AppConfig, DATA_DIR, customMcpServers, onConfigSaved, CLAUDE_API_INSTANCE, openCodeProviderKeys } from "./config/config.ts";
+import { cacheUntilConfigChanges, ensureDirs, instanceConfigs, loadConfig, changedInstanceIds, engineLaunches, roomTurnTimeoutMinutes, mcpCallTimeoutMinutes, cacheKeepWarmSettings, threadEventLogMaxBytes, maxConcurrentBotThreads, threadEventLogRetentionDays, saveConfig, showToolCallsEnabled, routinesInConversationEnabled, claudeUserMcpEnabled, skillAuthoringEnabled, skillReviewEnabled, skillReviewSteps, autoRecallEnabled, captureQuietMs, roomMemoryCaptureEnabled, tidyHour, llmThreadTitlesEnabled, stripWorkspaceCredentialEnv, PROVIDER_CREDENTIAL_ENV, persistableInstanceConfigs, type AppConfig, DATA_DIR, customMcpServers, onConfigSaved, CLAUDE_API_INSTANCE, openCodeProviderKeys } from "./config/config.ts";
 import { sweepThreadEventLogs, type ThreadLogRetentionCandidate } from "./storage/thread-retention.ts";
 import { ComputerControl } from "./computers/computer-control.ts";
 import { augmentedPath, resetPathCache } from "./platform/env-path.ts";
@@ -174,7 +174,7 @@ import { expandLearnTurnText, learnSource } from "./skills/skill-learn.ts";
 import { connectedAppsForSetup, expandSetupTurnText, setupModeActive, setupSystemPrompt, type SetupConnectedApps } from "./config/setup-mode.ts";
 import type { SkillRequestCardData } from "../shared/skill-request.ts";
 import { checkSoulDrift, readSoulDrift, soulFile, writeSoulMirror } from "./bots/bot-folder.ts";
-import { botPersona, buildSystemPrompt, userProfileSystemPrompt, computerPrompt, composioSystemPrompt, customMcpPrompt, CREDENTIAL_PROMPT, longCommandsPrompt, THREADS_PROMPT, WIDGET_PROMPT, LEARN_PROMPT, PROFILE_PROMPT, TEAM_MEMORY_PROMPT, TRIGGER_PROMPT, ROUTINE_EXECUTION_PROMPT, WEBHOOK_PROMPT, resolveComputerPromptKind, savedLoginsPrompt, teamAvailabilityPart } from "./agent/system-prompt.ts";
+import { botPersona, buildSystemPrompt, userProfileSystemPrompt, computerPrompt, composioSystemPrompt, customMcpPrompt, CREDENTIAL_PROMPT, longCommandsPrompt, THREADS_PROMPT, WIDGET_PROMPT, LEARN_PROMPT, PROFILE_PROMPT, TEAM_MEMORY_PROMPT, TRIGGER_PROMPT, ROUTINE_EXECUTION_PROMPT, WEBHOOK_PROMPT, resolveComputerPromptKind, teamAvailabilityPart } from "./agent/system-prompt.ts";
 import { shellTimeoutHookResult } from "./agent/shell-timeout-hint.ts";
 import { spillToolResult } from "./agent/tool-result-spill.ts";
 import { readCuaConnection, readCuaUnavailableReason, gatedLocalComputer } from "./computers/local-computer.ts";
@@ -183,23 +183,16 @@ import { claudeUserSkillsEnabled, settingsTurnFields } from "./agent/turn-settin
 import { addHeldSecretScrubber, redactSecretsInText } from "./security/redact.ts";
 import { ROUTINE_RESTARTED, RoutineManager, type RoutineRun, type RoutineRunOn, type RoutineRunTrigger } from "./automation/routines.ts";
 import { CalendarCallManager, type CalendarCall } from "./automation/calendar-calls.ts";
-import { BROWSER_CONTROL_REFUSAL, BROWSER_UPLOAD_TOOL, browserRuntimeEnv } from "./browser/browser-runtime.ts";
-import { namedUploadPaths, uploadableFiles } from "./browser/browser-upload.ts";
-import { listSignedInSites, signOutOfSites } from "./browser/browser-sites.ts";
+
 import { HeldSecrets, LoginStore } from "./security/login-store.ts";
 import { OnePasswordLogins, sdkOnePasswordClient, type OnePasswordSdk } from "./security/onepassword.ts";
 import { nativeRequire } from "./data/engine.ts";
-import { fillLogin } from "./security/login-fill.ts";
-import { BotLogins, cardLoginPlace, cardSignInElsewhere, observeSignInPage, type ObservedPage } from "./bots/bot-logins.ts";
-import { relayFrame } from "./browser/browser-relay.ts";
-import { browserEvidence, stepContext } from "./browser/browser-steps.ts";
-import { parseLoginFields, parseTotpField, createLoginRoutes } from "./routes/logins.ts";
-import { loginSite, savedLoginResumePrompt } from "../shared/logins.ts";
-import { browserRestartRefusal } from "./browser/browser-live.ts";
-import { browserEgress } from "./browser/egress/registry.ts";
-import { browserEngineEncryptionKey, clearBrowserSessionState, browserEngineStatus, browserSessionId } from "./browser/browser-engine.ts";
-import { chromeLauncher } from "./browser/chrome/launcher.ts";
-import { createBrowserHost } from "./host/browser.ts";
+
+import { BotLogins } from "./bots/bot-logins.ts";
+
+import { createLoginRoutes } from "./routes/logins.ts";
+import { savedLoginResumePrompt } from "../shared/logins.ts";
+
 import { createScreenFrameSource, type ScreenCapture } from "./computers/screen-frame-source.ts";
 import { screenFrameHash, screenSurfaceForTool, screenTouchingTool, settledFrameIsNews } from "./computers/screen-frame-gate.ts";
 import { RoutineRequestService } from "./automation/routine-requests.ts";
@@ -240,11 +233,11 @@ import { lazyClaimRetryText, settledWithin, startAutoVmClaim, type AutoVmClaimTa
 import { CONTROL_ACT_WITHIN_MS, CONTROL_BUSY, CONTROL_HANDED_BACK, CONTROL_WAIT_MS, CONTROL_WAITED, type ControlState } from "./computers/control-client.ts";
 import { computerFreeAfterText, computerParkedText, computerPersonAwayText, computerStoppedWaitingText, computerWaitingText, type ComputerHolder } from "./computers/computer-wait.ts";
 import { modelContextWindow } from "./model-catalog/model-context-window.ts";
-import { browserIsThePlace, computerSkippedNote, computerToolsRefusal, parseSurface, PlaceUnavailableError, placeUnavailable, resolveSurface, surfaceLabel, surfaceOfComputerKind, surfacePrompt, type ComputerWant, type PlaceSource, type Surface } from "./computers/surface.ts";
+import { computerSkippedNote, computerToolsRefusal, parseSurface, PlaceUnavailableError, placeUnavailable, resolveSurface, surfaceLabel, surfaceOfComputerKind, surfacePrompt, type ComputerWant, type PlaceSource, type Surface } from "./computers/surface.ts";
 import { PendingTurnCancellations, ProviderTurnGenerationRegistry, RetiredTurnRegistry, guardTurnDispatch, isTurnEventQuarantined } from "./agent/turn-dispatch-guard.ts";
 import { createGracefulShutdown } from "./platform/graceful-shutdown.ts";
 import { acquireDataDirLeaseForProcess } from "./storage/data-dir-lease.ts";
-import { createWorkspaceAccess, describeEdition, editionStatus, entitled, hostedWorkspaceConfiguration, hostedWorkspaceConfigured, LICENSE_WARN_DAYS, licenseWarning, sharedWorkspaceFullAccessConfigured, loadEnterpriseLayer, workspaceMembership, type EditionStatus, type WorkspaceAccess } from "./deployment/enterprise.ts";
+import { createWorkspaceAccess, describeEdition, editionStatus, entitled, hostedWorkspaceConfiguration, hostedWorkspaceConfigured, LICENSE_WARN_DAYS, licenseWarning, sharedWorkspaceFullAccessConfigured, loadEnterpriseLayer, type EditionStatus, type WorkspaceAccess } from "./deployment/enterprise.ts";
 import { environmentDescriptor, loadEnvironmentId, serverVersion } from "./auth/environment.ts";
 import { WorkspaceBackupMaintenance } from "./workspace/workspace-backup-maintenance.ts";
 import { createWorkspaceBackupRoutes } from "./workspace/workspace-backup-http.ts";
@@ -273,10 +266,10 @@ import { createBotSkillsRoutes } from "./routes/bot-skills.ts";
 import { createSkillShareRoutes } from "./routes/skill-share.ts";
 import { createTeamContextRoutes } from "./routes/team-context.ts";
 import { createDeciderRoutes } from "./routes/decider.ts";
-import { createBrowserSiteRoutes } from "./routes/browser-sites.ts";
+
 import { createInternalSignInRoutes } from "./routes/sign-in.ts";
 import { createInternalThreadRoutes } from "./routes/internal-threads.ts";
-import { createBrowserEvidenceRoutes } from "./routes/browser-evidence.ts";
+
 import { createSignInCardRoutes } from "./routes/sign-in-cards.ts";
 import { createInternalEscalateRoutes } from "./routes/internal-escalate.ts";
 import { createRoomHoldRoutes } from "./routes/room-holds.ts";
@@ -287,7 +280,7 @@ import { createTeamRoutes } from "./routes/teams.ts";
 import { createThreadModelRoutes } from "./routes/thread-models.ts";
 import { createUndoRoutes } from "./routes/undo.ts";
 import { createUpgrades } from "./routes/upgrades.ts";
-import { createBrowserViewerRoutes } from "./routes/browser-viewers.ts";
+
 import { createAntigravityLeftoverRoutes } from "./routes/antigravity-leftovers.ts";
 import { createAntigravityAccountRoutes } from "./routes/antigravity-accounts.ts";
 import { createConfigRoutes } from "./routes/config.ts";
@@ -338,7 +331,7 @@ let workspaceRestore: WorkspaceRestoreResult = { restored: false };
 
 if (existsSync(join(DATA_DIR, ".backups"))) {
   workspaceRestore = applyPendingWorkspaceRestore(DATA_DIR);
-  
+
   if (!workspaceRestore.restored && !workspaceRestore.rolledBack) workspaceRestore = readLastWorkspaceRestore(DATA_DIR) ?? workspaceRestore;
 }
 const workspaceMaintenance = new WorkspaceBackupMaintenance();
@@ -359,19 +352,14 @@ const sessions = new SessionRegistry({
 
 // A Cloud home's secrets come over the launcher's pipe, never this process's environment.
 
-
 const CLOUD_HOME = null;
-
 
 const lendingEnabled = () => CLOUD_HOME !== null;
 /** Owner-written routines and owner-started runs: the only routine turns that may use a lent Mac. */
 
-
 const foreignTurns = new Map<string, { botId: string; threadId: string }>();
 
-
 holdIncludedServices(process.env);
-
 
 const threadStarters = new ThreadStarters(join(DATA_DIR, "thread-starters.json"));
 // Every saved login value is scrubbed from whatever a bot or a transcript can read.
@@ -507,38 +495,21 @@ function turnOrigin(capability: Pick<InternalCapability, "threadId" | "generatio
   return owner.origin;
 }
 
-
-
-
-
-
-
-
 /** On a Cloud home a turn that may use the lent Mac reads only the owner's own conversations. */
-
-
-
 
 /** The only conversations that may feed a bot's memory, daily log, recall or brief; dropped whenever a session is revoked. */
 const ownerOnlyCache = new Map<string, { length: number; last?: string; owner: boolean }>();
-
-
-
-
 
 const CLOUD_OWNER_PROFILE_FIELDS = ["name", "title", "description", "soul", "notifications"] as const;
 
 /** On a Cloud home only the owner's devices may rename, rerun, rewrite or delete the owner's conversations; anyone else only their own. */
 
-
 /** A guest writes only in conversations it started: a line steered into the owner's running turn would reach it before anything could reclassify that turn. */
-
 
 /** The owner's one key across re-pairing; only an admin session is given it. */
 
 const CLOUD_NOBODY_KEY = `p_${createHash("sha256").update("cloud-nobody").digest("base64url").slice(0, 22)}`;
 /** Settled at boot once routines load (settleCloudHome); only `proven` feeds lending and memory. */
-
 
 function actorKey(auth: RequestAuth & { kind: "session" }): string {
   return personKey(auth.session);
@@ -551,22 +522,13 @@ function withRoutineWriter<T>(writer: string, work: () => T): T {
   try { return work(); } finally { routineWriterInFlight = previous; }
 }
 
-
-
-
-
-
 /** Approving a change never makes anyone else's routine the owner's: `wasOwners` is taken before the change. */
 
-
-
 /** Its turns run in Ask, confined to a private folder, and nothing in it reaches the owner's turns. */
-
 
 const guestDrivenTurns = new Map<string, string>();
 
 /** Work a guest's turn hands a teammate is the guest's too, however deep. */
-
 
 /** Never the owner when a guest drives the source, so the new conversation is confined like it. */
 function openerFrom(fromThreadId: string): string | undefined {
@@ -584,27 +546,14 @@ function parentThreadModel(botId: string, parentThreadId: string): { modelSelect
   return { modelSelection, ...(needsAsk ? { approvalMode: "ask" as const } : {}) };
 }
 
-
-
-
-
-
-
 /** A guest-driven turn runs in Ask whatever the bot's own level, with no shell. On a Cloud only its owner ever used, only what came in from outside is. */
-
 
 /** Loopback is not the owner on a Cloud home: only processes on the machine (a bot's shell) arrive that way. */
 function cloudOwnerSession(auth: RequestAuth): boolean {
   return auth.kind === "session" && auth.scopes.includes("admin");
 }
 
-
-
 /** Only a proven owner's words reach the lent Mac, memory and recall; an earlier key needs proof, not just no revocation. */
-
-
-
-
 
 /** Decides only whose answer to an existing card counts; it adds no card, gate or prompt. */
 function cardAnswerRefusal(auth: RequestAuth, threadId: string, requestId: string, behavior: string): string | null {
@@ -618,7 +567,7 @@ function cardAnswerRefusal(auth: RequestAuth, threadId: string, requestId: strin
     return "Only a workspace admin can review shared team memory.";
   }
   // A Cloud guest may read along but never answer: its words would reach the owner's turn and a lent Mac.
-  
+
   if (auth.scopes.includes("admin") || !sharedMembership()) return null;
   const known = [threadStarters.get(threadId), cardRequesterKey(threadId, requestId)].filter((person): person is string => Boolean(person));
   if (!known.length || known.includes(personKey(auth.session))) return null;
@@ -644,15 +593,12 @@ function cardAnswererFor(auth: RequestAuth): CardAnswerer {
 
 /** The answer reaches the turn before `answeredBy` is written, so a lending turn reads its answerer here. */
 
-
-
-
 async function answeringCardAs(auth: RequestAuth, threadId: string, requestId: string, work: () => Promise<unknown>): Promise<void> {
   const open = (() => {
     const card = store.messagesFor(threadId).find((message) => message.card?.requestId === requestId)?.card;
     return Boolean(card && !card.answered && !card.dismissed && !card.expired);
   })();
-  
+
   try {
     await withDecisionActor(decisionActorFor(auth), work);
   } finally {
@@ -661,7 +607,7 @@ async function answeringCardAs(auth: RequestAuth, threadId: string, requestId: s
     if (message && card && !card.answeredBy && card.answered !== "unavailable" && (card.answered || card.dismissed)) {
       store.patchMessage(threadId, message.id, { card: { ...card, answeredBy: { ...cardAnswererFor(auth) } } });
     }
-    
+
   }
 }
 
@@ -993,7 +939,7 @@ function adminAuditRows(
     rows.push({ category: "session", action: "session.revoke", target: { kind: "session", id: session.id, name: session.email ?? session.label },
       before: { label: session.label, ...(session.email ? { email: session.email } : {}), scopes: session.scopes } });
   }
-  
+
   if (plan.engineAction) rows.push({ category: "engine", action: `engine.${plan.engineAction.action}`, target: { kind: "engine", id: plan.engineAction.id } });
   const roomBody = plan.roomId ? parsedBodyOf(req) : undefined;
   const room = plan.roomId ? store.group(plan.roomId) : undefined;
@@ -1003,7 +949,6 @@ function adminAuditRows(
   }
   return rows;
 }
-
 
 function usageTriggerFor(auth: RequestAuth): UsageTrigger {
   return auth.kind === "session"
@@ -1074,11 +1019,7 @@ type UtilityParentPort = {
 };
 // Only Electron's utility process supplies parentPort, private to the desktop main process; plain Node leaves it absent.
 const utilityParentPort = (process as NodeJS.Process & { parentPort?: UtilityParentPort }).parentPort;
-type DesktopPrivateMessage = BrowserCleanupWireRequest | {
-  type: "openmausbot:browser-control";
-  botId: string;
-  held: true;
-} | {
+type DesktopPrivateMessage = {
   type: "openmausbot:phone-secret-save";
   requestId: string;
   target: string;
@@ -1119,44 +1060,17 @@ function applyDesktopMutationTokenMessage(raw: unknown): boolean {
   }
   desktopMutationToken = message.token;
   if (typeof message.companionToken === "string" && /^[A-Za-z0-9_-]{43}$/.test(message.companionToken)) {
-    
+
   }
   return true;
 }
-const browserCleanup: BrowserCleanupCoordinator = new BrowserCleanupCoordinator({
-  file: join(DATA_DIR, "browser-cleanups.json"),
-  send: (request) => {
-    // Only the managed engine: a PATH wrapper can fail the close and wedge the journal on retries.
-    const status = browserEngineStatus({ managedOnly: true });
-    const sessions = request.type === "openmausbot:browser-bot-deleted" && request.botId
-      ? [browserSessionId(request.botId, "")]
-      : request.partitionId
-        ? [browserSessionId("", request.partitionId)]
-        : [];
-    // Never acknowledge an erase that did not happen: a failure leaves the intent pending for retry.
-    const work = Promise.all([eraseChromeBrowser(request), ...sessions.map(async (session) => {
-          if (status.kind !== "ready") return true;
-          const ok = await clearBrowserSessionState(status.binaryPath, session, { encryptionKey: browserEngineEncryptionKey() });
-          if (!ok) console.warn(`browser cleanup: could not clear saved state for session ${session}; restart OpenMausBot to retry this profile's cleanup. Do not use state clear --all: it erases other profiles too.`);
-          return ok;
-        })]);
-    void work.then((results) => results.every(Boolean), (error) => {
-      console.warn("browser cleanup: could not clear saved session state", error);
-      return false;
-    }).then((ok) => {
-      browserCleanup.receive({ type: "openmausbot:browser-lifecycle-result", requestId: request.requestId, ok });
-    }).catch((error) => {
-      console.warn("browser cleanup: could not acknowledge cleanup", error);
-    });
-    return true;
-  },
-});
+
 utilityParentPort?.on("message", (event) => {
   const message = event?.data;
   try {
     if (applyDesktopMutationTokenMessage(message)) return;
     if (handleDesktopTrustedApprovalMessage(message)) return;
-    if (browserCleanup.receive(message)) return;
+
     composio.applyManagedBrokerMessage(message);
   } catch (error) {
     console.error(`[desktop-sync] rejected private parent message: ${error instanceof Error ? error.message : String(error)}`);
@@ -1173,7 +1087,7 @@ const managedPolicy = new ManagedDesktopPolicy({ onChange: () => {
 } });
 onKeyRejectionChange(() => { registry.forgetSnapshots(); broadcast({ kind: "config", ...configStatus() }); });
 function computerPlaceRefusal(kind: ComputerKind): { message: string; code: "cloud_home" | "managed_policy" } | undefined {
-  
+
   const managed = managedPolicy.computerRefusal(kind);
   return managed ? { message: managed, code: "managed_policy" } : undefined;
 }
@@ -1197,7 +1111,6 @@ const managedDesktop = new ManagedDesktopProviders({
     resyncOpenCodeProviderKeys();
   },
 });
-
 
 openCodeOrganisationManaged = () => managedPolicy.current() !== null || managedDesktop.enrolled();
 utilityParentPort?.on("message", event => {
@@ -1246,7 +1159,7 @@ type InternalCapability = {
   threadId: string;
   generation: string;
   depth: number;
-  kind: "agents" | "connectors" | "computer" | "browser" | "hooks" | "phone" | "data" | "highlevel";
+  kind: "agents" | "connectors" | "computer" | "hooks" | "phone" | "data" | "highlevel";
   skillAuthoring: boolean;
   createdBots: number;
   createdRooms?: number;
@@ -1255,7 +1168,7 @@ type InternalCapability = {
   teamComputerId?: string;
   /** Set only by the harness at attach; null: mounted, and the first call creates or wakes the Boat. */
   boxId?: string | null;
-  browserSession?: string;
+
   roomHandoffId?: string;
   attachedFiles?: number;
   /** attach_file may also deliver files saved outside the conversation's folders. Never on a Cloud home or a hosted workspace. */
@@ -1439,9 +1352,9 @@ function internalCapabilityIsActive(capability: InternalCapability): boolean {
       externalRuntimeIsActive(EXTERNAL_RUNTIMES_FILE, capability.externalRuntime, id => store.bot(id)));
   }
   const switching = computerSelectionTurns.get(capability.threadId);
-  if ((capability.kind === "computer" || capability.kind === "browser") &&
+  if ((capability.kind === "computer" ) &&
       switching?.generation === capability.generation && switching.selected) return false;
-  
+
   return (
     capability.orphanExpiresAt > Date.now() &&
     activeInternalGenerationByThread.get(capability.threadId) === capability.generation
@@ -1494,7 +1407,6 @@ function agentsIntegration(
   };
 }
 
-
 const hooksEnabled = () => process.env.OMB_HOOKS !== "0";
 function hooksIntegration(botId: string, threadId: string, generation: string): { url: string; token: string } {
   const token = mintInternalCapability({
@@ -1538,7 +1450,6 @@ async function asPlaceFailure(error: unknown, place: Surface, source: PlaceSourc
     const cause = (error instanceof Error ? error.message : String(error)).trim().replace(/[\s.]+$/, "");
     return placeUnavailable(place, { state: "place-failed", params: { bot: bot.name, cause: cause + "." }, source }, false);
   }
-
 
 const directTurnDispatchClaims = new Map<string, DirectTurnDispatchClaim>();
 const directTurnGenerationByThread = new Map<string, string>();
@@ -1751,7 +1662,7 @@ function releaseTurnResources(owner: TurnOwner | undefined): void {
   if (!owner) return;
   if (autoVmClaims.get(owner.threadId)?.owner.generation === owner.generation) autoVmClaims.delete(owner.threadId);
   if (settlingResourceOwners.get(owner.threadId) === owner.generation) settlingResourceOwners.delete(owner.threadId);
-  
+
   turnResources.release(owner);
   if (turnResourceOwners.get(owner.threadId)?.generation === owner.generation) turnResourceOwners.delete(owner.threadId);
   if (turnComputerResources.get(owner.threadId)?.owner.generation === owner.generation) turnComputerResources.delete(owner.threadId);
@@ -2057,12 +1968,6 @@ function cancelDirectTurnDispatch(botId: string, expectedThreadId?: string): Dir
   return claim;
 }
 
-const {
-  browserRuntime, browserLive, usedBrowserSessions, browserSweep, temporaryBrowserSessions,
-  currentBrowserSession, forgetTemporaryBrowser, myChromeAvailable, browserSessionSpec, browserIntegration,
-  browserReady, currentBrowserSpec, loginInput, browserSystemPrompt, signedInSitesRefusal, closeBrowser, browserEngineSwitched, eraseChromeBrowser, engineSummary,
-} = createBrowserHost({ cfg, store: () => store, turnResources, activeInternalGenerationByThread, mintInternalCapability, DESKTOP_MANAGED, CLOUD_HOME, PORT });
-
 const dataSheets = new DataSheetRegistry({
   broadcast: (frame) => broadcast({ ...frame }),
   dropResult: async (botId, name) => {
@@ -2094,16 +1999,6 @@ function dataIntegration(botId: string, turn: { threadId: string; generation: st
 /** Only with a connection and for a bot allowed to use it (connected apps on; scopes and grants name highlevel). */
 function highlevelIntegration(bot: BotRecord, turn: { threadId: string; generation: string }) {
   return highlevelHost.integration(bot, () => mintInternalCapability({ botId: bot.id, ...turn, kind: "highlevel", depth: 0, skillAuthoring: false, createdBots: 0, openedThreads: 0 }), `http://127.0.0.1:${PORT}`);
-}
-
-let browserEngineInstall: Promise<void> | null = null;
-let browserEngineInstallError: string | null = null;
-export function browserEngineSummary(): { kind: "engine" | "unavailable"; reason?: string; installable?: boolean; version?: string; chrome?: string; installing?: boolean; installError?: string; myChrome: boolean; engine: "agent-browser" | "chrome" } {
-  const status = browserEngineStatus();
-  const progress = { myChrome: myChromeAvailable(), ...(browserEngineInstall ? { installing: true } : {}), ...(browserEngineInstallError ? { installError: browserEngineInstallError } : {}) };
-  return engineSummary(status.kind === "ready"
-    ? { kind: "engine" as const, version: status.version, chrome: chromeLauncher.describe(), ...progress }
-    : { kind: "unavailable" as const, reason: status.reason, installable: status.installable, ...progress });
 }
 
 function connectedAppsIntegration(bot: Pick<BotRecord, "id" | "connectorTools">, threadId: string, generation: string) {
@@ -2145,7 +2040,7 @@ const computerControl = new ComputerControl((key, snapshot) => {
   computerControlRevision.set(botId, (computerControlRevision.get(botId) ?? 0) + 1);
   // One-way, fail-closed mirror into Electron: never send release, since a loopback caller can influence the server record.
   if (snapshot.held && /^[A-Za-z0-9_-]{1,120}$/.test(botId)) {
-    postDesktopPrivateMessage({ type: "openmausbot:browser-control", botId, held: true });
+
   }
   broadcast({ kind: "computer-control", botId, held: snapshot.held, helpReason: snapshot.helpReason, ...(snapshot.help ? { help: snapshot.help } : {}) });
   }
@@ -2198,7 +2093,7 @@ const selectionContext = {
 
 async function refreshUnsetModelSelections(instances?: readonly SelectableInstance[]): Promise<void> {
   const selectable = selectableInstances<SelectableInstance>(instances ?? await registry.describe());
-  
+
   bootSelection = await defaultSelection(undefined, selectable.filter(instance => readyToRun(instance, selectionContext)));
   if (hostedModels || !bootSelection.instanceId || !bootSelection.model) return;
   const selection = withNewBotEffort(bootSelection, cfg.newBots?.effort,
@@ -2549,22 +2444,8 @@ if (skillsLibraryEnabled(cfg)) {
   }
 }
 // Reconcile stale bot references before Electron can ACK the journal, so id reuse never attaches a bot to someone else's new account.
-let browserCleanupReferencesReconciled = true;
-try {
-  const committedProfileIds = new Set(browserCleanup.committedProfileIds());
-  for (const bot of store.bots) {
-    if (bot.browserProfile && committedProfileIds.has(bot.browserProfile)) {
-      store.patchBot(bot.id, { browserProfile: undefined });
-    }
-  }
-} catch (error) {
-  browserCleanupReferencesReconciled = false;
-  console.error(
-    `browser cleanup: could not reconcile committed profile references: ${error instanceof Error ? error.message : String(error)}`,
-  );
-}
+
 // Replay only after the secondary write above is durable.
-if (browserCleanupReferencesReconciled) browserCleanup.startPending();
 
 let activeCoordinationForThread = (_threadId: string): boolean => false;
 let cacheKeepWarmStatus = (_threadId: string): KeepWarmStatus | undefined => undefined;
@@ -2603,10 +2484,11 @@ const wireTrustedApprovalBot = (bot: NonNullable<ReturnType<typeof store.bot>>) 
 };
 
 function previewSystemPrompt(bot: BotRecord) {
-  const persona = botPersona(bot);
   const instance = registry.get(bot.modelSelection.instanceId);
+  const persona = botPersona(bot);
+
   const caps = instance?.adapter.capabilities;
-  
+
   const previewComputer = bot.computer;
   const computerPromptKind = resolveComputerPromptKind({
     kind: previewComputer === "cloud" ? "box" : previewComputer === "local" ? "local" : null,
@@ -2620,7 +2502,7 @@ function previewSystemPrompt(bot: BotRecord) {
   const agentsMounted = caps?.agentsMcp === true;
   const previewPlan = resolveSurface({
     destination: previewComputer,
-    browserOn: caps?.browserMcp === true && builtInBrowserEnabled(cfg) && bot.browser !== false,
+
   });
   const privateWorkspace = instance && supportsWorkspaceFiles(instance.driverKind);
   const built = buildSystemPrompt(persona, bot.soul ?? "", [
@@ -2646,7 +2528,6 @@ function previewSystemPrompt(bot: BotRecord) {
     { id: "composio", label: "Connected apps", text: caps?.composioMcp && bot.composio !== false && composio.configured(cfg) ? composioSystemPrompt(bot.connectorTools) + describeConnectorScopes(bot.connectorScopes) : "" },
     { id: "highlevel", label: "HighLevel", text: caps?.highlevelMcp === true && highlevelHost.mounts(bot) ? highlevelHost.prompt(bot) : "" },
     { id: "mcp", label: "MCP servers", text: caps?.customMcp ? customMcpPrompt(Object.keys(engineMcpServers(bot))) : "" },
-    { id: "browser", label: "Browser", text: previewPlan.browser ? browserPromptFor(bot, agentsMounted) : "" },
     { id: "coordination", label: "Team", text: agentsMounted && coordination ? ` ${coordination}` : "" },
     { id: "credential", label: "Credentials", text: agentsMounted ? CREDENTIAL_PROMPT : "" },
     { id: "routine", label: "Triggers", text: agentsMounted ? TRIGGER_PROMPT : "" },
@@ -2724,7 +2605,7 @@ async function botOverview(bot: BotRecord): Promise<BotOverview> {
       enabled: skill.enabled,
     })),
     engine,
-    browserEnabled: builtInBrowserEnabled(cfg),
+
     cloudHome: Boolean(CLOUD_HOME),
     connectedApps,
     sectionPeers,
@@ -2736,7 +2617,7 @@ async function botOverview(bot: BotRecord): Promise<BotOverview> {
 /** Defense in depth against hand-edited records. Delegation uses the receiving bot's grant, never the sender's, except a Chief's (delegatedLevel). */
 const approvalModeForTurn = (bot: BotRecord, peerInitiated = false, _threadId = bot.threadId): ApprovalMode => {
   // Judged by the conversation the turn runs in, never whichever of the bot's conversations is active.
-  
+
   const mode = approvalModeForOrigin(approvalModeFor(bot), { peerInitiated });
   if (!supportsApprovalMode(bot.modelSelection, mode)) {
     return "ask";
@@ -2803,7 +2684,7 @@ function roomTurnApprovalMode(bot: BotRecord, threadId: string, orchestration?: 
 }
 
 function roomTurnLevel(bot: BotRecord, threadId: string, source: Pick<HandoffView, "botId" | "threadId"> | undefined): ApprovalMode {
-  
+
   const from = source ? store.bot(source.botId) : undefined;
   const own = approvalModeForTurn(bot, source !== undefined, threadId);
   return (from && source && delegatedLevel(from, source.threadId, bot, own)) || own;
@@ -3401,7 +3282,7 @@ function updateChannel(groupId: string, value: unknown): GroupRecord {
 
   const existing = store.group(groupId);
   if (!existing) throw Object.assign(new Error("no such room"), { status: 404 });
-  
+
   if (
     channelTaskBlocked(existing) &&
     (body.memberIds !== undefined || body.defaultResponder !== undefined || body.bulletin !== undefined)
@@ -4524,7 +4405,7 @@ const upgrades = createUpgrades();
 let audienceChangedAt = 0;
 function audienceChanged(): void {
   audienceChangedAt = lastSeq;
-  browserLive.recheck();
+
   for (const client of sseClients) {
     if (client.viewer.kind !== "member") continue;
     sseClients.delete(client);
@@ -4532,7 +4413,7 @@ function audienceChanged(): void {
   }
 }
 function closeSessionStreams(sessionId: string): void {
-  browserLive.closeForOwner(sessionId);
+
   for (const client of sseClients) {
     if (client.sessionId !== sessionId) continue;
     sseClients.delete(client);
@@ -4548,8 +4429,6 @@ sessions.onSessionRevoked((sessionId) => {
   // A revoked owner device no longer vouches for its lines (cloudOwnerPerson).
   ownerOnlyCache.clear();
 });
-
-
 
 /** A stream id makes the cursor safe across restarts, since sequence numbers restart at 1. It rides
  * in the SSE `id:` field, so a browser EventSource resumes through Last-Event-ID with no client code. */
@@ -4899,7 +4778,7 @@ const memoryUpkeep = createMemoryUpkeep({
     const room = store.groupByThread(threadId);
     if (room) return roomCaptureAllowed(room, store.bot(botId)) ? captureRoomTurnFor(threadId, botId, turnId) : null;
     if (store.botByThread(threadId)?.id !== botId) return null;
-    
+
     return captureTurnFor(threadId, turnId);
   },
   ...({}),
@@ -5068,7 +4947,7 @@ bus.subscribe((event: RuntimeEvent) => {
     const bot = store.botByThread(event.threadId);
     if (!bot || !upkeepEnabled(bot) || isInternalTurn(event.threadId)
       || isUnattended(bot.id, event.threadId) || routines?.runForThread(event.threadId)) return;
-    
+
     const turn = captureTurnFor(event.threadId, event.turnId);
     if (turn) memoryUpkeep.noteTurn(bot.id, event.threadId, turn);
   } catch (error) {
@@ -5152,7 +5031,7 @@ bus.subscribe((event: RuntimeEvent) => {
     // A room fewer people can see than this bot leaves no line: session_search would hand it to anyone who sees the bot.
     const room = store.groupByThread(event.threadId);
     if (room && !roomFeedsBot(room, bot)) return;
-    
+
     // Lands after this turn's journal diff, so it is journaled here as the turn's own.
     const now = new Date();
     const writeLine = () => journalTurnWrite(bot.id, memoryLogPath(now), event.threadId, () => appendMemoryLog(bot.id, line, {
@@ -5353,11 +5232,6 @@ const COMPUTER_CALL_ACT_WITHIN_MS = Math.min(CONTROL_ACT_WITHIN_MS, Math.max(100
 const COMPUTER_CALL_POLL_MS = 250;
 const orphanBoatLifecycleBusyIds = new Set<string>();
 
-
-
-
-
-
 function botComputerControlKey(bot: BotRecord): string { return bot.id; }
 
 /** Waits here up to COMPUTER_CALL_WAIT_MS; a call that waited through a person's hold, or whose turn ended, is never performed. */
@@ -5411,16 +5285,7 @@ async function computerCallGate(internalCapability: InternalCapability, signal?:
 
 function botComputerControlSnapshot(botId: string, _pinnedComputerId?: string) { return computerControl.snapshot(botId); }
 
-
-
-
-
-
-
-
-
 /** Assignment authorizes waking, never replacing a missing paid machine. */
-
 
 function cloudEngine(instance: ReturnType<typeof registry.get>, model?: string): CloudEngine & { name: string } {
   return {
@@ -5430,9 +5295,6 @@ function cloudEngine(instance: ReturnType<typeof registry.get>, model?: string):
 }
 
 /** The agent process holds only a turn-scoped capability naming this Boat, never a Boat credential. */
-
-
-
 
 async function mountHostComputer(owner: TurnOwner, botId: string, providerSupportsLocal: boolean, onRejected: (failure: string, error?: unknown) => void) {
   if (!shouldMountLocalComputer({ requested: "local", hostPlatform: process.platform, providerSupportsLocal })) {
@@ -5455,16 +5317,7 @@ async function mountHostComputer(owner: TurnOwner, botId: string, providerSuppor
   return gatedLocalComputer(cua, controlIntegration(botId, owner.threadId, owner.generation, "this computer"));
 }
 
-
-
-
-
-
-
 /** The Cloud place is the consent boundary to create or wake a Boat (which un-pauses billing); Auto never reaches here. */
-
-
-
 
 function botHasActiveTurn(botId: string): boolean {
   const bot = store.bot(botId);
@@ -5474,12 +5327,12 @@ function botHasActiveTurn(botId: string): boolean {
 }
 
 function turnSurfacePlan(bot: BotRecord, runOn?: RoutineRunOn, threadId?: string) {
-  const instance = registry.get(bot.modelSelection.instanceId);
+
   const forcedBoat = runOn === "cloud" || Boolean(undefined);
   return resolveSurface({
     destination: forcedBoat ? "cloud" : bot.computer,
     pinnedSurface: forcedBoat || !threadId ? null : store.taskByThread(bot.id, threadId)?.surface,
-    browserOn: builtInBrowserEnabled(cfg) && bot.browser !== false && instance?.adapter.capabilities.browserMcp === true,
+
   });
 }
 
@@ -5498,7 +5351,7 @@ async function selectableComputers(bot: BotRecord) {
   const caps = instance?.adapter.capabilities;
   const off = bot.computer === "off";
   const toolsLeaveOut = computerToolsRefusal(bot.toolScope, "works-on", bot.name)?.message;
-  const surfaces = ["local", "browser"] as const;
+  const surfaces = ["local"] as const;
   return Promise.all(surfaces.map(async surface => {
     let ready = false;
     let canStart = false;
@@ -5506,13 +5359,10 @@ async function selectableComputers(bot: BotRecord) {
     let reason = "This computer is not configured or running. Open the Computer panel to set it up.";
     try {
       if (off) reason = "Computer access is Off in this bot's settings.";
-      else if (toolsLeaveOut && surface !== "browser") reason = toolsLeaveOut;
+      else if (toolsLeaveOut) reason = toolsLeaveOut;
       else if (surface === "local") {
         ready = shouldMountLocalComputer({ requested: "local", hostPlatform: process.platform,
           providerSupportsLocal: caps?.localComputerMcp === true }) && Boolean(readCuaConnection());
-      } else if (surface === "browser") {
-        ready = caps?.browserMcp === true && builtInBrowserEnabled(cfg) && bot.browser !== false && browserReady(bot.browserProfile);
-        reason = "The built-in browser is disabled, not installed, or unsupported by this model.";
       }
     } catch (error) { reason = error instanceof Error ? error.message : String(error); }
     const kind = surface === "local" ? "thisComputer" : undefined;
@@ -5561,10 +5411,7 @@ function engineSteersImages(instance: ReturnType<typeof registry.get> | undefine
   return Boolean(capabilities?.queueing && capabilities.steerImages && capabilities.nativeImageInput && instance?.adapter.steer);
 }
 
-
-
 /** Claimed synchronously before the provider mutation; startTurn checks the same set, so a turn and an irreversible lifecycle action cannot pass each other. */
-
 
 /** One synchronous lane: whichever lifecycle operation starts first excludes the other. */
 bus.subscribe((event: RuntimeEvent) => {
@@ -6252,7 +6099,7 @@ function handoffOpener(capability: Pick<InternalCapability, "botId" | "threadId"
         : { kind: "routine", source: "routine", ref: run.routineId },
     };
   }
-  
+
   return undefined;
 }
 
@@ -6797,14 +6644,14 @@ const SCREEN_SETTLE_TIMEOUT_MS = 10_000;
 function startScreenPoller(
   botId: string,
   threadId: string,
-  captures: { computer?: ScreenCapture; browser?: ScreenCapture },
+  captures: { computer?: ScreenCapture },
   { screenIsTheWork = false } = {},
 ) {
-  if (!captures.computer && !captures.browser) return;
+  if (!captures.computer) return;
   if (screenPollers.has(threadId)) return;
   const owner = turnResourceOwners.get(threadId);
   const computer = turnComputerResources.get(threadId);
-  const browserSession = currentBrowserSession(botId, botForThread(botId, threadId)?.browserProfile);
+
   const guarded = (capture: ScreenCapture | undefined, resource: string | undefined): ScreenCapture | undefined =>
     capture && owner && resource ? async () => {
       const isCurrent = () => turnResourceOwners.get(threadId)?.generation === owner.generation &&
@@ -6818,7 +6665,7 @@ function startScreenPoller(
   const entry = Object.assign(createScreenFrameSource({
     captures: {
       computer: guarded(captures.computer, computer?.resource),
-      browser: guarded(captures.browser, browserSession ? `browser:${browserSession}` : undefined),
+
     },
     control: () => ({
       held: botComputerControlSnapshot(botId, teamComputerTurns.get(threadId)?.computerId).held,
@@ -7012,7 +6859,7 @@ async function startTurn(
   const toolScope = toolScopeForTurn(bot.id);
   guestDrivenTurns.delete(threadId);
   const guestConfined = false;
-  
+
   const resolvedImages = extractTurnImages(text);
   const usesNativeImageInput = instance.adapter.capabilities.nativeImageInput === true;
   const providerText = promptWithDataContext(usesNativeImageInput ? resolvedImages.text : text, opts?.dataContext);
@@ -7098,7 +6945,7 @@ async function startTurn(
   const agentsMounted = instance.adapter.capabilities.agentsMcp === true;
 
   const dispatchClaimId = randomUUID();
-  
+
   const resourceOwner: TurnOwner = { threadId, generation: dispatchClaimId };
   turnResourceOwners.set(threadId, resourceOwner);
   directTurnGenerationByThread.set(threadId, dispatchClaimId);
@@ -7275,7 +7122,7 @@ async function startTurn(
       if (dispatchContext.handoff) handoffs.begin(threadId, dispatchClaimId, dispatchContext.handoff);
 
       const integrations: NonNullable<Parameters<typeof instance.adapter.sendTurn>[0]["integrations"]> = {};
-      let browser: Awaited<ReturnType<typeof browserIntegration>> = null;
+
       const selectedSkills = selectBundledSkills(
         providerText,
         [
@@ -7310,7 +7157,7 @@ async function startTurn(
       const checkpointCwd = cwd && cwd !== privateWorkspace ? cwd : undefined;
       const dwebUrl = process.env.DWEB_URL?.trim();
       if (dwebUrl) integrations.dweb = { url: dwebUrl };
-      
+
       const mountsLocalComputer = instance.adapter.capabilities.localComputerMcp === true;
       const dispatchTask = store.taskByThread(bot.id, threadId);
       let wants: ComputerWant = computerSkipped ? "off" : plan.computer;
@@ -7318,7 +7165,7 @@ async function startTurn(
         if (!answer.incident || error instanceof DirectTurnSetupCancelled || error instanceof ComputerWaitParked) throw error;
         computerSkipped ??= error instanceof Error ? error.message : String(error);
         wants = "off";
-        
+
         delete integrations.localComputer;
         releaseTurnComputer(resourceOwner);
       };
@@ -7331,7 +7178,7 @@ async function startTurn(
         : plan.pinned ? (dispatchTask?.surfaceSource === "auto" ? "auto-pin" : "pin")
         : "works-on";
       let previewCapture: (() => Promise<{ png: string; format: string }>) | null = null;
-      let browserCapture: (() => Promise<{ png: string; format: string }>) | null = null;
+
       let computerKind: "local" | null = null;
       const autoPinAllowed = () => {
         const liveBot = store.bot(bot.id);
@@ -7446,7 +7293,7 @@ async function startTurn(
       if (!directTurnClaimIsCurrent(bot.id, dispatchClaimId, threadId)) {
         throw new DirectTurnSetupCancelled("turn stopped before dispatch");
       }
-      // One bot snapshot for the browser bearer, setupModeActive and the prompt's soul, so a soul saved mid-dispatch cannot split them.
+      // One bot snapshot for setupModeActive and the prompt's soul, so a soul saved mid-dispatch cannot split them.
       const liveBot = store.bot(bot.id);
       const setupMode =
         agentsMounted &&
@@ -7461,37 +7308,16 @@ async function startTurn(
       }
       if (liveBot && instance.adapter.capabilities.highlevelMcp === true) { const crm = highlevelIntegration(liveBot, { threadId, generation: dispatchClaimId }); if (crm) integrations.highlevel = crm; }
       const mountedComputer = surfaceOfComputerKind(computerKind);
-      if (
-        liveBot &&
-        plan.browser &&
-        !(plan.computer === undefined && mountedComputer) &&
-        builtInBrowserEnabled(cfg) &&
-        liveBot.browser !== false &&
-        instance.adapter.capabilities.browserMcp === true
-      ) {
-        const selectedProfile = liveBot.browserProfile;
-        browser = await browserIntegration(bot.id, selectedProfile, { threadId, generation: dispatchClaimId });
-        if (browser) integrations.browser = browser.integration;
-        if (browser) {
-          const spec = browser.spec;
-          const session = browser.session;
-          // The preview shares the profile with tool calls: claim the same browser:<session> resource, and skip the frame while another thread holds it.
-          browserCapture = async () => {
-            const owner = turnResourceOwners.get(threadId);
-            if (!owner || !claimTurnResource(owner, `browser:${session}`)) throw new Error("another thread is using this browser");
-            return browserRuntime.previewFrame(session, () => relayFrame(spec, session), spec);
-          };
-        }
-      }
+
       if (autoPinAllowed()) {
         const claimSlot = autoVmClaims.get(threadId);
         const pinsAtClaim = claimSlot?.owner.generation === resourceOwner.generation;
-        const used = pinsAtClaim ? null : mountedComputer ?? (integrations.browser ? "browser" : null);
+        const used = pinsAtClaim ? null : mountedComputer;
         if (used) store.patchTask(bot.id, threadId, { surface: used, surfaceSource: "auto" });
       }
       const computerSelection = computerSelectionTurns.get(threadId);
-      if (computerSelection) computerSelection.mounted = mountedComputer ?? (integrations.browser ? "browser" : undefined);
-      recordTurnPlace(bot.id, threadId, mountedComputer ?? (integrations.browser ? "browser" : null));
+      if (computerSelection) computerSelection.mounted = mountedComputer ?? undefined;
+      recordTurnPlace(bot.id, threadId, mountedComputer);
       // Never overlap a replacement with a cancelled adapter's pre-id window: wait for it, then revalidate this exact claim.
       await pendingCancelledProviderHandshakes.waitForClear(threadId);
       if (!markDirectTurnDispatching(bot.id, dispatchClaimId, threadId)) {
@@ -7518,11 +7344,10 @@ async function startTurn(
         { id: "shell", label: "Long-running commands", text: worksInWorkspace ? longCommandsPrompt() : "" },
         { id: "computer", label: "Computer", text: computerPrompt(computerPromptKind) },
         { id: "", label: "", text: "" },
-        { id: "plan", label: "Surface", text: surfacePrompt({ computer: mountedComputer, browser: Boolean(integrations.browser) }, { pinned: plan.pinned, note: plan.note + (computerSkipped && plan.computer !== "off" ? computerSkippedNote(redactSecretsInText(computerSkipped)) : ""), canSelect: computerSelectionTurns.has(threadId), cloudHome: Boolean(CLOUD_HOME) }) },
+        { id: "plan", label: "Surface", text: surfacePrompt({ computer: mountedComputer, browser: false }, { pinned: plan.pinned, note: plan.note + (computerSkipped && plan.computer !== "off" ? computerSkippedNote(redactSecretsInText(computerSkipped)) : ""), canSelect: computerSelectionTurns.has(threadId), cloudHome: Boolean(CLOUD_HOME) }) },
         { id: "", label: "", text: "" },
         { id: "composio", label: "Connected apps", text: integrations.composio ? composioSystemPrompt(liveBot?.connectorTools ?? bot.connectorTools) + describeConnectorScopes((liveBot ?? bot).connectorScopes) : "" },
         { id: "mcp", label: "MCP servers", text: customMcpPrompt(Object.keys(integrations.custom ?? {})) },
-        { id: "browser", label: "Browser", text: integrations.browser ? browserPromptFor(bot, Boolean(integrations.agents)) : "" },
         { id: "data", label: "Data", text: integrations.data ? BUILT_IN_DATA_SYSTEM_PROMPT : "" },
         { id: "highlevel", label: "HighLevel", text: integrations.highlevel ? highlevelHost.prompt(liveBot ?? bot) : "" },
         { id: "coordination", label: "Team", text: coordinationPrompt ? ` ${coordinationPrompt}` : "" },
@@ -7585,7 +7410,6 @@ async function startTurn(
         systemVolatile: prompt.volatile,
         mentionTurn: tagged.length > 0,
         integrations,
-        ...(integrations.browser && browserIsThePlace(plan) ? { preloadBrowserTools: true } : {}),
         ...settingsTurnFields(cfg, DATA_DIR, managedPolicy.restrictsMcp()),
         cwd,
       })), () => !directTurnClaimExists(bot.id, dispatchClaimId, threadId), async () => {
@@ -7619,11 +7443,11 @@ async function startTurn(
         store.markTaskDispatched(bot.id, threadId, instanceId);
       }
       // A turn can settle before dispatch returns; a poller started after its turn.completed would never stop.
-      if ((previewCapture || browserCapture) && threadBusy(bot.id, threadId)) {
+      if (previewCapture && threadBusy(bot.id, threadId)) {
         startScreenPoller(
           bot.id,
           threadId,
-          { ...(previewCapture ? { computer: previewCapture } : {}), ...(browserCapture ? { browser: browserCapture } : {}) },
+          { ...(previewCapture ? { computer: previewCapture } : {}) },
         );
       }
       // An adapter may complete synchronously before dispatch resolves: close this exact generation from busy state.
@@ -7968,7 +7792,7 @@ routines = new RoutineManager({
   createTask: (botId, title, activate = false) => {
     const task = store.createTask(botId, title, activate);
     // On a Cloud home the routine's writer opens a run's conversation; a webhook run is the owner's, but its payload never reaches the lent Mac.
-    
+
     return task;
   },
   joinConversation: (run) => {
@@ -8028,7 +7852,7 @@ return undefined;
   onRunChanged: (run) => {  syncRoutineRunToSource(run); },
   onRunCut: (run) => run.groupId ? coordinator.cancelRoom(run.groupId, run.threadId!, ROUTINE_RESTARTED) : coordinator.cancelDirect(run.threadId!, ROUTINE_RESTARTED),
   onRunFailed: (run, alert) => {
-    
+
     const bot = store.bot(run.botId);
     if (!bot || alert === null) return;
     const said = alert?.detail ?? run.error, detail = said ? `${run.routineName}: ${said}` : run.routineName;
@@ -8129,76 +7953,53 @@ const routineRequests = new RoutineRequestService({
 });
 async function deleteBotWithLifecycle(botId: string, revalidate: () => void = () => {}, setupRequest?: TeamSetupRequest) {
   const deletionResponse = (status: number, body: { error?: string; ok?: boolean }) => ({ status, body });
-      revalidate();
-      const bot = store.bot(botId);
-      if (!bot) return deletionResponse( 404, { error: "no such bot" });
-      const activeRoutine = routines!.activeRunForBot(bot.id);
-      if (activeRoutine) {
-        return deletionResponse( 409, {
-          error: "stop this bot's active routine before deleting the bot",
-        });
-      }
-      const activeGroup = activeGroupTurnForBot(bot.id);
-      if (activeGroup) {
-        return deletionResponse( 409, {
-          error: `stop this bot's work in channel ${activeGroup.group.name} before deleting the bot`,
-        });
-      }
-      
-      
-      
-      try {
-        // Revalidate and record the browser cleanup intent before the first irreversible provider mutation.        // Revalidate and record the browser cleanup intent before the first irreversible provider mutation.
-        revalidate();
-        const browserCleanupRequest = browserCleanup.prepare("bot", bot.id);
-        try {
-          
-          // Invalidate every bot-callable bearer before the first asynchronous teardown step.
-          // Invalidate every bot-callable bearer before the first asynchronous teardown step.
-          for (const task of store.tasks(bot.id)) revokeInternalCapabilitiesForThread(task.threadId);
-          await interruptAllDirectThreads(bot.id);
-          for (const task of store.tasks(bot.id)) {
-            purgeTurnAttachmentsForThread(task.threadId);
-            clearTurnDigestState(task.threadId);
-            settleDirectFollowup(directTurnGenerationByThread.get(task.threadId), { ok: false, text: "The bot was deleted while it was working" });
-            directTurnGenerationByThread.delete(task.threadId);
-            directTurnBots.delete(task.threadId);
-          }
-          stopScreenPoller(bot.id);
-          lastReply.delete(bot.threadId);
-          cancelPeerApprovalsFor(bot.id);
-          computerControl.forget(bot.id);
-          computerControlRevision.delete(bot.id);
-          // Re-check the reviewed receipt at the final durable mutation, so a concurrent profile edit cannot be erased under a stale approval.
-          // Re-check the reviewed receipt at the final durable mutation, so a concurrent profile edit cannot be erased under a stale approval.
-          revalidate();
-          store.deleteBot(bot.id, setupRequest);
-          skillReview.dropBot(bot.id);
-          memoryUpkeep.forgetBot(bot.id);
-          routines!.disableForBot(bot.id);
-          webhooks.disableForBot(bot.id);
-          calendarCalls!.removeBot(bot.id);
-          browserLive.closeForBot(bot.id);
-          cacheKeepWarm.cancelBot(bot.id);
-          await forgetTemporaryBrowser(bot.id);
-          dataSheets.delete(bot.id);
-          if (dataEngine.unavailable() === null) await dataEngine.deleteBot(bot.id).catch((error) => console.warn(`data: could not delete ${bot.id}'s database`, error));
-        } catch (error) {
-          if (browserCleanupRequest) {
-            if (store.bot(bot.id)) browserCleanup.abort(browserCleanupRequest);
-            else browserCleanup.commit(browserCleanupRequest);
-          }
-          throw error;
-        }
-        if (browserCleanupRequest) {
-          const committedCleanup = browserCleanup.commit(browserCleanupRequest);
-          const acknowledged = await browserCleanup.ensure(committedCleanup);
-          requireBrowserCleanupAcknowledged(acknowledged, `Browser data for ${bot.name}`);
-        }
-        return deletionResponse( 200, { ok: true });
-      } finally {
-        
-      }
+  revalidate();
+  const bot = store.bot(botId);
+  if (!bot) return deletionResponse(404, { error: "no such bot" });
+  const activeRoutine = routines!.activeRunForBot(bot.id);
+  if (activeRoutine) {
+    return deletionResponse(409, {
+      error: "stop this bot's active routine before deleting the bot",
+    });
+  }
+  const activeGroup = activeGroupTurnForBot(bot.id);
+  if (activeGroup) {
+    return deletionResponse(409, {
+      error: `stop this bot's work in channel ${activeGroup.group.name} before deleting the bot`,
+    });
+  }
+
+  revalidate();
+
+  // Invalidate every bot-callable bearer before the first asynchronous teardown step.
+  for (const task of store.tasks(bot.id)) revokeInternalCapabilitiesForThread(task.threadId);
+  await interruptAllDirectThreads(bot.id);
+  for (const task of store.tasks(bot.id)) {
+    purgeTurnAttachmentsForThread(task.threadId);
+    clearTurnDigestState(task.threadId);
+    settleDirectFollowup(directTurnGenerationByThread.get(task.threadId), { ok: false, text: "The bot was deleted while it was working" });
+    directTurnGenerationByThread.delete(task.threadId);
+    directTurnBots.delete(task.threadId);
+  }
+  stopScreenPoller(bot.id);
+  lastReply.delete(bot.threadId);
+  cancelPeerApprovalsFor(bot.id);
+  computerControl.forget(bot.id);
+  computerControlRevision.delete(bot.id);
+  // Re-check the reviewed receipt at the final durable mutation, so a concurrent profile edit cannot be erased under a stale approval.
+  revalidate();
+  store.deleteBot(bot.id, setupRequest);
+  skillReview.dropBot(bot.id);
+  memoryUpkeep.forgetBot(bot.id);
+  routines!.disableForBot(bot.id);
+  webhooks.disableForBot(bot.id);
+  calendarCalls!.removeBot(bot.id);
+
+  cacheKeepWarm.cancelBot(bot.id);
+
+  dataSheets.delete(bot.id);
+  if (dataEngine.unavailable() === null) await dataEngine.deleteBot(bot.id).catch((error) => console.warn(`data: could not delete ${bot.id}'s database`, error));
+  return deletionResponse(200, { ok: true });
 }
 
 const driverCapabilitiesFor = (instanceId: string) => {
@@ -8478,7 +8279,7 @@ async function undoAppliedChange(res: ServerResponse, threadId: string, requestI
   let result: UndoResult = { claimed: false };
   if (card.routineRequest) {
     const undone = routineRequests.undo({ botId, threadId, requestId });
-    
+
     result = undone;
   } else if (card.webhookRequest) {
     result = webhookRequests.undo({ botId, threadId, requestId });
@@ -8775,9 +8576,9 @@ async function runClaimedGroupMemberTurn(
     return true;
   }
   const internalGeneration = beginInternalCapabilityGeneration(threadId);
-  
+
   // A room turn is never provably the owner's alone.
-  
+
   const resourceOwner: TurnOwner = { threadId, generation: internalGeneration };
   turnResourceOwners.set(threadId, resourceOwner);
   let roomClaimFailure: RoomClaimEnd | undefined;
@@ -8951,7 +8752,7 @@ async function runClaimedGroupMemberTurn(
   }
   store.setActivity(bot.id, "working");
   roomMemberLock.release(bot.id, threadId);
-  // Claim cleanup ownership before browser preparation can yield; the finally releases exactly this setup, never a newer turn.
+  // Claim cleanup ownership before tool preparation can yield; the finally releases exactly this setup, never a newer turn.
   roomSpeaker = { botId: bot.id, name: bot.name, color: bot.color, since: Date.now() };
   groupSpeakers.set(threadId, roomSpeaker);
   store.patchGroup(readyGroup.id, { busyBotId: bot.id });
@@ -8976,13 +8777,10 @@ async function runClaimedGroupMemberTurn(
   watchdog.watch(threadId, bot.id);
 
   // Mint only after claiming the fresh bot, so a deleted profile is never resurrected; "Works on" applies exactly as in a 1:1, so a room is no loophole.
-  
+
   const roomPlan = resolveSurface({
     destination: readyBot.computer,
-    browserOn:
-      builtInBrowserEnabled(cfg) &&
-      readyBot.browser !== false &&
-      instance.adapter.capabilities.browserMcp === true,
+
   });
   const roomKind = roomPlan.computer === "local" ? "thisComputer" : undefined;
   const roomPlaceRefusal = roomKind && computerPlaceRefusal(roomKind);
@@ -8992,19 +8790,13 @@ async function runClaimedGroupMemberTurn(
     if (data) integrations.data = data;
   }
   if (instance.adapter.capabilities.highlevelMcp === true) { const crm = highlevelIntegration(readyBot, { threadId, generation: internalGeneration }); if (crm) integrations.highlevel = crm; }
-  if (roomPlan.browser && !(false)) {
-    const selectedProfile = readyBot.browserProfile;
-    const browser = await browserIntegration(readyBot.id, selectedProfile, { threadId, generation: internalGeneration });
-    if (browser) integrations.browser = browser.integration;
-  }
-  const browserReadyBot = store.bot(readyBot.id);
-  if (isCancelled?.() || !browserReadyBot?.busy ||
+
+  const currentRoomBot = store.bot(readyBot.id);
+  if (isCancelled?.() || !currentRoomBot?.busy ||
       groupSpeakers.get(threadId) !== roomSpeaker ||
       activeInternalGenerationByThread.get(threadId) !== internalGeneration) {
     return false;
   }
-
-  
 
   // A channel has no pin and no Auto fallback: only a destination the person chose reaches a desktop.
   const roomSetupIsCurrent = () => !isCancelled?.() &&
@@ -9107,7 +8899,7 @@ async function runClaimedGroupMemberTurn(
   }
   const roomMemory = memorySystemPrompt(bot.id, { managedWrites: Boolean(integrations.agents), fileTools: worksInWorkspace, enabled: bot.memoryEnabled !== false });
   const recentLines = recentWork(recentWorkSources(bot), bot, { userName, currentThreadId: threadId, ...recentWorkFilter() });
-  recordTurnPlace(bot.id, threadId, surfaceOfComputerKind(roomComputerKind) ?? (integrations.browser ? "browser" : null));
+  recordTurnPlace(bot.id, threadId, surfaceOfComputerKind(roomComputerKind));
   const roomComputerPromptKind = resolveComputerPromptKind({
     kind: roomComputerKind,
   });
@@ -9130,9 +8922,8 @@ async function runClaimedGroupMemberTurn(
     { id: "mcp", label: "MCP servers", text: customMcpPrompt(Object.keys(integrations.custom ?? {})) },
     { id: "computer", label: "Computer", text: computerPrompt(roomComputerPromptKind) },
     { id: "", label: "", text: "" },
-    { id: "plan", label: "Surface", text: surfacePrompt({ computer: surfaceOfComputerKind(roomComputerKind), browser: Boolean(integrations.browser) }, { note: roomPlan.note, cloudHome: Boolean(CLOUD_HOME) }) },
+    { id: "plan", label: "Surface", text: surfacePrompt({ computer: surfaceOfComputerKind(roomComputerKind), browser: false }, { note: roomPlan.note, cloudHome: Boolean(CLOUD_HOME) }) },
     { id: "", label: "", text: "" },
-    { id: "browser", label: "Browser", text: integrations.browser ? browserPromptFor(bot, Boolean(integrations.agents)) : "" },
     { id: "data", label: "Data", text: integrations.data ? BUILT_IN_DATA_SYSTEM_PROMPT : "" },
     { id: "highlevel", label: "HighLevel", text: integrations.highlevel ? highlevelHost.prompt(readyBot) : "" },
     { id: "recall", label: "Recall", text: integrations.agents && bot.memoryEnabled !== false ? SESSION_SEARCH_SYSTEM_PROMPT : "" },
@@ -9292,7 +9083,6 @@ async function runClaimedGroupMemberTurn(
         systemVolatile: roomSystem.volatile,
         cwd,
         integrations,
-        ...(integrations.browser && browserIsThePlace(roomPlan) ? { preloadBrowserTools: true } : {}),
         ...settingsTurnFields(cfg, DATA_DIR, managedPolicy.restrictsMcp()),
         ...(instance.instanceId === readyBot.modelSelection.instanceId
           ? memberTurnSelection(readyBot.modelSelection)
@@ -10260,15 +10050,6 @@ function resolveReplyTarget(threadId: string, value: unknown): Message | undefin
 const CONNECTOR_SLUG = /^[a-z0-9][a-z0-9_-]{0,80}$/;
 
 /** The name the person gave an attachment, from the newest of this thread's messages that carries its exact tag. */
-function attachmentNameInThread(threadId: string, path: string): string | null {
-  const messages = store.messagesFor(threadId);
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const text = messages[i]!.text;
-    const name = text ? messageAttachmentName(text, path) : null;
-    if (name) return name;
-  }
-  return null;
-}
 
 function messageFileRootsForThread(senderId: string, threadId: string): string[] {
   const directBot = store.botByThread(threadId);
@@ -10678,13 +10459,6 @@ function maybeResumeConnectors(threadId: string, resumeKey: string) {
   return true;
 }
 
-
-
-
-
-
-
-
 function credentialDesktopHandoff(label: string): string {
   return `Securely provide the ${label} from OpenMausBot on your phone or computer. It is never added to chat.`;
 }
@@ -10722,8 +10496,6 @@ function resumeSecretCard(botId: string, threadId: string, messageId: string, ou
   });
   return true;
 }
-
-
 
 // By design OpenMausBot never receives a website password: the person signs in where the bot works, and the bot uses that session.
 
@@ -10795,8 +10567,7 @@ function settleSignIn(botId: string, threadId: string, messageId: string, outcom
   if (settled && card.resumed) return { status: 200, body: { [outcome]: true, resumed: true } };
   if (!settled) {
     const pleaded = computerControl.settleHelp(message.id);
-    if (card.place === "browser") browserLive.handBack(currentBrowserSession(bot.id, bot.browserProfile));
-    else for (const key of pleaded.length ? pleaded : [botComputerControlKey(bot)]) computerControl.release(key);
+    for (const key of pleaded.length ? pleaded : [botComputerControlKey(bot)]) computerControl.release(key);
   }
   const savedLogin = saved?.site ?? card.savedLogin;
   const resumed = answerCardNode(threadId, message.id, savedLogin ? savedLoginResumePrompt(savedLogin) : signInResumePrompt(card.site, outcome));
@@ -10806,100 +10577,9 @@ function settleSignIn(botId: string, threadId: string, messageId: string, outcom
   return { status: 200, body: { [outcome]: true, resumed, ...(savedLogin ? { saved: true, site: savedLogin } : {}) } };
 }
 
-/** The open sign-in card the person is answering, and the page its bot's browser shows (null when none a login could fill). */
-async function signInCardPage(botId: string, threadId: string, messageId: string):
-  Promise<{ card: SignInRequestCardData; cardHost: string; observed: ObservedPage | null } | { status: number; body: Record<string, unknown> }> {
-  const message = signInMessage(botId, threadId, messageId);
-  const bot = store.bot(botId);
-  if (!bot || !message?.signIn) return { status: 404, body: { error: "no such sign-in request" } };
-  const card = message.signIn;
-  if (card.superseded) return { status: 409, body: { error: "this sign-in request was superseded by a newer one" } };
-  if (signInOutcome(card)) return { status: 409, body: { error: "this sign-in request was already answered" } };
-  let cardHost: string;
-  try { cardHost = new URL(card.url).hostname.toLowerCase(); }
-  catch { return { status: 409, body: { error: "this sign-in request has no page address to save a login for" } }; }
-  const browser = card.place === "browser" ? await botBrowserTarget(botForThread(botId, threadId) ?? bot).catch(() => null) : null;
-  const observed = browser ? await observeSignInPage(loginInput(browser.session, browser.spec, browser.env).engine).catch(() => null) : null;
-  return { card, cardHost, observed };
-}
-
-async function signInSaveTarget(botId: string, threadId: string, messageId: string): Promise<{ status: number; body: Record<string, unknown> }> {
-  const page = await signInCardPage(botId, threadId, messageId);
-  if ("status" in page) return page;
-  const elsewhere = cardSignInElsewhere(page.cardHost, page.observed);
-  return { status: 200, body: { site: loginSite(page.cardHost), ...(elsewhere ? { signInHost: elsewhere } : {}) } };
-}
-
 /** The login is saved before the card settles, so a refused or failed save leaves the card open. */
-async function saveLoginFromCard(botId: string, threadId: string, messageId: string, body: Record<string, unknown>):
-  Promise<{ status: number; body: Record<string, unknown> }> {
-  const fields = parseLoginFields(body, { passwordRequired: true });
-  if (!fields.ok) return { status: 400, body: { error: fields.error } };
-  const totp = parseTotpField(body.totp);
-  if (!totp.ok) return { status: 400, body: { error: totp.error } };
-  const page = await signInCardPage(botId, threadId, messageId);
-  if ("status" in page) return page;
-  const current = signInMessage(botId, threadId, messageId)?.signIn;
-  if (!current || current.superseded || signInOutcome(current)) return { status: 409, body: { error: "this sign-in request was answered or replaced while the login was being saved" } };
-  const place = cardLoginPlace(page.cardHost, page.observed, body.signInHost);
-  logins.create({ ...place, username: fields.value.username ?? "", password: fields.value.password!, totp: totp.value ?? null, source: "card", bots: [botId] });
-  const elsewhere = place.hosts.filter((host) => loginSite(host) !== place.site);
-  return settleSignIn(botId, threadId, messageId, "done", { site: [place.site, ...elsewhere].join(" and ") });
-}
 
 /** Saved logins appear by site and username only. */
-function browserPromptFor(bot: { id: string; browserProfile?: string }, agentsMounted: boolean): string {
-  return browserSystemPrompt(bot.browserProfile) + (agentsMounted ? savedLoginsPrompt(botLogins.sitesFor(bot.id)) : "");
-}
-
-/** Null while the browser engine is not installed. */
-async function botBrowserTarget(bot: BotRecord): Promise<{ session: string; spec: { command: string; env: Record<string, string> }; env: NodeJS.ProcessEnv } | null> {
-  const target = await currentBrowserSpec(bot.id, bot.browserProfile);
-  return target && { ...target, env: browserRuntimeEnv({ ...target.spec.env, AGENT_BROWSER_SESSION: target.session }) };
-}
-
-const FILL_LOGIN_ELSEWHERE: Record<Surface, string> = { browser: "your built-in browser", local: "this computer", cloud: "the cloud computer" };
-
-/** Filled by the server as one browser action; the answer is a status in words, never a value. */
-async function fillLoginForTurn(bot: BotRecord, capability: InternalCapability, rawUsername: unknown, rawSubmit: unknown): Promise<{ ok: boolean; text: string }> {
-  const threadId = capability.threadId;
-  const place = signInPlace(bot, threadId);
-  if (place !== "browser") {
-    return { ok: false, text: place
-      ? `fill_login works in the built-in browser and My Chrome, not on ${FILL_LOGIN_ELSEWHERE[place]} yet. Call request_sign_in so the person signs in there.`
-      : "fill_login works in the built-in browser, and this conversation has none. Call request_sign_in instead." };
-  }
-  const current = botForThread(bot.id, threadId) ?? bot;
-  if (current.browser === false || current.computer === "off" || !builtInBrowserEnabled(cfg)) {
-    return { ok: false, text: "The built-in browser is off for you here, so fill_login has nothing to fill. Call request_sign_in instead." };
-  }
-  const browser = await botBrowserTarget(current);
-  if (!browser) return { ok: false, text: "The browser is not available on this computer right now. Call request_sign_in instead." };
-  const { session, spec, env } = browser;
-  if (!claimTurnResource(capability, `browser:${session}`)) {
-    return { ok: false, text: "Another conversation is using this browser. Wait until it finishes, then call fill_login again." };
-  }
-  const username = typeof rawUsername === "string" ? rawUsername.slice(0, 512) : undefined;
-  try {
-    const outcome = await browserRuntime.withSecretInput(session, spec, () => fillLogin({
-      username,
-      submit: rawSubmit !== false,
-      candidates: (host) => botLogins.candidates(bot.id, host),
-      available: async () => botLogins.sitesFor(bot.id),
-    }, {
-      ...loginInput(session, spec, env),
-      remember: (value, kind) => heldSecrets.remember(value, kind),
-    }), stepContext(current, capability, () => liveTurnByThread.get(threadId) ?? null));
-    if (outcome.ok && outcome.loginId) botLogins.markUsed(outcome.loginId);
-    return { ok: outcome.ok, text: outcome.text };
-  } catch (error) {
-    if (error instanceof Error && error.message === BROWSER_CONTROL_REFUSAL) {
-      return { ok: false, text: "The person is using this browser right now. Wait for them to hand it back, then call fill_login again." };
-    }
-    const reason = error instanceof Error ? error.message : String(error);
-    return { ok: false, text: `Could not fill the login: ${redactSecretsInText(reason)} Call request_sign_in if it keeps failing.` };
-  }
-}
 
 async function testCliBinary(
   cli: string,
@@ -11014,8 +10694,7 @@ function configStatus() {
       shareLearnedSkills: skillsHost.mode(),
       showToolCalls: showToolCallsEnabled(cfg),
       routinesInConversation: routinesInConversationEnabled(cfg),
-      browser: builtInBrowserEnabled(cfg),
-      
+
       claudeUserMcp: claudeUserMcpEnabled(cfg),
       claudeUserSkills: claudeUserSkillsEnabled(cfg),
       autoRecall: autoRecallEnabled(cfg),
@@ -11030,23 +10709,20 @@ function configStatus() {
       hintsSeen: cfg.onboarding?.hintsSeen ?? [],
       ...(cfg.onboarding?.firstTurnAt ? { firstTurnAt: cfg.onboarding.firstTurnAt } : {}),
     },
-    browserEngine: browserEngineSummary(),
-    // partitionId is read-only routing metadata: config PATCH rejects callers that try to choose it.
-    browserProfiles: cfg.browserProfiles ?? [],
     signIn: { admins: cfg.signIn?.admins ?? [], members: cfg.signIn?.members ?? [] },
-    membership: workspaceMembership()};
+  };
 }
 
 function configForAccess(status: ReturnType<typeof configStatus>, admin: boolean) {
   if (admin) return status;
-  // Client sessions get configured-or-not only: no SSH alias, email, browser partition id or sign-in list.
+  // Client sessions get configured-or-not only: no SSH alias, email or sign-in list.
   return {
     ...status,
     edition: { edition: status.edition.edition, features: status.edition.features },
     signIn: { admins: [], members: [] },
     opencodeGo: { configured: status.opencodeGo.configured, providerKeys: [] },
     profile: { name: status.profile.name, email: "" },
-    browserProfiles: status.browserProfiles.map((profile) => Object.fromEntries(Object.entries(profile).filter(([key]) => key !== "partitionId"))),
+
   };
 }
 
@@ -11079,7 +10755,7 @@ async function describeInstances() {
   void retryComputerEngineMove();
   const engines = selectableInstances(await registry.describe());
   await refreshUnsetModelSelections(engines);
-  
+
   return engines.map((instance) => {
     const entry = configs[instance.instanceId];
     const described = {
@@ -11090,7 +10766,7 @@ async function describeInstances() {
     if (hostedModels) return { ...described, readOnly: true,
       install: undefined, authentication: undefined, cli: undefined, cliCandidates: [],
     };
-    
+
     const policyReason = policyModelRefusal(instance);
     const policy = policyReason ? { policy: { organizationName: managedPolicy.current()!.organizationName, reason: policyReason } } : {};
     if (managedDesktop.owns(instance.instanceId)) return {
@@ -11309,10 +10985,10 @@ const workspaceBackupAccess = {
   },
   exclusive: <T>(work: () => Promise<T>, keepLocked?: boolean) => workspaceMaintenance.run(async () => {
     // Recheck inside the exclusive gate: another client may assign a computer while the restore body arrives.
-    
+
     return work();
   }, {
-    idle: () => !providerFleetReloading && !providerAuthSessions.active && !browserEngineInstall &&
+    idle: () => !providerFleetReloading && !providerAuthSessions.active  &&
       !routines?.isTicking && !calendarCalls?.isTicking &&
       !orphanBoatLifecycleBusyIds.size &&
       true &&
@@ -11332,7 +11008,6 @@ const workspaceBackupAccess = {
 const workspaceCopyAccess = { dataDir: DATA_DIR, appVersion: serverVersion(), readBody, restored: workspaceRestore, ...workspaceBackupAccess };
 const workspaceBackupRoutes = createWorkspaceBackupRoutes(workspaceCopyAccess);
 let restartRequested = false;
-
 
 // `workspaceAccess` is assigned at boot, after this line: read it per request.
 ROUTES.push(createHostedSlackRoutes({ bot: (id) => store.bot(id), hostedReady: () => Boolean(workspaceAccess) && entitled("admin") }));
@@ -11357,7 +11032,7 @@ ROUTES.push(createThreadRoutes({
   hostedWorkspace: HOSTED_WORKSPACE, sessionCookie: SESSION_COOKIE, loopback: LOOPBACK, defaultPage: DEFAULT_PAGE,
   workspaceAccess: () => workspaceAccess,
   desktopMutationToken: () => desktopMutationToken,
-  
+
   cliOwnerToken: () => cliOwnerToken,
   pageSize, messagePage, messageWindow, publicBotQueuedMessages, publicGroupState, wireBot, wireTask,
   botComputerControlSnapshot, messageFileRootsForThread, viewerFor, visibleTo, coordinator, groupThreadIsWorking,
@@ -11378,12 +11053,12 @@ ROUTES.push(createBotSettingsRoutes({
   cardAnswerRefusal,
 }));
 ROUTES.push(createBotPatchRoutes({
-  store, cfg, registry, sessions, browserRuntime, browserLive, memoryUpkeep, cacheKeepWarm, hostedModels, supportsApprovalMode,
+  store, cfg, registry, sessions,   memoryUpkeep, cacheKeepWarm, hostedModels, supportsApprovalMode,
   routines: () => routines,
   hostedWorkspace: HOSTED_WORKSPACE, hostedFullAccessRefusal: HOSTED_FULL_ACCESS_REFUSAL, desktopManaged: DESKTOP_MANAGED, maxWorkspaceBots: MAX_WORKSPACE_BOTS,
   broadcast, wireBot, publicGroupState, audienceChanged, storedAvatarExists, requestedTaskBot, threadBusy, activeGroupTurnForBot,
-  checkedModelSelection, engineSwitchNeedsAsk, currentBrowserSession, interruptAllDirectThreads, cancelGroupTurnOperations,
-  revokeInternalCapabilitiesForThread, runningTurnInstance, closeOpenApprovals,  forgetTemporaryBrowser,
+  checkedModelSelection, engineSwitchNeedsAsk,  interruptAllDirectThreads, cancelGroupTurnOperations,
+  revokeInternalCapabilitiesForThread, runningTurnInstance, closeOpenApprovals,
 }));
 ROUTES.push(createBotLifecycleRoutes({
   store, routines: () => routines, interruptAllDirectThreads, cancelDirectTurnDispatch, revokeInternalCapabilitiesForThread,
@@ -11407,7 +11082,7 @@ ROUTES.push(createBotMemoryRoutes({
   },
 }));
 ROUTES.push(createDeciderRoutes({ decider, config: () => cfg }), createNotificationRoutes());
-ROUTES.push(createSignInCardRoutes({ settle: settleSignIn, saveLogin: saveLoginFromCard, saveTarget: signInSaveTarget, threadVisible: (auth, threadId) => visibleTo(viewerFor(auth)).thread(threadId) }));
+ROUTES.push(createSignInCardRoutes({ settle: settleSignIn, threadVisible: (auth, threadId) => visibleTo(viewerFor(auth)).thread(threadId) }));
 ROUTES.push(createRoomHoldRoutes({
   group: (id) => store.group(id),
   setHold: (groupId, botId, held) => {
@@ -11434,14 +11109,14 @@ ROUTES.push(createChannelRoutes({
   broadcast,
   actorKey,
   threadStarters,
-  
+
   sendSequencer,
   roomMemberContexts,
   skillReview,
   groupSpeakers,
   groupTurnOperations,
   lastReply,
-  
+
   messageSender,
   usageTriggerFor,
   publicGroupState,
@@ -11476,12 +11151,12 @@ ROUTES.push(createTaskRoutes({
   handoffs,
   skillReview,
   threadStarters,
-  
+
   titleRegenerations,
   directTurnGenerationByThread,
   actorKey,
   cloudOwnerSession,
-  
+
   sharedWorkspaceFullAccessEnabled,
   supportsApprovalMode,
   threadBusy,
@@ -11515,32 +11190,7 @@ ROUTES.push(createTeamRoutes({
   starterNotes,
   ...skillExport(skillsHost),
 }));
-ROUTES.push(createBrowserSiteRoutes({
-  target: async (which) => {
-    const engine = browserEngineStatus();
-    if (engine.kind !== "ready") return { status: 409, error: engine.reason };
-    let session: string;
-    let profile: string | undefined;
-    if ("profile" in which) {
-      const target = browserProfilePartitionTarget(cfg, which.profile);
-      if (!target) return { status: 404, error: "This browser profile was removed." };
-      session = browserSessionId("", target.partitionId);
-      profile = target.profileId;
-    } else {
-      const bot = store.bot(which.bot);
-      if (!bot) return { status: 404, error: "no such bot" };
-      if (bot.browserProfile === "guest") return { status: 409, error: "A temporary browser saves no sign-ins." };
-      session = currentBrowserSession(bot.id, bot.browserProfile);
-      profile = bot.browserProfile;
-    }
-    const refusal = signedInSitesRefusal(profile);
-    if (refusal) return { status: 409, error: refusal };
-    return { binaryPath: engine.binaryPath, session, env: browserSessionSpec(engine.binaryPath, session, profile, await browserEgress.open(session)).env, encryptionKey: browserEngineEncryptionKey() };
-  },
-  list: (target) => listSignedInSites(target),
-  signOut: (target, site) => signOutOfSites(target, site),
-}));
-ROUTES.push(createBrowserEvidenceRoutes({ evidence: browserEvidence.attach({ onChange: (listener) => store.onChange(listener), threadExists: (id) => Boolean(threadOwner(id)) }), threadExists: (id) => Boolean(threadOwner(id)) }));
+
 ROUTES.push(createLoginRoutes(botLogins.routes((id) => Boolean(store.bot(id)))));
 ROUTES.push(createUsageRoutes({
   dataDir: DATA_DIR,
@@ -11576,12 +11226,12 @@ ROUTES.push(createAntigravityAccountRoutes({
   },
 }));
 ROUTES.push(createConfigRoutes({
-  store, cfg, registry, sessions, browserCleanup, browserLive, browserRuntime, usedBrowserSessions, decider,
-    closeBrowser, browserEngineSwitched,
+  store, cfg, registry, sessions,     decider,
+
   hostedModels: Boolean(hostedModels),
   providerConfigs,
   providerConfigBusy: { get: () => providerConfigBusy, set: (busy) => { providerConfigBusy = busy; } },
-  checkedModelSelection, policyModelRefusal, browserSessionSpec, configStatus, configForAccess,
+  checkedModelSelection, policyModelRefusal,  configStatus, configForAccess,
   resyncOpenCodeProviderKeys, revokeEngineCapabilities, reloadProviders, broadcast, drainQueuedSends,
 }));
 ROUTES.push(createInstanceRoutes({
@@ -11593,7 +11243,7 @@ ROUTES.push(createInstanceRoutes({
 }));
 ROUTES.push(createMcpServerRoutes({
   cfg, sessions, mcpOAuth,
-  
+
   fallbackPublicUrl: FALLBACK_PUBLIC_URL,
   mcpConfigBusy: { get: () => mcpConfigBusy, set: (busy) => { mcpConfigBusy = busy; } },
   mcpServerResponse, mcpPolicyRefusal, persistMcpServers, savedCustomDomain,
@@ -11604,29 +11254,9 @@ ROUTES.push(createStatusRoutes({
   store, cfg, outboundCounts,
   staticDir: STATIC_DIR,
   sharedWorkspaceFullAccessEnabled, adminActivityRecording, configStatus, broadcast,
-  browserEngineInstall: { get: () => browserEngineInstall, set: (install) => { browserEngineInstall = install; } },
-  browserEngineInstallError: { set: (error) => { browserEngineInstallError = error; } },
+
 }));
 
-ROUTES.push(createBrowserViewerRoutes({
-  upgrades, viewers: browserLive, dataDir: DATA_DIR,
-  browser: async (botId) => {
-    const bot = store.bot(botId);
-    if (!bot) return { status: 404, error: "no such bot" };
-    if (!builtInBrowserEnabled(cfg) || bot.browser === false) return { status: 409, error: "Enable this bot's browser in its profile first." };
-    const browser = await browserIntegration(bot.id, bot.browserProfile);
-    return browser ? { botId: bot.id, session: browser.session, spec: browser.spec } : { status: 503, error: "Install the browser engine first." };
-  },
-  authorize: async (req, auth) => !HOSTED_WORKSPACE || auth.kind !== "session" ? null
-    : workspaceAccess ? workspaceAccess.authorize(req, auth) : { status: 503, error: "Workspace sign-in is unavailable." },
-  current: (botId, session, auth) => {
-    const current = store.bot(botId);
-    return !!current && current.browser !== false && builtInBrowserEnabled(cfg) && currentBrowserSession(current.id, current.browserProfile) === session
-      && (auth.kind !== "session" || (sessions.isLive(auth.session.id) && visibleTo(viewerFor(auth)).bot(botId)));
-  },
-  restartRefusal: (session) => browserRestartRefusal(browserRuntime.interrupted(session), store.bots.filter((candidate) => candidate.busy
-    && currentBrowserSession(candidate.id, candidate.browserProfile) === session).map((candidate) => ({ waitingOnBrowser: computerControl.snapshot(candidate.id).help?.place === "browser" }))),
-}));
 ROUTES.push(createDataRoutes({
   bot: (id) => store.bot(id),
   engine: dataEngine,
@@ -11660,14 +11290,14 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     }
     // Hosted workspaces have one sign-in authority: a missing optional layer must never reactivate email/QR credential minting.
     if (HOSTED_WORKSPACE) {
-      
+
       if (workspaceAccess) {
         if (await workspaceAccess.handlePublic(req, res, url)) return;
       } else if (path.startsWith("/api/auth/hosted/") || path === "/pair" || (path === "/" && (!isLoopbackHost(req.headers.host) || isProxied(req)))) {
         return json(res, 503, { error: "Workspace sign-in is unavailable." });
       }
     }
-    
+
     // Public like the loopback listener it stands in for: the state is the credential, checked once.
     if (path === MCP_OAUTH_CALLBACK_PATH) {
       const answer = method === "GET"
@@ -11689,7 +11319,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       return json(res, challenge ? 200 : 404, challenge ?? { error: "No active domain check." });
     }
     // Never on a Cloud home: it is personal, and the owner's devices sign in through the Admin.
-    
+
     if (method === "POST" && (path === "/api/auth/email/start" || path === "/api/auth/email/verify")) {
       if (!/^application\/json\b/i.test(String(req.headers["content-type"] ?? ""))) {
         return json(res, 415, { error: "send the sign-in request as JSON (content-type: application/json)" });
@@ -11723,17 +11353,16 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       res.setHeader("set-cookie", serializeSessionCookie(SESSION_COOKIE, issued.token, { secure, maxAgeSeconds: cookieMaxAgeSeconds(issued.session) }));
       return json(res, 200, { session: issued.session, environment });
     }
-    
-    
+
     // The companion apps' pairing route: same window, lockout and single-use exchange as /api/auth/pair; redeeming the credential IS the sign-in.
-    
+
     const gate = resolveRequestAuth(req, {
       sessions,
       cookieName: SESSION_COOKIE,
       streamPath: "/api/events",
       url,
       loopbackMutationToken: desktopMutationToken,
-      
+
       features: {  },
       loopbackTrust: LOOPBACK.trust,
       cliOwnerToken, trustLocalBrowser: LOOPBACK.localBrowsers,
@@ -11772,14 +11401,12 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     }
     beginAdminAudit(req, res, method, path, auth);
 
-    
     if (await workspaceBackupRoutes(req, res, path, auth)) return;
-    
+
     // Count requests until their handler returns, not until the browser disconnects: a cancelled upload can still write.
     if (path.startsWith("/api/") && !["GET", "HEAD", "OPTIONS"].includes(method)) {
       releaseWorkspaceRequest = workspaceMaintenance.request();
     }
-    
 
     // Route modules are tried here, behind the gate; do not add route `if`s below.
     if (await dispatchRoutes(ROUTES, { req, res, url, path, method, auth, json, readBody })) return;
@@ -11815,8 +11442,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       res.setHeader("set-cookie", clearSessionCookie(SESSION_COOKIE));
       return json(res, 200, { ok: true });
     }
-    
-    
+
     // Admin-only by request-auth's default deny; only future pairing links change.
     if (path === "/api/settings/custom-domain") {
       res.setHeader("cache-control", "no-store");
@@ -11846,13 +11472,11 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         return json(res, 200, customDomainStatus());
       }
     }
-    
-    
+
     // Grants nothing by itself: it only keeps local bot turns and a remote screen action from using the screen at once.
-    
+
     // A main-process-only secret binds poll/results to that desktop; with the feature off the family 404s like a build without it.
-    
-    
+
     if (method === "GET" && path === "/api/auth/sessions") {
       return json(res, 200, { sessions: sessions.list(), current: auth.kind === "session" ? auth.session.id : null });
     }
@@ -11938,8 +11562,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       }
       const requiredCapabilityKind = path === "/api/internal/hook"
         ? "hooks"
-        : path === "/api/internal/browser/mcp"
-        ? "browser"
         : path === DATA_INTERNAL_MCP_PATH
         ? "data"
         : path === HIGHLEVEL_INTERNAL_MCP_PATH
@@ -12006,7 +11628,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         const requested = method === "POST" ? (await readInternalBody()).surface : undefined;
         if (method === "POST" && !canSelect) return json(res, 403, { error: "Computer selection is only available once per direct user request, with computer access enabled." });
         if (method === "POST" && requested !== "auto" && !parseSurface(requested)) {
-          return json(res, 400, { error: "surface must be auto, cloud, local, or browser" });
+          return json(res, 400, { error: "surface must be auto, cloud, or local" });
         }
         const unoffered = undefined;
         const options = await selectableComputers(bot);
@@ -12019,7 +11641,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         const startsOnFirstCall = claim?.owner.generation === internalCapability.generation && claim.startsComputer === true && !claim.failed;
         const picked = pickComputer(options, requested, current, startsOnFirstCall);
         const option = picked.option;
-        if (!option?.available) return json(res, 409, { error: option?.reason ?? "No configured computer or browser is available. Open the Computer panel to set one up.", options });
+        if (!option?.available) return json(res, 409, { error: option?.reason ?? "No configured computer is available. Open the Computer panel to set one up.", options });
         if (source!.selected) {
           if (source!.selected !== option.surface) return json(res, 409, { error: "A computer switch is already pending. End this turn to continue there." });
         } else {
@@ -12074,7 +11696,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       // Notes from a room fewer people can see than this bot would carry its words to everyone who can see the bot.
       if ((path === "/api/internal/memory" || path === "/api/internal/memory/log") && method === "POST") {
         // On a Cloud home only a provably-owner conversation writes memory: it loads into the owner's turns and can reach a lent Mac.
-        
+
         if (internalSender.memoryEnabled === false) {
           return json(res, 403, { error: "Memory is disabled for this bot." });
         }
@@ -12094,43 +11716,9 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         const result = ownersWrite(() => appendMemoryLog(internalSender.id, body.text, { source: memorySource() }));
         return json(res, result.ok ? 200 : 400, result);
       }
-      if (method === "POST" && path === "/api/internal/browser/mcp") {
-        const body = await readInternalBody();
-        const bot = store.bot(internalCapability.botId);
-        if (!bot || bot.browser === false || bot.computer === "off" || !builtInBrowserEnabled(cfg)) {
-          return json(res, 403, { error: "browser tools are not enabled for this bot" });
-        }
-        const browser = await browserIntegration(bot.id, bot.browserProfile);
-        if (!browser || browser.session !== internalCapability.browserSession) {
-          return json(res, 409, { error: "this browser profile changed; start a new turn" });
-        }
-        if (body?.method !== "tools/list" && body?.method !== "tools/call") {
-          return json(res, 400, { error: "unsupported browser method" });
-        }
-        let params = body.params;
-        if (body.method === "tools/call" && params?.name === BROWSER_UPLOAD_TOOL) {
-          const upload = uploadableFiles(params.arguments?.files, messageFileRootsForThread(bot.id, internalCapability.threadId));
-          if ("error" in upload) return json(res, 200, { result: { isError: true, content: [{ type: "text", text: upload.error }] } });
-          const requested = params.arguments.files as string[];
-          const files = namedUploadPaths(upload.files.map((file, i) => ({ file, name: attachmentNameInThread(internalCapability.threadId, requested[i]!) })), join(DATA_DIR, "browser-uploads"));
-          params = { ...params, arguments: { ...params.arguments, files } };
-        }
-        const result = await browserRuntime.agentRpc(browser.session, browser.spec, body.method, params, () => {
-          requireActiveInternalCapability();
-          const current = store.bot(bot.id);
-          if (!current || current.browser === false || current.computer === "off" || !builtInBrowserEnabled(cfg) ||
-              currentBrowserSession(current.id, current.browserProfile) !== browser.session) {
-            throw Object.assign(new Error("Browser access changed while connecting."), { status: 409 });
-          }
-          if (body.method === "tools/call" && !claimTurnResource(internalCapability, `browser:${browser.session}`)) {
-            throw Object.assign(new Error("another thread is using this browser — pause browser work until that thread finishes"), { status: 409 });
-          }
-        }, stepContext(bot, internalCapability, () => liveTurnByThread.get(internalCapability.threadId) ?? null));
-        requireActiveInternalCapability();
-        return json(res, 200, { result });
-      }
+
       // The turn's capability names its Boat; the Boat credential stays here.
-      
+
       // DuckDB runs here on the bot's own database; the agent process holds only the turn's capability.
       if (method === "POST" && path === DATA_INTERNAL_MCP_PATH) {
         const body = await readInternalBody();
@@ -12173,8 +11761,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         return json(res, 200, { claimed: true });
       }
       // Off: a 404 like a route that never existed. On: a turn sees only the computers of the person it provably acts for.
-      
-      
+
       if (method === "GET" && path === "/api/internal/agents") {
         const sender = internalSender;
         const bots = reachablePeers(store.bots, sender)
@@ -12304,7 +11891,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         const sender = owner.group ? { botId: from.id, name: from.name, color: from.color } : undefined;
         if (request.kind === "webhook") {
           // Its calls start the owner's bot: a turn the Cloud's owner did not drive cannot add or change one.
-          
+
           let applied: ReturnType<WebhookRequestService["submit"]>;
           try {
             applied = webhookRequests.submit({ botId: from.id, threadId: fromThreadId, operation: { ...request.operation, forBot }, from: sender, canCommit: () => internalCapabilityIsActive(internalCapability) });
@@ -12316,10 +11903,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           return json(res, 201, applied);
         }
         const proposedInput = { ...request.proposal, forBot };
-        
-        
-        
-        
+
         const proposed = await routineRequests.submit({
           botId: from.id,
           threadId: fromThreadId,
@@ -12329,9 +11913,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         });
         const proposedCard = store.messagesFor(fromThreadId).find((message) => message.id === proposed.messageId)?.card;
           // Applied at once: in the owner's proven conversation the routine is theirs; elsewhere it runs at that conversation's level (ownersLevel: only the owner spoke, whatever bots posted).
-        
-        
-        
+
         appendDecision(DATA_DIR, {
           threadId: fromThreadId,
           requestId: proposed.requestId,
@@ -13333,13 +12915,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         readBody: readInternalBody,
         request: (site, reason) => requestSignIn(internalSender, internalCapability.threadId, site, reason),
       })], { req, res, url, path, method, auth, json, readBody })) return;
-      if (method === "POST" && path === "/api/internal/fill-login") {
-        const body = await readInternalBody();
-        const outcome = await fillLoginForTurn(internalSender, internalCapability, body.username, body.submit);
-        // A turn stopped while the page was filled receives no answer.
-        requireActiveInternalCapability();
-        return json(res, 200, outcome);
-      }
+
       if (method === "POST" && path === "/api/internal/connectors/mcp") {
         const body = await readInternalBody();
         // Re-read the live bot right before relay, so turning Connected Apps off wins over a request authenticated under the old value.
@@ -13711,8 +13287,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       if (notYours) return json(res, 403, { error: notYours });
       const writer = auth.kind === "session" ? actorKey(auth) : CLOUD_NOBODY_KEY;
       const routine = withRoutineWriter(writer, () => routines!.create(body));
-      
-      
+
       return json(res, 201, { routine });
     }
     if (path === "/api/routines/wake" && method === "GET") {
@@ -13721,7 +13296,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     let routineMatch = path.match(/^\/api\/routines\/([\w-]+)\/run$/);
     if (routineMatch && method === "POST") {
       const run = routines!.runNow(routineMatch[1]);
-      
+
       return run ? json(res, 201, { run }) : json(res, 404, { error: "no such routine" });
     }
     routineMatch = path.match(/^\/api\/routines\/([\w-]+)$/);
@@ -13731,14 +13306,14 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       if (hidden) return json(res, 404, { error: hidden });
       const notYours = routineResultsRefusal(body);
       if (notYours) return json(res, 403, { error: notYours });
-      
+
       const previous = undefined;
       // A fingerprint that no longer matches means someone else changed what the routine runs; only the owner rewriting its instructions renews it.
       const writer = auth.kind === "session" && !cloudOwnerSession(auth) ? actorKey(auth)
           : previous && !false ? previous : CLOUD_NOBODY_KEY;
       const routine = withRoutineWriter(writer, () => routines!.update(routineMatch![1], body));
       // Anyone else's edit, of any field, makes the routine no longer the owner's until the owner rewrites it.
-      
+
       return routine ? json(res, 200, { routine }) : json(res, 404, { error: "no such routine" });
     }
     if (routineMatch && method === "DELETE") {
@@ -13928,7 +13503,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     if (path === "/api/sidebar-sections" && (method === "PATCH" || method === "DELETE")) {
       const section = url.searchParams.get("section")?.trim();
       if (!section) return json(res, 400, { error: "Choose a named team" });
-      
+
       let nextName: string | null = null;
       if (method === "PATCH") {
         const parsed = z.object({ name: z.string().trim().min(1).max(60) }).strict().safeParse(await readBody(req));
@@ -13945,7 +13520,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       const ids = z.array(z.string().regex(/^[\w-]+$/)).max(MAX_WORKSPACE_BOTS);
       const parsed = z.object({ addBotIds: ids, removeBotIds: ids }).strict().safeParse(await readBody(req));
       if (!parsed.success) return json(res, 400, { error: "Provide addBotIds and removeBotIds" });
-      
+
       const result = store.updateTeamMembers(section, parsed.data.addBotIds, parsed.data.removeBotIds);
       if (!result.ok) return json(res, result.reason === "unavailable" ? 404 : 409, { error:
         result.reason === "chief-conflict" ? "A team can have only one Chief of Staff. Change the Chief before moving this bot."
@@ -14256,8 +13831,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     if (m && method === "DELETE") return json(res, 200, await composio.removeService(cfg, m[1]));
 
     // An HPKE envelope bound to the paired device, bot, task, card and target; only the embedded Electron server holds the key to open it.
-    
-    
 
     // Desktop credential cards never send the credential through this route: Electron saves it to the OS-backed store first.
     m = path.match(/^\/api\/bots\/([\w-]+)\/secret-cards\/([\w-]+)\/(provided|resume|dismiss)$/);
@@ -14266,7 +13839,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       const threadId = String(body.threadId ?? "");
       const message = secretMessage(m[1], threadId, m[2]);
       if (!message?.secret) return json(res, 404, { error: "no such credential request" });
-      
+
       if (m[3] === "provided") {
         if (message.secret.dismissed) return json(res, 409, { error: "this credential request was dismissed" });
         if (message.secret.superseded) return json(res, 409, { error: "this credential request was superseded by a newer one" });
@@ -14521,12 +14094,11 @@ restoreChannelMessages();
 server.listen(PORT, "127.0.0.1", async () => {
   companyRuntimeReady();
   console.log(`openmausbot server on http://127.0.0.1:${PORT}`);
-  browserSweep.start(); 
-  if (builtInBrowserEnabled(cfg)) chromeLauncher.start();
-  followupsReady = true;
+
+    followupsReady = true;
   drainQueuedSends();
   drainQueuedChannelSends();
-  
+
   if (enginesRead) {
     await enginesRead;
     if (companyShutdown) return;
@@ -14582,11 +14154,9 @@ const gracefulShutdown = createGracefulShutdown({
       if (workspaceAccessTimer) clearInterval(workspaceAccessTimer);
       // Invalidate turn bearers before any cleanup reaches an await: child MCP processes and the listener may outlive it.
       revokeAllInternalCapabilities();
-      
-      
-      browserLive.closeAll();
+
       upgrades.close();
-      
+
       watchdog.stop();
       routines?.close();
       calendarCalls?.stop();
@@ -14598,11 +14168,7 @@ const gracefulShutdown = createGracefulShutdown({
     },
     async () => { await managedDesktop.close(); await registry.disposeAll(); },
     async () => { await dataEngine.closeAll().catch((error) => console.warn("data: close failed", error)); },
-    async () => {
-      const temporaries = [...temporaryBrowserSessions.keys()].map((botId) => forgetTemporaryBrowser(botId));
-      await Promise.all([...temporaries, browserSweep.closeAll()]);
-      await browserRuntime.closeAll();
-    },
+    async () => {},
     () => flushAllProfileHistory(),
     () => flushAllMemoryJournals(),
     () => flushUsageLedger(DATA_DIR),

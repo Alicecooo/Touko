@@ -60,7 +60,7 @@ export interface OverviewFacts {
   runs: Array<{ routineId: string; status: string; finishedAt?: number; startedAt?: number; scheduledFor: number }>;
   webhooks: Array<{ name: string; enabled: boolean }>;
   skills: Array<{ name: string; description: string; enabled: boolean }>;
-  engine: { agentsMcp?: boolean; composioMcp?: boolean; browserMcp?: boolean; computerMcp?: boolean } | null;
+  engine: { agentsMcp?: boolean; composioMcp?: boolean;  computerMcp?: boolean } | null;
   browserEnabled?: boolean;
   cloudHome?: boolean;
   connectedApps: { configured: boolean; authoritative: boolean; services: string[] };
@@ -216,7 +216,7 @@ function reachesLines(facts: OverviewFacts): string[] {
   } else if (couldUseApps(facts) && !apps.authoritative) {
     lines.push("Connected apps could not be checked.");
   }
-  if (facts.browserEnabled && facts.engine?.browserMcp && facts.bot.browser !== false && facts.bot.computer !== "off") lines.push("Has the built-in browser.");
+
   if (facts.engine?.agentsMcp && facts.sectionPeers > 0 && facts.bot.peers?.length !== 0) {
     const scope = facts.bot.chiefOfStaff && facts.bot.managedSections?.length ? "its allowed teams" : "its section";
     lines.push(`Can talk to ${facts.sectionPeers} other bot${facts.sectionPeers === 1 ? "" : "s"} in ${scope}.`);

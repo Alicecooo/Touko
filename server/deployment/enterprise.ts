@@ -87,17 +87,6 @@ export function hostedWorkspaceConfiguration(env: NodeJS.ProcessEnv = process.en
   } catch { return null; }
 }
 
-/** A hosted workspace never issues pairing codes or email sign-in: people come in through the portal. */
-export function workspaceMembership(env: NodeJS.ProcessEnv = process.env):
-  { authority: "local" | "portal"; pairingCodes: boolean; peopleUrl?: string } {
-  const hosted = hostedWorkspaceConfiguration(env);
-  const pairingCodes = !hostedWorkspaceConfigured(env);
-  if (!hosted?.portalMembership) return { authority: "local", pairingCodes };
-  const people = new URL("/people", hosted.admin);
-  people.search = new URLSearchParams({ workspace: hosted.workspace }).toString();
-  return { authority: "portal", pairingCodes, peopleUrl: people.href };
-}
-
 /** Only on a dedicated, portal-managed server; never an HTTP setting or a desktop grant. */
 export function sharedWorkspaceFullAccessConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.OMB_SHARED_WORKSPACE_FULL_ACCESS === "1" && env.OMB_DESKTOP_PARENT !== "1" &&

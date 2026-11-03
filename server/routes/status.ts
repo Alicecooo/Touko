@@ -2,7 +2,7 @@ import { DEFAULT_OUTBOUND_POLICY } from "../../shared/outbound.ts";
 import { readBotActivity } from "../agent/activity.ts";
 import { activityCsv, activityEntries, parseActivityWhat, readAdminActivityRange } from "../observability/admin-activity.ts";
 import { loadBrand } from "../deployment/brand.ts";
-import { browserEngineStatus, ensureChrome, installAgentBrowserBinary, resolveAgentBrowserBinary } from "../browser/browser-engine.ts";
+
 import { DATA_DIR, EVENTS_DIR, NATIVE_DIR, instanceConfigs, type AppConfig } from "../config/config.ts";
 import { boundRetentionDays, decisionsCsv, readDecisionRange, readDecisions } from "../observability/decision-log.ts";
 import { editionForMembers, editionStatus, entitled } from "../deployment/enterprise.ts";
@@ -26,14 +26,13 @@ export interface StatusRouteDeps {
   adminActivityRecording(): boolean;
   configStatus(): ConfigStatus;
   broadcast(payload: Record<string, unknown>): void;
-  browserEngineInstall: { get(): Promise<void> | null; set(install: Promise<void> | null): void };
-  browserEngineInstallError: { set(error: string | null): void };
+
 }
 
 export function createStatusRoutes(deps: StatusRouteDeps): RouteHandler {
   const {
     store, cfg, outboundCounts, staticDir: STATIC_DIR, sharedWorkspaceFullAccessEnabled, adminActivityRecording,
-    configStatus, broadcast, browserEngineInstall, browserEngineInstallError,
+
   } = deps;
   return async ({ req, res, url, path, method, auth, json, readBody }) => {
     let m: RegExpMatchArray | null = null;
@@ -45,29 +44,7 @@ export function createStatusRoutes(deps: StatusRouteDeps): RouteHandler {
       } });
     }
     // JSON-only, so a form posted from another local page cannot start the install. One install at a time.
-    if (method === "POST" && path === "/api/browser-engine/install") {
-      const mediaType = String(req.headers["content-type"] ?? "").split(";", 1)[0].trim().toLowerCase();
-      if (mediaType !== "application/json") {
-        return json(res, 415, { error: "content-type must be application/json" });
-      }
-      if (!browserEngineInstall.get()) {
-        const status = browserEngineStatus();
-        if (status.kind === "unavailable" && !status.installable) return json(res, 409, { error: status.reason });
-        browserEngineInstallError.set(null);
-        browserEngineInstall.set((async () => {
-          const binary = resolveAgentBrowserBinary() ?? await installAgentBrowserBinary({ log: (line) => console.log(line) });
-          await ensureChrome(binary, { log: (line) => console.log(line) });
-        })().then(
-          () => { browserEngineInstallError.set(null); },
-          (error: unknown) => { browserEngineInstallError.set(error instanceof Error ? error.message : String(error)); },
-        ).finally(() => {
-          browserEngineInstall.set(null);
-          broadcast({ kind: "config", ...configStatus() });
-        }));
-        broadcast({ kind: "config", ...configStatus() });
-      }
-      return json(res, 202, { installing: true });
-    }
+
     // Admin scope plus the `admin` entitlement; the socket's own permissions decide whether this workspace may drive the agent.
     const fleetRoute = /^\/api\/fleet(?:\/(workspaces(?:\/([a-z0-9-]+)(?:\/(users|suspend|resume))?)?|upgrade))?$/.exec(path);
     if (fleetRoute) {

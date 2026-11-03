@@ -1,12 +1,12 @@
 {
-  "name": "openmausbot",
+  "name": "touko",
   "private": true,
   "version": "0.1.115",
   "description": "A local-first chat app for running a team of AI agents.",
-  "homepage": "https://github.com/milind-soni/OpenMausBot",
+  "homepage": "https://github.com/Alicecooo/Touko",
   "repository": {
     "type": "git",
-    "url": "https://github.com/milind-soni/OpenMausBot.git"
+    "url": "https://github.com/Alicecooo/Touko.git"
   },
   "author": {
     "name": "Milind Soni",
@@ -38,7 +38,6 @@
     "test:electron": "node --test \"electron/*.node-test.mjs\"",
     "bench:observation": "node --experimental-strip-types scripts/benchmarks/benchmark-observation.ts",
     "bench:persistence": "node --experimental-strip-types scripts/benchmarks/benchmark-persistence.ts",
-    "bench:browser-stream": "node --experimental-strip-types scripts/benchmarks/benchmark-browser-stream.ts",
     "test:watch": "vitest",
     "check:desktop-control-container": "node tests/checks/desktop-control-container.check.mjs",
     "check:electron-syntax": "node tests/checks/electron-module-syntax.check.mjs",
@@ -48,13 +47,11 @@
     "prepare:windows-desktop-control": "node scripts/setup/prepare-windows-desktop-control.mjs",
     "check:windows-desktop-control": "node tests/checks/windows-desktop-control.check.mjs",
     "prepare:https-tunnel": "node scripts/setup/prepare-https-tunnel.mjs",
-    "prepare:browser": "node scripts/setup/prepare-browser-engine.mjs",
     "prepare:duckdb": "node scripts/setup/prepare-duckdb-runtime.mjs",
-    "check:browser-bundle": "node tests/checks/browser-bundle.check.mjs",
     "prepare:linux-desktop-control": "node scripts/setup/prepare-linux-desktop-control.mjs",
     "prepare:linux-desktop-control:offline": "node scripts/setup/prepare-linux-desktop-control.mjs --offline",
     "build:updater": "node scripts/build/bundle-updater.mjs",
-    "package:prepare": "pnpm build && pnpm build:server && pnpm build:updater && pnpm prepare:https-tunnel && pnpm prepare:browser && pnpm prepare:duckdb",
+    "package:prepare": "pnpm build && pnpm build:server && pnpm build:updater && pnpm prepare:https-tunnel && pnpm prepare:duckdb",
     "package:win": "pnpm package:prepare && pnpm prepare:windows-desktop-control && electron-builder --win --publish never",
     "package:linux": "pnpm package:prepare && pnpm prepare:linux-desktop-control && electron-builder --linux --x64 --publish never",
     "package:linux:offline": "pnpm package:prepare && pnpm prepare:linux-desktop-control:offline && electron-builder --linux --x64 --publish never",
@@ -73,7 +70,6 @@
     "typecheck:all": "pnpm typecheck && pnpm typecheck:scripts && pnpm typecheck:tests && pnpm typecheck:evals",
     "check:model-catalog": "node tests/checks/model-catalog.check.mjs",
     "generate:translations": "node scripts/generators/generate-translations.mjs",
-    "generate:browser-vendor-fixture": "node scripts/generators/generate-browser-vendor-fixture.mjs",
     "test:server:unit": "vitest run server --exclude \"tests/**\" --exclude \"src/**\" --exclude \"electron/**\" --exclude \"shared/**\"",
     "test:server": "vitest run tests/server"
   },

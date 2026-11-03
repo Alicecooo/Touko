@@ -15,7 +15,7 @@ export const TAB_LABEL: Record<PanelTab, LocaleKey> = {
 export type PageId =
   | "setup" | "model" | "instructions" | "always" | "routines" | "apps"
   | "memory" | "skills"
-  | "browser" | "folder"
+  | "folder"
   | "notifications" | "blurb" | "team" | "chiefteams" | "mcp" | "tools" | "webhooks" | "visibility" | "slack"
   | "overview" | "prompt" | "history";
 
@@ -34,7 +34,6 @@ export const PAGES: Record<PageId, PageMeta> = {
   apps: { title: "botPanel.page.apps", home: "details", where: "botPanel.where.apps", keywords: "composio connected apps per-app tools grants gmail calendar read write limit vault" },
   memory: { title: "botSettings.simple.memory", home: "library", where: "botPanel.where.memories", keywords: "memory notes remember obsidian upkeep tidy topic daily logs undo" },
   skills: { title: "botSettings.simple.skills", home: "library", where: "botPanel.where.skills", keywords: "skills import command learned procedures organization library teach" },
-  browser: { title: "place.browser", home: "computer", where: "computer.tab.computer", keywords: "browser logins sign in record steps profile sign out" },
   folder: { title: "computer.files.folder", home: "computer", where: "computer.tab.computer", keywords: "working folder directory cwd files" },
   notifications: { title: "notifications.title", home: "settings", where: "botPanel.where.profile", keywords: "alerts notifications" },
   blurb: { title: "botPanel.page.blurb", home: "settings", where: "botPanel.where.profile", keywords: "blurb description what it does" },

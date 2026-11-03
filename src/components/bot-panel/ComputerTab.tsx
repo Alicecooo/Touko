@@ -1,4 +1,4 @@
-import { Folder, Globe, KeyRound, Table } from "lucide-react";
+import { Folder, Table } from "lucide-react";
 
 import { writeComputerPanelView, type ComputerPanelView } from "@/lib/computer-panel-view";
 import { t } from "@/lib/i18n";
@@ -20,7 +20,7 @@ export function useOpenComputer(bot: Pick<Bot, "id">) {
   };
 }
 
-export function ComputerTab({ bot, derived, onOpen }: { bot: Bot; derived: Derived; onOpen: (page: PageId) => void }) {
+export function ComputerTab({ bot, onOpen }: { bot: Bot; derived: Derived; onOpen: (page: PageId) => void }) {
   const { capabilities } = useDesktopCapabilities();
   const openComputer = useOpenComputer(bot);
   const home = capabilities.host?.homeDir;
@@ -28,20 +28,7 @@ export function ComputerTab({ bot, derived, onOpen }: { bot: Bot; derived: Deriv
   return (
     <div data-panel-tabpanel="computer">
       <Card label={t("botPanel.onThisComputer")} anchor="on-computer">
-        <NavRow
-          data-panel-page="browser"
-          icon={Globe}
-          title={t("place.browser")}
-          hint={t(derived.browserEnabled ? "botPanel.browserOn" : "botPanel.browserOff")}
-          onClick={() => onOpen("browser")}
-        />
-        <NavRow
-          data-panel-page="logins"
-          icon={KeyRound}
-          title={t("botSettings.simple.logins")}
-          hint={t("botPanel.loginsHint", { name: bot.name })}
-          onClick={() => onOpen("browser")}
-        />
+
         <NavRow
           data-panel-page="folder"
           icon={Folder}

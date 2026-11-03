@@ -416,13 +416,13 @@ export function visibleMessages(bot: Pick<Bot, "messages" | "activeLeafId">): Me
   return path.reverse();
 }
 
-import type { BrowserEngineSummary, BrowserProfile, ConfigStatus, ManagedPolicySummary } from "./config-status";
-export type { BrowserEngineSummary, BrowserProfile, ConfigStatus, ManagedPolicySummary };
+import type { ConfigStatus, ManagedPolicySummary } from "./config-status";
+export type { ConfigStatus, ManagedPolicySummary };
 
 // A section left out here is wiped from state.config whenever a config frame lands.
 export type ConfigStatusFrame = Pick<
   ConfigStatus,
-  "xai" | "mistral" | "cerebras" | "groq" | "meta" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "fleet" | "composio" | "box" | "rooms" | "mcp" | "threads" | "automaticRecovery" | "cacheKeepWarm" | "opencodeGo" | "decider" | "imageGen" | "profile" | "language" | "features" | "onboarding" | "browserEngine" | "browserProfiles" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
+  "xai" | "mistral" | "cerebras" | "groq" | "meta" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "fleet" | "composio" | "box" | "rooms" | "mcp" | "threads" | "automaticRecovery" | "cacheKeepWarm" | "opencodeGo" | "decider" | "imageGen" | "profile" | "language" | "features" | "onboarding" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
 >;
 
 export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
@@ -451,8 +451,6 @@ export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
     language: frame.language,
     features: frame.features,
     onboarding: frame.onboarding,
-    browserEngine: frame.browserEngine,
-    browserProfiles: frame.browserProfiles,
     edition: frame.edition,
     budgets: frame.budgets,
     billing: frame.billing,
@@ -506,7 +504,7 @@ export interface InstanceInfo {
     composioMcp?: boolean;
     /** the engine can mount the native HighLevel tools (a connected app without Composio) */
     highlevelMcp?: boolean;
-    browserMcp?: boolean;
+
     images?: boolean;
     effortLevels?: readonly EffortLevel[];
     modelVariants?: boolean;
@@ -540,7 +538,6 @@ export type AppSettingsSection =
   | "computer"
   | "logins"
   | "usage"
-  | "people"
   | "activity"
   | "backups"
   | "workspaces"

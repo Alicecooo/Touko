@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigStatus, InstanceInfo } from "@/state/store";
-import {
-  APP, CONNECTORS_MODE, DECIDER, EDITION, ENGINE, KEY_PROVIDER, LOCAL_VM_MODE, PLATFORM,
-  TRIAL_CREDIT,
-} from "./analytics-allowlist";
+import { APP, CONNECTORS_MODE, DECIDER, EDITION, ENGINE, KEY_PROVIDER, LOCAL_VM_MODE, PLATFORM, TRIAL_CREDIT } from "./analytics-allowlist";
 import { buildUsageSnapshot, type SnapshotState, type UsageInput, type UsageSources } from "./usage-snapshot";
 
 const HOSTILE = "sk-ant-api03-HOSTILE-0123456789";
@@ -90,7 +87,7 @@ function hostileState(): SnapshotState {
       language: "ja",
       edition: { edition: "enterprise", features: [HOSTILE] },
       managedPolicy: { organizationName: HOSTILE, version: 1, companyModelsOnly: false, allowedEngines: [HOSTILE], mcp: { allowCustom: false, allowlist: [HOSTILE] }, remoteAccess: true },
-      browserProfiles: [{ id: HOSTILE, name: HOSTILE }],
+
       onboarding: { completedAt: "2026-10-01T00:00:00.000Z", version: 1, reelSeen: true, hintsSeen: [HOSTILE], firstTurnAt: "2026-10-01T00:05:00.000Z" },
     } as unknown as ConfigStatus,
     instances: [

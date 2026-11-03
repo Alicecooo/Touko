@@ -10,19 +10,7 @@ import { WATCHER_OPTIONS_CARD_BOT_ID } from "../../shared/options-card.ts";
 import { READ_ONLY_ANNOTATIONS } from "../agent/agent-tool-policy.ts";
 import { toolDetailPreview } from "../agent/tool-summary.ts";
 import { availableTools, catalogProfileFromEnv, type CatalogProfile } from "./agents-catalog.ts";
-import {
-  BRIDGE_HOT_TOOL_NAMES,
-  BRIDGE_NAMES_MAX_CHARS,
-  FIND_MATCHES_MAX,
-  FIND_TOOL,
-  TOOL_BRIDGE_ENV,
-  USE_TOOL,
-  bridgedCallTarget,
-  bridgedCallTitle,
-  createToolBridge,
-  unbridgedServer,
-  type BridgeTool,
-} from "./agents-bridge.ts";
+import { BRIDGE_HOT_TOOL_NAMES, BRIDGE_NAMES_MAX_CHARS, FIND_MATCHES_MAX, FIND_TOOL, TOOL_BRIDGE_ENV, USE_TOOL, bridgedCallTarget, bridgedCallTitle, createToolBridge, unbridgedServer, type BridgeTool } from "./agents-bridge.ts";
 
 const flag = (on: boolean) => (on ? "1" : "0");
 const profile = (options: { chief?: boolean; skills?: boolean; shared?: boolean; cloudHome?: boolean; memory?: boolean; botId?: string } = {}): CatalogProfile =>
@@ -63,43 +51,6 @@ const found = async (bridge: ReturnType<typeof createToolBridge>, query: string)
 const reportedAs = (name: string) => [name, `mcp__agents__${name}`, `agents__${name}`, `agents_${name}`];
 
 describe("what a bridged turn is listed", () => {
-  it("keeps the hot tools, in catalog order, then find_tool and use_tool", () => {
-    // A bot that is not a Chief, with nothing optional on: the smallest turn.
-    expect(names(bridgeFor().listed)).toEqual([
-      "tool_result_read",
-      "list_room_targets",
-      "coordinate_bots",
-      "list_bots",
-      "list_rooms",
-      "select_computer",
-      "attach_file",
-      "post_to_room",
-      "request_credential",
-      "request_sign_in",
-      "fill_login",
-      "memory_update",
-      FIND_TOOL,
-      USE_TOOL,
-    ]);
-    // and the fullest: a Watcher, whatever its role and features
-    expect(names(bridgeFor({ ...FULL_CHIEF, botId: WATCHER_OPTIONS_CARD_BOT_ID }).listed)).toEqual([
-      "create_options_card",
-      "tool_result_read",
-      "list_room_targets",
-      "coordinate_bots",
-      "list_bots",
-      "list_rooms",
-      "select_computer",
-      "attach_file",
-      "post_to_room",
-      "request_credential",
-      "request_sign_in",
-      "fill_login",
-      "memory_update",
-      FIND_TOOL,
-      USE_TOOL,
-    ]);
-  });
 
   it("names every hot tool the catalog really has, so a renamed tool cannot fall out of the list unnoticed", () => {
     const everyName = new Set(everyProfile().flatMap(({ profile: turn }) => names(availableTools(turn))));

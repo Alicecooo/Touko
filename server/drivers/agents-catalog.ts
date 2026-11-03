@@ -274,7 +274,7 @@ const TOOL_DEFINITIONS = [
     description:
       "Choose where this conversation does computer work. Call with no arguments to inspect actual available choices and the current place. For a task needing computer interaction, select the requested place, or auto to choose a suitable configured computer without asking the user to use menus. OpenMausBot reuses an existing computer first; with a configured provider it can start or provision one when needed. Do not provision for ordinary chat or just to inspect availability. A pending result means end this turn immediately: OpenMausBot updates the conversation selector and resumes the original request with that computer's real tools. Do not use the old tools after requesting a switch, repeat the task, or claim the action is done. This cannot change permissions, override Off, or switch a teammate/routine/channel.",
     inputSchema: { type: "object", additionalProperties: false, properties: {
-      surface: { type: "string", enum: ["auto", "cloud", "local", "browser"],
+      surface: { type: "string", enum: ["auto", "cloud", "local"],
         description: "auto = suitable configured computer, cloud = the bot's cloud computer, local = user's own desktop, browser = built-in browser. Omit to list." },
     } },
   },
@@ -486,19 +486,6 @@ const TOOL_DEFINITIONS = [
         reason: { type: "string", maxLength: 240, description: "One short sentence, in your words, on what the sign-in is for." },
       },
       required: ["site"],
-    },
-  },
-  {
-    name: "fill_login",
-    description:
-      "Sign in with a login the person saved in OpenMausBot. Call it on the login page open in your browser: OpenMausBot types the username, password and any one-time code itself, submits each step, and says where the page went; you never see the password. A login fills on its own site, such as any page of example.com. With no saved login for the site, call request_sign_in.",
-    inputSchema: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        username: { type: "string", maxLength: 512, description: "Which saved login to use when the site has more than one." },
-        submit: { type: "boolean", description: "false: fill only, you submit." },
-      },
     },
   },
   {
@@ -865,7 +852,7 @@ const CHIEF_TARGET_TOOL_NAMES = new Set(["propose_profile", "propose_model"]);
 const WATCHER_TOOL_NAMES = new Set(["create_options_card"]);
 
 const CLOUD_HOME_SURFACE = {
-  type: "string", enum: ["auto", "cloud", "browser"],
+  type: "string", enum: ["auto", "cloud"],
   description: "auto = suitable configured computer, cloud = the bot's cloud computer, browser = built-in browser. Omit to list. This server runs in the cloud: the user's own computer is not a place here.",
 };
 

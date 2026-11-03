@@ -226,7 +226,7 @@ describe("a room turn belongs to the room", () => {
     let roomId: string | undefined;
     try {
       // a sign-in needs a place to sign in on: this bot works in its built-in browser
-      expect((await api("PATCH", "/api/config", { features: { browser: true } })).status).toBe(200);
+      expect((await api("PATCH", "/api/config", { features: {  } })).status).toBe(200);
       const placed = await api("PATCH", `/api/bots/${bot.id}`, { computer: "browser" });
       expect(placed.status, JSON.stringify(placed.body)).toBe(200);
       const room = (await api("POST", "/api/groups", {
@@ -265,7 +265,7 @@ describe("a room turn belongs to the room", () => {
         stream.close();
       }
     } finally {
-      await api("PATCH", "/api/config", { features: { browser: false } }).catch(() => undefined);
+      await api("PATCH", "/api/config", { features: {  } }).catch(() => undefined);
       await cleanup([roomId], [bot.id]);
     }
   }, 45_000);

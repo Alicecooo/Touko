@@ -56,6 +56,39 @@ async function withFixture(mode: string, run: (helpers: {
   }
 }
 
+it("runs without the built-in browser and still mounts a user-supplied browser MCP", async () => {
+  await withFixture("happy", async ({ api, control, dump, clearDump, evidence }) => {
+    const config = await api("GET", "/api/config");
+    expect(config.status).toBe(200);
+    expect(config.body).not.toHaveProperty("browserEngine");
+    expect(config.body).not.toHaveProperty("browserProfiles");
+    expect(config.body.features).not.toHaveProperty("browser");
+    const { bot } = await control(["new-bot", "--name", "External browser tools"]) as { bot: Bot };
+    for (const [method, path] of [
+      ["POST", "/api/browser-engine/install"],
+      ["GET", `/api/bots/${bot.id}/browser/live`],
+    ]) expect((await api(method!, path!)).status).toBe(404);
+
+    await control(["run", "--bot", bot.id, "--text", "Reply without opening a browser.", "--timeout", "30"]);
+    const initial = await dump();
+    expect(initial.mcpConfig.mcpServers).not.toHaveProperty("browser");
+
+    expect((await api("POST", "/api/mcp/servers", { name: "browser", ...command })).status).toBe(201);
+    expect((await api("PATCH", "/api/mcp/servers/browser", { enabled: true })).status).toBe(200);
+    expect((await api("PATCH", `/api/bots/${bot.id}`, { mcpServers: ["browser"] })).status).toBe(200);
+    clearDump();
+    await control(["run", "--bot", bot.id, "--text", "Use the configured external tools if needed.", "--timeout", "30"]);
+    const configured = await dump();
+    expect(configured.mcpConfig.mcpServers).toHaveProperty("browser");
+    evidence.push({ manifest: {
+      builtInBrowserConfigured: false,
+      retiredRoutes: "not-found",
+      ordinaryChat: "completed",
+      customBrowserMcp: "mounted",
+    } });
+  });
+}, 60_000);
+
 it("imports atomically and mounts the selected MCP servers in fresh direct and room sessions", async () => {
   await withFixture("happy", async ({ api, control, dump, clearDump }) => {
     const secret = "fixture-only-mcp-secret";

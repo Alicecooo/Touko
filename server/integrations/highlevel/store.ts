@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { z } from "zod";
 
 import { writeFileAtomic } from "../../storage/atomic.ts";
-import { decryptBrowserState, encryptBrowserState } from "../../browser/browser-sites.ts";
+import { decryptStoredText, encryptStoredText } from "../../security/sealed-text.ts";
 
 export const HIGHLEVEL_FILE = "highlevel.json.enc";
 export const HIGHLEVEL_KEY_FILE = "highlevel-key";
@@ -76,7 +76,7 @@ export class HighLevelStore {
       const key = this.key(false);
       try {
         if (!key) throw new Error("missing key");
-        data = fileSchema.parse(JSON.parse(decryptBrowserState(readFileSync(this.file), key)));
+        data = fileSchema.parse(JSON.parse(decryptStoredText(readFileSync(this.file), key)));
       } catch {
         // Never log an unreadable file's contents.
         if (!this.unreadableWarned) console.warn("HighLevel: the saved connection could not be opened; connect again");
@@ -92,7 +92,7 @@ export class HighLevelStore {
     const parsed = fileSchema.parse(data);
     const key = this.key(true)!;
     mkdirSync(join(this.file, ".."), { recursive: true });
-    writeFileAtomic(this.file, encryptBrowserState(JSON.stringify(parsed), key), { mode: 0o600 });
+    writeFileAtomic(this.file, encryptStoredText(JSON.stringify(parsed), key), { mode: 0o600 });
     this.cache = parsed;
   }
 

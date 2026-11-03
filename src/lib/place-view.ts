@@ -1,8 +1,8 @@
 
 import { activeLocale, t } from "@/lib/i18n";
 import { engineSignedOut } from "@/lib/failed-turn";
-import { browserAvailable, builtInBrowserEnabled, type FeatureFlagConfig } from "@/lib/feature-flags";
-import { writeComputerPanelView } from "@/lib/computer-panel-view";
+import { type FeatureFlagConfig } from "@/lib/feature-flags";
+
 import { useAdvancedMode } from "@/lib/interface-mode";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
 import { openBotSettings } from "@/components/bot-panel/panel-link";
@@ -31,7 +31,7 @@ function engineFacts(instance: InstanceInfo | undefined, model: string | undefin
     name: instance?.displayName || instance?.driverKind || model || "",
     model: label || model || instance?.displayName || "",
     computer: instance?.capabilities?.computerMcp === true,
-    browser: instance?.capabilities?.browserMcp === true,
+    browser: false,
     signedIn: !engineSignedOut(instance),
   };
 }
@@ -56,7 +56,7 @@ export function placeFacts(input: {
     boat: config?.box?.configured ? (config.box.included ? "included" : "own-key") : "none",
     engine: engineFacts(instance, bot.modelSelection.model),
     toolsAllowComputer: canUseMcpServer(bot.toolScope, "computer"),
-    browserOn: builtInBrowserEnabled(config) && browserAvailable(config),
+    browserOn: false,
     role: seat.role,
     mode: seat.mode,
     ...(input.local ? { local: input.local } : {}),
@@ -83,8 +83,6 @@ export function placeHasIssue(view: PlaceView): boolean {
   return placeBlocked(view) || view.state === "cc-tools-off" || view.state === "cc-sign-in" || view.state === "cc-needs-key"
     || view.state === "cc-unavailable";
 }
-
-
 
 export function usePlaceSeat(config: Pick<ConfigStatus, "cloudHome"> | null | undefined, platform: DesktopCapabilities["host"]["platform"]): PlaceSeat {
   const plan = false;
@@ -117,10 +115,7 @@ export function openPlaceAction(
     case "watch":
     case "open-computer-panel":
       return false;
-    case "turn-on-browser":
-      writeComputerPanelView(target.botId, "browser");
-      dispatch({ type: "toggleComputer", open: true });
-      return true;
+
     default:
       return false;
   }

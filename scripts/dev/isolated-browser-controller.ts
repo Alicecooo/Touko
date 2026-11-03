@@ -1,19 +1,19 @@
-// `control-omb ui`: drives the real renderer headlessly against the fake-engine
-// fixture through the agent-browser binary the harness pins. It touches
+// `control-omb ui`: drives the renderer against the fake-engine fixture
+// through an externally configured agent-browser CLI. It touches
 // isolated-environment.ts's bindings only inside functions, so the import cycle is
 // harmless whichever loads first.
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveCliSpawn } from "../../server/platform/env-path.ts";
 
 import { ControlOmbError, HELP_UI, launchVerificationServer, parse, runControlOmb, type VerificationServer } from "./isolated-environment.ts";
-import { closeBrowserSession, ensureChrome, installAgentBrowserBinary, resolveAgentBrowserBinary } from "../../server/browser/browser-engine.ts";
+import { closeQaBrowser, checkQaBrowser, requireQaBrowser, resolveQaBrowser, qaCredentialFlags } from "./qa-browser-runtime.ts";
 import { fixtureApi, mountPreview, type MountedPreview } from "./preview-server.ts";
-import { credentialStoreFlags } from "../../server/browser/egress/gate.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-/** Gitignored, persistent: the binary and its Chrome download once per checkout. */
+/** Gitignored, persistent home for isolated UI verification sessions. */
 export const UI_TOOLS_DIR = join(ROOT, ".omb-scratch", "verify-tools");
 /** Verbs that change the fixture or the page; they take the explicit handle, never discovery. */
 export const UI_MUTATING = new Set(["click", "type", "press", "flag", "eval"]);
@@ -61,7 +61,7 @@ export function sessionEnv(handle: SessionEnv, parentEnv: NodeJS.ProcessEnv = pr
     AGENT_BROWSER_SESSION: handle.session,
     AGENT_BROWSER_HEADLESS: "1",
     AGENT_BROWSER_NO_WEBMCP: "1",
-    AGENT_BROWSER_ARGS: credentialStoreFlags().join("\n"),
+    AGENT_BROWSER_ARGS: qaCredentialFlags().join("\n"),
   };
   for (const [key, value] of Object.entries(parentEnv)) {
     if (value && PLATFORM_ENV.includes(key.toUpperCase())) env[key.toUpperCase()] = value;
@@ -81,7 +81,8 @@ export function agentBrowser(
   return new Promise((done, fail) => {
     let child: ChildProcess;
     try {
-      child = spawn(binary, [...args, "--json"], { env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+      const resolved = resolveCliSpawn(binary, [...args, "--json"], env);
+      child = spawn(resolved.command, resolved.args, { env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     } catch (error) {
       fail(new ControlOmbError(`could not start agent-browser: ${error instanceof Error ? error.message : String(error)}`));
       return;
@@ -139,31 +140,30 @@ export function installedChrome(toolsDir = UI_TOOLS_DIR, platform: NodeJS.Platfo
   return null;
 }
 
-/** OMB_AGENT_BROWSER_PATH, then the tools directory, then PATH; otherwise the
- * pinned download, verified by size and SHA-256. Chrome follows the same rule
- * with AGENT_BROWSER_EXECUTABLE_PATH. Both land once under UI_TOOLS_DIR. */
+/** Use OMB_QA_AGENT_BROWSER_PATH or PATH. Browser installation is managed
+ * externally; AGENT_BROWSER_EXECUTABLE_PATH can select an existing Chrome. */
 export async function ensureUiBrowser(
   parentEnv: NodeJS.ProcessEnv = process.env,
   log: (line: string) => void = () => {},
   toolsDir = UI_TOOLS_DIR,
 ): Promise<{ binary: string; chrome: string | null }> {
   mkdirSync(toolsDir, { recursive: true, mode: 0o700 });
-  let binary = resolveAgentBrowserBinary({ dataDir: toolsDir, env: parentEnv });
+  let binary = resolveQaBrowser({ dataDir: toolsDir, env: parentEnv });
   if (!binary) {
     const started = Date.now();
-    binary = await installAgentBrowserBinary({ dataDir: toolsDir, log });
-    log(`agent-browser installed at ${binary} in ${Date.now() - started}ms`);
+    binary = await requireQaBrowser({ dataDir: toolsDir, env: parentEnv, log });
+    log(`QA browser available at ${binary} in ${Date.now() - started}ms`);
   }
   const explicit = parentEnv.AGENT_BROWSER_EXECUTABLE_PATH?.trim();
   if (explicit) {
-    if (!existsSync(explicit)) throw new ControlOmbError(`AGENT_BROWSER_EXECUTABLE_PATH does not exist: ${explicit}`, "unset it to use the Chrome agent-browser installs");
+    if (!existsSync(explicit)) throw new ControlOmbError(`AGENT_BROWSER_EXECUTABLE_PATH does not exist: ${explicit}`, "select an existing browser or let the external CLI locate one");
     return { binary, chrome: resolve(explicit) };
   }
   let chrome = installedChrome(toolsDir);
   if (!chrome) {
     const started = Date.now();
-    await ensureChrome(binary, { env: sessionEnv({ home: toolsDir, session: "omb-ui-install", chrome: null }, parentEnv), log });
-    log(`Chrome ready in ${Date.now() - started}ms`);
+    await checkQaBrowser(binary, { env: sessionEnv({ home: toolsDir, session: "omb-ui-check", chrome: null }, parentEnv), log });
+    log(`External browser CLI checked in ${Date.now() - started}ms`);
     chrome = installedChrome(toolsDir);
     if (!chrome) log("no Chrome for Testing under the tools directory; the session will use the browser agent-browser finds itself");
   }
@@ -482,9 +482,9 @@ export async function launchUi(
     process.off("SIGINT", requestStop);
     process.off("SIGTERM", requestStop);
     if (opened) {
-      // closeBrowserSession waits until the daemon is really gone; a plain
+      // closeQaBrowser waits until the daemon is really gone; a plain
       // `close` only acknowledges. Both are scoped to this fixture's HOME.
-      if (!await closeBrowserSession(opened.binary, opened.env)) {
+      if (!await closeQaBrowser(opened.binary, opened.env)) {
         await agentBrowser(opened.binary, opened.env, ["close"], 15_000).catch(() => {});
       }
     }

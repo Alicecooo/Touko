@@ -21,10 +21,10 @@ export interface SurfacePlan {
   note: string;
 }
 
-const SURFACES: ReadonlySet<string> = new Set(["cloud", "local", "browser"]);
+const SURFACES: ReadonlySet<string> = new Set(["cloud", "local"]);
 
 export function parseSurface(value: unknown): Surface | undefined {
-  // SAFETY: the set membership check is the narrowing; only the four literals pass.
+  // SAFETY: the set membership check is the narrowing.
   return typeof value === "string" && SURFACES.has(value) ? (value as Surface) : undefined;
 }
 
@@ -33,11 +33,8 @@ export function surfaceOfComputerKind(kind: "box" | "local" | null): Surface | n
   return kind;
 }
 
-const NO_BROWSER_NOTE =
-  " This bot is set to work in the built-in browser, but the built-in browser is switched off in App Settings, so you have no browser and no computer this turn — say so instead of guessing.";
-
 const OFF_NOTE =
-  " This bot's \"Works on\" setting is Off, so no computer and no built-in browser are mounted this turn: you cannot open a page, click, or type on any screen. If the user asks for something that needs one, tell them Works on is Off in this bot's settings — never claim you are opening a browser you do not have.";
+  " This bot's \"Works on\" setting is Off, so no computer is mounted this turn. Separately configured external tools remain available within their granted scope. If an action needs computer tools, tell the user Works on is Off in this bot's settings; never claim to have used a computer that is not mounted.";
 
 export function computerSkippedNote(cause: string): string {
   const why = cause.trim().replace(/[\s.]+$/, "");
@@ -45,36 +42,15 @@ export function computerSkippedNote(cause: string): string {
 }
 
 /** One place per turn. A person's pin beats the bot's default (only Off overrides it), an Auto pin yields to a Works on change, and a pin the turn cannot honour is reported, never swapped. */
-export function resolveSurface(input: {
-  destination: Destination;
-  pinnedSurface?: Surface | null;
-  browserOn: boolean;
-}): SurfacePlan {
-  const { destination, browserOn } = input;
-  if (destination === "off") {
-    return { computer: "off", browser: false, pinned: null, note: OFF_NOTE };
-  }
+export function resolveSurface(input: { destination: Destination; pinnedSurface?: Surface | null }): SurfacePlan {
+  const destination = input.destination;
   const pin = input.pinnedSurface ?? null;
-  if (pin === "browser") {
-    if (browserOn) return { computer: "off", browser: true, pinned: "browser", note: "" };
-    // A missing browser is not permission to act on the host instead.
-    return { computer: "off", browser: false, pinned: pin,
-      note: " This conversation is pinned to the built-in browser, but its tools are unavailable this turn. No computer is mounted instead. Do not claim to have used it; a different place must be selected before acting there." };
+  if (destination === "off") return { computer: "off", browser: false, pinned: null, note: OFF_NOTE };
+  if (pin && pin !== "browser") return { computer: pin, browser: false, pinned: pin, note: "" };
+  if (destination === "browser" || pin === "browser") {
+    return { computer: "off", browser: false, pinned: null, note: " The built-in browser was removed. Use an explicitly configured external browser tool; no host computer is mounted in its place." };
   }
-  if (pin) return { computer: pin, browser: false, pinned: pin, note: "" };
-  if (destination === "browser") {
-    return browserOn
-      ? { computer: "off", browser: true, pinned: null, note: "" }
-      : { computer: "off", browser: false, pinned: null, note: NO_BROWSER_NOTE };
-  }
-  if (destination !== undefined) {
-    return { computer: destination, browser: false, pinned: null, note: "" };
-  }
-  return { computer: undefined, browser: browserOn, pinned: null, note: "" };
-}
-
-export function browserIsThePlace(plan: SurfacePlan): boolean {
-  return plan.computer === "off" && plan.browser;
+  return { computer: destination, browser: false, pinned: null, note: "" };
 }
 
 export function cloudPlaceRefusal(engine: CloudEngine & { name: string }, source: PlaceSource, bot: string): PlaceUnavailableError | null {

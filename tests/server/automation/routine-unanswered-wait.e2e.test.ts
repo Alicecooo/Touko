@@ -48,7 +48,7 @@ it("starts the next scheduled run of a routine whose sign-in nobody answered, an
     `await import(${JSON.stringify(pathToFileURL(join(process.cwd(), "tests/support/drivers/fake-claude-cli.ts")).href)});`,
   ].join("\n"), { mode: 0o700 });
   await api("PATCH", "/api/instances/claude", { cli: wrapper });
-  await api("PATCH", "/api/config", { features: { browser: true } });
+  await api("PATCH", "/api/config", { features: {  } });
   await api("PATCH", `/api/bots/${bot.id}`, { computer: "browser" });
   const { routine } = await api("POST", "/api/routines", {
     name: "Morning check", prompt: "Sign in to the site and check the dashboard.", botId: bot.id,

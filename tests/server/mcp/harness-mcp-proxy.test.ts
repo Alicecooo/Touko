@@ -24,7 +24,7 @@ beforeAll(async () => {
   url = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 });
 afterAll(async () => { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); });
-const connection = (kind: "browser" | "computer" | "data" | "highlevel" = "browser") => ({ url, token: "scoped-capability", kind });
+const connection = (kind: "data" | "computer" | "data" | "highlevel" = "data") => ({ url, token: "scoped-capability", kind });
 const frame = (method: string, params: unknown = {}) => ({ jsonrpc: "2.0", id: 1, method, params });
 
 describe("harness MCP capability proxy", () => {
@@ -40,7 +40,7 @@ describe("harness MCP capability proxy", () => {
     status = 200;
     payload = { result: { tools: [{ name: "agent_browser_snapshot" }] } };
     await expect(harnessMcpRequest(frame("tools/list"), connection())).resolves.toEqual({ jsonrpc: "2.0", id: 1, result: { tools: [{ name: "agent_browser_snapshot" }] } });
-    expect(requests.at(-1)).toEqual({ path: "/api/internal/browser/mcp", auth: "Bearer scoped-capability", body: { method: "tools/list", params: {} } });
+    expect(requests.at(-1)).toEqual({ path: "/api/internal/data/mcp", auth: "Bearer scoped-capability", body: { method: "tools/list", params: {} } });
     payload = { result: { content: [{ type: "image", data: "jpeg", mimeType: "image/jpeg" }] } };
     await expect(harnessMcpRequest(frame("tools/call", { name: "agent_browser_snapshot" }), connection())).resolves.toMatchObject({ result: { content: [{ type: "image", data: "jpeg" }] } });
   });
@@ -79,7 +79,7 @@ describe("harness MCP capability proxy", () => {
     const initialized = await harnessMcpRequest(frame("initialize"), connection("data")) as { result: { serverInfo: { name: string }; instructions?: string } };
     expect(initialized.result.serverInfo.name).toBe("openmausbot-data");
     expect(initialized.result.instructions).toContain("GROUP BY ALL");
-    expect(((await harnessMcpRequest(frame("initialize"), connection("browser"))) as { result: Record<string, unknown> }).result.instructions).toBeUndefined();
+    expect(((await harnessMcpRequest(frame("initialize"), connection("computer"))) as { result: Record<string, unknown> }).result.instructions).toBeUndefined();
     await expect(harnessMcpRequest(frame("tools/list"), connection("data"))).resolves.toEqual({ jsonrpc: "2.0", id: 1, result: { tools: [{ name: "data_sql" }], instructions: "DuckDB" } });
     expect(requests.at(-1)).toEqual({ path: "/api/internal/data/mcp", auth: "Bearer scoped-capability", body: { method: "tools/list", params: {} } });
     status = 503;
@@ -100,8 +100,8 @@ describe("harness MCP capability proxy", () => {
     };
     const gone = await listening();
     await new Promise<void>((resolve) => gone.peer.close(() => resolve()));
-    expect(textOf(await harnessMcpRequest(click, { url: gone.url, token: "t", kind: "browser" })))
-      .toMatch(/^OpenMausBot is restarting, so this browser call did not reach it and did not run\. Wait a few seconds/);
+    expect(textOf(await harnessMcpRequest(click, { url: gone.url, token: "t", kind: "data" })))
+      .toMatch(/^OpenMausBot is restarting, so this data call did not reach it and did not run\. Wait a few seconds/);
     const resetting = await listening((req) => req.socket.destroy());
     try {
       expect(textOf(await harnessMcpRequest(click, { url: resetting.url, token: "t", kind: "computer" })))
@@ -110,7 +110,7 @@ describe("harness MCP capability proxy", () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new DOMException("The operation was aborted due to timeout", "TimeoutError"); }));
     try {
       const late = textOf(await harnessMcpRequest(click, connection()));
-      expect(late).toMatch(new RegExp(`^OpenMausBot did not answer this browser call within ${HARNESS_PROXY_TIMEOUT_MS / 1_000} seconds\\. It may still be running`));
+      expect(late).toMatch(new RegExp(`^OpenMausBot did not answer this data call within ${HARNESS_PROXY_TIMEOUT_MS / 1_000} seconds\\. It may still be running`));
       expect(late).not.toMatch(/restart/i);
     } finally { vi.unstubAllGlobals(); }
   });
@@ -124,7 +124,7 @@ describe("harness MCP capability proxy", () => {
 
   it.each(["https://example.com", "http://127.0.0.1.evil.test", "http://user:pass@127.0.0.1", "http://127.0.0.1/path", "http://127.0.0.1/#secret"])("never sends its capability to invalid harness URL %s", async (badUrl) => {
     const count = requests.length;
-    await expect(harnessMcpRequest(frame("tools/call"), { url: badUrl, token: "private", kind: "browser" })).resolves.toMatchObject({ result: { isError: true } });
+    await expect(harnessMcpRequest(frame("tools/call"), { url: badUrl, token: "private", kind: "data" })).resolves.toMatchObject({ result: { isError: true } });
     expect(requests.length).toBe(count);
   });
 
@@ -164,7 +164,7 @@ describe("harness MCP capability proxy", () => {
 
   it("refuses to start without a known tool family", async () => {
     const child = spawn(process.execPath, ["--experimental-strip-types", fileURLToPath(new URL("../../../server/mcp/harness-mcp-proxy.ts", import.meta.url)), "shell"], {
-      env: { OMB_HARNESS_URL: url, OMB_MCP_TOKEN_BROWSER: "entrypoint-capability" }, stdio: ["pipe", "pipe", "pipe"],
+      env: { OMB_HARNESS_URL: url, OMB_MCP_TOKEN_DATA: "entrypoint-capability" }, stdio: ["pipe", "pipe", "pipe"],
     });
     const code = await new Promise<number | null>((resolve) => child.once("close", resolve));
     expect(code).toBe(2);
