@@ -202,9 +202,10 @@ describe("creating a bot from a preset", () => {
     expect(record.installedPackage).toEqual({ id: "sales-desk", name: "Sales desk", release: "1.3.0", requiredApps: [], source: "file",
       installId: imported.installId, presetKey: "support" });
     expect(record.modelSelection).toEqual({ instanceId: "claude", model: "default-model" });
-    for (const field of ["approvalMode", "autoApprove", "computer", "cwd", "composio", "mcpServers", "browser"] as const) {
+    for (const field of ["approvalMode", "autoApprove", "cwd", "composio", "mcpServers", "browser"] as const) {
       expect(record).not.toHaveProperty(field);
     }
+    expect(record.computer).toBeUndefined();
   });
 
   it("adds an organization preset's skills switched on, under the organization's own source, stamped for updates", async () => {

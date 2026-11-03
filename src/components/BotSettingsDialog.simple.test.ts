@@ -692,12 +692,9 @@ describe("the Apps card", () => {
 });
 
 describe("the Computer tab", () => {
-  it("leads to the browser and folder pages, and opens the data workspace", () => {
+  it("leads to the folder page and opens the data workspace", () => {
     const rendered = computer(makeBot());
-    click(find(rendered, "data-panel-page", "browser"));
-    expect(onOpen).toHaveBeenLastCalledWith("browser");
-    click(find(rendered, "data-panel-page", "logins"));
-    expect(onOpen).toHaveBeenLastCalledWith("browser");
+    expect(has(rendered, "data-panel-page", "browser")).toBe(false);
     click(find(rendered, "data-panel-page", "folder"));
     expect(onOpen).toHaveBeenLastCalledWith("folder");
     expect(has(rendered, "data-panel-page", "android")).toBe(false);

@@ -55,7 +55,7 @@ describe("the shelf card", () => {
     expect(orgModeBadge(entry())).toBeNull();
     expect(orgModeBadge(entry({ mode: "required" }))).toBe("Recommended by Acme Partners");
     expect(orgCardNotes(entry({ installed: { installId: "b".repeat(32), release: "1.2.0", status: "installed" } }))).toEqual([
-      "Version 1.3.0 available. Updates arrive automatically in an upcoming OpenMausBot update.",
+      "Version 1.3.0 available. Updates arrive automatically in an upcoming Touko update.",
     ]);
     expect(orgCardNotes(entry({ release: null, installed: { installId: "b".repeat(32), release: "1.3.0", status: "withdrawn" } }))).toEqual([
       "Withdrawn by Acme Partners",

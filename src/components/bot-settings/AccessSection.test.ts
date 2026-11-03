@@ -212,7 +212,7 @@ describe("AccessSection parts", () => {
   it("renders only the cards a page asks for, and every card without parts", () => {
     fixture.servers = [{ name: "notes", enabled: true }];
     const full = render(makeBot());
-    for (const text of ["Working folder", "Connected apps", "Let this bot use notes", "Browser", "Webhooks", "Always allowed"]) {
+    for (const text of ["Working folder", "Connected apps", "Let this bot use notes", "Webhooks", "Always allowed"]) {
       expect(full).toContain(text);
     }
     const mcp = renderToStaticMarkup(createElement(StoreProvider, null, createElement(AccessSection, { bot: makeBot(), derived: makeDerived(), parts: ["mcp"] })));

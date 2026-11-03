@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigStatus, InstanceInfo } from "@/state/store";
-import { APP, CONNECTORS_MODE, DECIDER, EDITION, ENGINE, KEY_PROVIDER, LOCAL_VM_MODE, PLATFORM, TRIAL_CREDIT } from "./analytics-allowlist";
+import { APP, CONNECTORS_MODE, DECIDER, EDITION, ENGINE, KEY_PROVIDER, PLATFORM, TRIAL_CREDIT } from "./analytics-allowlist";
 import { buildUsageSnapshot, type SnapshotState, type UsageInput, type UsageSources } from "./usage-snapshot";
 
 const HOSTILE = "sk-ant-api03-HOSTILE-0123456789";
@@ -40,17 +40,17 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 const DOCUMENTED = [
-  "key_providers", "key_count", "bots_cloud_vps", "bots", "bots_local_vm", "bots_this_computer", "bots_browser", "bots_off", "bots_auto", "rooms", "bot_channels",
+  "key_providers", "key_count", "bots", "bots_this_computer", "bots_browser", "bots_off", "bots_auto", "rooms", "bot_channels",
   "teams", "routines", "routines_enabled", "routines_cloud", "routines_room_goal", "routines_once", "routines_daily",
   "routines_interval", "routines_cron", "webhooks", "engines", "engine_count", "custom_endpoints", "trial_credit", "apps",
-  "apps_connected", "connectors_mode", "local_vm_mode", "vps_configured", "decider", "decider_included",
+  "apps_connected", "connectors_mode", "decider", "decider_included",
   "members", "edition",
   "org_managed", "onboarded", "first_turn", "platform", "remote_client",
 ];
 
 const WORDS: Record<string, readonly string[]> = {
   key_providers: KEY_PROVIDER, engines: [...ENGINE, "other"], trial_credit: TRIAL_CREDIT,
-  apps: [...APP, "other"], connectors_mode: [...CONNECTORS_MODE, "other"], local_vm_mode: [...LOCAL_VM_MODE, "other"],
+  apps: [...APP, "other"], connectors_mode: [...CONNECTORS_MODE, "other"],
   decider: [...DECIDER, "other"], edition: [...EDITION, "other"], platform: PLATFORM,
 };
 
@@ -174,11 +174,11 @@ describe("the daily usage snapshot", () => {
     const [sent] = snapshots();
     expect(sent).toEqual({
       key_providers: ["anthropic", "openai_compat", "composio", "opencode_go", "jev", "custom_image"],
-      key_count: 6, bots_cloud_vps: 3, bots: 9, bots_local_vm: 1, bots_this_computer: 1, bots_browser: 1, bots_off: 1, bots_auto: 2,
+      key_count: 6, bots: 9, bots_this_computer: 1, bots_browser: 1, bots_off: 1, bots_auto: 2,
       rooms: 2, bot_channels: 1, teams: 2,
       routines: 4, routines_enabled: 3, routines_cloud: 1, routines_room_goal: 1, routines_once: 1, routines_daily: 1, routines_interval: 1, routines_cron: 1,
       webhooks: 1, engines: ["claude", "openai_compat", "other"], engine_count: 4, custom_endpoints: 1, trial_credit: "used_up",
-      apps: ["gmail", "other"], apps_connected: 4, connectors_mode: "self_hosted", local_vm_mode: "per_bot", vps_configured: true,
+      apps: ["gmail", "other"], apps_connected: 4, connectors_mode: "self_hosted",
       decider: "jev", decider_included: false, members: 1, edition: "enterprise", org_managed: true, onboarded: true, first_turn: true,
       platform: "desktop", remote_client: false,
     });
@@ -239,7 +239,7 @@ describe("the daily usage snapshot", () => {
     for (const key of ["apps", "apps_connected", "members"]) {
       expect(sent, key).not.toHaveProperty(key);
     }
-    expect(sent).toMatchObject({ bots: 9, key_count: 8 });
+    expect(sent).toMatchObject({ bots: 9, key_count: 6 });
   });
 });
 
@@ -293,6 +293,6 @@ describe("what counts as a key, a computer source and an app", () => {
 
   it("leaves archived bots out of every bot count", () => {
     const bots = [{ computer: "cloud", hidden: true }, { computer: "cloud", cloudBackend: "vps", hidden: true }, { computer: "local", hidden: false }, { computer: "cloud" }] as UsageInput["bots"];
-    expect(buildUsageSnapshot(minimal({}, { bots }))).toMatchObject({ bots: 2, bots_cloud_vps: 0, bots_this_computer: 1 });
+    expect(buildUsageSnapshot(minimal({}, { bots }))).toMatchObject({ bots: 2, bots_this_computer: 1 });
   });
 });

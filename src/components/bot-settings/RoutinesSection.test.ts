@@ -103,7 +103,7 @@ describe("RoutinesSection", () => {
 
   it("renders a capitalized schedule sentence and name for each routine", () => {
     const markup = render([activeRoutine, pausedRoutine], []);
-    expect(markup).toContain("Every weekday at");
+    expect(markup).toContain("Weekdays at");
     expect(markup).toContain("Morning brief");
     expect(markup).toContain("Weekly digest");
   });

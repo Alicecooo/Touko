@@ -1,7 +1,7 @@
 // A config written by a newer or differently built app must load as an unavailable shadow, never crash the fleet.
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ModelCatalog } from "./contracts.ts";
@@ -472,7 +472,7 @@ process.exit(0);
     const binDir = join(scratch, "fake-path");
     mkdirSync(binDir);
     if (present) addFakeNpm(binDir);
-    process.env.PATH = binDir;
+    process.env.PATH = `${binDir}${delimiter}${dirname(process.execPath)}`;
     process.env.FAKE_NPM_LOG = join(scratch, "npm-calls.jsonl");
     resetPathCacheForTests();
     return binDir;

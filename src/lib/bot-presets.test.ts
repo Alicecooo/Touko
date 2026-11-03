@@ -40,7 +40,7 @@ describe("presets in New bot", () => {
     expect(presetDraftPatch(preset({ bot: {} })).name).toBe("Support agent");
     const draft = new BotCreationDraft({ ...EMPTY_BOT_DEFAULTS, profile: { approvalMode: "auto", computer: "local", composio: true, modelSelection: { instanceId: "claude", model: "opus" } } }, vi.fn());
     draft.patch(patch);
-    expect(draft.template.profile).toMatchObject({ approvalMode: "auto", computer: "local", composio: true, modelSelection: { instanceId: "claude", model: "opus" } });
+    expect(draft.template.profile).toMatchObject({ approvalMode: "auto", computer: null, composio: true, modelSelection: { instanceId: "claude", model: "opus" } });
   });
 
   it("turns the preset's picture into a file the draft uploads like any picture", async () => {

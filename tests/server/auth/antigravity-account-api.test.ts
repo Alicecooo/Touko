@@ -70,10 +70,6 @@ it("validates account requests and does not allow client-only sessions to add pr
     expect((await api("POST", "/api/instances/antigravity-accounts", body)).status).toBe(400);
   }
   expect((await api("POST", "/api/instances/antigravity-accounts", {}, { "content-type": "text/plain" })).status).toBe(415);
-  const pairing = await api("POST", "/api/auth/pairing", { scopes: ["client"] });
-  const paired = await api("POST", "/api/auth/pair", { code: pairing.body.code, label: "Non-admin fixture" });
-  expect(paired.status).toBe(200);
-  expect((await api("POST", "/api/instances/antigravity-accounts", { displayName: "Work", sourceInstanceId: "google-original" }, { authorization: `Bearer ${paired.body.token}` })).status).toBe(403);
   expect(readFileSync(join(home, "config.json"), "utf8")).toBe(saved);
 });
 

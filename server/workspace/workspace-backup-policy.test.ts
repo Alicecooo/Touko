@@ -14,13 +14,14 @@ describe("workspace backup data boundary", () => {
       mcpServers: { source: { command: "mcp", args: ["arg-secret"], env: { ORDINARY: "env-secret" }, headers: { Authorization: "Bearer header-secret" } } },
       futureConnection: { unrecognizedField: "future-secret" }, apiKey: "legacy-secret",
       defaultModelSelection: { instanceId: "source", model: "source" },
-      signIn: { admins: ["source@example.com"] }, customDomain: "source.example", vps: { sshAlias: "source" },
+      signIn: { admins: ["source@example.com"] }, customDomain: "source.example",
       cliStartup: { access: "public-url", publicUrl: "https://source.example" },
     };
     const portable = portableWorkspaceConfig({ ...connections, language: "ja", features: {  }, profile: { name: "Example" } });
     expect(portable).toEqual({ profile: { name: "Example" }, language: "ja", features: {  } });
     const restored = restoredWorkspaceConfig(portable, { ...connections, language: "en", budgets: { monthlyUsd: 12 } });
-    expect(restored).toEqual({ ...connections, ...portable });
+    const { features: _emptyFeatures, ...keptConnections } = connections;
+    expect(restored).toEqual({ ...keptConnections, profile: { name: "Example" }, language: "ja" });
     expect(restored.instances).toBe(connections.instances);
   });
 
@@ -34,8 +35,8 @@ describe("workspace backup data boundary", () => {
 
   it("keeps the destination's own computer-sharing switch, whatever the backup says", () => {
     const portable = portableWorkspaceConfig({ features: {  sharedComputers: true } });
-    expect(restoredWorkspaceConfig(portable, { features: { sharedComputers: false } }).features).toEqual({ browser: true, sharedComputers: false });
-    expect(restoredWorkspaceConfig(portable, {}).features).toEqual({ browser: true });
+    expect(restoredWorkspaceConfig(portable, { features: { sharedComputers: false } }).features).toEqual({ sharedComputers: false });
+    expect(restoredWorkspaceConfig(portable, {}).features ?? {}).toEqual({});
     expect(restoredWorkspaceConfig(portableWorkspaceConfig({ features: { sharedComputers: true } }), {})).not.toHaveProperty("features");
     expect(restoredWorkspaceConfig({}, { features: { sharedComputers: true,  } }).features).toEqual({ sharedComputers: true });
   });

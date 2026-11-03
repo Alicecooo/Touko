@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -12,7 +12,7 @@ import {
   launchVerificationServer,
   runControlOmb,
 } from "../../../scripts/dev/isolated-environment.ts";
-import { installedChrome, UI_MUTATING } from "../../../scripts/dev/isolated-browser-controller.ts";
+import { UI_MUTATING } from "../../../scripts/dev/isolated-browser-controller.ts";
 import { removeTempDir } from "../../support/environment/process-cleanup.ts";
 
 describe("control-omb command mapping", () => {
@@ -61,27 +61,6 @@ describe("control-omb command mapping", () => {
       await expect(runControlOmb(["ui", "snapshot", "--ui", handle])).rejects.toThrow("lacks previewUrl");
     } finally {
       await removeTempDir(dir);
-    }
-  });
-
-  it("finds the newest Chrome for Testing that agent-browser install unpacked", () => {
-    const dir = mkdtempSync(join(tmpdir(), "omb-ui-tools-"));
-    try {
-      expect(installedChrome(dir, "linux")).toBeNull();
-      const browsers = join(dir, ".agent-browser", "browsers");
-      for (const version of ["chrome-9.0.100.1", "chrome-153.0.8010.36"]) {
-        mkdirSync(join(browsers, version), { recursive: true });
-        writeFileSync(join(browsers, version, "chrome"), "");
-      }
-      expect(installedChrome(dir, "linux")).toBe(join(browsers, "chrome-153.0.8010.36", "chrome"));
-      expect(installedChrome(dir, "darwin")).toBeNull();
-      const app = join(browsers, "chrome-153.0.8010.36", "Google Chrome for Testing.app", "Contents", "MacOS");
-      mkdirSync(app, { recursive: true });
-      writeFileSync(join(app, "Google Chrome for Testing"), "");
-      expect(installedChrome(dir, "darwin")).toBe(join(app, "Google Chrome for Testing"));
-    } finally {
-      // synchronous removal is fine here: nothing spawned inside the directory
-      void removeTempDir(dir);
     }
   });
 

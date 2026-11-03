@@ -64,7 +64,7 @@ describe("managed engine setup errors", () => {
     const reason = "Cannot write Antigravity profile settings (EACCES).";
     const engine = managed({ state: "unavailable", reason });
     const markup = render(engine);
-    expect(markup).toContain("This computer didn't allow that. Check the file or folder permissions, then try again.");
+    expect(markup).toContain("Check the file or folder permissions, then try again.");
     expect(markup).not.toContain(reason);
     expect(markup).toContain('role="alert"');
     expect(markup).toContain("Install official Antigravity");

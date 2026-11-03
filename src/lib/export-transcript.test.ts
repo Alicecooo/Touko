@@ -146,7 +146,7 @@ describe("export-transcript", () => {
       exportedAt: fixedDate,
     });
 
-    expect(markdown).toContain("🔧 _Used tool:_ `reading package.json`");
+    expect(markdown).toContain("> 🔧 _Used tool:_ `readFile`");
     expect(markdown).toContain("📋 **Select framework**");
     expect(markdown).toContain("Options: `React`, `Vue`, `Svelte`");
     expect(markdown).toContain("Selected: **React**");
