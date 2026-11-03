@@ -14,7 +14,7 @@ import { toolDetailPreview } from "../agent/tool-summary.ts";
 
 describe("the catalog's names", () => {
   it("are every tool a turn could be given, whoever may call it, and neither of the bridge's own", () => {
-    for (const tool of ["coordinate_bots", "list_triggers", "vm_exec", "create_bot", "shared_computer", "skill_manage", "create_options_card", "memory_log"]) {
+    for (const tool of ["coordinate_bots", "list_triggers", "create_bot", "shared_computer", "skill_manage", "create_options_card", "memory_log"]) {
       expect(CATALOG_TOOL_NAMES.has(tool), tool).toBe(true);
     }
     expect(CATALOG_TOOL_NAMES.has(FIND_TOOL)).toBe(false);
@@ -66,11 +66,11 @@ describe("the bot's Activity log", () => {
 
   it("names a bridged call by the tool it ran, from the event alone", () => {
     ran("mcp__agents__use_tool", { name: "list_triggers", arguments: {} });
-    ran("mcp__agents__use_tool", { name: "vm_exec", arguments: { command: "ls" } }, false);
+    ran("mcp__agents__use_tool", { name: "memory_log", arguments: { text: "noted" } }, false);
     ran("agents_use_tool", { name: "session_search", arguments: { query: "pricing" } });
     expect(log()).toEqual([
       { tool: "mcp__agents__list_triggers", app: "Team", label: "List triggers", outcome: "ran" },
-      { tool: "mcp__agents__vm_exec", app: "Team", label: "Vm exec", outcome: "failed" },
+      { tool: "mcp__agents__memory_log", app: "Team", label: "Memory log", outcome: "failed" },
       { tool: "agents_session_search", app: null, label: "Agents session search", outcome: "ran" },
     ]);
   });

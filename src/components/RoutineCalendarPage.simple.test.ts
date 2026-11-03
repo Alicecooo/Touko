@@ -270,7 +270,7 @@ describe("routine editor", () => {
   it("shows a saved startup choice when the simple editor opens", () => {
     const html = editor({ ...routine, runOnStartup: true });
     expect(html).toContain('aria-expanded="true"');
-    expect(html).toMatch(/<input type="checkbox" aria-label="Also run when OpenMausBot starts"[^>]*checked[^>]*>/);
+    expect(html).toMatch(/<input type="checkbox" aria-label="Also run when Touko starts"[^>]*checked[^>]*>/);
   });
 
   it("offers Remember the last run for a repeating routine, off unless the routine has it", () => {

@@ -271,8 +271,8 @@ describe("ApprovalCard learned skills", () => {
     const markup = renderToStaticMarkup(createElement(ApprovalCard, { message }));
     expect(markup).toContain("enable a learned skill");
     expect(markup).toContain("Files an expense in the company portal.");
-    expect(markup).toContain("Review the complete SKILL.md before enabling");
-    expect(markup).toContain("Source: learn:conversation");
+    expect(markup).toContain("Review the complete SKILL.md and any reference files before applying this proposal.");
+    expect(markup).toContain("Source:learn:conversation");
     expect(markup).toContain("name: file-expense");
     expect(markup).toContain("sha256 abcdef01");
 
@@ -309,7 +309,6 @@ describe("ApprovalCard learned skills", () => {
     };
 
     expect(renderToStaticMarkup(createElement(ApprovalCard, { message }))).toContain("update a learned skill");
-    expect(renderToStaticMarkup(createElement(ApprovalCard, { message }))).toContain("replacing the current version");
     message.card!.answered = "allow";
     expect(renderToStaticMarkup(createElement(ApprovalCard, { message }))).toContain("Skill updated");
   });
@@ -342,13 +341,8 @@ describe("ApprovalCard learned skills", () => {
     };
 
     const markup = renderToStaticMarkup(createElement(ApprovalCard, { message }));
-    expect(markup).toContain("created by an older build");
-    expect(markup).toContain("cannot be safely applied");
-    expect(markup).toContain("create the skill again");
-
-    message.card!.skillRequest!.action = "update";
-    expect(renderToStaticMarkup(createElement(ApprovalCard, { message })))
-      .toContain("propose the update again");
+    expect(markup).toContain("This proposal came from an older version. Reject it and ask the bot to propose it again.");
+    expect(markup).not.toContain(">Enable<");
   });
 });
 

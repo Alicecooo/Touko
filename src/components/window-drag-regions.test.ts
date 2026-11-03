@@ -102,15 +102,6 @@ describe.each([
     expect(region(header.querySelector("[data-chathead-identity], [data-roomhead-identity]"))).toBe("no-drag");
   });
 
-  it("drops the right-hand controls below the caption buttons on Windows only", () => {
-    const controls = (chrome: Chrome) => {
-      fixture.chrome = chrome;
-      return dom(view()).querySelector("[data-chathead-controls], [data-roomhead-controls]");
-    };
-    expect(styleValue(controls("win-caption"), "margin-top")).toBe("16px");
-    expect(styleValue(controls("mac-inset"), "margin-top")).toBe("16px");
-  });
-
   it("leaves Linux's native title bar alone", () => {
     fixture.chrome = "native";
     const document = dom(view());

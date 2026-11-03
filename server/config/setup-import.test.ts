@@ -262,16 +262,16 @@ describe("finding what another AI tool already set up on this computer", () => {
     expect(applySetupImport(machine, host, { skills: true, tools: true })).toMatchObject({ skills: { added: ["pdf"] }, tools: { added: ["ok"] } });
   });
 
-  it("accepts a trailing comma, gives a name OpenMausBot keeps for itself an mcp- prefix, and calls a different server by a taken name a conflict", () => {
+  it("accepts a trailing comma, prefixes a reserved server name, and calls a different server by a taken name a conflict", () => {
     const home = fixtureHome();
     put(home, ".cursor/mcp.json", '{ "mcpServers": { "notion": { "url": "https://mcp.notion.com/mcp", }, }, }');
     put(home, ".gemini/settings.json", JSON.stringify({ mcpServers: { browser: { command: "my-browser-tool" }, github: { command: "docker", args: ["run", "github-mcp"] } } }));
     const { machine } = machineFor(home);
     const github = { command: "npx", args: ["-y", "@modelcontextprotocol/server-github"], env: {}, enabled: true };
     const { host, servers } = hostFor({ servers: { github } });
-    expect(detectSetup(machine, host).tools).toEqual([{ name: "notion", source: "cursor" }, { name: "mcp-browser", source: "gemini" }]);
+    expect(detectSetup(machine, host).tools).toEqual([{ name: "notion", source: "cursor" }, { name: "browser", source: "gemini" }]);
     expect(applySetupImport(machine, host, { tools: true }).tools).toEqual({
-      added: ["notion", "mcp-browser"], present: [], skipped: [{ name: "github", reason: "conflict" }],
+      added: ["notion", "browser"], present: [], skipped: [{ name: "github", reason: "conflict" }],
     });
     expect(servers().github).toEqual(github);
   });

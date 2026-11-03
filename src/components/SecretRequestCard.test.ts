@@ -128,25 +128,6 @@ describe("SecretRequestCard key analytics", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("reports a Boat key saved over the desktop bridge once, even when only the resume is retried", async () => {
-    const setCredential = vi.fn().mockResolvedValue({ box: { configured: true } });
-    vi.stubGlobal("window", { ogb: { setCredential } });
-    fixture.api.mockRejectedValueOnce(new Error("resume failed")).mockResolvedValueOnce({ ok: true });
-    await submit("boxToken");
-    card("boxToken").find((node) => node.type === "form")!.props.onSubmit!({ preventDefault: () => {} });
-    await flush();
-    expect(setCredential).toHaveBeenCalledExactlyOnceWith("boxToken", KEY);
-    expect(fixture.api).toHaveBeenCalledTimes(2);
-    expect(fixture.track.mock.calls).toEqual([["api_key_saved", { provider: "boat", via: "chat_request", result: "ok" }]]);
-    for (const fragment of [KEY, KEY.slice(0, 6), KEY.slice(-6), String(KEY.length)]) expect(JSON.stringify(fixture.track.mock.calls)).not.toContain(fragment);
-  });
-
-  it("reports a Boat key boat.dev refused as rejected", async () => {
-    vi.stubGlobal("window", { ogb: { setCredential: vi.fn().mockRejectedValue(new Error("Error invoking remote method 'credential:set': KeyRejected: That doesn't look like a Boat API key")) } });
-    await submit("boxToken");
-    expect(fixture.track.mock.calls).toEqual([["api_key_saved", { provider: "boat", via: "chat_request", result: "rejected" }]]);
-  });
-
   it("reports an xAI key saved from chat as unverified: nothing checks it before it is used", async () => {
     fixture.api.mockResolvedValueOnce({ xai: { configured: true } }).mockResolvedValueOnce({ ok: true });
     await submit("xaiApiKey", "xai-ZZtestSECRET0123456789");

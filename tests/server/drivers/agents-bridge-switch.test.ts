@@ -658,7 +658,7 @@ describe("the name a bridged call is given", () => {
 
   it("is the tool it ran on a turn that was bridged, for any tool of today's catalog, and its own for anything else", () => {
     bridgedAgents("thread-bridged", agents(), ON, bot, CLAUDE, {}, HOST);
-    for (const tool of ["list_triggers", "vm_exec", "shared_computer", "create_bot", "create_options_card", "memory_log", "post_to_room"]) {
+    for (const tool of ["list_triggers", "shared_computer", "create_bot", "create_options_card", "memory_log", "post_to_room"]) {
       expect(bridgedToolTitle("thread-bridged", "mcp__agents__use_tool", JSON.stringify({ name: tool, arguments: {} }, null, 2)), tool).toBe(`mcp__agents__${tool}`);
       expect(bridgedToolTitle("thread-bridged", "agents_use_tool", { name: tool }), tool).toBe(`agents_${tool}`);
       expect(bridgedToolTitle("thread-bridged", "use_tool", { name: tool }), tool).toBe(tool);
@@ -720,18 +720,18 @@ describe("the record of bridged turns", () => {
 
 describe("what the prompt builder and the Activity log load", () => {
   it("is no engine driver: the rule's text and the question of whether a turn is bridged need none", async () => {
-    const here = dirname(fileURLToPath(import.meta.url));
+    const server = join(dirname(fileURLToPath(import.meta.url)), "../../../server");
     const loaded = async (entry: string) => {
-      const result = await build({ entryPoints: [join(here, entry)], bundle: true, platform: "node", format: "esm", write: false, metafile: true, logLevel: "silent", packages: "external" });
+      const result = await build({ entryPoints: [join(server, entry)], bundle: true, platform: "node", format: "esm", write: false, metafile: true, logLevel: "silent", packages: "external" });
       return Object.keys(result.metafile.inputs);
     };
-    for (const entry of ["system-prompt.ts", "activity.ts", "agents-bridge-names.ts", "mcp-gate.ts", "drivers/agents-proxy.ts"]) {
+    for (const entry of ["agent/system-prompt.ts", "agent/activity.ts", "drivers/agents-bridge-names.ts", "mcp/mcp-gate.ts", "drivers/agents-proxy.ts"]) {
       const inputs = await loaded(entry);
       const drivers = inputs.filter((input) => /server\/drivers\/(claude|codex|pi|openai-chat|muse-code)\.ts$|server\/drivers\/acp\/|agents-bridge-switch\.ts$/.test(input));
       expect(drivers, entry).toEqual([]);
     }
     // and the switch, which reads the drivers to decide, is where they are loaded from
-    expect((await loaded("agents-bridge-switch.ts")).some((input) => input.endsWith("server/drivers/claude.ts"))).toBe(true);
+    expect((await loaded("drivers/agents-bridge-switch.ts")).some((input) => input.endsWith("server/drivers/claude.ts"))).toBe(true);
   }, 60_000);
 });
 

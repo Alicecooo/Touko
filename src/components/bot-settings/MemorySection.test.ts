@@ -142,7 +142,7 @@ describe("MemoryUpkeepCard", () => {
   it("explains the switch and hides the tidy button while off", () => {
     const markup = render(createElement(MemoryUpkeepCard, { enabled: false, status: null, tidying: false, onToggle: noop, onTidy: noop }));
     expect(markup).toContain("Memory upkeep");
-    expect(markup).toContain("you can remove any");
+    expect(markup).toContain("Every change shows below and can be undone.");
     expect(markup).not.toContain("Tidy up now");
   });
 

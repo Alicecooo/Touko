@@ -31,13 +31,12 @@ describe("workspace credential migration", () => {
     expect(result.credentialsChanged).toBe(true);
     expect(result.credentials).toEqual({
       xaiApiKey: "xai-secret",
-      boxToken: "boat-secret",
       opencodeGoApiKey: "ocg-secret",
       openaiImageApiKey: "image-secret",
     });
     expect(result.config).toEqual({
       xai: { url: "https://api.example.test/v1" },
-      box: {},
+      box: { token: "boat-secret" },
       imageGen: {},
       opencodeGo: {},
       profile: { name: "Ada" },
@@ -76,11 +75,11 @@ describe("workspace credential migration", () => {
 
   it("treats a saved non-empty value as newest intent and overwrites the store", () => {
     const result = migrateWorkspaceCredentials(
-      { box: { token: "box-NEW" } },
-      { boxToken: "box-OLD", xaiApiKey: "xai-keep" },
+      { xai: { key: "xai-NEW" } },
+      { xaiApiKey: "xai-OLD" },
     );
-    expect(result.credentials).toEqual({ boxToken: "box-NEW", xaiApiKey: "xai-keep" });
-    expect(result.config.box).toEqual({});
+    expect(result.credentials).toEqual({ xaiApiKey: "xai-NEW" });
+    expect(result.config.xai).toEqual({});
   });
 
   it("treats an empty saved value as no information and keeps the stored secret", () => {
@@ -128,14 +127,12 @@ describe("workspace credential env", () => {
     expect(
       workspaceCredentialEnv({
         xaiApiKey: "xai-secret",
-        boxToken: "boat-secret",
         opencodeGoApiKey: "ocg-secret",
         openaiImageApiKey: "image-secret",
         composioApiKey: "ak_handled-separately",
       }),
     ).toEqual({
       XAI_API_KEY: "xai-secret",
-      BOX_TOKEN: "boat-secret",
       OPENCODE_API_KEY: "ocg-secret",
       OMB_OPENAI_IMAGE_KEY: "image-secret",
     });

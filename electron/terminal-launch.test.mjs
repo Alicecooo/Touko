@@ -20,16 +20,10 @@ function launcher(outcomes) {
 }
 
 describe("blank terminal launcher", () => {
-  it("opens Terminal on macOS without a command argument", async () => {
+  it("does not launch a terminal on macOS", async () => {
     const fake = launcher(["spawn"]);
-    await expect(openBlankTerminal("darwin", fake.run)).resolves.toBe(true);
-    expect(fake.calls).toEqual([
-      {
-        executable: "osascript",
-        args: ["-e", 'tell application "Terminal" to activate'],
-        options: undefined,
-      },
-    ]);
+    await expect(openBlankTerminal("darwin", fake.run)).resolves.toBe(false);
+    expect(fake.calls).toEqual([]);
   });
 
   it("opens a blank PowerShell window on Windows", async () => {

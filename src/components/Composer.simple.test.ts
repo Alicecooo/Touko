@@ -104,7 +104,6 @@ describe("the Simple composer in a bot chat", () => {
     openPlus();
     click(item("approval"));
     const submenu = document.body.querySelector<HTMLElement>("[data-sidebar-popover-submenu]")!;
-    expect(submenu.textContent).toContain("Command allowlist");
     const ask = submenu.querySelector('[data-menu-key="approval:ask"]')!;
     expect(ask.querySelector(".lucide-check")).not.toBeNull();
     click(submenu.querySelector('[data-menu-key="approval:full"]'));

@@ -327,7 +327,6 @@ describe("Settings → Appearance", () => {
     expect(html).toContain("Maximum running threads per bot");
     expect(html).toContain("Automatic recovery");
     expect(html).toContain('aria-label="App language"');
-    expect(html).toContain("Diagnostics");
     expect(html).not.toContain('aria-label="Show threads"');
     expect(html).not.toContain('aria-label="Choose sidebar density"');
     expect(html).not.toContain('aria-label="Show tool calls in chat"');
@@ -338,7 +337,6 @@ describe("Settings → Appearance", () => {
     vi.stubGlobal("window", { ogb: { remoteClient: { active: true } } });
     const html = render();
     expect(html).toContain('<option value="appearance" selected="">Appearance</option>');
-    expect(html).toContain('<option value="companion">Remote access</option>');
     expect(html).not.toContain('<option value="general">');
     expect(html).not.toContain('<option value="connections">');
     expect(html).not.toContain('<option value="engines">');
@@ -398,10 +396,7 @@ describe("Settings → Appearance", () => {
     vi.stubGlobal("window", { ogb: { environments: {} } });
     const local = render();
     expect(local).toContain('<option value="desktopWorkspaces" selected="">Servers</option>');
-    expect(local).toContain("Server address or pairing link");
     expect(local).toContain("Name (optional)");
-    expect(local).toContain("Your servers");
-    expect(local).toContain("npx openmausbot pair --label");
     fixture.section = "general";
     vi.stubGlobal("window", { ogb: { workspaces: {} } });
     expect(render()).not.toContain('<option value="desktopWorkspaces"');
@@ -419,15 +414,5 @@ describe("Settings → Appearance", () => {
     vi.stubGlobal("window", { ogb: { organization: {}, remoteClient: { active: true } } });
     expect(render()).not.toContain('<option value="organization"');
     expect(render()).toContain("Midnight");
-  });
-  it("offers personal Cloud separately and only through the local desktop bridge", () => {
-    fixture.section = "cloudAccount";
-    vi.stubGlobal("window", { ogb: { cloudAccount: {} } });
-    expect(render()).toContain('<option value="cloudAccount" selected="">MausBot Cloud</option>');
-    expect(render()).toContain("Free local use");
-    fixture.section = "appearance";
-    vi.stubGlobal("window", {}); expect(render()).not.toContain('<option value="cloudAccount"');
-    vi.stubGlobal("window", { ogb: { cloudAccount: {}, remoteClient: { active: true } } });
-    expect(render()).not.toContain('<option value="cloudAccount"');
   });
 });

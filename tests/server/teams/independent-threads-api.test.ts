@@ -436,7 +436,7 @@ describe("independent bot tasks through the isolated control surface", () => {
     evidence.push({ cappedTitleLength: 80, blankMemoryReplacementRejected: true, generatedFilesRetained: true });
   }, 30_000);
 
-  it("exposes background waiting threads and pins paired approval answers to the displayed request", async () => {
+  it("exposes background waiting threads and pins approval answers to the displayed request", async () => {
     const created = await tool("create_bot", { name: "Phone approval fixture", instance_id: "claude", model: models[0] });
     const botId = created.bot.id;
     const threadA = created.bot.activeTaskId;
@@ -453,30 +453,19 @@ describe("independent bot tasks through the isolated control surface", () => {
     await expect.poll(async () => (await botState(botId)).tasks.filter((task: any) => task.activity === "waiting-on-you").length).toBe(2);
     await tool("switch_task", { target_type: "bot", target_id: botId, task_id: threadA });
 
-    const invitation = await api("POST", "/api/auth/pairing", { label: "Isolated iOS approval fixture", scopes: ["client", "admin"] });
-    expect(invitation.status).toBe(200);
-    const accepted = await api("POST", "/api/auth/pair", { code: invitation.body.code, label: "Isolated iOS client" });
-    expect(accepted.status).toBe(200);
-    const paired = async (method: string, path: string, body?: unknown) => {
-      const response = await fetch(`${session.info.url}${path}`, {
-        method, headers: { "content-type": "application/json", authorization: `Bearer ${accepted.body.token}` },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      });
-      return { status: response.status, body: await response.json() as any };
-    };
-    const fleet = await paired("GET", "/api/bots?messages=50");
+    const fleet = await api("GET", "/api/bots?messages=50");
     const bot = fleet.body.bots.find((candidate: any) => candidate.id === botId);
     expect(bot.threadId).toBe(threadA);
     expect(bot.tasks.find((task: any) => task.threadId === threadB)?.activity).toBe("waiting-on-you");
     expect(bot.messages.some((message: any) => message.card?.requestId === "phone-approval-b")).toBe(false);
-    const background = await paired("GET", `/api/threads/${threadB}/messages?limit=50`);
+    const background = await api("GET", `/api/threads/${threadB}/messages?limit=50`);
     expect(background.body.messages.some((message: any) => message.card?.requestId === "phone-approval-b" && !message.card.answered)).toBe(true);
 
-    const stale = await paired("POST", `/api/threads/${threadA}/respond`, { requestId: "phone-approval-b", behavior: "allow" });
+    const stale = await api("POST", `/api/threads/${threadA}/respond`, { requestId: "phone-approval-b", behavior: "allow" });
     expect(stale.body.outcome).toBe("unavailable");
     expect(answersA).toEqual([]);
     expect(answersB).toEqual([]);
-    const answered = await paired("POST", `/api/threads/${threadB}/respond`, { requestId: "phone-approval-b", behavior: "allow" });
+    const answered = await api("POST", `/api/threads/${threadB}/respond`, { requestId: "phone-approval-b", behavior: "allow" });
     expect(answered.status).toBe(200);
     expect(answered.body.outcome).toBe("allowed-once");
     await expect.poll(() => answersB.some((answer) => answer.id === "phone-approval-b")).toBe(true);

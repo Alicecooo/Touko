@@ -619,7 +619,7 @@ describe("agents-proxy MCP surface", () => {
     const list = await rpc("tools/list");
     const tool = list.result.tools.find((entry: { name: string }) => entry.name === "select_computer");
     expect(tool.inputSchema).toMatchObject({ type: "object", additionalProperties: false,
-      properties: { surface: { type: "string", enum: ["auto", "cloud", "vm", "local", "browser"] } } });
+      properties: { surface: { type: "string", enum: ["auto", "cloud", "local"] } } });
     expect(tool.inputSchema.required ?? []).not.toContain("surface");
     expect(tool.description).toContain("end this turn immediately");
     expect(tool.description).toContain("with a configured provider it can start or provision one when needed");
@@ -627,8 +627,8 @@ describe("agents-proxy MCP surface", () => {
     expect(tool.annotations?.readOnlyHint).not.toBe(true);
   });
 
-  it.each(["auto", "cloud", "vm", "local", "browser"])("select_computer posts the requested %s target without inventing success", async (surface) => {
-    computerResponse = { state: "pending", surface: surface === "auto" ? "vm" : surface, instruction: "End this turn; the original request will resume." };
+  it.each(["auto", "cloud", "local"])("select_computer posts the requested %s target without inventing success", async (surface) => {
+    computerResponse = { state: "pending", surface: surface === "auto" ? "cloud" : surface, instruction: "End this turn; the original request will resume." };
     const response = await callTool("select_computer", { surface });
     expect(response.result.isError).toBeFalsy();
     expect(JSON.parse(response.result.content[0].text)).toEqual(computerResponse);
@@ -1003,7 +1003,7 @@ describe("agents-proxy MCP surface", () => {
   it("asks for a sign-in with only the site and the bot's reason, and ends the turn", async () => {
     const res = await callTool("request_sign_in", { site: " https://example.com/login ", reason: "The report is behind a login." });
     expect(res.result.isError).toBeFalsy();
-    expect(res.result.content[0].text).toContain("The person was asked to sign in to example.com on your built-in browser.");
+    expect(res.result.content[0].text).toContain("The person was asked to sign in to example.com on the place you work.");
     expect(res.result.content[0].text).toContain("Your turn ends now");
     expect(res.result.content[0].text).toContain("resumes you when they finish or decline");
     expect(res.result.content[0].text).toContain("Never ask for the password or a code in chat");
@@ -2201,7 +2201,7 @@ describe("tool bridge", () => {
   /** The main child's switches: a Chief with skills and shared computers. */
   const CHIEF = { OMB_SKILL_AUTHORING_ENABLED: "1", OMB_SHARED_COMPUTERS_ENABLED: "1", OMB_CHIEF_OF_STAFF: "1" };
   const CHIEF_ONLY = ["create_bot", "list_team_setup", "propose_team_setup", "propose_bot_deletion", "create_room", "manage_room", "retry_thread"];
-  const HOT = ["tool_result_read", "list_room_targets", "coordinate_bots", "list_bots", "list_rooms", "select_computer", "attach_file", "post_to_room", "request_credential", "request_sign_in", "fill_login", "memory_update"];
+  const HOT = ["tool_result_read", "list_room_targets", "coordinate_bots", "list_bots", "list_rooms", "select_computer", "attach_file", "post_to_room", "request_credential", "request_sign_in", "memory_update"];
   let chief: Rpc;
   let plain: Rpc;
   let off: Rpc;

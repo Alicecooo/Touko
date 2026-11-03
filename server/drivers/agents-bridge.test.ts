@@ -59,7 +59,7 @@ describe("what a bridged turn is listed", () => {
     for (const { name, profile: turn } of everyProfile()) {
       const tools = availableTools(turn);
       const hot = createToolBridge(tools as BridgeTool[]).listed.length - 2;
-      expect(hot, name).toBeGreaterThanOrEqual(11);
+      expect(hot, name).toBeGreaterThanOrEqual(10);
       expect(hot, name).toBeLessThanOrEqual(14);
       expect(hot, name).toBeLessThan(tools.length / 2);
     }
@@ -181,7 +181,6 @@ describe("find_tool", () => {
     ["change my name and title", "propose_profile"],
     ["switch this bot to a different model", "propose_model"],
     ["search my earlier conversations", "session_search"],
-    ["run a shell command in the VM", "vm_exec"],
     ["add an MCP server", "add_mcp_server"],
     ["see how the threads I opened are going", "list_threads"],
     ["write a line to today's log", "memory_log"],
@@ -194,7 +193,7 @@ describe("find_tool", () => {
     ["open a separate job for each pull request", "start_thread"],
     ["read the whole message from an old conversation", "session_read"],
     ["retry the failed thread", "retry_thread"],
-    ["cron", "create_trigger"],
+    ["cron", "manage_trigger"],
   ])("ranks the hidden tool first from how a person would ask: %s", async (query, expected) => {
     const matches = (await found(bridgeFor(FULL_CHIEF), query)).matches;
     expect(matches[0]!.name).toBe(expected);
@@ -260,14 +259,11 @@ describe("find_tool", () => {
   it("never returns a tool outside this turn's profile", async () => {
     const plain = bridgeFor();
     const allowed = new Set(names(plain.hidden));
-    for (const query of ["create a new specialist bot", "delete a teammate", "set up the team", "retry a failed thread", "share a computer", "save a skill", ...CHIEF_ONLY, "skill_manage", "shared_computer", "vm_exec"]) {
+    for (const query of ["create a new specialist bot", "delete a teammate", "set up the team", "retry a failed thread", "share a computer", "save a skill", ...CHIEF_ONLY, "skill_manage", "shared_computer"]) {
       const answer = await plain.find({ query });
       const matches = answer.isError ? [] : (JSON.parse(answer.text) as FindPayload).matches;
       for (const match of matches) expect(allowed.has(match.name), `${query} → ${match.name}`).toBe(true);
     }
-    // and a Cloud home, which has no Local VM, cannot find its shell
-    expect(names((await found(bridgeFor({ cloudHome: true }), "run a shell command in the VM")).matches)).not.toContain("vm_exec");
-    expect(names((await found(bridgeFor(), "run a shell command in the VM")).matches)).toContain("vm_exec");
   });
 
   it("points at the tool list for a tool that is already in it", async () => {

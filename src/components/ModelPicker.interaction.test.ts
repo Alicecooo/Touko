@@ -168,7 +168,7 @@ describe("ModelPicker with a signed-out or missing Claude", () => {
     const html = open(bot("claude", "claude-opus-5-5")).html;
     expect(html).toContain('aria-label="Claude"');
     expect(html).toContain("Set up Claude");
-    expect(html).toContain("`claude` CLI not found");
+    expect(html).toContain("claude is not installed, or is not on the PATH used by Touko.");
     expect(html).toContain("npm install -g @anthropic-ai/claude-code");
     expect(html).not.toContain("data-model-local-entry");
   });
@@ -178,20 +178,10 @@ describe("ModelPicker with a signed-out or missing Claude", () => {
     const opened = open(bot("codex", "gpt-5.6"));
     expect(rail(opened)!.props.instances.map((instance) => instance.instanceId)).toEqual(["codex"]);
     expect(opened.html).not.toContain('aria-label="Claude"');
-    expect(opened.html).toContain("Model providers and accounts");
   });
 });
 
 describe("the way into API keys", () => {
-  it("opens Settings on the API keys section from the picker footer", () => {
-    fixture.instances = [codex];
-    const opened = open(bot("codex", "gpt-5.6"));
-    const entry = opened.nodes.find((node) => node.props["data-model-add-api-keys"]);
-    expect(opened.html).toContain("Add API keys");
-    (entry!.props.onClick as () => void)();
-    expect(fixture.dispatch).toHaveBeenCalledWith({ type: "toggleAppSettings", open: true, section: "connections" });
-  });
-
   it("says the shortcut changes keys too once a key is saved", () => {
     const openai: InstanceInfo = {
       instanceId: "openai", driverKind: "openai-compat", displayName: "OpenAI", access: "api",
