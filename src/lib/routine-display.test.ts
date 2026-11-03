@@ -8,10 +8,10 @@ describe("where a routine runs", () => {
       label: "My Cloud", hint: "Runs on schedule, even when your computer is off.",
     });
     expect(routineRunsOn({ roomGoal: false, runOn: "cloud", cloudHome: true })).toEqual({
-      label: "Cloud computer", hint: "Runs the whole job on the bot's cloud computer, even when your computer is off.",
+      label: "VPS computer", hint: "Runs the whole job on the bot's VPS computer, even when your computer is off.",
     });
     expect(routineRunsOn({ roomGoal: false, computer: "cloud", cloudHome: true })).toEqual({
-      label: "The bot's cloud computer", hint: "Runs on schedule, even when your computer is off.",
+      label: "The bot's VPS computer", hint: "Runs on schedule, even when your computer is off.",
     });
     expect(routineRunsOn({ roomGoal: true, cloudHome: true })).toEqual({
       label: "My Cloud, with the whole group", hint: "Runs on schedule, even when your computer is off.",
@@ -21,10 +21,10 @@ describe("where a routine runs", () => {
 
   it("on a desktop, a routine starts while OpenMausBot is open there", () => {
     expect(routineRunsOn({ roomGoal: false, cloudHome: false })).toEqual({
-      label: "This computer", hint: "Starts while OpenMausBot is open here.",
+      label: "This computer", hint: "Starts while Touko is open here.",
     });
     expect(routineRunsOn({ roomGoal: false, runOn: "cloud", cloudHome: false })).toEqual({
-      label: "Cloud computer", hint: "Runs the whole job on the bot's cloud computer while OpenMausBot is open.",
+      label: "VPS computer", hint: "Runs the whole job on the bot's VPS computer while Touko is open.",
     });
     expect(routineRunsOn({ roomGoal: false, computer: "vm", cloudHome: false }).label).toBe("The bot's virtual machine");
     expect(routineRunsOn({ roomGoal: true, cloudHome: false }).label).toBe("This computer, with the whole group");

@@ -30,7 +30,7 @@ describe("a failed turn's row", () => {
   });
 
   it("is the only way the server writes one", () => {
-    const dir = new URL("../server", import.meta.url);
+    const dir = new URL("../server/", import.meta.url);
     const handWritten = readdirSync(dir, { recursive: true, encoding: "utf8" })
       .map((file) => file.replaceAll("\\", "/"))
       // server/headless is the openmausbot command line: it prints errors to a terminal and never writes a turn row

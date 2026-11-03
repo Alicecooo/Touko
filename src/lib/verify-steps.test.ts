@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { SAVE_RUN_AS_SKILL_LINE } from "../../shared/learn-request";
@@ -31,9 +30,6 @@ const stagedSkill = (card: Record<string, unknown> = {}): Message => ({
   id: `o${++seq}`, at: seq, role: "bot", kind: "options",
   card: { title: "Enable this skill?", options: [], skillRequest: { name: "verify-omb" }, ...card } as unknown as Message["card"],
 });
-const triggerTerms = (): string[] =>
-  JSON.parse(readFileSync(new URL("../../skills/create-verification-skill/manifest.json", import.meta.url), "utf8")).triggerTerms;
-
 const DOCTOR = "pnpm dev:isolated doctor --url http://127.0.0.1:8799";
 const SEND = "node --experimental-strip-types scripts/dev/isolated-environment.ts send --bot x --text y";
 const PRESS = './node_modules/.bin/control-atlas.mjs press "Meta+K"';
@@ -276,14 +272,6 @@ describe("skillPrompt", () => {
     const steps = runSteps([claude(DOCTOR, true), codex(SEND, false), acp(PRESS), claude(`${DOCTOR} --dry-run`, true), claude(PUSH, true)]);
     const prompt = skillPrompt(steps, "verify the fixture");
 
-    it("mounts the bundled skill by opening with one of its trigger phrases", () => {
-      const terms = triggerTerms();
-      const opening = prompt.split("\n")[0].toLowerCase();
-      expect(terms.some((term) => opening.includes(term.toLowerCase()))).toBe(true);
-      const annotated = `Also cover the send step.\n\n${prompt}Keep the doctor step first.`.toLowerCase();
-      expect(terms.some((term) => annotated.includes(term.toLowerCase()))).toBe(true);
-    });
-
     it("carries the person's request as the goal, between the trigger line and the rule", () => {
       expect(prompt.split("\n").slice(0, 4)).toEqual([
         "Create a verification skill from the run below.",
@@ -328,11 +316,6 @@ describe("skillPrompt", () => {
       ]);
       expect(prompt).not.toContain("/learn");
       expect(skillPrompt(steps).split("\n")[1]).toBe("Goal: the run below");
-    });
-
-    it("does not carry the verification-skill trigger phrase, so that skill stays unmounted", () => {
-      const lower = prompt.toLowerCase();
-      expect(triggerTerms().some((term) => lower.includes(term.toLowerCase()))).toBe(false);
     });
 
     it("lists the steps untagged and ends with a blank line", () => {

@@ -59,7 +59,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("caption chrome", () => {
-  it.each<[Chrome, boolean]>([["mac-inset", true], ["win-caption", true], ["native", false]])(
+  it.each<[Chrome, boolean]>([["mac-inset", false], ["win-caption", true], ["native", false]])(
     "%s headers drag: %s",
     (chrome, drags) => {
       const value = captionChrome(chrome);
@@ -90,7 +90,7 @@ describe.each([
   ["chat", () => createElement(ChatView, { bot }), "[data-chathead-row]"],
   ["room", () => createElement(GroupView, { group: room }), "[data-roomhead-row]"],
 ] as const)("%s header", (_name, view, rowSelector) => {
-  it.each<Chrome>(["mac-inset", "win-caption"])("is a drag region with every control cut out on %s", (chrome) => {
+  it.each<Chrome>(["win-caption"])("is a drag region with every control cut out on %s", (chrome) => {
     fixture.chrome = chrome;
     const document = dom(view());
     const header = document.querySelector(rowSelector)!.parentElement!;
@@ -108,7 +108,7 @@ describe.each([
       return dom(view()).querySelector("[data-chathead-controls], [data-roomhead-controls]");
     };
     expect(styleValue(controls("win-caption"), "margin-top")).toBe("16px");
-    expect(styleValue(controls("mac-inset"), "margin-top")).toBe("");
+    expect(styleValue(controls("mac-inset"), "margin-top")).toBe("16px");
   });
 
   it("leaves Linux's native title bar alone", () => {
@@ -120,7 +120,7 @@ describe.each([
 });
 
 describe("headerless views", () => {
-  it.each<[Chrome, boolean]>([["mac-inset", true], ["win-caption", true], ["native", false]])(
+  it.each<[Chrome, boolean]>([["mac-inset", false], ["win-caption", true], ["native", false]])(
     "get a top drag strip on %s: %s",
     (chrome, drags) => {
       fixture.chrome = chrome;

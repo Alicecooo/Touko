@@ -13,7 +13,7 @@ const option = (surface: ComputerOption["surface"], state: "ready" | "asleep" | 
 describe("which computer select_computer picks", () => {
   // A Works on: Cloud computer turn before its first computer call: the
   // cloud computer is missing or asleep, and the built-in browser is ready.
-  const offered = (cloud: "asleep" | "missing") => [option("cloud", cloud), option("vm", "off"), option("browser", "ready")];
+  const offered = (cloud: "asleep" | "missing") => [option("cloud", cloud), option("browser", "ready")];
 
   it("keeps the cloud computer this turn starts on its first call: asking for it or for Auto never moves the request", () => {
     for (const cloud of ["asleep", "missing"] as const) {
@@ -41,11 +41,11 @@ describe("which computer select_computer picks", () => {
     expect(pickComputer(options, "browser", "cloud", true)).toMatchObject({ option: { surface: "browser" }, current: false });
   });
 
-  it("on Auto with nothing current prefers a ready Local VM, then anything ready, then one it can start or create", () => {
-    expect(pickComputer([option("browser", "ready"), option("vm", "ready")], "auto", "off", false).option?.surface).toBe("vm");
+  it("on Auto with nothing current prefers the first ready computer, then one it can start or create", () => {
+    expect(pickComputer([option("browser", "ready"), option("local", "ready")], "auto", "off", false).option?.surface).toBe("browser");
     expect(pickComputer([option("cloud", "asleep"), option("browser", "ready")], "auto", "off", false).option?.surface).toBe("browser");
-    expect(pickComputer([option("cloud", "missing"), option("vm", "asleep")], "auto", "off", false).option?.surface).toBe("vm");
-    expect(pickComputer([option("cloud", "missing"), option("vm", "missing")], "auto", "off", false).option?.surface).toBe("vm");
+    expect(pickComputer([option("cloud", "missing"), option("local", "asleep")], "auto", "off", false).option?.surface).toBe("local");
+    expect(pickComputer([option("cloud", "missing"), option("local", "missing")], "auto", "off", false).option?.surface).toBe("cloud");
     expect(pickComputer([option("cloud", "off")], "auto", "off", false).option).toBeUndefined();
   });
 });

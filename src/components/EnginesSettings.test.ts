@@ -238,7 +238,7 @@ describe("Settings → Engines → setup cards", () => {
 
     vi.stubGlobal("window", { ogb: { remoteClient: { active: true } } });
     const remote = renderToStaticMarkup(createElement(EnginesSettings));
-    expect(remote).toContain("open Settings → API keys on the computer running OpenMausBot");
+    expect(remote).toContain("open Settings → API keys on the computer running Touko");
     expect(remote).not.toContain("Change key");
 
     vi.stubGlobal("window", {});
@@ -352,7 +352,7 @@ describe("Settings → Engines → Claude accounts", () => {
   it("shows Claude Code's setup instead of accounts while it is missing", () => {
     const html = renderClaude(claude("claude", "Personal", undefined, { snapshot: { state: "unavailable", reason: "`claude` CLI not found" } }));
     expect(html).not.toContain("data-accounts");
-    expect(html).toContain("CLI not found");
+    expect(html).toContain("claude is not installed, or is not on the PATH used by Touko.");
     expect(html).toContain("Needs setup");
   });
 

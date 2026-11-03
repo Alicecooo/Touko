@@ -53,10 +53,8 @@ describe("Settings → Connections", () => {
     fixture.config = configStatusFromFrame({
       composio: { configured: false },
       box: { configured: false },
-      vps: { configured: false, sshAlias: "" },
       rooms: { turnTimeoutMinutes: 10 },
       mcp: { callTimeoutMinutes: 10 },
-      localVm: { mode: "shared", maxInstances: 1 },
       cloudHome: true,
     });
     const { SettingsModal } = await import("./SettingsModal");

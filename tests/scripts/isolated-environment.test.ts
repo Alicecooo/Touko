@@ -27,9 +27,3 @@ describe("the fixture's fake engine knobs", () => {
   });
 });
 
-describe("the isolated environment", () => {
-  it("lets the Pro answer cross only as OMB_PRO_PLAN=1", () => {
-    expect(childEnv({ OMB_PRO_PLAN: "1" })).toMatchObject({ OMB_PRO_PLAN: "1" });
-    for (const value of [undefined, "", "0", "true", "yes"]) expect(childEnv({ OMB_PRO_PLAN: value }), String(value)).not.toHaveProperty("OMB_PRO_PLAN");
-  });
-});

@@ -1,6 +1,6 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { enginesBinDir, enginesPrefix, installNpmEngine, npmPackageOf, serverInstallFor } from "./engine-install.ts";
 import { augmentedPath, findCliCandidates, registerPathDir, resetPathCacheForTests } from "./env-path.ts";
@@ -63,7 +63,9 @@ function useFakeNpm() {
     mkdirSync(ctx.binDir);
     writeFakeNpm(ctx.binDir);
     originalPath = process.env.PATH;
-    process.env.PATH = ctx.binDir;
+    // The fake npm is a Node shebang. Keep this process's node on PATH after the
+    // stand-in directory so `env node` resolves, without letting that directory's npm win.
+    process.env.PATH = `${ctx.binDir}${delimiter}${dirname(process.execPath)}`;
     process.env.FAKE_NPM_LOG = join(ctx.scratch, "calls.jsonl");
     delete process.env.FAKE_NPM_MODE;
     resetPathCacheForTests();

@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AppState, ConfigStatus, InstanceInfo } from "@/state/store";
+import type { AppState, InstanceInfo } from "@/state/store";
 
 const fixture = vi.hoisted(() => ({ owner: true as boolean | null, track: vi.fn(), api: vi.fn(), connectedApps: vi.fn() }));
 vi.mock("@/lib/use-owner-or-admin", () => ({ useOwnerOrAdmin: () => fixture.owner }));
@@ -24,7 +24,7 @@ function ready(patch: Partial<AppState> = {}): AppState {
     connected: true,
     hydrated: true,
     routinesLoadState: "ready",
-    config: { composio: { configured: false }, vps: { configured: false, sshAlias: "" }, rooms: { turnTimeoutMinutes: 30 }, localVm: { mode: "shared", maxInstances: 1 } } as ConfigStatus,
+    config: { composio: { configured: false }, box: { configured: false }, rooms: { turnTimeoutMinutes: 30 } },
     instances: [{ instanceId: "claude", driverKind: "claudeAgent", displayName: "Claude", snapshot: { state: "available", authenticated: true }, models: { default: "", options: [] } } as InstanceInfo],
     webhookIngress: { available: true, baseUrl: "http://127.0.0.1:8800" },
     ...patch,
