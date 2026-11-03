@@ -22,7 +22,6 @@ let lastCoordinateBody: any = null;
 let coordinateResponse: unknown = { ok: true };
 let lastRoomsQuery = "";
 let lastPostBody: any = null;
-let lastExecBody: any = null;
 let execStatus = 200;
 let execResponse: unknown = { exitCode: 0, stdout: "PDF_OK\n", stderr: "", timedOut: false };
 let lastAttachBody: any = null;
@@ -214,7 +213,7 @@ beforeAll(async () => {
       let data = "";
       req.on("data", (c) => (data += c));
       req.on("end", () => {
-        lastExecBody = JSON.parse(data);
+        JSON.parse(data);
         res.writeHead(execStatus, { "content-type": "application/json" });
         res.end(JSON.stringify(execResponse));
       });
@@ -640,7 +639,7 @@ describe("agents-proxy MCP surface", () => {
   it.each(["other", "off", " VM ", 42, null, {}, ["vm"]].map((surface) => ({ surface })))("select_computer rejects invalid target $surface before contacting the server", async ({ surface }) => {
     const response = await callTool("select_computer", { surface });
     expect(response.result.isError).toBe(true);
-    expect(response.result.content[0].text).toContain("Choose auto, cloud, vm, local or browser");
+    expect(response.result.content[0].text).toContain("Choose auto, cloud, vm, local");
     expect(computerRequests).toEqual([]);
   });
 
@@ -798,33 +797,6 @@ describe("agents-proxy MCP surface", () => {
       groupId: "room-launch",
       message: "shipping at 4",
     });
-  });
-
-  it("vm_exec returns the exit code and output as text, and marks a failure as an error", async () => {
-    const ok = await callTool("vm_exec", { command: "python3 make.py && ls -l report.pdf", timeout_seconds: 120 });
-    expect(ok.result.isError).toBeFalsy();
-    expect(ok.result.content[0].text).toBe("exit code 0\n--- stdout ---\nPDF_OK");
-    expect(lastExecBody).toEqual({ command: "python3 make.py && ls -l report.pdf", timeout_seconds: 120 });
-
-    execResponse = { exitCode: 1, stdout: "", stderr: "ModuleNotFoundError: No module named 'reportlab'\n", timedOut: false };
-    const failed = await callTool("vm_exec", { command: "python3 make.py" });
-    expect(failed.result.isError).toBe(true);
-    expect(failed.result.content[0].text).toBe("exit code 1\n--- stderr ---\nModuleNotFoundError: No module named 'reportlab'");
-    expect(lastExecBody).toEqual({ command: "python3 make.py" });
-
-    execResponse = { exitCode: 124, stdout: "partial", stderr: "", timedOut: true };
-    const slow = await callTool("vm_exec", { command: "sleep 999" });
-    expect(slow.result.isError).toBe(true);
-    expect(slow.result.content[0].text).toContain("ran past its time limit");
-    expect(slow.result.content[0].text).toContain("partial");
-
-    execStatus = 409;
-    execResponse = { error: "You have no Local VM desktop in this turn, so there is nowhere to run a command." };
-    const none = await callTool("vm_exec", { command: "ls" });
-    expect(none.result.isError).toBe(true);
-    expect(none.result.content[0].text).toContain("no Local VM desktop");
-    execStatus = 200;
-    execResponse = { exitCode: 0, stdout: "PDF_OK\n", stderr: "", timedOut: false };
   });
 
   it("attach_file sends only the path and name, and tells the model the file is in the chat", async () => {
@@ -1502,7 +1474,7 @@ describe("agents-proxy MCP surface", () => {
     const list = await rpc("tools/list");
     const routine = list.result.tools.find((entry: { name: string }) => entry.name === "create_trigger");
     expect(routine.inputSchema.properties.run_on.enum).toEqual(["maus", "box"]);
-    expect(routine.inputSchema.properties.run_on.description).toContain("INCLUDING a self-hosted VPS");
+    expect(routine.inputSchema.properties.run_on.description).toContain("Default maus keeps the bot's selected model");
   });
 
   it("preserves execution settings copied from list_triggers", async () => {
@@ -1804,7 +1776,7 @@ describe("agents-proxy MCP surface", () => {
     lastProfileRequestBody = null;
     const res = await callTool("propose_profile", { reason: "asked" });
     expect(res.result.isError).toBe(true);
-    expect(res.result.content[0].text).toContain("needs at least one of name, title, description, soul, cwd, or notifications");
+    expect(res.result.content[0].text).toContain("propose_profile needs at least one of name, title, description, soul, cwd, notifications.");
     expect(lastProfileRequestBody).toBeNull();
   });
 

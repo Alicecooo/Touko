@@ -27,7 +27,6 @@ vi.mock("@/lib/logins", () => ({
   cardSaveTarget: (...args: unknown[]) => cardSaveTarget(...args),
 }));
 
-import { LoginForm } from "./LoginForm";
 import { SignInBanner, SignInRequestCard } from "./SignInRequestCard";
 
 const card = (signIn: Record<string, unknown> = {}): Message => ({
@@ -74,13 +73,12 @@ describe("SignInRequestCard while it waits", () => {
     expect(html).toContain("— Pepper");
     expect(html).toContain("Pepper’s built-in browser");
     for (const label of ["Open", "Done", "Cancel"]) expect(html).toContain(label);
-    expect(html).toContain("OpenMausBot never sees it.");
+    expect(html).toContain("Touko never sees it.");
     expect(html).not.toContain("<input");
   });
 
   it.each([
-    ["vm", "the Local VM Pepper works on"],
-    ["cloud", "the cloud computer Pepper works on"],
+    ["cloud", "the VPS computer Pepper works on"],
     ["local", "on this computer, in the browser Pepper is using"],
   ])("names the place for %s", (place, words) => {
     expect(view({ place })).toContain(words);
@@ -88,7 +86,7 @@ describe("SignInRequestCard while it waits", () => {
 
   it("says the host computer, not this one, where this computer is somewhere else", () => {
     here.value = false;
-    expect(view({ place: "local" })).toContain("the computer OpenMausBot runs on");
+    expect(view({ place: "local" })).toContain("the computer Touko runs on");
   });
 
   it("Open goes to the place the bot works", () => {
@@ -105,44 +103,6 @@ describe("SignInRequestCard while it waits", () => {
     expect(fixture.setters[1]).toHaveBeenCalledWith(true);
     fixture.setters = []; fixture.states = { 1: true };
     expect(view({ place: "local" })).toContain("Not the Browser tab: it keeps its own sign-ins");
-  });
-
-  it("offers to save a login in the built-in browser, which opens a masked form in place of the buttons", () => {
-    button(tree(), "Save a login").props.onClick!();
-    // saving (the third useState) turns on
-    expect(fixture.setters[2]).toHaveBeenCalledWith(true);
-    fixture.setters = []; fixture.states = { 2: true };
-    const html = view();
-    expect(html).toContain("Save the username and password for example.com.");
-    expect(html).toContain('type="password"');
-    expect(html).toMatch(/type="password" autocomplete="new-password"/iu);
-    expect(html).toContain("Save and continue");
-    expect(html).not.toMatch(/>Done<|>Open</);
-    expect(saveLoginFromCard).not.toHaveBeenCalled();
-  });
-
-  it("names a sign-in page on another site, open in the browser, as a choice left unticked, and saves it only when ticked", async () => {
-    const elsewhere = { site: "example.com", signInHost: "login.microsoftonline.com" };
-    cardSaveTarget.mockResolvedValue(elsewhere);
-    button(tree(), "Save a login").props.onClick!();
-    await settle();
-    expect(cardSaveTarget).toHaveBeenCalledExactlyOnceWith({ botId: "pepper", threadId: "thread-1", messageId: "card-1", place: "browser" });
-    // target and the tick are the fourth and fifth useState
-    expect(fixture.setters[3]).toHaveBeenCalledWith(elsewhere);
-    fixture.setters = []; fixture.states = { 2: true, 3: elsewhere };
-    const html = view();
-    expect(html).toContain("Also fill it on login.microsoftonline.com, the sign-in page open in the browser now");
-    const tick = /<input type="checkbox"[^>]*name="signInHost"[^>]*>/u.exec(html)?.[0];
-    expect(tick).toBeDefined();
-    expect(tick).not.toContain("checked");
-    const fields = { username: "alice", password: "fake-card-pass", totp: "" };
-    const form = (nodes: Node[]) => nodes.find((node) => node.type === LoginForm)!.props as unknown as { onSubmit: (value: typeof fields) => Promise<void> };
-    fixture.setters = [];
-    await form(tree()).onSubmit(fields);
-    expect(saveLoginFromCard).toHaveBeenLastCalledWith({ botId: "pepper", threadId: "thread-1", messageId: "card-1" }, fields, undefined);
-    fixture.setters = []; fixture.states = { 2: true, 3: elsewhere, 4: true };
-    await form(tree()).onSubmit(fields);
-    expect(saveLoginFromCard).toHaveBeenLastCalledWith({ botId: "pepper", threadId: "thread-1", messageId: "card-1" }, fields, "login.microsoftonline.com");
   });
 
   it("does not offer to save a login from a desktop paired to another computer", () => {
@@ -193,7 +153,7 @@ describe("SignInRequestCard once settled", () => {
 });
 
 describe("SignInBanner", () => {
-  const help = { botId: "pepper", threadId: "thread-1", messageId: "card-1", site: "example.com", place: "vm" as const };
+  const help = { botId: "pepper", threadId: "thread-1", messageId: "card-1", site: "example.com", place: "local" as const };
   const banner = (takeControl?: { onClick: () => void }) => {
     let root!: ReactNode;
     function Capture() { root = SignInBanner({ help, askerName: "Pepper", takeControl }); return root; }

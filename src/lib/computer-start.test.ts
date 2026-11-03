@@ -5,8 +5,8 @@ import { computerStartLine } from "./computer-start";
 describe("computerStartLine", () => {
   it("names the bot's cloud computer while it is created or woken", () => {
     expect(computerStartLine({ state: "provisioning", place: "cloud" }, "Scout"))
-      .toBe("Starting Scout's cloud computer. The first start takes about a minute.");
-    expect(computerStartLine({ state: "waking", place: "cloud" }, "Scout")).toBe("Waking Scout's cloud computer…");
+      .toBe("Starting Scout's VPS computer. The first start takes about a minute.");
+    expect(computerStartLine({ state: "waking", place: "cloud" }, "Scout")).toBe("Waking Scout's VPS computer…");
   });
 
   it("keeps the Local VM's line, and shows nothing when nothing is starting", () => {

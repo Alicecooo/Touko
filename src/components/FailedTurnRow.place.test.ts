@@ -54,7 +54,7 @@ beforeEach(() => {
 describe("J11: a failed place's row", () => {
   it("says no hours are left in one line, with one button: See your plan", () => {
     const { html, buttons } = show(stored(hours), vi.fn());
-    expect(html).toContain("This month&#x27;s 50 cloud computer hours are used up. They come back on 1 November.");
+    expect(html).toContain("This month&#x27;s 50 VPS computer hours are used up. They come back on 1 November.");
     expect(buttons).toHaveLength(1);
     expect(buttons[0]).toContain("See your plan");
     expect(html).not.toContain("Retry");
@@ -70,7 +70,7 @@ describe("J11: a failed place's row", () => {
 
   it("leads a person's pin back to the grid's choice in Simple, and to the composer's in Advanced", () => {
     const pinned = stored({ state: "cc-no-start", params: { bot: "Scout" }, source: "pin" });
-    expect(show(pinned).buttons[0]).toContain("Use Cloud computer");
+    expect(show(pinned).buttons[0]).toContain("Use Computer on a self-hosted VPS");
     fixture.advanced = true;
     expect(show(pinned).buttons[0]).toContain("Clear this conversation&#x27;s place");
   });
@@ -84,10 +84,10 @@ describe("J11: a failed place's row", () => {
 
   it("reads Needs a Boat key as My Cloud's on a desktop with a paid plan", () => {
     const needsKey: PlaceRow = { state: "cc-needs-key", params: { bot: "Scout" }, source: "works-on" };
-    expect(show(stored(needsKey)).html).toContain("A cloud computer here needs your own Boat key, a paid service.");
+    expect(show(stored(needsKey)).html).toContain("A VPS computer here needs your own Boat key, a paid service.");
     const seat = { server: "mac", plan: true, role: "admin", mode: "simple" } as const;
     expect(placeRowViewFor(needsKey, seat)).toMatchObject({
-      state: "cc-on-my-cloud", line: "Cloud computers from your plan work for bots on My Cloud for now.", action: { id: "open-my-cloud" },
+      state: "cc-on-my-cloud", line: "VPS computers from your plan work for bots on My Cloud for now.", action: { id: "open-my-cloud" },
     });
     expect(placeRowViewFor(needsKey, { ...seat, server: "my-cloud" }).state).toBe("cc-needs-key");
   });

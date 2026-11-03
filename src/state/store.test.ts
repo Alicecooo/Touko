@@ -993,11 +993,9 @@ describe("config status frames", () => {
         xai: { configured: true },
         composio: { configured: true, mode: "managed" },
         box: { configured: false },
-        vps: { configured: true, sshAlias: "homelab" },
         rooms: { turnTimeoutMinutes: 20 },
         mcp: { callTimeoutMinutes: 30 },
         threads: { maxConcurrentPerBot: 10 },
-        localVm: { mode: "per-bot", maxInstances: 3 },
         opencodeGo: { configured: true },
         profile: { name: "Ian", email: "ian@example.test" },
         features: { skillAuthoring: true },
@@ -1006,11 +1004,9 @@ describe("config status frames", () => {
       xai: { configured: true },
       composio: { configured: true, mode: "managed" },
       box: { configured: false },
-      vps: { configured: true, sshAlias: "homelab" },
       rooms: { turnTimeoutMinutes: 20 },
       mcp: { callTimeoutMinutes: 30 },
       threads: { maxConcurrentPerBot: 10 },
-      localVm: { mode: "per-bot", maxInstances: 3 },
       opencodeGo: { configured: true },
       profile: { name: "Ian", email: "ian@example.test" },
       features: { skillAuthoring: true },
@@ -1073,10 +1069,8 @@ describe("config status", () => {
   const config = configStatusFromFrame({
     composio: { configured: false },
     box: { configured: false },
-    vps: { configured: false, sshAlias: "" },
     rooms: { turnTimeoutMinutes: 5 },
     mcp: { callTimeoutMinutes: 10 },
-    localVm: { mode: "shared", maxInstances: 2 },
     features: { skillAuthoring: true },
   });
 
@@ -2404,10 +2398,8 @@ describe("live config frames", () => {
   const baseFrame: ConfigStatusFrame = {
     composio: { configured: false },
     box: { configured: false },
-    vps: { configured: false, sshAlias: "" },
     rooms: { turnTimeoutMinutes: 10 },
     mcp: { callTimeoutMinutes: 10 },
-    localVm: { mode: "shared", maxInstances: 1 },
   };
 
   it("keeps automatic recovery and its backup through live config refreshes", () => {

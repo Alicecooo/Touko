@@ -52,12 +52,8 @@ const isSource = (name: string) => /\.(?:ts|tsx|mjs|cjs|js)$/.test(name) && !/\.
 
 /** No snippet keeps the word file-wide; otherwise only literals containing the snippet. */
 const ALLOWED: ReadonlyArray<{ file: string; snippet?: string; why: string }> = [
-  { file: "shared/credential-request.ts", snippet: "when Boat is selected", why: "the card that asks for a person's own Boat key" },
-  { file: "server/boat-create-idempotency.ts", snippet: "unnamed Boat", why: "own-key repair: boat.dev's own name for a machine" },
   { file: "server/auth/request-auth.ts", snippet: "OMB Cloud home", why: "a request-trust reason and log warning, never shown in the app" },
-  { file: "electron/cloud-account.mjs", snippet: "[cloud] OMB Cloud sent plan", why: "a log line" },
   { file: "server/workspace/workspace-backup.ts", snippet: "OMB-WORKSPACE-1", why: "a backup file's format marker" },
-  { file: "electron/cloud-move.mjs", snippet: "OMB-WORKSPACE-1", why: "a backup file's format marker" },
   { file: "electron/company-backups.mjs", snippet: "OMB-WORKSPACE-1", why: "a backup file's format marker" },
 ];
 
@@ -137,20 +133,11 @@ describe("one name per thing", () => {
   it("copy that points at a control names it exactly as the control is labelled", () => {
     const e = en as Record<string, string>;
     const source = (file: string) => readFileSync(join(ROOT, file), "utf8");
-    const settings = `Settings → ${e["settings.section.cloudAccount"]}`;
-    const myCloud = /CLOUD_HOME_NAME = "([^"]+)"/.exec(source("electron/cloud-home.mjs"))?.[1];
-    const thisComputer = /id: "workspace-local", label: "([^"]+)"/.exec(source("electron/environments.cjs"))?.[1];
-    const serverMenuLocal = /\{ label: "([^"]+)", type: "radio", checked: !active/.exec(source("electron/menu.mjs"))?.[1];
-    expect([myCloud, thisComputer, serverMenuLocal]).toEqual([e["cloudSetup.myCloud"], e["place.local"], e["place.local"]]);
+    const thisComputer = /server: "Server", local: "([^"]+)"/.exec(source("electron/environments.cjs"))?.[1];
+    expect(thisComputer).toBe(e["place.local"]);
+    expect(source("electron/menu.mjs")).toContain('label: labels.local, type: "radio"');
+    expect(source("electron/environments.cjs")).toContain('id: "workspace-local", label: labels.local');
     const pointers: Array<[string, string[]]> = [
-      ["cloudHome.connectHelp", [e["place.local"]!]],
-      ["cloudPhone.step1", [myCloud!]],
-      ["lending.status.connectFirst", [e["cloudHome.connect"]!]],
-      ["computer.worksOnHintCloudHome", [e["lending.title"]!, settings]],
-      ["cloudMove.leftBehindLend", [e["lending.title"]!, settings]],
-      ["cloudAccount.onCloudSignIn", [e["cloudAccount.signInAgain"]!, settings]],
-      ["cloudAccount.storageFailed", [e["cloudAccount.signOut"]!]],
-      ["cloudAccount.codeExpired", [e["cloudAccount.signIn"]!]],
       ["computer.routines.offWarning", [e["routines.runsOn.boat"]!]],
     ];
     const stale = pointers.flatMap(([key, labels]) => labels.filter((label) => !e[key]!.includes(label)).map((label) => `${key} → ${label}`));

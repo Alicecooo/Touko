@@ -64,7 +64,8 @@ describe("managed engine setup errors", () => {
     const reason = "Cannot write Antigravity profile settings (EACCES).";
     const engine = managed({ state: "unavailable", reason });
     const markup = render(engine);
-    expect(markup).toContain(reason);
+    expect(markup).toContain("This computer didn't allow that. Check the file or folder permissions, then try again.");
+    expect(markup).not.toContain(reason);
     expect(markup).toContain('role="alert"');
     expect(markup).toContain("Install official Antigravity");
     expect(engineStatus(engine)).toBe("Setup required");
@@ -164,7 +165,7 @@ describe("server device-code sign-in", () => {
     };
     const markup = renderToStaticMarkup(createElement(StoreProvider, null, createElement(EngineSetup, { instance: engine })));
     expect(markup).toContain("Continue with ChatGPT");
-    expect(markup).toContain("separate from MausBot Cloud and API billing");
+    expect(markup).toContain("API billing is separate.");
     expect(markup).not.toContain("codex login");
     expect(markup).not.toContain("Device-code login");
   });
@@ -239,7 +240,7 @@ describe("API-key engine setup", () => {
 
   it("has no button on a remote client, whose settings hide the keys", () => {
     const html = render(keyEngine("openai-compat", { state: "unavailable" }), { platform: "darwin", remoteClient: { active: true } });
-    expect(html).toContain("on the computer running OpenMausBot");
+    expect(html).toContain("on the computer running Touko");
     expect(html).not.toContain("Open API keys");
   });
 

@@ -37,12 +37,12 @@ describe("local computer UI eligibility", () => {
     ).toBe(true);
   });
 
-  it("keeps This computer selectable on macOS before CUA is granted", () => {
+  it("does not offer This computer on macOS until CUA is granted", () => {
     const capabilities = {
       host: { platform: "darwin" as const },
       localComputer: { available: false },
     } as DesktopCapabilities;
-    expect(localComputerSelectable({ capabilities, providerSupportsLocal: true })).toBe(true);
+    expect(localComputerSelectable({ capabilities, providerSupportsLocal: true })).toBe(false);
     expect(localComputerSelectable({ capabilities, providerSupportsLocal: false })).toBe(false);
     expect(
       localComputerSelectable({
@@ -91,7 +91,7 @@ describe("local computer UI eligibility", () => {
     expect(
       localComputerDisabledReason({ capabilities, providerSupportsLocal: true }),
     ).toBe(
-      "Local computer control is not available on Wayland yet. Sign out and choose Ubuntu on Xorg to use This computer.",
+      "Computer control is not available on Wayland yet. Sign out and choose Ubuntu on Xorg.",
     );
   });
 
@@ -234,12 +234,10 @@ describe("local computer UI eligibility", () => {
   it("refuses cloud preview polling when a stale ready phase belongs to Auto or another destination", () => {
     const ready = {
       computer: "cloud" as const,
-      cloudBackend: "box" as const,
       phase: "ready",
       botId: "bot-a",
       resolvedBotId: "bot-a",
       resolvedComputer: "cloud" as const,
-      resolvedCloudBackend: "box" as const,
     };
     expect(shouldPollCloudPreview(ready)).toBe(true);
     expect(shouldPollCloudPreview({ ...ready, computer: undefined })).toBe(false);
@@ -248,25 +246,12 @@ describe("local computer UI eligibility", () => {
     expect(shouldPollCloudPreview({ ...ready, botId: "bot-b" })).toBe(false);
     expect(shouldPollCloudPreview({ ...ready, resolvedBotId: null })).toBe(false);
     expect(shouldPollCloudPreview({ ...ready, resolvedComputer: undefined })).toBe(false);
-    expect(shouldPollCloudPreview({ ...ready, cloudBackend: "vps" })).toBe(false);
-    expect(shouldPollCloudPreview({ ...ready, resolvedCloudBackend: "vps" })).toBe(false);
+    expect(shouldPollCloudPreview({ ...ready, resolvedComputer: "local" })).toBe(false);
   });
 
-  it("rejects stale persisted selections in both cloud-backend switch directions", () => {
-    const expected = { computer: "cloud" as const, cloudBackend: "box" as const };
-    expect(persistedComputerSelectionMatches({ ...expected, persistedBot: expected })).toBe(true);
-    expect(persistedComputerSelectionMatches({
-      ...expected,
-      persistedBot: { computer: "cloud", cloudBackend: "vps" },
-    })).toBe(false);
-    expect(persistedComputerSelectionMatches({
-      computer: "cloud",
-      cloudBackend: "vps",
-      persistedBot: { computer: "cloud", cloudBackend: "box" },
-    })).toBe(false);
-    expect(persistedComputerSelectionMatches({
-      ...expected,
-      persistedBot: { computer: undefined, cloudBackend: "box" },
-    })).toBe(false);
+  it("rejects a persisted selection that is not the destination this render expects", () => {
+    expect(persistedComputerSelectionMatches({ computer: "cloud", persistedBot: { computer: "cloud" } })).toBe(true);
+    expect(persistedComputerSelectionMatches({ computer: "cloud", persistedBot: { computer: "local" } })).toBe(false);
+    expect(persistedComputerSelectionMatches({ computer: "cloud", persistedBot: { computer: undefined } })).toBe(false);
   });
 });

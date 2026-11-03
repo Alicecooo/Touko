@@ -340,22 +340,22 @@ describe("Store", () => {
     store.patchTask(bot.id, autoMismatch.threadId, { surface: "local", surfaceSource: "auto" });
     store.patchTask(bot.id, personMismatch.threadId, { surface: "local", surfaceSource: "user" });
     store.patchTask(bot.id, legacyMismatch.threadId, { surface: "local" });
-    store.patchTask(bot.id, autoMatch.threadId, { surface: "vm", surfaceSource: "auto" });
+    store.patchTask(bot.id, autoMatch.threadId, { surface: "browser", surfaceSource: "auto" });
     const changes = vi.fn();
     store.onChange(changes);
-    expect(store.clearAutoSurfacePins(bot.id, "vm")).toBe(1);
+    expect(store.clearAutoSurfacePins(bot.id, "browser")).toBe(1);
     const cleared = store.taskByThread(bot.id, autoMismatch.threadId)!;
     expect(cleared.surface).toBeUndefined();
     expect(cleared.surfaceSource).toBeUndefined();
     expect(store.taskByThread(bot.id, personMismatch.threadId)).toMatchObject({ surface: "local", surfaceSource: "user" });
     expect(store.taskByThread(bot.id, legacyMismatch.threadId)).toMatchObject({ surface: "local" });
-    expect(store.taskByThread(bot.id, autoMatch.threadId)).toMatchObject({ surface: "vm" });
+    expect(store.taskByThread(bot.id, autoMatch.threadId)).toMatchObject({ surface: "browser" });
     expect(changes).toHaveBeenCalledTimes(1);
     const saved = JSON.parse(readFileSync(join(DATA_DIR, "bots.json"), "utf8")) as any[];
     const savedCleared = saved[0].tasks.find((task: any) => task.threadId === autoMismatch.threadId);
     expect(savedCleared).not.toHaveProperty("surface");
     expect(savedCleared).not.toHaveProperty("surfaceSource");
-    expect(store.clearAutoSurfacePins(bot.id, "vm")).toBe(0);
+    expect(store.clearAutoSurfacePins(bot.id, "browser")).toBe(0);
     const reloaded = new Store(selection);
     expect(reloaded.taskByThread(bot.id, personMismatch.threadId)).toMatchObject({ surface: "local", surfaceSource: "user" });
     expect(reloaded.taskByThread(bot.id, legacyMismatch.threadId)).toMatchObject({ surface: "local" });
@@ -993,8 +993,8 @@ describe("Store", () => {
     raw.find((bot) => bot.id === boat.id)!.cloudBackend = "box";
     raw.find((bot) => bot.id === vps.id)!.cloudBackend = "vps";
     raw.find((bot) => bot.id === vps.id)!.autoStartVps = true;
-    raw.find((bot) => bot.id === vps.id)!.computer = "vm" as BotRecord["computer"];
-    raw.find((bot) => bot.id === vps.id)!.tasks = [{ threadId: "legacy-vm", title: "Legacy", surface: "vm" as BotRecord["computer"] } as BotRecord["tasks"][number]];
+    const legacy = raw.find((bot) => bot.id === vps.id)!;
+    Object.assign(legacy, { computer: "vm", tasks: [{ threadId: "legacy-vm", title: "Legacy", surface: "vm" }] });
     writeFileSync(join(DATA_DIR, "bots.json"), JSON.stringify(raw));
 
     const reloaded = new Store(selection);

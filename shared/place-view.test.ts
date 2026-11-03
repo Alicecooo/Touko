@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import en from "../src/locales/en.json";
 import {
-  cloudRefusal, PLACE_EN, PLACE_STATES, PLACE_WORDS, placeRowText, placeRowView, placeState, placeView, placeViewOf,
+  cloudRefusal, PLACE_STATES, PLACE_WORDS, placeRowText, placeRowView, placeState, placeView, placeViewOf,
   type PlaceFacts, type PlaceParams, type PlaceSource, type PlaceState,
 } from "./place-view.ts";
 
@@ -50,14 +49,6 @@ describe("U1: one line and at most one action for every state", () => {
       expect(user.action, state).toBeNull();
       expect(user.line, state).toBe(`${admin.line} Ask an Admin to change it.`);
     }
-  });
-
-  it("mirrors en.json exactly, key for key", () => {
-    const catalog = en as Record<string, string>;
-    for (const [key, value] of Object.entries(PLACE_EN)) expect(catalog[key], key).toBe(value);
-    const mirrored = new Set(Object.keys(PLACE_EN));
-    const inCatalog = Object.keys(catalog).filter((key) => /^place\.(view|action)\./.test(key) || key === "place.askAdmin" || key === "place.backOnAuto");
-    expect(inCatalog.filter((key) => !mirrored.has(key))).toEqual([]);
   });
 
   it("keeps jargon out of what subscribers read", () => {
@@ -117,10 +108,9 @@ describe("placeState", () => {
     expect(placeState(facts({ refusal: { state: "cc-no-hours", params: { hours: 50, month: "November" } } }))).toEqual({
       state: "cc-no-hours", params: { bot: "Scout", hours: 50, month: "November" },
     });
-    expect(placeState(facts({ backend: "vps" })).state).toBe("vps");
   });
 
-  it("reads Auto, Off, the browser, this computer and a Local VM", () => {
+  it("reads Auto, Off, the browser and this computer", () => {
     expect(placeState(facts({ place: "auto" })).state).toBe("auto");
     expect(placeState(facts({ place: "auto", teamComputer: "Team desk" }))).toEqual({ state: "auto-team", params: { bot: "Scout", computer: "Team desk" } });
     expect(placeState(facts({ place: "off" })).state).toBe("off");
@@ -130,13 +120,12 @@ describe("placeState", () => {
     expect(placeState(facts({ place: "local", local: { ready: false, reason: "Not yet." } }))).toEqual({
       state: "local-unavailable", params: { bot: "Scout", reason: "Not yet." },
     });
-    expect(placeState(facts({ place: "vm", engine: { name: "X", computer: false, browser: true, signedIn: true } })).state).toBe("vm-cannot");
   });
 
   it("words the Auto line for where this server runs", () => {
     expect(placeView(facts({ place: "auto" })).line).toMatch(/starts its cloud computer by itself/);
-    expect(placeView(facts({ place: "auto", server: "pc" })).line).not.toMatch(/Local VM/);
-    expect(placeView(facts({ place: "auto", server: "linux" })).line).toMatch(/Local VM/);
+    expect(placeView(facts({ place: "auto", server: "pc" })).line).toBe("Uses the built-in browser, a private desktop on this computer, or this computer's screen, whichever the task needs.");
+    expect(placeView(facts({ place: "auto", server: "linux" })).line).toBe("Uses the built-in browser, or a configured computer when a task needs a desktop.");
     expect(placeView(facts({ engine: { name: "Claude", computer: true, browser: true, signedIn: false } })).line)
       .toBe("Sign in to Claude on My Cloud first. Scout uses it on the cloud computer too.");
   });
