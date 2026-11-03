@@ -7,7 +7,7 @@ The principle: evaluate the harness, never the models. A scripted engine replays
 ## Run
 
     pnpm eval                     # all scenarios, JSON + markdown report under evals/reports/runs/
-    pnpm eval --scenario lazy-computer-claim
+    pnpm eval --scenario dispatch-supersede
     pnpm eval --golden            # tier 2: replay redacted golden threads against committed trace baselines
     pnpm eval --live              # tier 3: opt-in live-model smoke (skips unless OMB_EVAL_LIVE=1)
     pnpm typecheck && pnpm exec tsc -p evals/tsconfig.json   # evals are also typechecked standalone
@@ -33,14 +33,12 @@ Each fixture declares a `world`, the `bots` to create with their scripted `turns
 
 - `dispatch-supersede` — a message sent to an idle Chief while its coordinated work is outstanding runs immediately as its own turn (not steered into the dispatching turn, not queued behind the work), the assignment stays attached, and that turn is told which work is outstanding. (Current semantics: a new message is not a cancellation.)
 - `routine-deferral` — a routine due behind a busy target is stamped `deferredAt` while staying queued, then dispatches and completes when the target frees.
-- `lazy-claim-screenless` (issue #1361) — a screen-less Auto turn mounts computer tools without claiming the VM and completes while another thread holds it; no wait activity appears.
-- `lazy-computer-claim` (issue #1361) — the first screen call fires the deferred claim, is honestly refused while another thread holds the VM, shows the existing wait activity, and proceeds on release.
-- `lazy-claim-rejection` (issue #1369) — a VM that dies between dispatch and the first screen call rejects the fired claim: the call is refused honestly instead of as contention, exactly one terminal computer-unavailable error lands, the turn ends instead of staying busy, and a later screen call fails closed after teardown revokes the bridge capability.
+- `skill-assignment-visibility` — with the skills library on, a turn before assignment omits the library skill from its system prompt; after the assignment, the next turn's prompt carries it.
 
 ## Worlds
 
 - `coordination` — the packaged verification server with the scripted room engine: ordinary chat, `coordinate_bots` handoffs, routines.
-- `localVm` — the real server with the container boundary replaced by the in-repo VM fixture (`tests/support/computers/local-vm-container-hooks.mjs`): hermetic Local VM lifecycle, no Podman. The runner plays the bridge's computer-control poll, which is the seam the lazy claim lives at.
+- `localVm` — the real server with the container boundary replaced by the in-repo VM fixture (`tests/support/computers/local-vm-container-hooks.mjs`). No committed scenario uses it: the container computer module those scenarios drove has been removed.
 
 ## Tier 2 — golden-thread replay
 
