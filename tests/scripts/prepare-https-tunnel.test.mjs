@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
 
 import {
   CLOUDFLARED_ASSETS,
@@ -94,8 +93,6 @@ const PINNED_ASSETS = {
     archive: false,
   },
 };
-
-const packageJson = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
 
 function executableFixture(target) {
   const bytes = Buffer.alloc(128);

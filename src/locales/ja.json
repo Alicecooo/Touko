@@ -304,7 +304,7 @@
   "organization.useCompanyDone": "{name} に切り替えました: {names}。元に戻すには、ボットのモデルチップを使ってください。",
   "settings.section.appearance": "外観",
   "settings.section.experimental": "実験的機能",
-  "settings.section.connections": "API キー",
+  "settings.section.connections": "モデル API 接続",
   "settings.section.decisionModel": "判断用モデル",
   "settings.section.engines": "モデルプロバイダー",
   "settings.section.usage": "使用状況",
@@ -2362,7 +2362,7 @@
   "connectors.tab.connected": "連携済み",
   "connectors.searchPlaceholder": "アプリを検索",
   "connectors.notConfigured": "連携済みアプリは一時的に利用できません。ホストを再起動してから再試行するか、そちらで接続サービスを設定してください。",
-  "connectors.setupNeeded": "接続済みアプリはまだセットアップされていません。Gmail や Slack などを接続するには、設定 → API キーの「接続済みアプリをセルフホスト」に Composio プロジェクトキーを追加してください。",
+  "connectors.setupNeeded": "アプリの接続には Composio のプロジェクトキーが必要です。「設定 → アプリと MCP」で設定してから、各アプリのアカウントを認証してください。",
   "connectors.setupNeededRemote": "ホストで接続済みアプリがまだセットアップされていません。アプリを接続するには、ホストの設定に Composio プロジェクトキーを追加してください。",
   "connectors.openSettings": "設定を開く",
   "connectors.perBot.title": "すべてのボットがこれらのアプリを使えるわけではありません。",
@@ -3049,5 +3049,6 @@
   "error.plain.notFound": "見つかりませんでした。削除された可能性があります。",
   "error.plain.tooLarge": "サイズが大きすぎるため送信できません。",
   "error.plain.server": "接続先で問題が発生しました。もう一度お試しください。",
-  "error.plain.generic": "問題が発生しました。もう一度お試しください。"
+  "error.plain.generic": "問題が発生しました。もう一度お試しください。",
+  "settings.section.appConnections": "アプリと MCP"
 }

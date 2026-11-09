@@ -110,7 +110,7 @@
   "chat.error.connectOwnAi": "Підключити власний ШІ",
   "settings.section.appearance": "Вигляд",
   "settings.section.experimental": "Експериментальні",
-  "settings.section.connections": "API-ключі",
+  "settings.section.connections": "API-підключення моделей",
   "settings.section.engines": "Провайдери моделей",
   "settings.section.usage": "Використання",
   "settings.profile.title": "Профіль",
@@ -1569,5 +1569,7 @@
   "room.holds.resume": "Відновити {name}",
   "room.holds.stop": "Зупинити {name}",
   "room.holds.stopTitle": "Зупинити лише {name}; решта кімнати працює далі",
-  "room.holds.avatarHeld": "{name} — призупинено (зупинено вами)"
+  "room.holds.avatarHeld": "{name} — призупинено (зупинено вами)",
+  "settings.section.appConnections": "Застосунки та MCP",
+  "connectors.setupNeeded": "Для підключення застосунків потрібен ключ проєкту Composio. Додайте його в Налаштування → Застосунки та MCP, а потім авторизуйте облікові записи."
 }

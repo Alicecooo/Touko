@@ -29,7 +29,7 @@
   "engines.trialCreditTooLow": "इस चैट के लिए आपका ट्रायल Claude क्रेडिट बहुत कम बचा है। नई चैट शुरू करें, या अपने Claude या ChatGPT खाते से साइन इन करें, या API कुंजी जोड़ें।",
   "chat.error.connectOwnAi": "अपना AI कनेक्ट करें",
   "settings.section.experimental": "प्रयोगात्मक",
-  "settings.section.connections": "API कुंजियाँ",
+  "settings.section.connections": "मॉडल API कनेक्शन",
   "settings.section.engines": "मॉडल प्रदाता",
   "settings.section.usage": "उपयोग",
   "settings.profile.title": "प्रोफ़ाइल",
@@ -1088,5 +1088,7 @@
   "room.holds.resume": "{name} को फिर शुरू करें",
   "room.holds.stop": "{name} को रोकें",
   "room.holds.stopTitle": "सिर्फ़ {name} को रोकें; बाकी रूम चलता रहेगा",
-  "room.holds.avatarHeld": "{name} — रोका गया (आपके द्वारा)"
+  "room.holds.avatarHeld": "{name} — रोका गया (आपके द्वारा)",
+  "settings.section.appConnections": "ऐप्स और MCP",
+  "connectors.setupNeeded": "ऐप कनेक्शन के लिए Composio प्रोजेक्ट कुंजी चाहिए। सेटिंग्स → ऐप्स और MCP में इसे जोड़ें, फिर अपने ऐप खातों को अधिकृत करें।"
 }

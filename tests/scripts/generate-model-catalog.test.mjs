@@ -1,12 +1,9 @@
 import { MAX_GZIP_BYTES, snapshotProblems } from "../checks/model-catalog.check.mjs";
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { LICENSE_PATH, SNAPSHOT_PATH, buildCatalogDocument, serializeCatalog, toLf } from "../../scripts/generators/generate-model-catalog.mjs";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 // As checked out: a Windows working tree may still hold CRLF.
 const committed = readFileSync(SNAPSHOT_PATH, "utf8");
 const licenseText = toLf(readFileSync(LICENSE_PATH, "utf8"));

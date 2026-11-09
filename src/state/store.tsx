@@ -470,6 +470,8 @@ export interface EngineInstall {
 }
 
 export interface InstanceInfo {
+  apiProtocol?: "openai" | "anthropic";
+  url?: string;
   instanceId: string;
   driverKind: string;
   displayName: string;
@@ -531,6 +533,7 @@ export type AppSettingsSection =
   | "appearance"
   | "experimental"
   | "connections"
+  | "appConnections"
   | "decisionModel"
   | "engines"
   | "companion"

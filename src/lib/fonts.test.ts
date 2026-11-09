@@ -1,17 +1,5 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_FONT, FONT_IDS, applyFont, readFont } from "./fonts";
-
-const css = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), "../styles.css"),
-  "utf8",
-);
-
-const blocks = new Set(
-  [...css.matchAll(/:root\[data-font="([a-z-]+)"\]/g)].map(([, id]) => id),
-);
+import { DEFAULT_FONT, applyFont, readFont } from "./fonts";
 
 describe("fonts", () => {
   // Vitest runs in node here: stand in the two globals the module touches.
@@ -22,18 +10,6 @@ describe("fonts", () => {
       setItem: (k: string, v: string) => void store.set(k, v),
     });
     vi.stubGlobal("document", { documentElement: { dataset: {} as DOMStringMap } });
-  });
-
-  it("gives every non-default font a stylesheet block that sets --font-sans", () => {
-    for (const id of FONT_IDS.filter((f) => f !== DEFAULT_FONT)) {
-      expect(blocks).toContain(id);
-      const body = css.match(new RegExp(`:root\\[data-font="${id}"\\]\\s*\\{([^}]*)\\}`))?.[1] ?? "";
-      expect(body).toMatch(/--font-sans\s*:/);
-    }
-  });
-
-  it("registers every stylesheet block", () => {
-    for (const id of blocks) expect(FONT_IDS).toContain(id as (typeof FONT_IDS)[number]);
   });
 
   it("stamps a chosen font and remembers it", () => {

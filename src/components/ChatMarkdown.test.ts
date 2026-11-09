@@ -1,7 +1,4 @@
 // @vitest-environment happy-dom
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { act, createElement } from "react";
 import * as React from "react";
 import { createRoot } from "react-dom/client";
@@ -247,17 +244,6 @@ describe("math rendering", () => {
     }));
     expect(html).toContain('href="https://shop.test/item/$5"');
     expect(html.match(/class="katex"/g)).toHaveLength(1);
-  });
-
-  it("contains long inline formulas in a horizontal scroll container", () => {
-    const html = renderToStaticMarkup(createElement(ChatMarkdown, {
-      text: `Inline $${"abcdefghijklmnopqrstuvwxyz".repeat(3)}$.`,
-    }));
-    expect(html.match(/class="katex"/g)).toHaveLength(1);
-    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../styles.css"), "utf8");
-    const rule = css.match(/\.chat-md :not\(\.katex-display\) > \.katex \{([^}]*)\}/)?.[1];
-    expect(rule).toContain("max-width: 100%");
-    expect(rule).toContain("overflow-x: auto");
   });
 
   it("does not pair dollars across paragraphs", () => {

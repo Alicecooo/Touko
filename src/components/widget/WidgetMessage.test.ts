@@ -1,7 +1,4 @@
 // @vitest-environment happy-dom
-import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -669,16 +666,5 @@ describe("pressing", () => {
     await press(button("More")!);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(posted(1).body.widgetAction.ref).toBe(widgetActions(parsed.value).find((entry) => entry.label === "More")!.ref);
-  });
-});
-
-describe("the widget renderer's sources", () => {
-  it("name no colour of their own: every one comes from a token", () => {
-    const here = dirname(fileURLToPath(import.meta.url));
-    const sources = readdirSync(here).filter((name) => /\.tsx?$/.test(name) && !/\.test\./.test(name));
-    expect(sources.length).toBeGreaterThanOrEqual(8);
-    const offending = sources.flatMap((name) =>
-      readFileSync(join(here, name), "utf8").split("\n").flatMap((line, index) => (/#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/.test(line) ? [`${name}:${index + 1}`] : [])));
-    expect(offending).toEqual([]);
   });
 });

@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { providerIconError } from "../../shared/provider-icon.ts";
 import { assertSeparateClaudeAccount, configuredAccountDirectory, createClaudeAccountSchema, instanceSettingsSchema, newClaudeAccount } from "../auth/claude-accounts.ts";
 import { updateClaudeCli } from "../platform/claude-update.ts";
-import { persistableInstanceConfigs, saveConfig, withInstanceCli, type AppConfig } from "../config/config.ts";
-import { addEndpoint, addEndpointSchema, isAddedEndpoint, withEndpointUrls } from "../model-catalog/openai-compat-endpoints.ts";
+import { DATA_DIR, persistableInstanceConfigs, saveConfig, withInstanceCli, type AppConfig } from "../config/config.ts";
+import { addApiEndpoint, addEndpoint, addEndpointSchema, apiEndpointSchema, isAddedEndpoint, withEndpointUrls } from "../model-catalog/openai-compat-endpoints.ts";
 import type { InstanceConfigMap, ModelSelection } from "../harness/contracts.ts";
 import { BUILT_IN_DRIVERS } from "../drivers/builtIn.ts";
 import { findCliCandidates, resetPathCache } from "../platform/env-path.ts";
@@ -99,6 +99,21 @@ export function createInstanceRoutes(deps: InstanceRouteDeps): RouteHandler {
           config: { authMode: "chatgpt-plan", ...(typeof cli === "string" && cli ? { cli } : {}) } };
         await persistProviderInstance(instanceId, instances);
         return json(res, 201, { instanceId, instances: await describeInstances() });
+      } finally { providerConfigBusy.set(false); }
+    }
+
+    if (method === "POST" && path === "/api/instances/api-endpoints") {
+      if (!String(req.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) return json(res, 415, { error: "content-type must be application/json" });
+      const parsed = apiEndpointSchema.safeParse(await readBody(req, 8192));
+      if (!parsed.success) return json(res, 400, { error: "Enter a protocol, display name (up to 80 characters), base URL and API key." });
+      if (providerConfigBusy.get()) return json(res, 409, { error: "provider settings are already being updated" });
+      providerConfigBusy.set(true);
+      try {
+        const instances = persistableInstanceConfigs(cfg);
+        const added = addApiEndpoint(instances, parsed.data, DATA_DIR);
+        if ("error" in added) return json(res, 400, { error: added.error });
+        await persistProviderInstance(added.instanceId, instances);
+        return json(res, 201, { instanceId: added.instanceId, instances: await describeInstances() });
       } finally { providerConfigBusy.set(false); }
     }
 

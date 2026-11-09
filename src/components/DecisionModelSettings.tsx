@@ -87,7 +87,7 @@ export function DecisionModelSettings() {
     : usingShared
       ? "decider.openrouter.status.sharedHint"
       : !configured
-        ? "decider.openrouter.status.notConnectedHint"
+        ? null
         : sharedKey
           ? "decider.openrouter.status.ownFallbackHint"
           : null;
@@ -213,7 +213,7 @@ export function DecisionModelSettings() {
       )}
       <SettingRow
         title={t(openrouter ? "decider.openrouter.master" : "decider.master")}
-        subtitle={configured ? undefined : t(openrouter ? "decider.masterNeedsKey.openrouter" : "decider.masterNeedsKey")}
+        subtitle={configured ? undefined : t("decider.masterNeedsKey")}
       >
         <Switch
           data-testid="decider-master"
@@ -250,7 +250,7 @@ export function DecisionModelSettings() {
                   onClick={() => dispatch({ type: "toggleAppSettings", open: true, section: "connections" })}
                   className="cursor-pointer text-accent hover:underline"
                 >
-                  {t("decider.openrouter.key.manageLink")}
+                  {t("settings.section.connections")}
                 </button>
               </>
             )}

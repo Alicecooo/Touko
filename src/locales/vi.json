@@ -338,7 +338,7 @@
   "organization.useCompanyDone": "Hiện đang dùng {name}: {names}. Để hoàn tác, hãy dùng thẻ mô hình của bot.",
   "settings.section.appearance": "Giao diện",
   "settings.section.experimental": "Thử nghiệm",
-  "settings.section.connections": "Khóa API",
+  "settings.section.connections": "Kết nối API mô hình",
   "settings.section.decisionModel": "Mô hình quyết định",
   "settings.section.engines": "Nhà cung cấp mô hình",
   "settings.section.logins": "Đăng nhập",
@@ -2754,7 +2754,7 @@
   "connectors.tab.connected": "Đã kết nối",
   "connectors.searchPlaceholder": "Tìm kiếm ứng dụng",
   "connectors.notConfigured": "Các ứng dụng đã kết nối tạm thời không khả dụng. Hãy thử lại sau khi khởi động lại host, hoặc định cấu hình dịch vụ kết nối tại đó.",
-  "connectors.setupNeeded": "Các ứng dụng đã kết nối vẫn chưa được thiết lập. Để kết nối Gmail, Slack và nhiều dịch vụ khác, hãy thêm khóa dự án Composio trong Cài đặt → Khóa API, bên dưới Tự lưu trữ ứng dụng đã kết nối.",
+  "connectors.setupNeeded": "Kết nối ứng dụng cần khóa dự án Composio. Thêm khóa trong Cài đặt → Ứng dụng và MCP, rồi cấp quyền cho các tài khoản ứng dụng.",
   "connectors.setupNeededRemote": "Các ứng dụng đã kết nối vẫn chưa được thiết lập trên host. Hãy thêm khóa dự án Composio trong phần cài đặt của host để kết nối ứng dụng.",
   "connectors.openSettings": "Mở cài đặt",
   "connectors.perBot.title": "Không phải bot nào cũng có thể sử dụng các ứng dụng này.",
@@ -3473,5 +3473,6 @@
   "apiInstances.remove": "Xóa {name}",
   "apiInstances.refreshModels": "Phát hiện lại mô hình cho {name}",
   "apiInstances.empty": "Chưa có máy chủ nào khác.",
-  "apiInstances.failed": "Không lưu được máy chủ. Hãy kiểm tra các trường rồi thử lại."
+  "apiInstances.failed": "Không lưu được máy chủ. Hãy kiểm tra các trường rồi thử lại.",
+  "settings.section.appConnections": "Ứng dụng và MCP"
 }

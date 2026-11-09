@@ -762,7 +762,7 @@ export function PluginsPanel() {
                 )}
                 onClick={() => {
                   close();
-                  dispatch({ type: "toggleAppSettings", open: true, section: "connections" });
+                  dispatch({ type: "toggleAppSettings", open: true, section: "appConnections" });
                 }}
               >
                 {t("connectors.openSettings")}

@@ -4,8 +4,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { patchOrganizationUpdater } from "../scripts/build/patch-organization-updater.mjs";
 import environments from "./environments.cjs";
-import localOrigin from "./local-origin.cjs";
-import { createOrganizationEntry, isOrganizationDeepLink, takeOrganizationDeepLink, organizationRestartIntent, withOrganizationRestartIntent, withoutOrganizationRestartIntent } from "./organization-entry.mjs";
+import { createOrganizationEntry, isOrganizationDeepLink, takeOrganizationDeepLink } from "./organization-entry.mjs";
 
 const remote = { id: "old", name: "Old cloud", origin: "https://old.example" };
 const companion = { endpoint: "https://c-old.openmausbot.com", serverName: "Old computer", deviceId: "device-a" };

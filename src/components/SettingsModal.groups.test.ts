@@ -111,7 +111,7 @@ describe("Settings rail groups", () => {
     expect(html).toContain("glass-surface");
     expect(rail(html)).toEqual({
       you: ["general", "appearance", "companion"],
-      ai: ["engines", "connections", "decisionModel"],
+      ai: ["engines", "connections", "appConnections", "decisionModel"],
       computers: ["desktopWorkspaces", "logins"],
       account: ["organization", "usage", "backups", "experimental"],
     });

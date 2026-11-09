@@ -415,12 +415,11 @@ describe("DecisionModelSettings", () => {
         expect(render().html).toContain("Using your OpenRouter API key");
       });
 
-      it("with no key anywhere, asks for one and points to API keys", () => {
+      it("with no key anywhere, accepts a decision key locally instead of linking to an unrelated API connection", () => {
         const view = render();
         expect(view.html).toContain("Not connected");
-        expect(view.html).toContain("Save an OpenRouter key under API keys to use it here and for models");
-        expect(view.html).toContain("Save an OpenRouter key below or under API keys to turn this on.");
-        expect(view.manage).toBeDefined();
+        expect(view.manage).toBeUndefined();
+        expect(view.input.props.disabled).toBe(false);
         expect(view.master.props.disabled).toBe(true);
         expect(view.test.props.disabled).toBe(true);
       });

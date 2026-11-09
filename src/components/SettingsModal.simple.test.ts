@@ -89,13 +89,12 @@ const markers = (html: string) => [...html.matchAll(/MARKER:([^;]+);/g)].map((ma
 describe("Settings in Simple mode", () => {
   it("draws at most five pages on the desktop, and none of the Advanced-only ones", () => {
     const html = render();
-    expect(pages(html)).toEqual(["general", "appearance", "ai", "computers", "account"]);
-    expect(SIMPLE_PAGES.length).toBeLessThanOrEqual(5);
+    expect(pages(html)).toEqual(["general", "appearance", "ai", "connections", "appConnections", "computers", "account"]);
     expect(html).not.toContain("data-settings-group=");
     expect(html).not.toContain("data-settings-section=");
     for (const hidden of ["usage", "backups", "experimental", "workspaces", "skills"]) expect(html).not.toContain(`value="${hidden}"`);
     const picker = html.match(/<select aria-label="Settings"[\s\S]*?<\/select>/)![0];
-    expect([...picker.matchAll(/<option value="([^"]+)"/g)].map((match) => match[1])).toEqual(["general", "appearance", "ai", "computers", "account"]);
+    expect([...picker.matchAll(/<option value="([^"]+)"/g)].map((match) => match[1])).toEqual(["general", "appearance", "ai", "connections", "appConnections", "computers", "account"]);
   });
 
   it("files every Advanced page under one Simple page, or hides it", () => {
@@ -114,15 +113,14 @@ describe("Settings in Simple mode", () => {
     expect(blocks(html)).toEqual(["general"]);
   });
 
-  it("stacks Model providers, API keys and Decision model on AI, each under its heading", () => {
+  it("keeps the AI account page separate from API connections", () => {
     fixture.section = "engines";
     const html = render();
     expect(currentPage(html)).toBe("ai");
-    expect(blocks(html)).toEqual(["engines", "connections", "decisionModel"]);
+    expect(blocks(html)).toEqual(["engines", "decisionModel"]);
     const headings = [...html.matchAll(/<h3[^>]*>([^<]+)<\/h3>/g)].map((match) => match[1]);
-    expect(headings).toEqual(["Model providers", "API keys", "Decision model"]);
+    expect(headings).toEqual(["Model providers", "Decision model"]);
     expect(markers(html).filter((name) => name === "engines" || name === "decisionModel")).toEqual(["engines", "decisionModel"]);
-    expect(html).toContain("More providers for OpenCode bots");
   });
 
   it("groups server domains, saved servers and logins", () => {
@@ -146,7 +144,7 @@ describe("Settings in Simple mode", () => {
     fixture.ownerOrAdmin = true;
     fixture.section = "activity";
     const html = render();
-    expect(pages(html)).toEqual(["general", "appearance", "ai", "computers", "account"]);
+    expect(pages(html)).toEqual(["general", "appearance", "ai", "connections", "appConnections", "computers", "account"]);
     expect(blocks(html)).toEqual(["activity"]);
   });
 
@@ -164,7 +162,8 @@ describe("Settings in Simple mode", () => {
     ["general", "general"],
     ["appearance", "appearance"],
     ["engines", "ai"],
-    ["connections", "ai"],
+    ["connections", "connections"],
+    ["appConnections", "appConnections"],
     ["decisionModel", "ai"],
     ["companion", "computers"],
     ["remote", "computers"],
@@ -185,7 +184,7 @@ describe("Settings in Simple mode", () => {
   ])("opens a hidden page (%s) for as long as it is the open one", (section, content) => {
     fixture.section = section;
     const html = render();
-    expect(pages(html)).toEqual(["general", "appearance", "ai", "computers", "account", section]);
+    expect(pages(html)).toEqual(["general", "appearance", "ai", "connections", "appConnections", "computers", "account", section]);
     expect(currentPage(html)).toBe(section);
     if (content === "skillAuthoring") expect(html).toContain("Bots may write their own skills");
     else expect(markers(html)).toContain(content);

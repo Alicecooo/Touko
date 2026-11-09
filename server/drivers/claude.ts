@@ -271,6 +271,7 @@ export interface ClaudeConfig {
   configDir?: string;
   managed?: boolean;
   managedModels?: string[];
+  apiModels?: string[];
   permissionMode: "acceptEdits" | "auto" | "bypassPermissions";
   tools?: string[];
   disallowedTools?: string[];
@@ -649,11 +650,13 @@ function decodeConfig(raw: unknown): ClaudeConfig {
   const configDir = typeof o.configDir === "string" ? o.configDir.trim() : undefined;
   if (configDir) resolveClaudeConfigDir(configDir);
   if (o.managedModels !== undefined && (o.managed !== true || !Array.isArray(o.managedModels) || !o.managedModels.length || o.managedModels.some(model => typeof model !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/.test(model)))) throw new Error("Invalid hosted Claude models.");
+  if (o.apiModels !== undefined && (o.requireApiKey !== true || !Array.isArray(o.apiModels) || !o.apiModels.length || o.apiModels.length > 64 || o.apiModels.some(model => typeof model !== "string" || !model.trim() || model.length > 200 || /[\s\p{Cc}]/u.test(model)))) throw new Error("Invalid API model IDs.");
   return {
     cli: typeof o.cli === "string" ? o.cli : "claude",
     ...(configDir ? { configDir } : {}),
     ...(o.managed === true ? { managed: true } : {}),
     ...(o.managedModels ? { managedModels: o.managedModels as string[] } : {}),
+    ...(o.apiModels ? { apiModels: o.apiModels as string[] } : {}),
     permissionMode: (mode as ClaudeConfig["permissionMode"]) ?? "acceptEdits",
     ...(tools !== undefined ? { tools } : {}),
     ...(disallowedTools !== undefined ? { disallowedTools } : {}),
@@ -843,16 +846,17 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
     if (inheritsUserConfig(catalogEnv)) {
       console.error(`claude (${instanceId}): OMB_CLAUDE_INHERIT_USER_CONFIG=1 — bots inherit this machine's Claude Code MCP servers, skills, hooks and CLAUDE.md on every turn; remove it unless a bot needs a user-scope server`);
     }
-    let models = config.managedModels ? { default: config.managedModels[0], options: config.managedModels.map(id => ({ id, label: id })) } : STATIC_CLAUDE_MODELS;
+    const configuredModels = config.managedModels ?? config.apiModels;
+    let models = configuredModels ? { default: configuredModels[0], options: configuredModels.map(id => ({ id, label: id })) } : STATIC_CLAUDE_MODELS;
     const refreshModels = async () => {
-      if (config.managed) return;
+      if (config.managed || config.apiModels) return;
       try {
         const resolved = await mergeLocalInject(readClaudeModelCatalog(catalogEnv), catalogEnv);
         if (resolved.options.length) models = resolved;
       } catch {}
       try { writeStartupModelCache(instanceId, models); } catch {}
     };
-    const startupModelRefresh = config.managed ? null : (await openStartupModelCatalog({
+    const startupModelRefresh = config.managed || config.apiModels ? null : (await openStartupModelCatalog({
       instanceId,
       use: (catalog) => { models = catalog; },
       current: () => models,
@@ -1959,7 +1963,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
           reject(new Error(NO_ANTHROPIC_KEY));
           return;
         }
-        const model = named ?? config.managedModels?.[0] ?? "claude-haiku-4-5";
+        const model = named ?? config.managedModels?.[0] ?? config.apiModels?.[0] ?? "claude-haiku-4-5";
         const env = environment(model);
         const args = backgroundCallArgs({ model, outputFormat: onUsage ? "json" : "text", supports: (flag) => cliVersion !== null && claudeCliSupports(cliVersion, flag), isolated: !inheritsUserConfig(env) });
         const { child, removeCwd } = spawnBackgroundCall(config.cli, args, env);

@@ -3,17 +3,18 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLocale } from "@/lib/i18n";
 
-const fixture = vi.hoisted(() => ({ config: undefined as import("@/state/store").ConfigStatus | undefined }));
+const fixture = vi.hoisted(() => ({ section: "connections" as import("@/state/store").AppSettingsSection, config: undefined as import("@/state/store").ConfigStatus | undefined }));
 vi.mock("./DesktopCapabilities", () => ({ useDesktopCapabilities: () => ({ capabilities: {} }) }));
 vi.mock("@/state/store", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/state/store")>(),
   api: vi.fn(),
-  useStore: () => ({ state: { appSettingsSection: "connections", instances: [], config: fixture.config }, dispatch: vi.fn() }),
+  useStore: () => ({ state: { appSettingsSection: fixture.section, instances: [], config: fixture.config }, dispatch: vi.fn() }),
 }));
 vi.mock("@/lib/analytics", () => ({ analyticsEnabled: () => false, setAnalyticsEnabled: vi.fn() }));
 
 beforeEach(() => {
   fixture.config = undefined;
+  fixture.section = "connections";
   vi.stubGlobal("window", {});
   vi.stubGlobal("document", { documentElement: { dataset: {} } });
   setLocale("en");
@@ -33,6 +34,7 @@ describe("Settings → Connections", () => {
   });
 
   it("points OpenCode users at `opencode auth login` for other providers", async () => {
+    fixture.section = "engines";
     const { SettingsModal } = await import("./SettingsModal");
     const html = renderToStaticMarkup(createElement(SettingsModal));
     expect(html).toContain("More providers for OpenCode bots");
@@ -40,6 +42,7 @@ describe("Settings → Connections", () => {
   });
 
   it("offers keys for other OpenCode providers next to the OpenCode key", async () => {
+    fixture.section = "engines";
     const { SettingsModal } = await import("./SettingsModal");
     const html = renderToStaticMarkup(createElement(SettingsModal));
     const opencode = html.indexOf('data-api-key-row="opencodeGo"');
@@ -49,6 +52,7 @@ describe("Settings → Connections", () => {
   });
 
   it("sends nobody on a Cloud to a terminal, only to the keys for other providers", async () => {
+    fixture.section = "engines";
     const { configStatusFromFrame } = await import("@/state/store");
     fixture.config = configStatusFromFrame({
       composio: { configured: false },

@@ -407,7 +407,7 @@
   "organization.useCompanyDone": "Ahora usan {name}: {names}. Para deshacerlo, usa el chip de modelo del bot.",
   "settings.section.appearance": "Apariencia",
   "settings.section.experimental": "Experimental",
-  "settings.section.connections": "Claves de API",
+  "settings.section.connections": "Conexiones API de modelos",
   "settings.section.decisionModel": "Modelo de decisión",
   "settings.section.engines": "Proveedores de modelos",
   "settings.section.logins": "Inicios de sesión",
@@ -2997,7 +2997,7 @@
   "connectors.tab.connected": "Conectadas",
   "connectors.searchPlaceholder": "Buscar apps",
   "connectors.notConfigured": "Las apps conectadas no están disponibles temporalmente. Inténtalo tras reiniciar el host, o configura allí el servicio de conexión.",
-  "connectors.setupNeeded": "Las apps conectadas aún no están configuradas. Para conectar Gmail, Slack y más, añade una clave de proyecto de Composio en Ajustes → Claves de API, en «Autoalojar las apps conectadas».",
+  "connectors.setupNeeded": "Las conexiones de aplicaciones necesitan una clave de proyecto de Composio. Configúrala en Ajustes → Apps y MCP y luego autoriza tus cuentas.",
   "connectors.setupNeededRemote": "Las apps conectadas aún no están configuradas en el host. Añade una clave de proyecto de Composio en los ajustes del host para conectar apps.",
   "connectors.openSettings": "Abrir ajustes",
   "connectors.perBot.title": "No todos los bots pueden usar estas apps.",
@@ -3719,5 +3719,6 @@
   "apiInstances.remove": "Quitar {name}",
   "apiInstances.refreshModels": "Volver a detectar los modelos de {name}",
   "apiInstances.empty": "Aún no hay otros servidores.",
-  "apiInstances.failed": "No se pudo guardar el servidor. Revisa los campos e inténtalo de nuevo."
+  "apiInstances.failed": "No se pudo guardar el servidor. Revisa los campos e inténtalo de nuevo.",
+  "settings.section.appConnections": "Apps y MCP"
 }

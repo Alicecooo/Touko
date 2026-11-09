@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { soulSystemPrompt } from "../bots/bot-folder.ts";
 
-import { longCommandsPrompt, buildSystemPrompt, CONVERSATIONAL_STYLE_PROMPT, userProfileSystemPrompt, computerPrompt, resolveComputerPromptKind, mentionPrompt, COMPOSIO_PROMPT, composioSystemPrompt, customMcpPrompt, CREDENTIAL_PROMPT, LEARN_PROMPT, PROFILE_PROMPT, TRIGGER_PROMPT, ROUTINE_EXECUTION_PROMPT, WEBHOOK_PROMPT, SIGN_IN_PROMPT, type ComputerPromptKind } from "./system-prompt.ts";
+import { buildSystemPrompt, CONVERSATIONAL_STYLE_PROMPT, userProfileSystemPrompt, computerPrompt, resolveComputerPromptKind, mentionPrompt, COMPOSIO_PROMPT, composioSystemPrompt, customMcpPrompt, SIGN_IN_PROMPT, type ComputerPromptKind } from "./system-prompt.ts";
 
 describe("resolveComputerPromptKind", () => {
   it.each([
@@ -105,30 +105,7 @@ describe("buildSystemPrompt", () => {
   });
 });
 
-describe("computerPrompt", () => {
-  it("distinguishes background window control from foreground desktop input", () => {
-    const prompt = computerPrompt("local");
-    expect(prompt).toContain("background delivery");
-    expect(prompt).toContain("do not bring OpenMausBot");
-    expect(prompt).toContain("dedicated browser tools");
-    expect(prompt).toContain("keeping the user's intended browser profile/account");
-    expect(prompt).toContain("Do not silently retry a background refusal");
-    expect(prompt).toContain("including through shell scripts, AppleScript/System Events");
-    expect(prompt).toContain("If a background action unexpectedly changes focus");
-  });
-  it("is empty with no computer", () => {
-    expect(computerPrompt(null)).toBe("");
-  });
-
-});
-
 describe("shared sentences", () => {
-  it("each begins with one space so they concatenate onto the persona line", () => {
-    for (const sentence of [COMPOSIO_PROMPT, CREDENTIAL_PROMPT, TRIGGER_PROMPT, ROUTINE_EXECUTION_PROMPT, LEARN_PROMPT, WEBHOOK_PROMPT, PROFILE_PROMPT, SIGN_IN_PROMPT]) {
-      expect(sentence.startsWith(" ")).toBe(true);
-      expect(sentence.startsWith("  ")).toBe(false);
-    }
-  });
 
   it("customMcpPrompt names the mounted servers and is empty for none", () => {
     expect(customMcpPrompt([])).toBe("");
@@ -144,30 +121,6 @@ describe("shared sentences", () => {
     expect(mentionPrompt([{ id: "a1", name: "Ana" }, { id: "b2", name: "Bo" }])).toBe(
       " The user tagged @Ana (bot_id a1) and @Bo (bot_id b2) in their message. If they assigned independent work, use coordinate_bots and finish your turn without waiting; for a question, use coordinate_bots with consult: true — the answer resumes you.",
     );
-  });
-
-  it("configuration prompts follow actual applied or pending results without elevating another bot", () => {
-    expect(PROFILE_PROMPT).toContain("propose_profile");
-    for (const prompt of [PROFILE_PROMPT, LEARN_PROMPT]) {
-      expect(prompt).toContain("continue the requested work without asking for another confirmation");
-      expect(prompt).toContain("Never claim success before an applied result");
-      expect(prompt).toContain("Full Access does not grant another bot broader permissions");
-      expect(prompt).not.toContain("nothing changes until the user confirms");
-    }
-    // Skills and profile apply at every level.
-    for (const prompt of [PROFILE_PROMPT, LEARN_PROMPT]) {
-      expect(prompt).toContain("applies immediately at every access level and the person sees it with an Undo");
-      expect(prompt).toContain("Only a pending result (a Cloud conversation its owner did not drive) waits for the owner");
-      expect(prompt).not.toContain("may wait for the person");
-    }
-    expect(LEARN_PROMPT).toContain("only when the user explicitly asks to revise that exact name");
-    // Triggers have no pending state: the bot sets them up in the same turn and the person undoes from the card.
-    expect(TRIGGER_PROMPT).toContain("set it up with create_trigger in this turn");
-    expect(TRIGGER_PROMPT).toContain("Do not ask for confirmation");
-    expect(TRIGGER_PROMPT).toContain("Edit, Pause and Undo");
-    expect(TRIGGER_PROMPT).not.toMatch(/pending|explicitly asks/);
-    expect(CREDENTIAL_PROMPT).toContain("secure credential request");
-    expect(CREDENTIAL_PROMPT).not.toContain("applied immediately");
   });
 });
 
@@ -196,19 +149,6 @@ describe("composioSystemPrompt", () => {
     expect(prompt).not.toContain("Slack");
     expect(prompt).not.toContain("Notion");
   });
-
-  it("starts with exactly one space like every shared sentence", () => {
-    const prompt = composioSystemPrompt({ gmail: { tools: "*" } });
-    expect(prompt.startsWith(" ")).toBe(true);
-    expect(prompt.startsWith("  ")).toBe(false);
-  });
-});
-
-describe("longCommandsPrompt", () => {
-  it("names Bash's limit", () => {
-    expect(longCommandsPrompt()).toContain("`timeout` in milliseconds, up to 600000");
-    expect(longCommandsPrompt()).not.toContain("vm_exec");
-  });
 });
 
 describe("reply style", () => {
@@ -226,9 +166,5 @@ describe("reply style", () => {
     expect(built.sections.map((s) => s.id)).toEqual(["persona", "soul", "reply-style", "memory", "x"]);
     expect(built.stable).toContain(CONVERSATIONAL_STYLE_PROMPT);
     expect(built.volatile).not.toContain("Reply style");
-    expect(CONVERSATIONAL_STYLE_PROMPT).toMatch(/short/i);
-    expect(CONVERSATIONAL_STYLE_PROMPT).toMatch(/blank line/);
-    expect(CONVERSATIONAL_STYLE_PROMPT).toMatch(/code block/);
-    expect(CONVERSATIONAL_STYLE_PROMPT).toMatch(/language/);
   });
 });

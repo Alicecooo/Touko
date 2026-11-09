@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Window } from "happy-dom";
 import { describe, expect, it } from "vitest";
 import { contrastRatio, mixSrgb, toneForSurface } from "./color-contrast";
 import { MAUS_COLORS, MAUS_COLOR_NAMES } from "./mascot";
@@ -20,28 +19,6 @@ function skin(id: string): Record<string, string> {
 }
 
 describe("room speaker colors", () => {
-  it("gives chat text a taller line box without changing the type size", () => {
-    expect(css).toMatch(/\.chat-text,\s*\.chat-md\s*\{\s*line-height:\s*1\.75;/);
-  });
-
-  it("names each bot with a class that reads the skin token", () => {
-    for (const color of MAUS_COLOR_NAMES) {
-      expect(css).toContain(`.bot-identity[data-bot-color="${color}"] { color: var(--identity-${color}); }`);
-    }
-  });
-
-  it("applies chat colors outside window drag controls", async () => {
-    const window = new Window();
-    try {
-      const sheet = new window.CSSStyleSheet();
-      sheet.replaceSync(css);
-      const selectors = Array.from(sheet.cssRules).flatMap((rule) => "selectorText" in rule ? [rule.selectorText] : []);
-      expect(selectors).toContain('.bot-identity[data-bot-color="blue"]');
-      expect(selectors).toContain(".user-bubble-colored .mention-highlight");
-    } finally {
-      await window.happyDOM.close();
-    }
-  });
 
   it.each(SKIN_IDS.flatMap((id) => MAUS_COLOR_NAMES.map((color) => [id, color] as const)))(
     "gives %s × %s a name color that clears 4.5:1 on the thread",

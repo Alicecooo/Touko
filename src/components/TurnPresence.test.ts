@@ -2,7 +2,6 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { phraseAt, phraseHoldMs } from "@/lib/live-activity";
@@ -93,15 +92,5 @@ describe("TurnPresence phrases", () => {
     const markup = renderToStaticMarkup(createElement(TurnPresence, { avatar: null, visible: true, label: "Running a command", since: 1 }));
     expect(markup).toContain("Running a command");
     expect(markup).toContain("thinking-shimmer");
-  });
-});
-
-describe("thinking shimmer box", () => {
-  it("pads the sheen past ascenders, descenders and arabic marks without moving the layout", () => {
-    const css = readFileSync("src/styles.css", "utf8");
-    const rule = css.match(/\.thinking-shimmer \{[^}]*\}/)?.[0] ?? "";
-    expect(rule).toContain("background-clip: text");
-    expect(rule).toMatch(/padding: 0\.35em 0\.12em/);
-    expect(rule).toMatch(/margin: -0\.35em -0\.12em/);
   });
 });

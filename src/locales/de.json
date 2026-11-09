@@ -98,7 +98,7 @@
   "engines.trialCreditTooLow": "Dein restliches Claude-Guthaben der Testphase reicht für diesen Chat nicht aus. Starte einen neuen Chat, melde dich mit deinem eigenen Claude- oder ChatGPT-Konto an oder füge einen API-Schlüssel hinzu.",
   "chat.error.connectOwnAi": "Eigene KI verbinden",
   "settings.section.experimental": "Experimentell",
-  "settings.section.connections": "API-Schlüssel",
+  "settings.section.connections": "Modell-API-Verbindungen",
   "settings.section.engines": "Modellanbieter",
   "settings.section.usage": "Nutzung",
   "settings.profile.title": "Profil",
@@ -1106,5 +1106,7 @@
   "room.holds.resume": "{name} fortsetzen",
   "room.holds.stop": "{name} stoppen",
   "room.holds.stopTitle": "Nur {name} stoppen; der Rest des Raums arbeitet weiter",
-  "room.holds.avatarHeld": "{name} – angehalten (von dir gestoppt)"
+  "room.holds.avatarHeld": "{name} – angehalten (von dir gestoppt)",
+  "settings.section.appConnections": "Apps & MCP",
+  "connectors.setupNeeded": "App-Verbindungen benötigen einen Composio-Projektschlüssel. Richte ihn unter Einstellungen → Apps & MCP ein und autorisiere anschließend deine App-Konten."
 }

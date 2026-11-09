@@ -12,6 +12,7 @@ import { DEVICE_SIGN_IN_COPY, deviceSignInProvider } from "./DeviceSignIn";
 import { AntigravityFreeSpace } from "./AntigravityFreeSpace";
 import { CacheKeepWarmSettings } from "./CacheKeepWarmSettings";
 import { Select } from "./Select";
+import { OpenCodeConnectionSettings } from "./ConnectionSettings";
 
 interface ProbeResult {
   ok: boolean;
@@ -371,6 +372,7 @@ export function EnginesSettings() {
         }}
       />
       <CacheKeepWarmSettings />
+      <OpenCodeConnectionSettings />
     </div>
   );
 }

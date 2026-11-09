@@ -338,7 +338,7 @@
   "organization.useCompanyDone": "Artık {name} kullanıyor: {names}. Geri almak için botun model butonunu kullanın.",
   "settings.section.appearance": "Görünüm",
   "settings.section.experimental": "Deneysel",
-  "settings.section.connections": "API anahtarları",
+  "settings.section.connections": "Model API bağlantıları",
   "settings.section.decisionModel": "Karar modeli",
   "settings.section.engines": "Model sağlayıcılar",
   "settings.section.logins": "Giriş bilgileri",
@@ -2754,7 +2754,7 @@
   "connectors.tab.connected": "Bağlandı",
   "connectors.searchPlaceholder": "Uygulamalarda ara",
   "connectors.notConfigured": "Bağlı uygulamalar geçici olarak kullanılamıyor. Ana bilgisayarı yeniden başlattıktan sonra tekrar deneyin veya bağlantı hizmetini orada yapılandırın.",
-  "connectors.setupNeeded": "Bağlı uygulamalar henüz kurulmadı. Gmail, Slack ve daha fazlasını bağlamak için Ayarlar → API anahtarları bölümündeki Kendi barındırdığınız bağlı uygulamalar altında bir Composio proje anahtarı ekleyin.",
+  "connectors.setupNeeded": "Uygulama bağlantıları bir Composio proje anahtarı gerektirir. Ayarlar → Uygulamalar ve MCP bölümünde yapılandırın, ardından uygulama hesaplarınıza yetki verin.",
   "connectors.setupNeededRemote": "Bağlı uygulamalar ana bilgisayarda henüz kurulmadı. Uygulamaları bağlamak için ana bilgisayarın ayarlarına bir Composio proje anahtarı ekleyin.",
   "connectors.openSettings": "Ayarları aç",
   "connectors.perBot.title": "Her bot bu uygulamaları kullanamaz.",
@@ -3473,5 +3473,6 @@
   "apiInstances.remove": "{name} kaldır",
   "apiInstances.refreshModels": "{name} için modelleri yeniden algıla",
   "apiInstances.empty": "Henüz başka sunucu yok.",
-  "apiInstances.failed": "Sunucu kaydedilemedi. Alanları kontrol edip tekrar deneyin."
+  "apiInstances.failed": "Sunucu kaydedilemedi. Alanları kontrol edip tekrar deneyin.",
+  "settings.section.appConnections": "Uygulamalar ve MCP"
 }

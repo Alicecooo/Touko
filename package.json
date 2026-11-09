@@ -22,7 +22,7 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "clean": "node scripts/clean-build-output.mjs",
-    "lint": "oxlint --deny-warnings .",
+    "lint": "oxlint --deny-warnings . && node tests/checks/source-conventions.check.mjs",
     "check:contrast": "node tests/checks/skin-contrast.check.mjs",
     "i18n:check": "node tests/checks/translations.check.mjs",
     "dev": "vite",

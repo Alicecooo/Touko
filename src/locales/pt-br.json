@@ -407,7 +407,7 @@
   "organization.useCompanyDone": "Agora usando {name}: {names}. Para desfazer, use o seletor de modelo do bot.",
   "settings.section.appearance": "Aparência",
   "settings.section.experimental": "Experimental",
-  "settings.section.connections": "Chaves de API",
+  "settings.section.connections": "Conexões de API de modelos",
   "settings.section.decisionModel": "Modelo de decisão",
   "settings.section.engines": "Provedores de modelos",
   "settings.section.logins": "Logins",
@@ -3161,7 +3161,7 @@
   "connectors.tab.connected": "Conectados",
   "connectors.searchPlaceholder": "Buscar apps",
   "connectors.notConfigured": "Os apps conectados estão temporariamente indisponíveis. Tente de novo depois de reiniciar o host, ou configure lá o serviço de conexão.",
-  "connectors.setupNeeded": "Os apps conectados ainda não estão configurados. Para conectar Gmail, Slack e outros, adicione uma chave de projeto do Composio em Configurações → Chaves de API, em “Hospedar os apps conectados por conta própria”.",
+  "connectors.setupNeeded": "As conexões de apps precisam de uma chave de projeto do Composio. Configure-a em Configurações → Apps e MCP e depois autorize suas contas.",
   "connectors.setupNeededRemote": "Os apps conectados ainda não estão configurados no host. Adicione uma chave de projeto do Composio nas configurações do host para conectar apps.",
   "connectors.openSettings": "Abrir configurações",
   "connectors.perBot.title": "Nem todo bot pode usar estes apps.",
@@ -4327,5 +4327,6 @@
   "history.restoreUnavailable": "As instruções anteriores exatas não estão disponíveis, então esta alteração não pode ser desfeita.",
   "botNotifications.title": "Notificações",
   "botNotifications.help": "Receba uma notificação quando este agente terminar ou precisar de entrada",
-  "botNotifications.label": "Notificações do agente"
+  "botNotifications.label": "Notificações do agente",
+  "settings.section.appConnections": "Apps e MCP"
 }

@@ -29,7 +29,7 @@
   "engines.trialCreditTooLow": "Il reste trop peu de crédit Claude d'essai pour cette conversation. Commencez une nouvelle conversation, ou connectez-vous avec votre propre compte Claude ou ChatGPT, ou ajoutez une clé API.",
   "chat.error.connectOwnAi": "Connecter votre propre IA",
   "settings.section.experimental": "Expérimental",
-  "settings.section.connections": "Clés API",
+  "settings.section.connections": "Connexions API des modèles",
   "settings.section.engines": "Fournisseurs de modèles",
   "settings.section.usage": "Utilisation",
   "settings.profile.title": "Profil",
@@ -1088,5 +1088,7 @@
   "room.holds.resume": "Reprendre {name}",
   "room.holds.stop": "Arrêter {name}",
   "room.holds.stopTitle": "Arrêter seulement {name} ; le reste du salon continue",
-  "room.holds.avatarHeld": "{name} — en pause (arrêté par vous)"
+  "room.holds.avatarHeld": "{name} — en pause (arrêté par vous)",
+  "settings.section.appConnections": "Applications et MCP",
+  "connectors.setupNeeded": "Les connexions aux applications nécessitent une clé de projet Composio. Configurez-la dans Paramètres → Applications et MCP, puis autorisez vos comptes."
 }

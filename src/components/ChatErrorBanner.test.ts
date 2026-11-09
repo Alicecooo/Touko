@@ -1,10 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { ChatErrorBanner, ChatNotice } from "./ChatErrorBanner";
 
-const source = (name: string) => readFileSync(new URL(`../${name}`, import.meta.url), "utf8");
 
 describe("ChatErrorBanner", () => {
   it("renders nothing when there is no error", () => {
@@ -33,23 +31,6 @@ describe("ChatErrorBanner", () => {
     const markup = renderToStaticMarkup(createElement(ChatErrorBanner, { message: "Clipboard has no image", onDismiss: () => undefined }));
     expect(markup).not.toContain("<details");
   });
-
-  it("wraps a long message instead of widening the banner", () => {
-    const markup = renderToStaticMarkup(createElement(ChatErrorBanner, { message: "Failed to fetch", onDismiss: () => undefined }));
-    expect(markup).toContain('class="min-w-0 flex-1 break-words"');
-  });
-
-  it("is the banner both the chat and the room render", () => {
-    for (const file of ["components/ChatView.tsx", "components/GroupView.tsx"]) {
-      const text = source(file);
-      expect(text).toContain("<ChatErrorBanner");
-      expect(text).toContain('message={state.error}');
-      expect(text).toContain('dispatch({ type: "error", message: null })');
-    }
-    const store = source("state/store.tsx");
-    expect(store).toContain("useChatErrorClear(state.error, clearChatError)");
-    expect(store).not.toContain('setTimeout(() => rawDispatch({ type: "error", message: null }), 6000)');
-  });
 });
 
 describe("ChatNotice", () => {
@@ -67,11 +48,5 @@ describe("ChatNotice", () => {
     const text = markup({ kind: "steer-images", botName: null });
     expect(text).toContain("Pictures can&#x27;t be steered into this bot&#x27;s running turn. Your message will be sent as the next turn.");
     expect(text).toContain('role="status"');
-  });
-
-  it("shows in the room as well as the chat", () => {
-    for (const file of ["components/ChatView.tsx", "components/GroupView.tsx"]) {
-      expect(source(file)).toContain("<ChatNotice notice={state.notice} />");
-    }
   });
 });

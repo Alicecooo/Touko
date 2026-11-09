@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Archive, CircleUser, Coins, FlaskConical, KeyRound, LockKeyhole, Monitor, Palette, ScrollText, Search, Sparkles, Terminal, User, X, Building2, Zap, BookOpen } from "lucide-react";
+import { Archive, CircleUser, Coins, FlaskConical, KeyRound, LockKeyhole, Monitor, Palette, Plug, ScrollText, Search, Sparkles, Terminal, User, X, Building2, Zap, BookOpen } from "lucide-react";
 import { api, useStore, type AppSettingsSection, type ConfigStatus } from "@/state/store";
 import { routinesInConversationEnabled, showToolCallsEnabled, skillAuthoringEnabled, skillsLibraryEnabled } from "@/lib/feature-flags";
 import { localeChoices, type LocaleKey } from "@/locales";
 import { t } from "@/lib/i18n";
-import { AnthropicEveryClaudeBot, ApiKeyRow, OpenCodeProviderKeys } from "./ApiKeys";
+import { AppConnectionSettings, ModelApiSettings } from "./ConnectionSettings";
 import { AnalyticsRow } from "./AnalyticsRow";
-import { OtherOpenAiCompatServers } from "./OpenAiCompatServers";
 import { DecisionModelSettings } from "./DecisionModelSettings";
 import { EnginesSettings } from "./EnginesSettings";
 import { ActivitySection } from "./ActivitySection";
@@ -69,7 +68,8 @@ export const SECTIONS: Array<{
   { id: "appearance", group: "you", labelKey: "settings.section.appearance", icon: Palette, keywords: ["skin", "theme", "appearance", "chat width", "width", "wide", "full width", "bubble", "bubbles", "tools", "tool calls", "threads", "show threads", "hide threads", "sidebar", "density", "compact", "comfortable", "avatars", "display", "run", "this run", "run card", "commands", "notifications", "sound", "sounds", "mute", "silent", "chime", "pinned", "circles", "universal", "groups", "top", "send", "enter", "return", "shift+enter", "ctrl+enter", "cmd+enter", "⌘+enter", "new line", "keyboard", "ime", "japanese", "message color", "my messages", "toolbar", "tools layout", "footer", "routines", "triggers", "team map"] },
   { id: "companion", group: "you", labelKey: "settings.section.server", icon: Monitor, keywords: ["server", "https", "domain", "dns", "self-hosted", "caddy"] },
   { id: "engines", group: "ai", labelKey: "settings.section.engines", icon: Terminal, keywords: ["models", "model providers", "engines", "claude", "codex", "grok", "providers", "cli", "sign in", "subscription"] },
-  { id: "connections", group: "ai", labelKey: "settings.section.connections", icon: KeyRound, keywords: ["keys", "api", "api key", "api keys", "connections", "composio", "box", "xai", "mistral", "cerebras", "meta", "muse", "router", "openrouter", "base url", "openai", "anthropic", "groq", "opencode", "provider"] },
+  { id: "connections", group: "ai", labelKey: "settings.section.connections", icon: KeyRound, keywords: ["keys", "api", "api key", "api keys", "connections", "xai", "mistral", "cerebras", "meta", "muse", "router", "openrouter", "base url", "openai", "anthropic", "groq", "opencode", "provider"] },
+  { id: "appConnections", group: "ai", labelKey: "settings.section.appConnections", icon: Plug, keywords: ["apps", "connections", "composio", "mcp", "tools", "servers", "gmail", "github", "slack", "notion", "应用", "连接", "工具", "連線", "應用"] },
   { id: "decisionModel", group: "ai", labelKey: "settings.section.decisionModel", icon: Zap, keywords: ["decision", "jev", "typesafe", "routing", "auto", "rooms", "who answers"] },
   { id: "skills", group: "ai", labelKey: "settings.section.skills", icon: BookOpen, keywords: ["skills", "library", "assign", "agent skills", "skill md"] },
   { id: "desktopWorkspaces", group: "computers", labelKey: "settings.section.desktopWorkspaces", icon: Building2, keywords: ["workspace", "cloud", "hosted", "server", "servers", "connect", "pair", "switch", "local"] },
@@ -92,7 +92,9 @@ export type SimpleSettingsPage = {
 export const SIMPLE_PAGES: SimpleSettingsPage[] = [
   { id: "general", labelKey: "settings.section.general", icon: User, sections: ["general"] },
   { id: "appearance", labelKey: "settings.section.appearance", icon: Palette, sections: ["appearance"] },
-  { id: "ai", labelKey: "settings.group.ai", icon: Sparkles, sections: ["engines", "connections", "decisionModel"] },
+  { id: "ai", labelKey: "settings.group.ai", icon: Sparkles, sections: ["engines", "decisionModel"] },
+  { id: "connections", labelKey: "settings.section.connections", icon: KeyRound, sections: ["connections"] },
+  { id: "appConnections", labelKey: "settings.section.appConnections", icon: Plug, sections: ["appConnections"] },
   { id: "computers", labelKey: "settings.group.computers", icon: Monitor, sections: ["companion", "desktopWorkspaces", "logins"] },
   { id: "account", labelKey: "settings.group.account", icon: CircleUser, sections: ["organization", "activity"] },
 ];
@@ -654,48 +656,9 @@ export function SettingsModal() {
       case "experimental":
         return <ExperimentalFeaturesRow />;
       case "connections":
-        return (
-          <Card
-            title={t("settings.connections.title")}
-            subtitle={t("settings.connections.subtitle")}
-          >
-            <div className="flex flex-col gap-4">
-              {state.config?.composio.mode === "managed" ? (
-                <div className="rounded-lg border border-success/25 bg-success/10 px-3 py-2 text-[13px] text-success">
-                  {t("settings.connections.ready")}
-                </div>
-              ) : null}
-              <div className="text-[11.5px] font-medium uppercase tracking-wide text-ink-secondary">{t("keys.providers.title")}</div>
-              <p className="-mt-3 text-[12px] leading-relaxed text-ink-secondary">{t("keys.providers.subtitle")}</p>
-              <ApiKeyRow section="openai" testProvider="openai" />
-              <ApiKeyRow section="anthropic" testProvider="anthropic" />
-              <AnthropicEveryClaudeBot />
-              <ApiKeyRow section="xai" testProvider="xai" />
-              <ApiKeyRow section="openrouter" testProvider="openrouter" />
-              <ApiKeyRow section="mistral" testProvider="mistral" />
-              <ApiKeyRow section="cerebras" testProvider="cerebras" />
-              <ApiKeyRow section="groq" testProvider="groq" />
-              <ApiKeyRow section="meta" testProvider="meta" />
-              <OtherOpenAiCompatServers />
-              <div className="pt-2 text-[11.5px] font-medium uppercase tracking-wide text-ink-secondary">{t("keys.integrations.title")}</div>
-              <></>
-              <ApiKeyRow section="opencodeGo" />
-              {state.config?.cloudHome !== true && (
-                <p className="-mt-2 text-[11.5px] leading-relaxed text-ink-secondary">
-                  {t("keys.opencode.providersHint").split("{command}").flatMap((part, index) =>
-                    index === 0 ? [part] : [<code key={index} className="font-mono">opencode auth login</code>, part])}
-                </p>
-              )}
-              <OpenCodeProviderKeys />
-              <details className="rounded-lg border border-hairline/40 bg-inset px-3 py-2">
-                <summary className="cursor-pointer text-[13px] text-ink-secondary">{t("settings.connections.selfHost")}</summary>
-                <div className="mt-3">
-                  <ApiKeyRow section="composio" />
-                </div>
-              </details>
-            </div>
-          </Card>
-        );
+        return <ModelApiSettings />;
+      case "appConnections":
+        return <AppConnectionSettings />;
       case "decisionModel":
         return <DecisionModelSettings />;
       case "engines":
