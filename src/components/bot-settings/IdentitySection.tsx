@@ -2,7 +2,6 @@ import { useState } from "react";
 import { BookOpen } from "lucide-react";
 
 import { useStore, type Bot } from "@/state/store";
-import type { MausMotion, MausState } from "@/lib/mascot";
 import { cn } from "@/lib/cn";
 import { BOT_PROFILE_LIMITS } from "../../../shared/bot-profile";
 import { BotProfileAvatarCard } from "../BotProfileAvatarCard";
@@ -20,15 +19,11 @@ export type IdentityPart = "avatar" | "provenance" | "name" | "title" | "blurb";
 export function IdentitySection({
   bot,
   patch,
-  activeState,
-  mascotMotion,
   namePlaceholder,
   parts,
 }: {
   bot: Bot;
   patch: (patch: BotPatch) => void;
-  activeState: MausState;
-  mascotMotion: { kind: Exclude<MausMotion, "none">; nonce: number } | null;
   namePlaceholder?: string;
   parts?: readonly IdentityPart[];
 }) {
@@ -39,7 +34,7 @@ export function IdentitySection({
 
   return (
     <div className="flex flex-col gap-4">
-      {shows("avatar") && <BotProfileAvatarCard bot={bot} activeState={activeState} mascotMotion={mascotMotion} onPatch={patch} />}
+      {shows("avatar") && <BotProfileAvatarCard bot={bot} onPatch={patch} />}
       {shows("provenance") && <PackageProvenance bot={bot} />}
 
       {shows("name") && <div>

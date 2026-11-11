@@ -9,7 +9,7 @@ import { placeRowText, type PlaceRow } from "../../shared/place-view";
 const fixture = vi.hoisted(() => {
   vi.stubGlobal("window", {});
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => {} });
-  return { dispatch: vi.fn(), advanced: false, ownerOrAdmin: null as boolean | null, bots: [] as Bot[], config: {} as Record<string, unknown> };
+  return { dispatch: vi.fn(), ownerOrAdmin: null as boolean | null, bots: [] as Bot[], config: {} as Record<string, unknown> };
 });
 vi.mock("@/state/store", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/state/store")>();
@@ -22,10 +22,6 @@ vi.mock("./DesktopCapabilities", async (importOriginal) => ({
   ...await importOriginal<typeof import("./DesktopCapabilities")>(),
   useDesktopCapabilities: () => ({ capabilities: { host: { packaged: true, platform: "darwin" }, localComputer: { available: true } }, ready: true }),
   useCaptionChrome: () => ({}),
-}));
-vi.mock("@/lib/interface-mode", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/lib/interface-mode")>(),
-  useAdvancedMode: () => fixture.advanced,
 }));
 vi.mock("@/lib/use-owner-or-admin", () => ({ useOwnerOrAdmin: () => fixture.ownerOrAdmin }));
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }));
@@ -45,7 +41,6 @@ function show(tool: NonNullable<Message["tool"]>, onRetry?: () => void) {
 
 beforeEach(() => {
   fixture.dispatch = vi.fn();
-  fixture.advanced = false;
   fixture.ownerOrAdmin = null;
   fixture.config = {};
   fixture.bots = [{ id: "scout", name: "Scout", computer: "cloud", modelSelection: { instanceId: "claude", model: "m" } } as Bot];
@@ -66,13 +61,6 @@ describe("J11: a failed place's row", () => {
     expect(show(passing, vi.fn()).buttons).toHaveLength(1);
     expect(show(passing, vi.fn()).buttons[0]).toContain("Try again");
     expect(show(passing).buttons).toHaveLength(0);
-  });
-
-  it("leads a person's pin back to the grid's choice in Simple, and to the composer's in Advanced", () => {
-    const pinned = stored({ state: "cc-no-start", params: { bot: "Scout" }, source: "pin" });
-    expect(show(pinned).buttons[0]).toContain("Use Computer on a self-hosted VPS");
-    fixture.advanced = true;
-    expect(show(pinned).buttons[0]).toContain("Clear this conversation&#x27;s place");
   });
 
   it("gives a User no button that changes a setting, and says who can", () => {

@@ -67,8 +67,6 @@ function makeDerived(): ReturnType<typeof import("./useBotSettingsDerived").useB
     activeBotRoutines: 0,
     localSelectable: false,
     localDisabledReason: null,
-    activeState: "idle",
-    mascotMotion: null,
   } as ReturnType<typeof import("./useBotSettingsDerived").useBotSettingsDerived>;
 }
 

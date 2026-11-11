@@ -9,7 +9,6 @@ import { StoreProvider } from "@/state/store";
 
 const fixture = vi.hoisted(() => ({
   density: "comfortable" as SidebarDensity,
-  advanced: true,
   windowChrome: undefined as "mac-inset" | "win-caption" | "native" | undefined,
   hostLabel: undefined as string | undefined,
 }));
@@ -18,7 +17,6 @@ vi.mock("@/lib/sidebar-preferences", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/sidebar-preferences")>(),
   useSidebarDensity: () => fixture.density,
 }));
-vi.mock("@/lib/interface-mode", () => ({ useAdvancedMode: () => fixture.advanced, setAdvancedMode: () => {} }));
 vi.mock("./DesktopCapabilities", async (importOriginal) => ({
   ...await importOriginal<typeof import("./DesktopCapabilities")>(),
   useDesktopCapabilities: () => {
@@ -36,7 +34,6 @@ const render = () => renderToStaticMarkup(
 
 beforeEach(() => {
   fixture.density = "comfortable";
-  fixture.advanced = true;
   fixture.windowChrome = undefined;
   fixture.hostLabel = undefined;
   vi.stubGlobal("window", { innerWidth: 1280, location: { protocol: "http:", search: "" } });
@@ -63,7 +60,6 @@ describe("sidebar header", () => {
   );
 
   it.each(["comfortable", "compact"] as const)("keeps collapse and add but no activity menu in Simple mode at %s density", (density) => {
-    fixture.advanced = false;
     fixture.density = density;
     const html = render();
     expect(html).toContain('aria-label="Collapse sidebar to avatars"');
@@ -72,7 +68,6 @@ describe("sidebar header", () => {
   });
 
   it("still offers Expand on an icons rail in Simple mode, so the rail is never a dead end", () => {
-    fixture.advanced = false;
     fixture.density = "icons";
     const html = render();
     expect(html).toContain('aria-label="Expand sidebar"');
@@ -93,18 +88,10 @@ describe("sidebar glass head and foot", () => {
       };
       const head = at('data-glass-bar="top"');
       const topRow = at("data-sidebar-top-row");
-      const search = at('aria-label="Search bots and messages"');
       const list = at('class="glass-scroller ');
       const foot = at('data-glass-bar="bottom"');
-      const automations = at('data-sidebar-nav="automations"');
-      const places = at('data-sidebar-nav="team-map"');
       expect(head).toBeLessThan(topRow);
-      expect(topRow).toBeLessThan(search);
-      expect(search).toBeLessThan(list);
       expect(list).toBeLessThan(foot);
-      expect(foot).toBeLessThan(automations);
-      expect(automations).toBeLessThan(places);
-      expect(html.match(/data-sidebar-nav="automations"/g)).toHaveLength(1);
       expect(html.match(/data-glass-frame=""/g)).toHaveLength(1);
       expect(at("data-glass-frame")).toBeLessThan(head);
     },
@@ -113,7 +100,6 @@ describe("sidebar glass head and foot", () => {
 
 describe("sidebar foot in Simple mode", () => {
   it.each(["comfortable", "compact"] as const)("keeps Automations above the profile row, with Apps at its end (%s)", (density) => {
-    fixture.advanced = false;
     fixture.density = density;
     const html = render();
     const foot = html.indexOf('data-glass-bar="bottom"');
@@ -126,7 +112,6 @@ describe("sidebar foot in Simple mode", () => {
   });
 
   it("keeps one Automations row in the foot and no Routines row in Advanced mode, and still one Apps", () => {
-    fixture.advanced = true;
     const html = render();
     expect(html).not.toContain('data-sidebar-nav="routines"');
     expect(html.match(/data-sidebar-nav="automations"/g)).toHaveLength(1);

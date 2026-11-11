@@ -9,10 +9,8 @@ import {
   UNIVERSAL_PINS_KEY,
   SIDEBAR_COLLAPSED_SECTIONS_KEY,
   SIDEBAR_DENSITY_KEY,
-  SIDEBAR_TOOLS_LAYOUT_KEY,
   SIDEBAR_WIDTH_KEY,
   SIDEBAR_SECTION_ORDER_KEY,
-  SIMPLE_SIDEBAR_WIDTH_KEY,
   clampSidebarWidth,
   loadPinnedCircles,
   loadPinnedCircleOrder,
@@ -21,13 +19,11 @@ import {
   loadCollapsedSections,
   loadSectionOrder,
   loadSidebarDensity,
-  loadSidebarToolsLayout,
   loadSidebarWidth,
   parsePinnedCircles,
   parseUniversalPins,
   parseSidebarAttentionPinned,
   parseSidebarDensity,
-  parseSidebarToolsLayout,
   saveCollapsedSections,
   savePinnedCircles,
   setPinnedCircleOrder,
@@ -35,10 +31,7 @@ import {
   saveSectionOrder,
   saveSidebarAttentionPinned,
   saveSidebarDensity,
-  saveSidebarToolsLayout,
   saveSidebarWidth,
-  setSidebarToolsLayout,
-  subscribeSidebarToolsLayout,
   toggleCollapsedSection,
   usePinnedCircleOrder,
 } from "./sidebar-preferences";
@@ -79,17 +72,6 @@ describe("sidebar width preference", () => {
     expect(setItem).toHaveBeenCalledWith(SIDEBAR_WIDTH_KEY, "360");
     expect(loadSidebarWidth({ getItem: () => { throw new Error("blocked"); } })).toBeNull();
     expect(() => saveSidebarWidth(360, { setItem: () => { throw new Error("blocked"); } })).not.toThrow();
-  });
-
-  it("keeps Simple mode's width under its own key, so resizing one mode leaves the other alone", () => {
-    const setItem = vi.fn();
-    saveSidebarWidth(300, { setItem }, SIMPLE_SIDEBAR_WIDTH_KEY);
-    expect(setItem).toHaveBeenCalledExactlyOnceWith(SIMPLE_SIDEBAR_WIDTH_KEY, "300");
-    const saved: Record<string, string> = { [SIDEBAR_WIDTH_KEY]: "360", [SIMPLE_SIDEBAR_WIDTH_KEY]: "300" };
-    const storage = { getItem: (key: string) => saved[key] ?? null };
-    expect(loadSidebarWidth(storage)).toBe(360);
-    expect(loadSidebarWidth(storage, SIMPLE_SIDEBAR_WIDTH_KEY)).toBe(300);
-    expect(loadSidebarWidth({ getItem: (key) => key === SIDEBAR_WIDTH_KEY ? "360" : null }, SIMPLE_SIDEBAR_WIDTH_KEY)).toBeNull();
   });
 });
 
@@ -232,42 +214,3 @@ describe("sidebar attention pin preference", () => {
   });
 });
 
-describe("sidebar tools layout preference", () => {
-  it("tools layout defaults to rows and ignores malformed values", () => {
-    expect(parseSidebarToolsLayout("rows")).toBe("rows");
-    expect(parseSidebarToolsLayout("toolbar")).toBe("toolbar");
-    expect(parseSidebarToolsLayout("icons")).toBe("rows");
-    expect(parseSidebarToolsLayout("")).toBe("rows");
-    expect(parseSidebarToolsLayout(null)).toBe("rows");
-    expect(loadSidebarToolsLayout({ getItem: () => null })).toBe("rows");
-    expect(loadSidebarToolsLayout({ getItem: () => "menu" })).toBe("rows");
-    expect(loadSidebarToolsLayout({ getItem: () => { throw new Error("blocked"); } })).toBe("rows");
-
-    const setItem = vi.fn();
-    saveSidebarToolsLayout("toolbar", { setItem });
-    expect(setItem).toHaveBeenCalledWith(SIDEBAR_TOOLS_LAYOUT_KEY, "toolbar");
-    expect(loadSidebarToolsLayout({ getItem: (key) => (key === SIDEBAR_TOOLS_LAYOUT_KEY ? "toolbar" : null) })).toBe("toolbar");
-  });
-
-  it("setSidebarToolsLayout notifies subscribers and persists", () => {
-    const values = new Map<string, string>();
-    vi.stubGlobal("localStorage", {
-      getItem: (key: string) => values.get(key) ?? null,
-      setItem: (key: string, value: string) => void values.set(key, value),
-    });
-    const listener = vi.fn();
-    const unsubscribe = subscribeSidebarToolsLayout(listener);
-    try {
-      setSidebarToolsLayout("toolbar");
-      expect(listener).toHaveBeenCalledOnce();
-      expect(values.get(SIDEBAR_TOOLS_LAYOUT_KEY)).toBe("toolbar");
-      expect(loadSidebarToolsLayout()).toBe("toolbar");
-      setSidebarToolsLayout("rows");
-      expect(listener).toHaveBeenCalledTimes(2);
-      expect(values.get(SIDEBAR_TOOLS_LAYOUT_KEY)).toBe("rows");
-    } finally {
-      unsubscribe();
-      vi.unstubAllGlobals();
-    }
-  });
-});

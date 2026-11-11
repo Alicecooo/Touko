@@ -1,15 +1,11 @@
 export type ComputerPanelView = "routines" | "files" | "data";
 
-type PanelTabsContext = { advanced: boolean };
-
-export function computerPanelTabs({ advanced }: PanelTabsContext): ComputerPanelView[] {
-  return advanced
-    ? ["files", "routines", "data"]
-    : ["files", "data"];
+export function computerPanelTabs(): ComputerPanelView[] {
+  return ["files", "routines", "data"];
 }
 
-export function resolveComputerPanelView(view: ComputerPanelView, context: PanelTabsContext): ComputerPanelView {
-  return computerPanelTabs(context).includes(view) ? view : "files";
+export function resolveComputerPanelView(view: ComputerPanelView): ComputerPanelView {
+  return computerPanelTabs().includes(view) ? view : "files";
 }
 
 const STORAGE_PREFIX = "omb-computer-panel-view";

@@ -101,14 +101,6 @@ export interface ComposedTurn {
   turn: "first" | "resume" | "rerun" | "answered" | "continued";
 }
 
-export interface LiveHandoffEdge {
-  sourceBotId: string;
-  targetBotId: string;
-  state: "queued" | "running";
-  threadId: string;
-  groupId?: string;
-}
-
 /** Every method may throw; the runtime logs a throw and reads it as "not now". */
 export interface CoordinatorHost {
   /** Recheck addresses and route permission immediately before every dispatch. */
@@ -157,7 +149,6 @@ export interface Coordinator {
   activeDirect(threadId: string): boolean;
   assignerOf(threadId: string): HandoffView | undefined;
   outstandingDirect(threadId: string): HandoffView[];
-  liveEdges(): LiveHandoffEdge[];
   stopAwaitingDirect(threadId: string, reason?: string): HandoffView[];
   /** The next start goes on with this thread's turn, so a shutdown's "cut" line would be false. */
   continuesAfterRestart(threadId: string): boolean;

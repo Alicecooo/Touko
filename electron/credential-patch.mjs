@@ -6,8 +6,7 @@ export const CREDENTIAL_PATCH = {
   opencodeGoApiKey: (value) => ({ opencodeGo: { apiKey: value } }),
   jevApiKey: (value) => ({ decider: { key: value } }),
   openrouterDeciderKey: (value) => ({ decider: { openrouterKey: value } }),
-  openaiImageApiKey: (value) => ({ imageGen: { key: value } }),
-  customImageApiKey: (value) => ({ imageGen: { customApiKey: value } })};
+};
 
 /** Electron 43's ipcMain.handle sends a thrown error to the page as its toString(), so a key the provider refused travels as its name. */
 export function credentialSaveError(status, body) {

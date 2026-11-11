@@ -2,8 +2,6 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { BOT_SECTIONS } from "../bot-settings/sections";
-import { sectionTarget } from "./page-registry";
 import { linkTarget, openBotSettings, usePanelLink, type PanelLink } from "./panel-link";
 
 const link = (extra: Partial<PanelLink> & Pick<PanelLink, "section">): PanelLink => ({ nonce: 1, ...extra });
@@ -27,13 +25,6 @@ describe("named links into a bot's settings", () => {
     expect(linkTarget("access", link({ section: "access", page: "folder" }))).toEqual({ tab: "computer", page: "folder" });
     // A plain Access link (the team map's computer button) still opens the Computer tab, where Works on lives.
     expect(linkTarget("access", link({ section: "access" }))).toEqual({ tab: "computer" });
-  });
-
-  it("never applies a link's page to another section, and falls back to the section's own place", () => {
-    for (const { id } of BOT_SECTIONS) {
-      expect(linkTarget(id, null)).toEqual(sectionTarget(id));
-      if (id !== "access") expect(linkTarget(id, link({ section: "access", page: "apps" }))).toEqual(sectionTarget(id));
-    }
   });
 
   it("makes every open a new link, so the same one followed twice is seen twice", () => {

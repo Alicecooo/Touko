@@ -87,7 +87,6 @@ describe("app, role and key lists", () => {
   it("names a provider for every credential a bot can ask for in chat, and nothing else", () => {
     const expected = {
       xaiApiKey: "xai", opencodeGoApiKey: "opencode_go",
-      openaiImageApiKey: "openai_image",
     };
     expect(Object.keys(expected).sort()).toEqual(Object.keys(CREDENTIAL_TARGETS).sort());
     for (const [target, provider] of Object.entries(expected)) expect(credentialProvider(target)).toBe(provider);

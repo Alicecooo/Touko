@@ -211,7 +211,7 @@ describe("openChatLink", () => {
 
   it("returns from the team map to the open chat, where the notice shows", async () => {
     const dispatch = vi.fn();
-    expect(openChatLink(dispatch, "openmausbot://bot/nobody", { ...await state(), activeView: "team-map" }, true)).toBe(false);
+    expect(openChatLink(dispatch, "openmausbot://bot/nobody", { ...await state(), activeView: "routines" }, true)).toBe(false);
     expect(actions(dispatch)).toEqual([
       { type: "select", id: "ada" },
       { type: "notice", notice: { kind: "bot-gone", botName: null } },

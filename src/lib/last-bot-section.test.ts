@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BOT_SECTIONS } from "@/components/bot-settings/sections";
 import {
-  BOT_SETTINGS_SECTION_IDS,
   LAST_BOT_SECTION_KEY,
   readLastBotSection,
   rememberBotSection,
@@ -49,9 +47,5 @@ describe("last bot section", () => {
     });
     expect(readLastBotSection()).toBeNull();
     expect(() => rememberBotSection("soul")).not.toThrow();
-  });
-
-  it("the section id list matches the rail", () => {
-    expect([...BOT_SETTINGS_SECTION_IDS].sort()).toEqual(BOT_SECTIONS.map((entry) => entry.id).sort());
   });
 });

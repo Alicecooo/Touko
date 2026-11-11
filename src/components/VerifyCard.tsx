@@ -89,7 +89,7 @@ export function VerifyCard({
               {t(skill === "saved" ? "chat.verify.saved" : "chat.verify.staged")}
             </div>
           ) : canSave && (
-            <div className="flex flex-col items-end gap-1 border-t border-hairline/25 px-3 py-2">
+            <div className="flex justify-end border-t border-hairline/25 px-3 py-2">
               <button
                 type="button"
                 onClick={onSave}
@@ -98,7 +98,6 @@ export function VerifyCard({
                 <BookmarkPlus size={13} aria-hidden="true" />
                 {t("chat.verify.save")}
               </button>
-              <span className="text-[12px] text-ink-secondary">{t("chat.verify.saveHint")}</span>
             </div>
           )}
         </>

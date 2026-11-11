@@ -1,8 +1,5 @@
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode.ts";
-import { botAvatarUrlFromStoredPath } from "../../shared/bot-avatar.ts";
 import type { WireBot } from "../../shared/wire.ts";
-import { deleteAttachment, saveImage } from "../workspace/attachments.ts";
-import { avatarGenerationRequestSchema, avatarGenerationStateMatches, generateAvatarImage, snapshotAvatarGenerationState } from "../bots/avatar-image.ts";
 import { parseBotProfilePatch } from "../bots/bot-profile.ts";
 import type { AppConfig } from "../config/config.ts";
 import type { ModelSelection } from "../harness/contracts.ts";
@@ -39,7 +36,7 @@ export interface BotSettingsRouteDeps {
 
 export function createBotSettingsRoutes(deps: BotSettingsRouteDeps): RouteHandler {
   const {
-    store, cfg,
+    store,
     cloudHome: CLOUD_HOME, cloudOwnerProfileFields: CLOUD_OWNER_PROFILE_FIELDS,
     hostedModels, supportsApprovalMode, directTurnBots, broadcast, wireBot, cloudOwnerSession, storedAvatarExists,
     requestedTaskBot, threadBusy, activeGroupTurnForBot, checkedModelSelection, engineSwitchNeedsAsk, readCursor,
@@ -49,37 +46,6 @@ export function createBotSettingsRoutes(deps: BotSettingsRouteDeps): RouteHandle
   return async ({ req, res, path, method, auth, json, readBody }) => {
     let m: RegExpMatchArray | null = null;
     const requirePinnedClientThread = pinnedClientThread(auth, req);
-    m = path.match(/^\/api\/bots\/([\w-]+)\/avatar\/generate$/);
-    if (m && method === "POST") {
-      const existing = store.bot(m[1]);
-      if (!existing) return json(res, 404, { error: "no such bot" });
-      // Snapshot the fields this request owns before the first await, so a late result cannot win.
-      const initialAvatar = snapshotAvatarGenerationState(existing);
-      const parsed = avatarGenerationRequestSchema.safeParse(await readBody(req));
-      if (!parsed.success) {
-        return json(res, 400, { error: `prompt must be at most 400 characters` });
-      }
-      const generated = await generateAvatarImage(cfg, existing, parsed.data.prompt);
-      const current = store.bot(existing.id);
-      if (!current) return json(res, 404, { error: "no such bot" });
-      if (!avatarGenerationStateMatches(initialAvatar, current)) {
-        return json(res, 409, { error: "avatar changed while generation was in progress" });
-      }
-      const saved = saveImage(generated.bytes, generated.mime);
-      const avatarUrl = botAvatarUrlFromStoredPath(saved.path);
-      if (!avatarUrl) throw Object.assign(new Error("Could not store the generated avatar"), { status: 500 });
-      const avatarCrop = initialAvatar.avatarCrop && initialAvatar.avatarCrop !== "mascot"
-        ? initialAvatar.avatarCrop
-        : "circle";
-      const bot = store.patchBot(current.id, { avatarUrl, avatarCrop });
-      if (!bot) {
-        deleteAttachment(saved.path);
-        return json(res, 404, { error: "no such bot" });
-      }
-      const visible = wireBot(bot);
-      broadcast({ kind: "bot", bot: visible });
-      return json(res, 201, { avatarUrl, bot: visible });
-    }
     m = path.match(/^\/api\/bots\/([\w-]+)\/profile$/);
     if (m && method === "PATCH") {
       const parsed = parseBotProfilePatch(await readBody(req), true);

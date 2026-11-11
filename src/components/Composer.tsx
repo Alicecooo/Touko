@@ -5,7 +5,6 @@ import { useStore, visibleMessages, currentTaskBot, type Bot, type Group, type M
 import { cn } from "@/lib/cn";
 import { useMenuMotion } from "./MenuMotion";
 import { activeLocale, t } from "@/lib/i18n";
-import { useAdvancedMode } from "@/lib/interface-mode";
 import { imeComposing, sendKeyLabel, sendsMessage, useSendKey } from "@/lib/send-key";
 import { draftRevision, appendDraftAttachments, changeDraftAttachmentPending, forgetFailedComposerSend, markDraftEdited, prependComposerDraft, recoverFailedComposerSend, rememberFailedComposerSend, replaceDraftAttachment, restoredSendId, restoredRequestText, useComposerDraft, useComposerChannelMode, useDraftAttachmentPending, useFailedComposerSends, type ComposerSendSnapshot, type FailedComposerSend } from "@/lib/drafts";
 import { BotAvatar } from "./Avatar";
@@ -17,10 +16,10 @@ import { LocalComputerAutoWarning } from "./LocalComputerAutoWarning";
 import { ApprovalModeSelector } from "./ApprovalModeSelector";
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
 import { appendPastedText, handoffAttachmentImagePreview, clipboardHasImages, clipboardImageFiles, composeMessage, dataContextFor, composerShouldRefocus, composerTakesFocusOnOpen, imageAttachmentFromFile, replyTargetTakesFocus, intakeFiles, isLongPaste, optimisticImageAttachment, pasteAttachment, releaseAttachmentImagePreview, type Attachment, type PasteAttachment } from "@/lib/composer-attachments";
-import { normalizeState } from "@/lib/mascot";
+
 import { goalCoordinatorForComposer, groupComposerHint, jevRoomRoutingOn, openTaskWorking, roomRespondersForComposer } from "@/lib/group-routing";
 import { PendingApprovalActions, PendingApprovalPanel, pendingApprovals } from "./PendingApproval";
-import { ComposerPlusMenu, GoalToggle } from "./ComposerPlusMenu";
+import { GoalToggle } from "./GoalToggle";
 import { useDesktopCapabilities } from "./DesktopCapabilities";
 import { ComposerReplyStrip } from "./ReplyQuote";
 import { escapeCancelsReply } from "@/lib/replies";
@@ -64,7 +63,6 @@ export function Composer({
   const { state, dispatch } = useStore();
   const { threads, currentBotId } = useThreadRefs();
   const { capabilities } = useDesktopCapabilities();
-  const advanced = useAdvancedMode();
   const sendKey = useSendKey();
   const sendLabel = sendKeyLabel(sendKey);
   const remoteClient = window.ogb?.remoteClient?.active === true;
@@ -736,7 +734,6 @@ export function Composer({
                   icon={peer.bot ? (
                     <BotAvatar
                       bot={peer.bot}
-                      state={normalizeState(peer.bot.mascotExpression) ?? "happy"}
                       size={24}
                     />
                   ) : (
@@ -791,7 +788,7 @@ export function Composer({
           onEdit={locked ? undefined : editQueued}
         />
         <div className="relative">
-          {advanced && <div
+          {<div
             aria-hidden
             data-composer-backdrop
             className="pointer-events-none absolute -left-5 -right-5 -bottom-3 top-1/2 bg-app"
@@ -812,12 +809,8 @@ export function Composer({
           />
           {!locked && (
             <div className="flex flex-wrap items-center gap-1">
-              {!advanced && <ComposerPlusMenu
-                onAttach={() => fileInput.current?.click()}
-                goal={goal}
-                approval={approvalChoice && modeBot && { name: modeBot.name, choice: approvalChoice }}
-              />}
-              {advanced && <button
+              
+              {<button
                 type="button"
                 onClick={() => fileInput.current?.click()}
                 aria-label={t("composer.attach")}
@@ -826,9 +819,8 @@ export function Composer({
               >
                 <Paperclip size={17} />
               </button>}
-              {/* Simple mode keeps the chip only while Finish together is on, so the + menu's choice stays visible. */}
-              {goal && (advanced || goal.on) && <GoalToggle on={goal.on} onToggle={goal.onToggle} />}
-              {advanced && approvalChoice && <ApprovalModeSelector {...approvalChoice} />}
+              {goal && <GoalToggle on={goal.on} onToggle={goal.onToggle} />}
+              {(approvalChoice) && <ApprovalModeSelector {...approvalChoice} />}
             </div>
           )}
           <MentionTextarea
@@ -955,9 +947,7 @@ export function Composer({
             <Square size={14} className="fill-current" />
           </button>
         )}
-        
-        
-        
+
         {!locked && (
           <button
             onClick={send}

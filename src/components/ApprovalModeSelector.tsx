@@ -4,7 +4,6 @@ import { Check } from "lucide-react";
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
 import { cn } from "@/lib/cn";
 import { useMenuMotion } from "./MenuMotion";
-import { APPROVAL_LEVELS_URL, openExternalLink } from "@/lib/app-links";
 import { t } from "@/lib/i18n";
 import { approvalModeOptions, approvalModeOptionsFor, approvalModeSelectionRequiresLocalDesktop, shownApprovalMode } from "@/lib/approval-mode-options";
 
@@ -117,18 +116,6 @@ export function ApprovalModeSelector({
             motion.className,
           )}
         >
-          <div className="border-b border-hairline/20 px-4 py-3">
-            <div className="text-[14px] font-medium text-ink">
-              {t("approvalMode.question", { provider: providerName })}
-            </div>
-            <button
-              type="button"
-              onClick={() => void openExternalLink(APPROVAL_LEVELS_URL)}
-              className="mt-1 text-[12px] text-ink-secondary underline underline-offset-2 hover:text-ink"
-            >
-              {t("approvalMode.learnMore")}
-            </button>
-          </div>
           <div className="flex flex-col py-1.5">
             {visibleOptions.map((option) => {
               const selected = option.mode === mode;

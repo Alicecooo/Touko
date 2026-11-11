@@ -66,7 +66,7 @@ describe("what a saved key's check said", () => {
 
   it("is ok for keys the server checks before saving, and unverified for the rest", () => {
     for (const provider of ["composio"] as const) expect(savedKeyResult(provider)).toBe("ok");
-    for (const provider of ["opencode_go", "openai_image", "custom_endpoint", "xai", "other"] as const) expect(savedKeyResult(provider)).toBe("unverified");
+    for (const provider of ["opencode_go", "custom_endpoint", "xai", "other"] as const) expect(savedKeyResult(provider)).toBe("unverified");
   });
 });
 

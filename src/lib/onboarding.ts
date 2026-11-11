@@ -1,4 +1,5 @@
-import { ONBOARDING_CLOUD_HINT, WELCOME_VERSION } from "../../electron/onboarding-record.mjs";
+export const WELCOME_VERSION = 1;
+export const ONBOARDING_CLOUD_HINT = "onboarding-cloud-v1";
 
 export interface OnboardingStatus {
   completedAt: string;
@@ -8,7 +9,7 @@ export interface OnboardingStatus {
   firstTurnAt?: string;
 }
 
-export { ONBOARDING_CLOUD_HINT, WELCOME_VERSION };
+
 
 export const EMPTY_ONBOARDING: OnboardingStatus = {
   completedAt: "",

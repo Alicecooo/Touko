@@ -14,7 +14,7 @@ export function allow<const T extends string>(value: unknown, list: readonly T[]
 
 export const KEY_PROVIDER = [
   "anthropic", "openai", "openrouter", "openai_compat", "xai", "mistral", "cerebras", "groq", "meta", "composio",
-  "opencode_go", "custom_endpoint", "jev", "openrouter_decider", "openai_image", "custom_image",
+  "opencode_go", "custom_endpoint", "jev", "openrouter_decider",
 ] as const;
 export type KeyProvider = (typeof KEY_PROVIDER)[number];
 
@@ -25,8 +25,7 @@ export const SECTION_PROVIDER = {
 } as const satisfies Record<string, KeyProvider>;
 
 const CREDENTIAL_PROVIDER = new Map<string, KeyProvider>(Object.entries( {
-   xaiApiKey: "xai", opencodeGoApiKey: "opencode_go",
-  openaiImageApiKey: "openai_image"} satisfies Record<CredentialTargetId, KeyProvider>));
+   xaiApiKey: "xai", opencodeGoApiKey: "opencode_go"} satisfies Record<CredentialTargetId, KeyProvider>));
 
 export function credentialProvider(target: unknown): KeyProvider | "other" {
   return (typeof target === "string" && CREDENTIAL_PROVIDER.get(target)) || "other";

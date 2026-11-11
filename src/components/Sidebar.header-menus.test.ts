@@ -31,15 +31,12 @@ vi.mock("./DesktopCapabilities", async () => {
   return { useDesktopCapabilities: () => ({ capabilities: initialDesktopCapabilities() }) };
 });
 vi.mock("@/lib/thread-preferences", () => ({ useShowThreads: () => true }));
-// The Active Threads menu is an Advanced-mode control; Simple hides it.
-vi.mock("@/lib/interface-mode", () => ({ useAdvancedMode: () => true, setAdvancedMode: () => {} }));
 vi.mock("@/state/store", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/state/store")>();
   return { ...original, useStore: () => ({ state: original.initialState, dispatch: vi.fn() }) };
 });
 
 import { Sidebar } from "./Sidebar";
-import { SidebarNewChatPanel } from "./SidebarNewChatPanel";
 
 type Props = { children?: ReactNode; className?: string; onClick?: () => void; [key: string]: unknown };
 function nodes(value: ReactNode): ReactElement<Props>[] {
@@ -133,19 +130,5 @@ describe.each(menus)("sidebar header menu: $name", ({ label, item }) => {
     expect(text(render())).toContain(item);
     press({ closest: () => null });
     expect(text(render())).not.toContain(item);
-  });
-});
-
-describe("sidebar header menu: New chat", () => {
-  it("leads the + menu and opens the New chat panel in its place", () => {
-    trigger("New or share").props.onClick!();
-    const first = render().find((node) => node.type === "button" && text([node]).includes("New chat"));
-    expect(first).toBeDefined();
-    expect(render().some((node) => node.type === SidebarNewChatPanel)).toBe(false);
-    first!.props.onClick!();
-    vi.stubGlobal("document", { body: {} });
-    const tree = render();
-    expect(tree.some((node) => node.type === SidebarNewChatPanel)).toBe(true);
-    expect(text(tree)).not.toContain("Create team");
   });
 });

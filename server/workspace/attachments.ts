@@ -3,6 +3,7 @@ import { createReadStream, linkSync, mkdirSync, readFileSync, readdirSync, statS
 import { link, open, unlink } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { DATA_DIR } from "../config/config.ts";
+import { readBundledPortrait } from "../bots/portrait-assets.ts";
 
 export const ATTACHMENTS_DIR = join(DATA_DIR, "attachments");
 
@@ -553,6 +554,7 @@ export async function saveImageUpload(
 
 export function attachmentExists(name: string): boolean {
   if (!/^[A-Za-z0-9-]+\.(png|jpg|gif|webp)$/.test(name)) return false;
+  if (readBundledPortrait(name)) return true;
   try {
     return statSync(join(ATTACHMENTS_DIR, name)).isFile();
   } catch {
@@ -560,9 +562,11 @@ export function attachmentExists(name: string): boolean {
   }
 }
 
-/** Only a bare filename inside ATTACHMENTS_DIR resolves: the route must never become a file server for the data dir. */
+/** Bare attachment filenames or exact public portrait catalog entries only. */
 export function readAttachment(name: string): { bytes: Buffer; mime: string } | null {
   if (!/^[A-Za-z0-9-]+\.(png|jpg|jpeg|gif|webp|mp3|wav)$/.test(name)) return null;
+  const portrait = readBundledPortrait(name);
+  if (portrait) return { bytes: portrait, mime: "image/png" };
   const path = join(ATTACHMENTS_DIR, name);
   if (extname(path) === ".jpeg") return null;
   try {

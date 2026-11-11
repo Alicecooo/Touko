@@ -3,6 +3,7 @@
 // only when they can see every bot in it, and bots reach each other only with the same audience (sameAudience): a room
 // transcript or a delegation would otherwise carry a restricted bot's words to people who cannot see it.
 import { z } from "zod";
+import { parsePortraitAssetName } from "../../shared/portrait-avatars.ts";
 
 import type { BotVisibility } from "../../shared/wire.ts";
 
@@ -207,6 +208,8 @@ export class VisibleSet {
 
   /** Refused only when everything referencing it is hidden; an unreferenced one (a member's own upload) is served, its name is random. */
   attachment(name: string, threadsReferencing: (name: string) => readonly string[]): boolean {
+    // Bundled character artwork is public and contains no workspace data.
+    if (parsePortraitAssetName(name)) return true;
     if (this.everything) return true;
     const url = `/api/attachments/${name}`;
     let referenced = false;

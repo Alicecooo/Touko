@@ -20,8 +20,7 @@ describe("workspace backup data boundary", () => {
     const portable = portableWorkspaceConfig({ ...connections, language: "ja", features: {  }, profile: { name: "Example" } });
     expect(portable).toEqual({ profile: { name: "Example" }, language: "ja", features: {  } });
     const restored = restoredWorkspaceConfig(portable, { ...connections, language: "en", budgets: { monthlyUsd: 12 } });
-    const { features: _emptyFeatures, ...keptConnections } = connections;
-    expect(restored).toEqual({ ...keptConnections, profile: { name: "Example" }, language: "ja" });
+    expect(restored).toEqual({ ...connections, profile: { name: "Example" }, language: "ja" });
     expect(restored.instances).toBe(connections.instances);
   });
 

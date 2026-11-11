@@ -296,7 +296,6 @@ export function PluginsPanel() {
   const [category, setCategory] = useState<string | null>(null);
   // Appended after the older state so tests that seed state by call order keep their indices.
   const [highLevelConnected, setHighLevelConnected] = useState<boolean | null>(null);
-  const [mcpActionContainer, setMcpActionContainer] = useState<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   const polls = useRef(new Map<string, () => void>());
@@ -684,7 +683,6 @@ export function PluginsPanel() {
                 className="min-w-0 flex-1 bg-transparent text-[14px] text-ink placeholder:text-ink-secondary focus:outline-none"
               />
             </label>
-            <div ref={setMcpActionContainer} className="flex shrink-0 items-center" />
           </div>
           <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("apps.categoriesAria")}>
             <button
@@ -730,12 +728,6 @@ export function PluginsPanel() {
               embedded
               hideWhop={filter === "all"}
               showContent={filter !== "connected" && category === null}
-              actionContainer={mcpActionContainer}
-              onAddServer={() => {
-                chooseFilter("all");
-                setSearch("");
-                contentRef.current?.scrollTo({ top: 0 });
-              }}
             />
           </div>
           {stale && (
@@ -952,7 +944,7 @@ export function PluginsPanel() {
                       data-used-by-avatar={candidate.id}
                       className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-menu ring-2 ring-menu"
                     >
-                      <BotAvatar bot={candidate} size={USED_BY_AVATAR_SIZE} animated={false} />
+                      <BotAvatar bot={candidate} size={USED_BY_AVATAR_SIZE} />
                     </span>
                   ))}
                 </span>

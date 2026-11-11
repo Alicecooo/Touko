@@ -75,9 +75,8 @@ export const NewBotDialog = lazyScreen("NewBotDialog", async () => (await import
 
 export const TriggersPage = lazyScreen("TriggersPage", async () => (await import("./TriggersPage")).TriggersPage);
 export const SettingsModal = lazyScreen("SettingsModal", async () => (await import("./SettingsModal")).SettingsModal);
-export const TeamMapPage = lazyScreen("TeamMapPage", async () => (await import("./TeamMapPage")).TeamMapPage);
 
-const SCREENS = [ActivityPanel, BotSettingsDialog, ComputerPanel, InspectorPanel, NewBotDialog, SettingsModal, TeamMapPage, TriggersPage];
+const SCREENS = [ActivityPanel, BotSettingsDialog, ComputerPanel, InspectorPanel, NewBotDialog, SettingsModal, TriggersPage];
 
 if (typeof location !== "undefined" && new URLSearchParams(location.search).has("desktop-settings")) {
   void SettingsModal.preload().catch(() => {});

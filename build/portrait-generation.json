@@ -1,0 +1,100 @@
+{
+  "date": "2026-11-10",
+  "tool": "Built-in image_gen",
+  "style": "Classic Japanese visual-novel illustration; fine contours, natural adult face proportions balanced between sharp and soft, restrained cel shading.",
+  "appSource": "build/app-icon-source.svg",
+  "appIconMethod": "Hand-authored vector symbol; character artwork is for bot avatars only.",
+  "shyDirection": "No blush, cheek tint or hatching. Use averted gaze, reserved brows and a small bashful smile.",
+  "assets": [
+    {
+      "file": "public/portraits/touko-portrait-v1-nocturne-idle.png",
+      "sourceImage": "exec-2f6c18d3-8219-4687-9c6f-ec6930ffa75f.png",
+      "prompt": "Approved balanced classic Japanese visual-novel portrait: quiet composed young adult, natural slightly elongated oval face, moderately rounded defined chin, short subtle shaded nose plane, fine contours and restrained cel shading. Preserve the original character, outfit and framing; a face design halfway between the sharp first portrait and overly soft revision."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-nocturne-happy.png",
+      "sourceImage": "exec-88bf3f47-64f1-44ac-87e0-4d033b07963d.png",
+      "prompt": "Edit the supplied approved character portrait. Change ONLY the facial expression: A warm clearly visible happy smile, softly bright eyes, mouth slightly open with a small natural smile. Keep mature restrained expression. Preserve EXACTLY the same character identity, approved balanced natural adult face proportions, softly rounded but defined chin, delicate fine lines, hair shape and color, eye color, clothing, silver clasp, pose, framing, muted navy tile and parchment circle, and alpha outside the rounded tile. Keep understated classic Japanese visual-novel cel shading. No chibi, no new objects or accessories, no text, no collage. ONE finished square image."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-nocturne-shy.png",
+      "sourceImage": "exec-7a01bfce-33cb-4f23-9a83-cfc86ed7999b.png",
+      "prompt": "Edit the provided finished character portrait. Change ONLY the cheek coloration: COMPLETELY REMOVE ALL BLUSH, all pink/red/orange cheek tint, diagonal blush hatching and flushed marks. Restore both cheeks and nose to the same natural light ivory skin tone as the rest of the face, with only the original subtle neutral cel shading. Keep the exact shy expression through the slightly averted/downward gaze, reserved brows and small bashful closed mouth. Preserve everything else exactly: face proportions, eyes, hair, glasses/hair ribbons where present, clothing, pose, framing, background, linework and character identity. Do not make a smile broader. No rosy cheeks, no makeup, no new marks, no text. One square finished image; preserve existing transparency outside the tile if the source has it."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-nocturne-thinking.png",
+      "sourceImage": "exec-52b1c5d5-f7af-4d70-acc1-b22f4a728871.png",
+      "prompt": "Edit the supplied approved character portrait. Change ONLY the facial expression: Thoughtful and curious: gaze gently directed up to one side, one eyebrow slightly lifted, closed neutral lips, a slight contemplative tilt in the eyebrows. No hands or thought bubbles. Preserve EXACTLY the same character identity, approved balanced natural adult face proportions, softly rounded but defined chin, delicate fine lines, hair shape and color, eye color, clothing, silver clasp, pose, framing, muted navy tile and parchment circle, and alpha outside the rounded tile. Keep understated classic Japanese visual-novel cel shading. No chibi, no new objects or accessories, no text, no collage. ONE finished square image."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-nocturne-working.png",
+      "sourceImage": "exec-f60a18c0-1771-41bc-871c-4a464d70330b.png",
+      "prompt": "Edit the supplied approved character portrait. Change ONLY the facial expression: Focused and attentive: direct steady gaze, subtly lowered brows, composed closed neutral lips, a small firm mouth, no anger or aggressive scowl. Preserve EXACTLY the same character identity, approved balanced natural adult face proportions, softly rounded but defined chin, delicate fine lines, hair shape and color, eye color, clothing, silver clasp, pose, framing, muted navy tile and parchment circle, and alpha outside the rounded tile. Keep understated classic Japanese visual-novel cel shading. No chibi, no new objects or accessories, no text, no collage. ONE finished square image."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-nocturne-sleeping.png",
+      "sourceImage": "exec-53ab1b72-ed11-4957-8c1d-17bab7be6fca.png",
+      "prompt": "Edit the supplied approved character portrait. Change ONLY the facial expression: Peacefully asleep: BOTH eyes fully closed with softly curved eyelids, face fully relaxed, mouth a tiny restful closed curve. Keep head pose unchanged, no sleep bubbles or letters. Preserve EXACTLY the same character identity, approved balanced natural adult face proportions, softly rounded but defined chin, delicate fine lines, hair shape and color, eye color, clothing, silver clasp, pose, framing, muted navy tile and parchment circle, and alpha outside the rounded tile. Keep understated classic Japanese visual-novel cel shading. No chibi, no new objects or accessories, no text, no collage. ONE finished square image."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-ember-idle.png",
+      "sourceImage": "exec-760ee7e2-e7e7-4490-b3bb-efe3af2c710a.png",
+      "prompt": "Edit target IMAGE 1. Image 2 is the approved FACE PROPORTION and style reference. Change ONLY the facial design in Image 1 so it has the same balanced softness as Image 2: moderately rounded chin tip, naturally elongated oval adult anime face, slight jaw structure, softly almond eyes with quiet neutral confident gaze, short subtle nose plane with a small light shadow, tiny reserved closed mouth, no broad grin or added blush. The current Image 1 face is too pointed and its nose too triangular: soften those moderately, not excessively. Preserve exact character identity, hairstyle, eye color, clothing, hair accessory/glasses, backdrop, entire pose and framing of Image 1. Keep classic early-2000s Japanese visual-novel fine linework and restrained cel shading. Natural adult proportions, no chibi or babyface. Square finished portrait, full-bleed background, no collage or text."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-ember-happy.png",
+      "sourceImage": "exec-630fe6e5-320d-4532-9d33-fae04d38da7c.png",
+      "prompt": "Edit the supplied approved original character portrait. Change ONLY the facial expression: A warm clearly visible happy smile, softly bright eyes, mouth slightly open with a small natural smile. Keep mature restrained expression. Preserve EXACT character identity and the approved balanced natural adult face proportions, moderately rounded defined chin, fine outlines, hair shape and color, eye color, all glasses or hair ribbons, clothing, pose, head angle, framing and full-bleed background including the parchment circle. Keep restrained classic Japanese visual-novel cel shading. No chibi, no new accessories, no hands or props, no text or collage. ONE finished square portrait image."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-ember-shy.png",
+      "sourceImage": "exec-7d30f6a9-214b-4bd9-bc6d-7978c480faf9.png",
+      "prompt": "Edit the provided finished character portrait. Change ONLY the cheek coloration: COMPLETELY REMOVE ALL BLUSH, all pink/red/orange cheek tint, diagonal blush hatching and flushed marks. Restore both cheeks and nose to the same natural light ivory skin tone as the rest of the face, with only the original subtle neutral cel shading. Keep the exact shy expression through the slightly averted/downward gaze, reserved brows and small bashful closed mouth. Preserve everything else exactly: face proportions, eyes, hair, glasses/hair ribbons where present, clothing, pose, framing, background, linework and character identity. Do not make a smile broader. No rosy cheeks, no makeup, no new marks, no text. One square finished image; preserve existing transparency outside the tile if the source has it."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-ember-thinking.png",
+      "sourceImage": "exec-f3c3c845-efe9-4822-8d8a-43452d2ac25f.png",
+      "prompt": "Edit the supplied approved original character portrait. Change ONLY the facial expression: Thoughtful and curious: gaze gently directed up to one side, one eyebrow slightly lifted, closed neutral lips, a slight contemplative tilt in the eyebrows. No hands or thought bubbles. Preserve EXACT character identity and the approved balanced natural adult face proportions, moderately rounded defined chin, fine outlines, hair shape and color, eye color, all glasses or hair ribbons, clothing, pose, head angle, framing and full-bleed background including the parchment circle. Keep restrained classic Japanese visual-novel cel shading. No chibi, no new accessories, no hands or props, no text or collage. ONE finished square portrait image."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-ember-working.png",
+      "sourceImage": "exec-3ff6d8d3-f46e-4540-9793-6a28ba03f373.png",
+      "prompt": "Edit the supplied approved original character portrait. Change ONLY the facial expression: Focused and attentive: direct steady gaze, subtly lowered brows, composed closed neutral lips, a small firm mouth, no anger or aggressive scowl. Preserve EXACT character identity and the approved balanced natural adult face proportions, moderately rounded defined chin, fine outlines, hair shape and color, eye color, all glasses or hair ribbons, clothing, pose, head angle, framing and full-bleed background including the parchment circle. Keep restrained classic Japanese visual-novel cel shading. No chibi, no new accessories, no hands or props, no text or collage. ONE finished square portrait image."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-ember-sleeping.png",
+      "sourceImage": "exec-de2dcb6b-73ae-4511-95c9-033bac373bfd.png",
+      "prompt": "Edit the supplied approved original character portrait. Change ONLY the facial expression: Peacefully asleep: BOTH eyes fully closed with softly curved eyelids, face fully relaxed, mouth a tiny restful closed curve. Keep head pose unchanged, no sleep bubbles or letters. Preserve EXACT character identity and the approved balanced natural adult face proportions, moderately rounded defined chin, fine outlines, hair shape and color, eye color, all glasses or hair ribbons, clothing, pose, head angle, framing and full-bleed background including the parchment circle. Keep restrained classic Japanese visual-novel cel shading. No chibi, no new accessories, no hands or props, no text or collage. ONE finished square portrait image."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-sage-idle.png",
+      "sourceImage": "exec-80ebe019-405a-4d23-8a29-3a5053cccc75.png",
+      "prompt": "Edit target IMAGE 1. Image 2 is the approved FACE PROPORTION and style reference. Change ONLY the facial design in Image 1 so it has the same balanced softness as Image 2: moderately rounded chin tip, naturally elongated oval adult anime face, slight jaw structure, softly almond eyes with quiet neutral confident gaze, short subtle nose plane with a small light shadow, tiny reserved closed mouth, no broad grin or added blush. The current Image 1 face is too pointed and its nose too triangular: soften those moderately, not excessively. Preserve exact character identity, hairstyle, eye color, clothing, hair accessory/glasses, backdrop, entire pose and framing of Image 1. Keep classic early-2000s Japanese visual-novel fine linework and restrained cel shading. Natural adult proportions, no chibi or babyface. Square finished portrait, full-bleed background, no collage or text."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-sage-happy.png",
+      "sourceImage": "exec-bbecfbbc-05a9-41f2-b4c1-48a4c3b43571.png",
+      "prompt": "Edit the supplied approved original character portrait. Change ONLY the facial expression: A warm clearly visible happy smile, softly bright eyes, mouth slightly open with a small natural smile. Keep mature restrained expression. Preserve EXACT character identity and the approved balanced natural adult face proportions, moderately rounded defined chin, fine outlines, hair shape and color, eye color, all glasses or hair ribbons, clothing, pose, head angle, framing and full-bleed background including the parchment circle. Keep restrained classic Japanese visual-novel cel shading. No chibi, no new accessories, no hands or props, no text or collage. ONE finished square portrait image."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-sage-shy.png",
+      "sourceImage": "exec-9b79c0e6-82c0-49f5-b6b1-f2ee0e6b7465.png",
+      "prompt": "Edit the provided finished character portrait. Change ONLY the cheek coloration: COMPLETELY REMOVE ALL BLUSH, all pink/red/orange cheek tint, diagonal blush hatching and flushed marks. Restore both cheeks and nose to the same natural light ivory skin tone as the rest of the face, with only the original subtle neutral cel shading. Keep the exact shy expression through the slightly averted/downward gaze, reserved brows and small bashful closed mouth. Preserve everything else exactly: face proportions, eyes, hair, glasses/hair ribbons where present, clothing, pose, framing, background, linework and character identity. Do not make a smile broader. No rosy cheeks, no makeup, no new marks, no text. One square finished image; preserve existing transparency outside the tile if the source has it."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-sage-thinking.png",
+      "sourceImage": "exec-88432bba-777f-43ab-8e58-e932880c2404.png",
+      "prompt": "Edit the supplied approved original character portrait. Change ONLY the facial expression: Thoughtful and curious: gaze gently directed up to one side, one eyebrow slightly lifted, closed neutral lips, a slight contemplative tilt in the eyebrows. No hands or thought bubbles. Preserve EXACT character identity and the approved balanced natural adult face proportions, moderately rounded defined chin, fine outlines, hair shape and color, eye color, all glasses or hair ribbons, clothing, pose, head angle, framing and full-bleed background including the parchment circle. Keep restrained classic Japanese visual-novel cel shading. No chibi, no new accessories, no hands or props, no text or collage. ONE finished square portrait image."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-sage-working.png",
+      "sourceImage": "exec-b302fdb5-5623-4b70-9018-ceba031dc1c9.png",
+      "prompt": "Edit the supplied approved original character portrait. Change ONLY the facial expression: Focused and attentive: direct steady gaze, subtly lowered brows, composed closed neutral lips, a small firm mouth, no anger or aggressive scowl. Preserve EXACT character identity and the approved balanced natural adult face proportions, moderately rounded defined chin, fine outlines, hair shape and color, eye color, all glasses or hair ribbons, clothing, pose, head angle, framing and full-bleed background including the parchment circle. Keep restrained classic Japanese visual-novel cel shading. No chibi, no new accessories, no hands or props, no text or collage. ONE finished square portrait image."
+    },
+    {
+      "file": "public/portraits/touko-portrait-v1-sage-sleeping.png",
+      "sourceImage": "exec-1e3dc022-d2f2-4aa5-98b9-2873a367f26c.png",
+      "prompt": "Edit the supplied approved original character portrait. Change ONLY the facial expression: Peacefully asleep: BOTH eyes fully closed with softly curved eyelids, face fully relaxed, mouth a tiny restful closed curve. Keep head pose unchanged, no sleep bubbles or letters. Preserve EXACT character identity and the approved balanced natural adult face proportions, moderately rounded defined chin, fine outlines, hair shape and color, eye color, all glasses or hair ribbons, clothing, pose, head angle, framing and full-bleed background including the parchment circle. Keep restrained classic Japanese visual-novel cel shading. No chibi, no new accessories, no hands or props, no text or collage. ONE finished square portrait image."
+    }
+  ]
+}

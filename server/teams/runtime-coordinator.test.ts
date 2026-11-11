@@ -406,7 +406,6 @@ describe("RuntimeCoordinator: the run adapter", () => {
     expect(w.host.parks).toHaveLength(1);
     expect(w.host.parks[0]).toMatchObject({ node: { id: node.id, status: "waiting" }, question: "Which account should I use?" });
     expect(w.coordinator.node(node.id)?.status).toBe("waiting");
-    expect(w.coordinator.liveEdges()).toEqual([{ sourceBotId: "chief", targetBotId: "builder", state: "running", threadId: "builder-work" }]);
     expect(w.host.reports).toHaveLength(0);
     expect(w.coordinator.answer("tester-work", "no one is parked here")).toBe(false);
     expect(w.coordinator.answer("builder-work", "Use the staging account")).toBe(true);
@@ -514,26 +513,13 @@ describe("RuntimeCoordinator: read models", () => {
     expect(w.coordinator.assignerOf("chief-chat")).toBeUndefined();
     expect(w.coordinator.outstandingDirect("chief-chat").map(n => n.id).sort()).toEqual([b.id, r.id].sort());
     expect(w.coordinator.outstandingDirect("builder-work")).toEqual([]);
-    expect(w.coordinator.liveEdges()).toEqual([
-      { sourceBotId: "chief", targetBotId: "builder", state: "running", threadId: "builder-work" },
-      { sourceBotId: "chief", targetBotId: "scout", state: "running", threadId: "room-1", groupId: "g1" },
-    ]);
     await flush();
     expect(w.coordinator.node(r.id)?.status).toBe("completed");
-    expect(w.coordinator.liveEdges()).toEqual([{ sourceBotId: "chief", targetBotId: "builder", state: "running", threadId: "builder-work" }]);
     const { node: t } = send(w, builder, "gen-1", b.id, tester, "Test it");
     w.host.busyAnswer = node => node.id === t.id;
     w.coordinator.tick();
-    expect(w.coordinator.liveEdges()).toEqual([
-      { sourceBotId: "chief", targetBotId: "builder", state: "running", threadId: "builder-work" },
-      { sourceBotId: "builder", targetBotId: "tester", state: "queued", threadId: "tester-work" },
-    ]);
     await w.host.release(b.id, { ok: true, text: "done" });
     expect(w.coordinator.node(b.id)?.status).toBe("waiting");
-    expect(w.coordinator.liveEdges()).toEqual([
-      { sourceBotId: "chief", targetBotId: "builder", state: "running", threadId: "builder-work" },
-      { sourceBotId: "builder", targetBotId: "tester", state: "queued", threadId: "tester-work" },
-    ]);
     expect(w.coordinator.activeDirect("builder-work")).toBe(true);
     expect(w.coordinator.assignerOf("tester-work")).toMatchObject({ id: b.id, status: "waiting" });
   });

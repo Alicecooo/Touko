@@ -14,13 +14,11 @@ vi.mock("@/state/store", async (importOriginal) => {
     useStore: () => ({ state: original.initialState, dispatch: fixture.dispatch, flushBotPatches: () => Promise.resolve(null) }),
   };
 });
-vi.mock("@/lib/interface-mode", () => ({ useAdvancedMode: () => false, readAdvancedMode: () => false, setAdvancedMode: vi.fn() }));
 vi.mock("../DesktopCapabilities", async (importOriginal) => ({
   ...await importOriginal<typeof import("../DesktopCapabilities")>(),
   useCaptionChrome: () => ({ dragProps: {}, padClass: "" }),
 }));
-vi.mock("../Avatar", () => ({ BotAvatar: () => null, MausAvatar: () => null }));
-vi.mock("../AvatarImageGenerator", () => ({ AvatarImageGenerator: () => null }));
+vi.mock("../Avatar", () => ({ BotAvatar: () => null }));
 vi.mock("@/lib/use-organization-branding", () => ({ useOrganizationBranding: () => null }));
 vi.mock("../bot-settings/MemorySection", () => ({ MemorySection: () => null }));
 vi.mock("../bot-settings/useBotOverview", () => ({
@@ -44,7 +42,7 @@ const bot: Bot = {
   modelSelection: { instanceId: "claude", model: "claude-opus-5-5" },
 };
 const onClose = vi.fn();
-const derived = { activeState: "idle", patch: vi.fn() } as never;
+const derived = { patch: vi.fn() } as never;
 
 let host: HTMLDivElement;
 let root: Root;

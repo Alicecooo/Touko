@@ -81,7 +81,7 @@ export function CalendarSidebar({ bots, anchor, onSelectDate }: CalendarSidebarP
                 className="shrink-0 text-ink-secondary/35 transition-colors group-hover:text-ink-secondary"
                 aria-hidden="true"
               />
-              <BotAvatar bot={bot} size={27} animated={false} />
+              <BotAvatar bot={bot} size={27} />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[11.5px] font-medium text-ink">{bot.name}</div>
                 <div className="truncate text-[9.5px] text-ink-tertiary">

@@ -14,7 +14,6 @@ import {
 const MAPPINGS: Array<[CredentialTargetId, CredentialConfig]> = [
   ["xaiApiKey", { xai: { key: "secret" } }],
   ["opencodeGoApiKey", { opencodeGo: { apiKey: "secret" } }],
-  ["openaiImageApiKey", { imageGen: { key: "secret" } }],
 ];
 
 describe("credential request allowlist", () => {

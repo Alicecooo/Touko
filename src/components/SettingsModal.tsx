@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Archive, CircleUser, Coins, FlaskConical, KeyRound, LockKeyhole, Monitor, Palette, Plug, ScrollText, Search, Sparkles, Terminal, User, X, Building2, Zap, BookOpen } from "lucide-react";
+import { Archive, Coins, FlaskConical, KeyRound, LockKeyhole, Monitor, Palette, Plug, ScrollText, Search, Terminal, User, X, Building2, Zap, BookOpen } from "lucide-react";
 import { api, useStore, type AppSettingsSection, type ConfigStatus } from "@/state/store";
 import { routinesInConversationEnabled, showToolCallsEnabled, skillAuthoringEnabled, skillsLibraryEnabled } from "@/lib/feature-flags";
 import { localeChoices, type LocaleKey } from "@/locales";
@@ -25,7 +25,7 @@ import { SkillsSection } from "./SkillsSection";
 import { LicenseExpiryBanner } from "./LicenseExpiryBanner";
 import { WorkspacesSection, workspacesAvailable } from "./WorkspacesSection";
 import { SkinPicker } from "./SkinPicker";
-import { ChatWidthRow, FontRow, SidebarToolsLayoutRow } from "./AppearanceSelectRows";
+import { ChatWidthRow, FontRow } from "./AppearanceSelectRows";
 import { setColorUserBubbles, useColorUserBubbles } from "@/lib/user-bubble-preference";
 import { RoomTurnTimeoutSettings } from "./RoomTurnTimeoutSettings";
 import { McpCallTimeoutSettings } from "./McpCallTimeoutSettings";
@@ -39,7 +39,6 @@ import { cn } from "@/lib/cn";
 import { glassPopupFrameStyle } from "@/lib/glass-popup";
 import { NotificationRows } from "./NotificationSettingsRows";
 import { setShowThreads, useShowThreadsChoice } from "@/lib/thread-preferences";
-import { setAdvancedMode, useAdvancedMode } from "@/lib/interface-mode";
 import { parseSidebarDensity, setPinnedCircles, setSidebarDensity, setUniversalPins, SIDEBAR_DENSITIES, usePinnedCircles, useSidebarDensity, useUniversalPins, type SidebarDensity } from "@/lib/sidebar-preferences";
 import { setShowRunCard, useShowRunCard } from "@/lib/run-card-preferences";
 import { parseSendKey, SEND_KEYS, sendKeyLabel, setSendKey, useSendKey } from "@/lib/send-key";
@@ -65,7 +64,7 @@ export const SECTIONS: Array<{
   keywords: string[];
 }> = [
   { id: "general", group: "you", labelKey: "settings.section.general", icon: User, keywords: ["profile", "name", "email", "about me", "about", "suggestions", "suggested", "memory", "analytics", "updates", "effort", "new bots", "reasoning", "threads", "parallel", "concurrency", "cleanup", "retention", "event log", "event-log", "log size", "automatic recovery", "backup model", "fallback", "routines", "conversation", "schedule"] },
-  { id: "appearance", group: "you", labelKey: "settings.section.appearance", icon: Palette, keywords: ["skin", "theme", "appearance", "chat width", "width", "wide", "full width", "bubble", "bubbles", "tools", "tool calls", "threads", "show threads", "hide threads", "sidebar", "density", "compact", "comfortable", "avatars", "display", "run", "this run", "run card", "commands", "notifications", "sound", "sounds", "mute", "silent", "chime", "pinned", "circles", "universal", "groups", "top", "send", "enter", "return", "shift+enter", "ctrl+enter", "cmd+enter", "⌘+enter", "new line", "keyboard", "ime", "japanese", "message color", "my messages", "toolbar", "tools layout", "footer", "routines", "triggers", "team map"] },
+  { id: "appearance", group: "you", labelKey: "settings.section.appearance", icon: Palette, keywords: ["skin", "theme", "appearance", "chat width", "width", "wide", "full width", "bubble", "bubbles", "tools", "tool calls", "threads", "show threads", "hide threads", "sidebar", "density", "compact", "comfortable", "avatars", "display", "run", "this run", "run card", "commands", "notifications", "sound", "sounds", "mute", "silent", "chime", "pinned", "circles", "universal", "groups", "top", "send", "enter", "return", "shift+enter", "ctrl+enter", "cmd+enter", "⌘+enter", "new line", "keyboard", "ime", "japanese", "message color", "my messages"] },
   { id: "companion", group: "you", labelKey: "settings.section.server", icon: Monitor, keywords: ["server", "https", "domain", "dns", "self-hosted", "caddy"] },
   { id: "engines", group: "ai", labelKey: "settings.section.engines", icon: Terminal, keywords: ["models", "model providers", "engines", "claude", "codex", "grok", "providers", "cli", "sign in", "subscription"] },
   { id: "connections", group: "ai", labelKey: "settings.section.connections", icon: KeyRound, keywords: ["keys", "api", "api key", "api keys", "connections", "xai", "mistral", "cerebras", "meta", "muse", "router", "openrouter", "base url", "openai", "anthropic", "groq", "opencode", "provider"] },
@@ -81,59 +80,6 @@ export const SECTIONS: Array<{
   { id: "workspaces", group: "account", labelKey: "settings.section.workspaces", icon: Building2, keywords: ["clients", "tenants", "fleet", "workspaces", "installation", "installations"] },
   { id: "experimental", group: "account", labelKey: "settings.section.experimental", icon: FlaskConical, keywords: ["early", "preview", "learn", "skill", "authoring"] },
 ];
-
-export type SimpleSettingsPage = {
-  id: string;
-  labelKey: LocaleKey;
-  icon: typeof User;
-  sections: AppSettingsSection[];
-};
-
-export const SIMPLE_PAGES: SimpleSettingsPage[] = [
-  { id: "general", labelKey: "settings.section.general", icon: User, sections: ["general"] },
-  { id: "appearance", labelKey: "settings.section.appearance", icon: Palette, sections: ["appearance"] },
-  { id: "ai", labelKey: "settings.group.ai", icon: Sparkles, sections: ["engines", "decisionModel"] },
-  { id: "connections", labelKey: "settings.section.connections", icon: KeyRound, sections: ["connections"] },
-  { id: "appConnections", labelKey: "settings.section.appConnections", icon: Plug, sections: ["appConnections"] },
-  { id: "computers", labelKey: "settings.group.computers", icon: Monitor, sections: ["companion", "desktopWorkspaces", "logins"] },
-  { id: "account", labelKey: "settings.group.account", icon: CircleUser, sections: ["organization", "activity"] },
-];
-
-export const SIMPLE_HIDDEN_SECTIONS: readonly AppSettingsSection[] = ["usage", "backups", "experimental", "workspaces", "skills"];
-
-export function simpleSettingsPages(
-  available: ReadonlyArray<(typeof SECTIONS)[number]>,
-  open: AppSettingsSection,
-): SimpleSettingsPage[] {
-  const allowed = new Set(available.map((entry) => entry.id));
-  const pages = SIMPLE_PAGES
-    .map((page) => ({ ...page, sections: page.sections.filter((id) => allowed.has(id)) }))
-    .filter((page) => page.sections.length > 0);
-  const hidden = SIMPLE_HIDDEN_SECTIONS.includes(open) ? available.find((entry) => entry.id === open) : undefined;
-  if (hidden) pages.push({ id: hidden.id, labelKey: hidden.labelKey, icon: hidden.icon, sections: [hidden.id] });
-  return pages;
-}
-
-export function revealSettingsBlock(
-  scroller: { scrollTop: number; querySelector: (selector: string) => { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null },
-  section: AppSettingsSection,
-  indexInPage: number,
-): void {
-  if (indexInPage <= 0) {
-    scroller.scrollTop = 0;
-    return;
-  }
-  scroller.querySelector(`[data-settings-block="${section}"]`)?.scrollIntoView?.({ block: "start" });
-}
-
-function simplePageMatches(page: SimpleSettingsPage, query: string): boolean {
-  if (!query) return true;
-  if (t(page.labelKey).toLowerCase().includes(query)) return true;
-  return page.sections.some((id) => {
-    const entry = SECTIONS.find((candidate) => candidate.id === id);
-    return entry ? sectionMatches(entry, query) : false;
-  });
-}
 
 export function sectionMatches(section: (typeof SECTIONS)[number], query: string): boolean {
   if (!query) return true;
@@ -276,19 +222,6 @@ function ColorUserBubblesRow() {
         checked={enabled}
         aria-label={t("settings.userBubbles.aria")}
         onClick={() => setColorUserBubbles(!enabled)}
-      />
-    </SettingRow>
-  );
-}
-
-function AdvancedModeRow() {
-  const enabled = useAdvancedMode();
-  return (
-    <SettingRow className="rounded-2xl border border-accent-border/40 bg-raised-hover/40 py-4" title={t("settings.advancedMode.title")} subtitle={t("settings.advancedMode.subtitle")}>
-      <Switch
-        checked={enabled}
-        aria-label={t("settings.advancedMode.title")}
-        onClick={() => setAdvancedMode(!enabled)}
       />
     </SettingRow>
   );
@@ -500,7 +433,6 @@ function ExperimentalFeaturesRow() {
 
 export function SettingsModal() {
   const { state, dispatch } = useStore();
-  const advanced = useAdvancedMode();
   const remoteActive = window.ogb?.remoteClient?.active === true;
   const section: AppSettingsSection =
     (remoteActive && !["appearance", "desktopWorkspaces"].includes(state.appSettingsSection)) || state.appSettingsSection === "remote" || state.appSettingsSection === "computer"
@@ -522,27 +454,15 @@ export function SettingsModal() {
   const availableSections = baseSections.filter((entry) => entry.id !== "skills" || skillsLibraryEnabled(state.config));
   const visibleSections = availableSections.filter((entry) => sectionMatches(entry, q));
 
-  const simplePages = advanced ? [] : simpleSettingsPages(availableSections, section);
-  const visiblePages = simplePages.filter((page) => simplePageMatches(page, q));
-  const currentPage = simplePages.find((page) => page.sections.includes(section));
-
-  const sectionLabelKey = advanced
-    ? SECTIONS.find((entry) => entry.id === section)?.labelKey
-    : currentPage?.labelKey;
-  const nextVisibleSection = advanced
-    ? visibleSections.some((entry) => entry.id === section) ? undefined : visibleSections[0]?.id
-    : currentPage && visiblePages.includes(currentPage)
-      ? undefined
-      : visiblePages[0] && (visiblePages[0].sections.find((id) => visibleSections.some((entry) => entry.id === id)) ?? visiblePages[0].sections[0]);
+  const sectionLabelKey = SECTIONS.find((entry) => entry.id === section)?.labelKey;
+  const nextVisibleSection = visibleSections.some((entry) => entry.id === section) ? undefined : visibleSections[0]?.id;
 
   useEffect(() => {
     if (nextVisibleSection) dispatch({ type: "toggleAppSettings", open: true, section: nextVisibleSection });
   }, [dispatch, nextVisibleSection]);
-
-  const sectionIndex = currentPage?.sections.indexOf(section) ?? 0;
   useEffect(() => {
-    if (scrollRef.current) revealSettingsBlock(scrollRef.current, section, advanced ? 0 : sectionIndex);
-  }, [advanced, section, sectionIndex]);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [section]);
 
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -604,7 +524,7 @@ export function SettingsModal() {
       case "general":
         return (
           <>
-            <AdvancedModeRow />
+            
 
             <></>
             <Card title={t("settings.profile.title")} subtitle={t("settings.profile.subtitle")}>
@@ -638,14 +558,12 @@ export function SettingsModal() {
             <Card title={t("settings.skin.title")} subtitle={t("settings.skin.subtitle")}>
               <SkinPicker />
             </Card>
-            {remoteActive && <AdvancedModeRow />}
             <FontRow />
             <ChatWidthRow />
             <ColorUserBubblesRow />
             <SendKeyRow />
             <SidebarDensityRow />
-            {advanced && <SidebarToolsLayoutRow />}
-            {advanced && <ShowThreadsRow />}
+            {<ShowThreadsRow />}
             <PinnedCirclesRow />
             <UniversalPinsRow />
             <NotificationRows />
@@ -680,10 +598,6 @@ export function SettingsModal() {
         return null;
     }
   };
-
-  const blockHeading = (labelKey: LocaleKey) => (
-    <h3 className="px-4 text-[13px] font-semibold uppercase tracking-[0.06em] text-ink-secondary">{t(labelKey)}</h3>
-  );
 
   return (
     <div
@@ -723,12 +637,12 @@ export function SettingsModal() {
               className="w-full bg-transparent text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none"
             />
           </div>
-          {(advanced ? visibleSections.length === 0 : visiblePages.length === 0) && (
+          {((visibleSections.length === 0)) && (
             <div className="px-2.5 py-4 text-[12.5px] leading-relaxed text-ink-secondary">
               {t("settings.noMatch", { query: query.trim() })}
             </div>
           )}
-          {advanced ? SETTINGS_GROUPS.map((group) => {
+          {SETTINGS_GROUPS.map((group) => {
             const entries = visibleSections.filter((entry) => entry.group === group.id);
             if (entries.length === 0) return null;
             return (
@@ -753,34 +667,12 @@ export function SettingsModal() {
                 ))}
               </div>
             );
-          }) : (
-            <div className="flex flex-col gap-0.5 pb-2">
-              {visiblePages.map((page) => {
-                const Icon = page.icon;
-                const current = page === currentPage;
-                return (
-                  <button
-                    key={page.id}
-                    data-settings-page={page.id}
-                    onClick={() => openSection(page.sections[0]!)}
-                    aria-current={current ? "page" : undefined}
-                    className={cn(
-                      "cursor-pointer flex min-h-9 items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors motion-reduce:transition-none",
-                      current ? "bg-control text-ink" : "text-ink-secondary hover:bg-control/50 hover:text-ink",
-                    )}
-                  >
-                    <Icon size={15} className="shrink-0" />
-                    {t(page.labelKey)}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          })}
         </nav>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-hairline/30 px-3 py-3 sm:pl-9">
-            {advanced ? (
+            {
               <Select className="min-w-0 sm:hidden"
                 aria-label={t("settings.title")}
                 value={section}
@@ -800,21 +692,7 @@ export function SettingsModal() {
                   );
                 })}
               </Select>
-            ) : (
-              <Select className="min-w-0 sm:hidden"
-                aria-label={t("settings.title")}
-                value={currentPage?.id ?? ""}
-                onChange={(event) => {
-                  setQuery("");
-                  const page = simplePages.find((candidate) => candidate.id === event.target.value);
-                  if (page) openSection(page.sections[0]!);
-                }}
-              >
-                {simplePages.map((page) => (
-                  <option key={page.id} value={page.id}>{t(page.labelKey)}</option>
-                ))}
-              </Select>
-            )}
+            }
             <span className="hidden text-[15px] font-semibold text-ink sm:block">
               {sectionLabelKey ? t(sectionLabelKey) : null}
             </span>
@@ -830,21 +708,9 @@ export function SettingsModal() {
 
           <div ref={scrollRef} className="flex flex-1 flex-col gap-4 overflow-y-auto px-3 py-4 sm:px-5 sm:pb-5">
             <LicenseExpiryBanner config={state.config} />
-            {advanced ? (
+            {
               renderSection(section)
-            ) : currentPage ? (
-              currentPage.sections.map((id) => {
-                const stacked = currentPage.sections.length > 1;
-                const labelKey = SECTIONS.find((entry) => entry.id === id)?.labelKey;
-                return (
-                  <section key={id} data-settings-block={id} className="flex scroll-mt-2 flex-col gap-4">
-                    {stacked && labelKey ? blockHeading(labelKey) : null}
-                    {renderSection(id)}
-
-                  </section>
-                );
-              })
-            ) : null}
+            }
           </div>
         </div>
       </div>

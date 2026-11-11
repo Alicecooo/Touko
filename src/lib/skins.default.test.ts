@@ -4,13 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const values = new Map<string, string>();
 
-// Each case loads fresh modules over the same storage, as a launch would; interface-mode keeps a per-session choice.
+// Each case loads fresh modules over the same storage, as a launch would.
 async function boot() {
   vi.resetModules();
-  const [{ settleAdvancedModeDefault, readAdvancedMode }, skins] = await Promise.all([import("./interface-mode"), import("./skins")]);
-  settleAdvancedModeDefault();
+  const skins = await import("./skins");
   skins.applySkin(skins.readSkin());
-  return { skin: document.documentElement.dataset.skin, advanced: readAdvancedMode(), stored: values.get("omb-skin") };
+  return { skin: document.documentElement.dataset.skin, stored: values.get("omb-skin") };
 }
 
 beforeEach(() => {
@@ -26,10 +25,10 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("default skin", () => {
-  it("opens a fresh install in Meadow, in Simple mode, and keeps it on the next launch", async () => {
-    expect(await boot()).toEqual({ skin: "meadow", advanced: false, stored: "meadow" });
+  it("opens a fresh install in Meadow, and keeps it on the next launch", async () => {
+    expect(await boot()).toEqual({ skin: "meadow", stored: "meadow" });
     values.set("omb-installed", "2026-10-17T00:00:00.000Z");
-    expect(await boot()).toEqual({ skin: "meadow", advanced: false, stored: "meadow" });
+    expect(await boot()).toEqual({ skin: "meadow", stored: "meadow" });
   });
 
   it("keeps an install that ran before in Midnight when nobody picked a skin", async () => {
@@ -39,7 +38,7 @@ describe("default skin", () => {
 
   it("keeps Midnight for an earlier install whose saved skin is missing or no longer exists", async () => {
     values.set("omb-installed", "2026-01-01T00:00:00.000Z");
-    expect(await boot()).toEqual({ skin: "midnight", advanced: true, stored: "midnight" });
+    expect(await boot()).toEqual({ skin: "midnight", stored: "midnight" });
     values.set("omb-skin", "retired-skin");
     expect(await boot()).toMatchObject({ skin: "midnight", stored: "midnight" });
   });
@@ -49,8 +48,7 @@ describe("default skin", () => {
     expect(await boot()).toMatchObject({ skin: "lagoon" });
     values.clear();
     values.set("omb-skin", "midnight");
-    values.set("omb-advanced-mode", "0");
-    expect(await boot()).toMatchObject({ skin: "midnight", advanced: false });
+    expect(await boot()).toMatchObject({ skin: "midnight" });
   });
 
   it("shows Meadow as the selected skin in Appearance on a fresh install", async () => {

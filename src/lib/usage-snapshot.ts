@@ -48,8 +48,6 @@ function keyProviders(config: ConfigStatus): KeyProvider[] {
     [config.opencodeGo?.configured, "opencode_go"],
     [ownDecider && config.decider?.provider === "jev", "jev"],
     [ownDecider && config.decider?.provider === "openrouter", "openrouter_decider"],
-    [config.imageGen?.openaiConfigured, "openai_image"],
-    [config.imageGen?.customKeyConfigured, "custom_image"],
   ];
   return configured.flatMap(([on, provider]) => on === true ? [provider] : []);
 }

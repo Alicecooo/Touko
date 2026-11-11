@@ -2,7 +2,6 @@ export const APP_NAME = "Touko";
 export const APP_REPOSITORY = "https://github.com/milind-soni/OpenMausBot";
 
 
-export const APPROVAL_LEVELS_URL = `${APP_REPOSITORY}/blob/main/docs/approval-levels.md`;
 
 export const RELEASES_URL = `${APP_REPOSITORY}/releases`;
 

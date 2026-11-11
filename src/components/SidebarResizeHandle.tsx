@@ -1,22 +1,21 @@
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 
 import { t } from "@/lib/i18n";
-import { SIDEBAR_WIDTH_KEY, SIMPLE_SIDEBAR_WIDTH_KEY, clampSidebarWidth, loadSidebarWidth, saveSidebarWidth, type SidebarDensity } from "@/lib/sidebar-preferences";
+import { SIDEBAR_WIDTH_KEY, clampSidebarWidth, loadSidebarWidth, saveSidebarWidth, type SidebarDensity } from "@/lib/sidebar-preferences";
 
-export function sidebarDefaultWidth(density: SidebarDensity, simple: boolean): number {
-  return density === "compact" ? 272 : simple ? 288 : 320;
+export function sidebarDefaultWidth(density: SidebarDensity): number {
+  return density === "compact" ? 272 : 320;
 }
 
 export type SidebarSizing = ReturnType<typeof useSidebarWidth>;
 
-export function useSidebarWidth({ simple, density, sidePanelOpen, sidebarRef }: {
-  simple: boolean;
+export function useSidebarWidth({ density, sidePanelOpen, sidebarRef }: {
   density: SidebarDensity;
   sidePanelOpen: boolean;
   sidebarRef: RefObject<HTMLElement | null>;
 }) {
-  const key = simple ? SIMPLE_SIDEBAR_WIDTH_KEY : SIDEBAR_WIDTH_KEY;
-  const defaultWidth = sidebarDefaultWidth(density, simple);
+  const key = SIDEBAR_WIDTH_KEY;
+  const defaultWidth = sidebarDefaultWidth(density);
   const maxWidth = sidePanelOpen ? defaultWidth : Math.min(480, window.innerWidth - 320);
   const [savedWidth, setSavedWidth] = useState<number | null>(() => loadSidebarWidth(undefined, key));
   const widthRef = useRef(savedWidth);

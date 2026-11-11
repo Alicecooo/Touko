@@ -2,8 +2,6 @@
 import { activeLocale, t } from "@/lib/i18n";
 import { engineSignedOut } from "@/lib/failed-turn";
 import { type FeatureFlagConfig } from "@/lib/feature-flags";
-
-import { useAdvancedMode } from "@/lib/interface-mode";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
 import { openBotSettings } from "@/components/bot-panel/panel-link";
 import type { Action, Bot, ConfigStatus, InstanceInfo } from "@/state/store";
@@ -17,7 +15,6 @@ export interface PlaceSeat {
   server: ServerKind;
   plan: boolean;
   role: "admin" | "user";
-  mode: "simple" | "advanced";
 }
 
 export function serverKind(_config: Pick<ConfigStatus, "cloudHome"> | null | undefined, platform: DesktopCapabilities["host"]["platform"]): ServerKind {
@@ -58,7 +55,6 @@ export function placeFacts(input: {
     toolsAllowComputer: canUseMcpServer(bot.toolScope, "computer"),
     browserOn: false,
     role: seat.role,
-    mode: seat.mode,
     ...(input.local ? { local: input.local } : {}),
     ...(input.computer ? { computer: input.computer } : {}),
     ...(input.teamComputer ? { teamComputer: input.teamComputer } : {}),
@@ -71,7 +67,7 @@ export function placeViewFor(facts: PlaceFacts): PlaceView {
 
 export function placeRowViewFor(row: PlaceRow, seat: PlaceSeat, worksOnLabel?: string): PlaceView {
   const read = row.state === "cc-needs-key" && seat.plan && seat.server !== "my-cloud" ? { ...row, state: "cc-on-my-cloud" as const } : row;
-  return placeRowView(read, { server: seat.server, role: seat.role, mode: seat.mode, worksOnLabel, translate: placeTranslate, locale: activeLocale() });
+  return placeRowView(read, { server: seat.server, role: seat.role, worksOnLabel, translate: placeTranslate, locale: activeLocale() });
 }
 
 export function placeBlocked(view: PlaceView): boolean {
@@ -87,8 +83,7 @@ export function placeHasIssue(view: PlaceView): boolean {
 export function usePlaceSeat(config: Pick<ConfigStatus, "cloudHome"> | null | undefined, platform: DesktopCapabilities["host"]["platform"]): PlaceSeat {
   const plan = false;
   const ownerOrAdmin = useOwnerOrAdmin();
-  const advanced = useAdvancedMode();
-  return { server: serverKind(config, platform), plan, role: ownerOrAdmin === false ? "user" : "admin", mode: advanced ? "advanced" : "simple" };
+  return { server: serverKind(config, platform), plan, role: ownerOrAdmin === false ? "user" : "admin" };
 }
 
 export function openPlaceAction(
@@ -105,7 +100,6 @@ export function openPlaceAction(
     case "sign-in": appSettings("engines"); return true;
     case "manage-computers": appSettings("computer"); return true;
     case "add-boat-key": appSettings("computer"); return true;
-    case "open-team-map": dispatch({ type: "showTeamMap" }); return true;
     
     
     case "clear-pin":

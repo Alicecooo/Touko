@@ -539,6 +539,10 @@ export class Store {
         delete b.approvalGrant;
         botsMigrated = true;
       }
+      if ("mascotBody" in b) {
+        delete (b as BotRecord & { mascotBody?: unknown }).mascotBody;
+        botsMigrated = true;
+      }
       const avatar = botAvatarProfile(b);
       if (b.avatarUrl !== undefined && avatar.avatarUrl !== b.avatarUrl) {
         delete b.avatarUrl;
@@ -1465,7 +1469,7 @@ export class Store {
     profile: Partial<
       Pick<
         BotRecord,
-        "name" | "title" | "description" | "soul" | "color" | "mascotExpression" | "mascotBody" | "modelSelection" | "section" | "cwd" | "visibility" | "toolScope"
+        "name" | "title" | "description" | "soul" | "color" | "mascotExpression" | "modelSelection" | "section" | "cwd" | "visibility" | "toolScope"
       >
     > = {},
     opts: {
@@ -1487,9 +1491,7 @@ export class Store {
       soulHash: soulHash(profile.soul ?? ""),
       notifications: true,
       color: profile.color ?? COLORS[this.bots.length % COLORS.length],
-      ...(profile.mascotExpression ? { mascotExpression: profile.mascotExpression } : {}),
-      ...(profile.mascotBody ? { mascotBody: profile.mascotBody } : {}),
-      // Restricted from its first frame: no one else is ever told it exists.
+      ...(profile.mascotExpression ? { mascotExpression: profile.mascotExpression } : {}),      // Restricted from its first frame: no one else is ever told it exists.
       ...(profile.visibility && profile.visibility !== "everyone" ? { visibility: structuredClone(profile.visibility) } : {}),
       ...(toolScope.scope ? { toolScope: toolScope.scope } : {}),
       unread: false,

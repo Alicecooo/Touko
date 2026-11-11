@@ -1,5 +1,4 @@
 import { newId, type ModelSelection } from "../harness/contracts.ts";
-import { botMascotBody } from "../../shared/mascot-bodies.ts";
 import { takeImportName } from "../../shared/import-name.ts";
 import { MAX_TEAM_BACKUP_BYTES, parseTeamBackup, type BackupTask, type TeamBackup } from "../../shared/team-backup.ts";
 import { helperModelAllowed, type BotVisibility } from "../../shared/wire.ts";
@@ -100,7 +99,7 @@ export function createTeamBackup(store: Store, routines: Routine[], name: string
     bots: store.bots.map((bot) => ({
       key: bot.id, name: bot.name, title: bot.title, description: bot.description, soul: bot.soul,
       section: bot.section, color: bot.color,
-      mascotExpression: bot.mascotExpression ?? undefined, mascotBody: bot.mascotBody ?? undefined,
+      mascotExpression: bot.mascotExpression ?? undefined,
       chiefOfStaff: Boolean(bot.chiefOfStaff), hidden: Boolean(bot.hidden), playbooks: bot.playbooks ?? [],
       // Grants travel so the team's shape survives, but the import still lands every bot grant-less.
       ...(bot.connectorTools ? { connectorTools: structuredClone(bot.connectorTools) } : {}),
@@ -165,7 +164,6 @@ export function importTeamBackup(store: Store, routines: RoutineManager, input: 
       const bot = store.createBot({
         name: takeImportName(source.name, takenNames), title: source.title, description: source.description, soul: source.soul,
         color: source.color, mascotExpression: source.mascotExpression,
-        mascotBody: botMascotBody(source.mascotBody),
         modelSelection: selection, section: sectionFor(source.section),
         // who may see the imported team is the importing admin's choice
         ...(options.visibility ? { visibility: options.visibility } : {}),

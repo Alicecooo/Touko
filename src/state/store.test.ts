@@ -1676,7 +1676,7 @@ describe("pending queued chip", () => {
       },
     });
 
-    expect(landed.mascotMotion).toMatchObject({ botId: "b1", kind: "working" });
+    expect(landed.bots[0]?.messages.some(message => message.id === "landed")).toBe(true);
   });
 
   it("keeps a Shift+Enter multiline message as one entry", () => {
@@ -2201,14 +2201,14 @@ describe("bot settings section", () => {
   it.each(["identity", "model"] as const)("opens a bot's %s settings without leaving the team map or reading its conversations", (section) => {
     const state = {
       ...initialState,
-      activeView: "team-map" as const,
+      activeView: "routines" as const,
       selectedId: "room",
       bots: [{ ...bot, unread: true }],
       groups: [{ id: "room", unread: true } as Group],
     };
     const next = reducer(state, { type: "toggleSettings", botId: bot.id, section });
     expect(next.selectedId).toBe(bot.id);
-    expect(next.activeView).toBe("team-map");
+    expect(next.activeView).toBe("routines");
     expect(next.settingsOpen).toBe(true);
     expect(next.botSettingsSection).toBe(section);
     expect(next.botSettingsExpandAccordion).toBe(true);
@@ -2220,7 +2220,7 @@ describe("bot settings section", () => {
     const other = { ...bot, id: "other-bot" };
     const state = {
       ...initialState,
-      activeView: "team-map" as const,
+      activeView: "routines" as const,
       selectedId: bot.id,
       bots: [bot, other],
       settingsOpen: true,
@@ -2229,7 +2229,7 @@ describe("bot settings section", () => {
     };
     const next = reducer(state, { type: "toggleSettings", botId: other.id });
     expect(next.selectedId).toBe(other.id);
-    expect(next.activeView).toBe("team-map");
+    expect(next.activeView).toBe("routines");
     expect(next.settingsOpen).toBe(true);
     expect(next.botSettingsSection).toBe("soul");
     expect(next.botSettingsExpandAccordion).toBe(false);
@@ -2246,7 +2246,7 @@ describe("bot settings section", () => {
   it.each(["missing-bot", "hidden-bot", "room"])("ignores unavailable settings target %s", (botId) => {
     const state = {
       ...initialState,
-      activeView: "team-map" as const,
+      activeView: "routines" as const,
       selectedId: bot.id,
       bots: [bot, { ...bot, id: "hidden-bot", hidden: true }],
       groups: [{ id: "room" } as Group],
@@ -2381,7 +2381,7 @@ describe("activity panel", () => {
   it("switching to routines or the team map closes the activity panel", () => {
     const open = { ...initialState, activityOpen: true };
     expect(reducer(open, { type: "showRoutines" }).activityOpen).toBe(false);
-    expect(reducer(open, { type: "showTeamMap" }).activityOpen).toBe(false);
+    expect(reducer(open, { type: "showRoutines" }).activityOpen).toBe(false);
   });
 
   it("opens Files as its own page, carrying the folders it should offer to share only when asked", () => {
@@ -2390,7 +2390,6 @@ describe("activity panel", () => {
     expect(suggested).toMatchObject({ activeView: "files", filesSuggest: ["/Users/ada/site"], activityOpen: false, appSettingsOpen: false, settingsOpen: false });
     expect(reducer(suggested, { type: "showFiles" })).toMatchObject({ activeView: "files", filesSuggest: null });
     expect(reducer(suggested, { type: "showFiles", suggest: [] }).filesSuggest).toBeNull();
-    expect(reducer(suggested, { type: "showTeamMap" })).toMatchObject({ activeView: "team-map", filesSuggest: null });
   });
 });
 

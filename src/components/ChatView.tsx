@@ -1,5 +1,4 @@
 import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch } from "react";
-import { useAdvancedMode } from "@/lib/interface-mode";
 import { ThreadLinkContext } from "@/components/ThreadLinkMenu";
 import { useShowThreads } from "@/lib/thread-preferences";
 import { useCopyFeedback } from "@/lib/copy-text";
@@ -28,7 +27,7 @@ import { isCancelledTranscriptRow } from "../../shared/client-cancel";
 import { BotAvatar } from "./Avatar";
 import { TurnPresence } from "./TurnPresence";
 import { showToolCallsEnabled, skillAuthoringEnabled } from "@/lib/feature-flags";
-import { normalizeState, stateForBot } from "@/lib/mascot";
+
 import { peerLine, peerRequest, type PeerLine } from "@/lib/peer-message";
 import { showWorkingDots } from "@/lib/turn-tail";
 import { lastNonReceipt } from "@/lib/receipts";
@@ -92,7 +91,6 @@ import { JumpToLatestButton } from "./JumpToLatestButton";
 
 const USER_COLLAPSE_CHARS = 600;
 const USER_COLLAPSE_LINES = 8;
-export const SIMPLE_BUBBLE = "rounded-[23px] font-normal";
 
 interface ChatRows {
   botId: string;
@@ -108,7 +106,7 @@ interface ChatRows {
   bubbleStyle?: ReturnType<typeof userBubbleStyle>;
   dispatch: Dispatch<Action>;
   onBranch: (messageId: string) => boolean;
-  conversational: boolean; simple?: boolean;
+  conversational: boolean;
   openedAt: number;
 }
 
@@ -121,7 +119,7 @@ function useChatRows(): ChatRows {
 }
 
 const drawnBot = (bot: Bot) =>
-  [bot.id, bot.name, bot.hidden, bot.color, bot.mascotBody, bot.mascotExpression, bot.avatarUrl, bot.avatarCrop, bot.avatarZoom, bot.avatarFocusX, bot.avatarFocusY].join("\u0001");
+  [bot.id, bot.name, bot.hidden, bot.color, bot.mascotExpression, bot.avatarUrl, bot.avatarCrop, bot.avatarZoom, bot.avatarFocusX, bot.avatarFocusY].join("\u0001");
 
 function useDrawnBots(bots: readonly Bot[]): readonly Bot[] {
   const signature = bots.map(drawnBot).join("\u0002");
@@ -180,10 +178,7 @@ export function ErrorRow({
   setupInstance?: InstanceInfo;
   claudeUpdateInstance?: InstanceInfo;
 }) {
-  
-  
-  
-  
+
   const headline = plainHeadline ?? message;
   const usageUrl = message.includes("subscription_sharing_usage_limit_exceeded") ? CHATGPT_USAGE_URL : codexUsageLimitReached(message) ? CODEX_USAGE_URL : null;
   return (
@@ -373,7 +368,7 @@ const Bubble = memo(function Bubble({
   replyTarget?: Message;
   onReply: (message: Message) => void;
 }) {
-  const { botId, threadId, botName, busy, mentionPeers, mentionPerson, focus, dispatch, onBranch, bubbleStyle, conversational, simple, openedAt } = useChatRows();
+  const { botId, threadId, botName, busy, mentionPeers, mentionPerson, focus, dispatch, onBranch, bubbleStyle, conversational, openedAt } = useChatRows();
   const remoteClient = window.ogb?.remoteClient?.active === true;
   const peer = peerLine(message) ?? peerRequest(message, botId);
   const user = message.role === "user" && !peer;
@@ -461,8 +456,8 @@ const Bubble = memo(function Bubble({
               : attachmentsOnly || split
                 ? "text-ink"
                 : user
-                  ? cn("bg-bubble-user px-4 py-2.5 whitespace-pre-wrap text-ink", bubbleStyle && "user-bubble-colored", simple && cn(SIMPLE_BUBBLE, bubbleStyle && "antialiased"))
-                  : cn("bg-card px-4 py-2.5 text-ink", simple && SIMPLE_BUBBLE),
+                  ? cn("bg-bubble-user px-4 py-2.5 whitespace-pre-wrap text-ink", bubbleStyle && "user-bubble-colored")
+                  : "px-1 py-2 text-ink",
           )}
           style={user && !webhookView && !attachmentsOnly ? bubbleStyle : undefined}
           title={new Date(message.at).toLocaleString()}
@@ -609,11 +604,7 @@ function PeerLabel({ peer }: { peer: PeerLine }) {
     <div className="mb-1 flex items-center gap-1.5 pl-0.5" data-testid="peer-label">
       <BotAvatar
         bot={author ?? { name: peer.name, color: "blue" }}
-        state={normalizeState(author?.mascotExpression) ?? "happy"}
         size={16}
-        motion="none"
-        motionKey={0}
-        animated={false}
       />
       <span className="text-[11px] font-medium text-ink-secondary">{peer.name}</span>
       <span className="text-[11px] text-ink-tertiary">· {how}</span>
@@ -636,7 +627,7 @@ const ActivityChip = memo(function ActivityChip({ message, place = "auto" }: { m
           title={t("chat.openConversationWith", { name: comm.withName })}
           className="ui-pill"
         >
-          <BotAvatar bot={withBot ?? { name: comm.withName, color: comm.withColor }} state="happy" size={16} animated={false} />
+          <BotAvatar bot={withBot ?? { name: comm.withName, color: comm.withColor }} size={16} />
           <span className="max-w-[480px] truncate">{tool.name}</span>
           <ChevronRight size={13} />
         </button>
@@ -666,7 +657,7 @@ function RoutineRunRow({ message, botId }: { message: Message; botId: string }) 
 function EmptyChat({ bot }: { bot: Bot }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
-      <BotAvatar bot={bot} state="idle" size={64} motion="none" motionKey={0} />
+      <BotAvatar bot={bot} size={64} />
       <div className="text-[17px] font-semibold text-ink">{bot.name}</div>
       <div className="max-w-[360px] text-[14px] text-ink-secondary">
         {bot.description || t("chat.emptyPrompt")}
@@ -927,11 +918,9 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   const { dragProps: headerDragProps, noDragStyle: headerNoDragStyle, controlsShiftStyle } = useCaptionChrome();
   const composerDockRef = useRef<HTMLDivElement>(null);
   const composerDock = useComposerDockPad(composerDockRef);
-  const advanced = useAdvancedMode();
   const canWrite = true;
 
   const computerStarting = computerStartLine(state.computerStarts[bot.id], bot.name);
-  const mascotMotion = state.mascotMotion?.botId === bot.id ? state.mascotMotion : null;
   const [findOpen, setFindOpen] = useState(false);
   const { replyTo, selectReply, clearReply, consumeReply, restoreReply } = useReplyDraft(
     bot.threadId,
@@ -999,7 +988,6 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   const locale = activeLocale();
   const busy = Boolean(bot.busy);
   const openedAt = useThreadOpenedAt(bot.threadId);
-  const headerAnimated = busy || (mascotMotion?.kind ?? "none") !== "none";
   const branch = useRef(messages);
   branch.current = messages;
   const onBranch = useCallback((messageId: string) => branch.current.some((m) => m.id === messageId), []);
@@ -1007,8 +995,8 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   const bubbleStyle = useMemo(() => (colorMine ? userBubbleStyle(bot.color) : undefined), [colorMine, bot.color]);
   const hasMore = Boolean(bot.hasMore);
   const rows = useMemo<ChatRows>(
-    () => ( { botId: bot.id, threadId: bot.threadId, botName: bot.name, busy, hasMore, bots, mentionPeers, mentionPerson: { profileName: state.config?.profile?.name }, focus, showToolCalls, locale, dispatch, onBranch, bubbleStyle, conversational: isConversational(bot.replyStyle), simple: !advanced, openedAt}),
-    [bot.id, bot.threadId, bot.name, busy, hasMore, bots, mentionPeers, state.config?.profile?.name, focus, showToolCalls, locale, dispatch, onBranch, bubbleStyle, bot.replyStyle, advanced, openedAt],
+    () => ( { botId: bot.id, threadId: bot.threadId, botName: bot.name, busy, hasMore, bots, mentionPeers, mentionPerson: { profileName: state.config?.profile?.name }, focus, showToolCalls, locale, dispatch, onBranch, bubbleStyle, conversational: isConversational(bot.replyStyle), openedAt}),
+    [bot.id, bot.threadId, bot.name, busy, hasMore, bots, mentionPeers, state.config?.profile?.name, focus, showToolCalls, locale, dispatch, onBranch, bubbleStyle, bot.replyStyle, openedAt],
   );
   const place = effectivePlace(bot, bot.tasks?.find((task) => task.threadId === bot.threadId));
 
@@ -1035,7 +1023,6 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   }, [lastUserMessage]);
 
   const lastMessage = lastNonReceipt(messages);
-  const toolInFlight = lastMessage?.kind === "activity" && lastMessage.tool?.ok === undefined;
   const activity = liveActivityPhrases(lastMessage);
   const waiting = Boolean(
     bot.busy &&
@@ -1121,8 +1108,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
             aria-label={t("chat.openProfileAria", { name: bot.name })}
             className={cn(CHATHEAD_PILL, "group h-9 gap-2.5 pl-2 pr-3.5 hover:bg-raised-hover")}
           >
-            <BotAvatar bot={bot} state={stateForBot({ ...bot, messages })} size={24}
-              motion={mascotMotion?.kind ?? "none"} motionKey={mascotMotion?.nonce ?? 0} animated={headerAnimated} />
+            <BotAvatar bot={bot} size={24} />
             <span className="min-w-0 truncate text-[14px] font-medium text-ink">{bot.name}</span>
             {chiefOfStaffBadge(bot)}
           </button>
@@ -1158,7 +1144,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
             </button>
           )}
           <ThreadContextWarning bot={bot} messages={messages} />
-          {(advanced || remoteClient) && <ChatHeaderMenu key={`menu:${bot.threadId}`} bot={bot} />}
+          {<ChatHeaderMenu key={`menu:${bot.threadId}`} bot={bot} />}
         </div>
         </div>
       </div>
@@ -1257,11 +1243,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
             avatar={
               <BotAvatar
                 bot={bot}
-                state={toolInFlight ? "working" : "thinking"}
                 size={36}
-                forward={false}
-                lookAround={1}
-                trackPointer={false}
               />
             }
             visible={presenceVisible}
@@ -1298,7 +1280,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
         </div>
       )}
       
-      {(
+      {
       <Composer
         key={bot.threadId}
         bot={profile}
@@ -1310,14 +1292,14 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
           ? () => setEditingId(lastUserMessage.id)
           : undefined}
       />
-      )}
-      {(
+      }
+      {
       <CitationSelectionToolbar
         key={`${bot.id}:${bot.threadId}`}
         viewportRef={scrollRef}
         onAdd={(citation) => appendDraftAttachments(`bot:${citation.source.ownerId}:${citation.source.threadId}`, [citation])}
       />
-      )}
+      }
       </div>
       </GlassScrollFrame>
 

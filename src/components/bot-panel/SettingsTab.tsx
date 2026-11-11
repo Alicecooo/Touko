@@ -3,7 +3,6 @@ import { Archive, Check, CheckCheck, Copy, FileCode2, FileText, History, LayoutG
 
 import { t } from "@/lib/i18n";
 import type { LocaleKey } from "@/locales";
-import { setAdvancedMode, useAdvancedMode } from "@/lib/interface-mode";
 import { requestNotificationPermission } from "@/lib/notify";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
 import { useStore, type Bot } from "@/state/store";
@@ -58,7 +57,6 @@ export function SettingsTab({ bot, derived, slackUrl, query, onQuery, onOpen, on
   const { state, dispatch } = useStore();
   const actions = useBotActions(bot);
   const ownerOrAdmin = useOwnerOrAdmin();
-  const advanced = useAdvancedMode();
   
   const { patch, canCoordinate, sectionName } = derived;
   const displaySectionName = sectionName === "General" ? t("botAccess.teams.general") : sectionName;
@@ -205,19 +203,6 @@ export function SettingsTab({ bot, derived, slackUrl, query, onQuery, onOpen, on
           drill={false}
           disabled={actions.deleting}
           onClick={actions.requestDelete}
-        />
-      )),
-    ] },
-    { label: null, anchor: "mode", rows: [
-      inline("advanced", `${t("settings.advancedMode.title")} ${t("botPanel.advancedHint")}`, (
-        <SwitchRow
-          key="advanced"
-          data-panel-row="advanced"
-          title={t("settings.advancedMode.title")}
-          hint={t("botPanel.advancedHint")}
-          color={bot.color}
-          checked={advanced}
-          onChange={() => setAdvancedMode(!advanced)}
         />
       )),
     ] },

@@ -137,7 +137,6 @@ export function BotPanel({ bot, derived, slackUrl = null, headerClassName, linke
             <div className="relative" ref={editorRef}>
               <PanelHero
                 bot={bot}
-                activeState={derived.activeState}
                 patch={derived.patch}
                 editorOpen={editorOpen}
                 onToggleEditor={() => setEditorOpen((open) => !open)}
@@ -145,7 +144,7 @@ export function BotPanel({ bot, derived, slackUrl = null, headerClassName, linke
               {editorOpen && (
                 <>
                   <div className="fixed inset-0 z-20" aria-hidden="true" data-panel-scrim onClick={closeEditor} />
-                  <AvatarEditorCard bot={bot} activeState={derived.activeState} onPatch={derived.patch} onClose={closeEditor} />
+                  <AvatarEditorCard bot={bot} onPatch={derived.patch} onClose={closeEditor} />
                 </>
               )}
             </div>

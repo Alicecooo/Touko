@@ -228,8 +228,6 @@ export function PageBody({ page, ...context }: PageContext & { page: PageId }): 
         <IdentitySection
           bot={bot}
           patch={derived.patch}
-          activeState={derived.activeState}
-          mascotMotion={derived.mascotMotion}
           parts={["provenance", "blurb"]}
         />
       );

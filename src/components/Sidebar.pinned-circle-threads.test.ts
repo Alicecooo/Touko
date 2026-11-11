@@ -8,12 +8,6 @@ import type { BotAvatarCrop } from "../../shared/bot-avatar";
 // renderToStaticMarkup reads useShowThreads's server snapshot, which ignores
 // the stored choice, so the cases flip the hook itself.
 const threads = vi.hoisted(() => ({ show: true }));
-
-// Threads are an Advanced-mode surface (Simple keeps one conversation per bot), so these render as Advanced.
-vi.mock("@/lib/interface-mode", async (original) => ({
-  ...await original<typeof import("@/lib/interface-mode")>(),
-  useAdvancedMode: () => true,
-}));
 vi.mock("@/lib/thread-preferences", async (original) => ({
   ...await original<typeof import("@/lib/thread-preferences")>(),
   useShowThreads: () => threads.show,
@@ -70,11 +64,10 @@ describe("pinned circle frame", () => {
     ["circle", "50%"],
     ["rounded", "22%"],
     ["square", "0"],
-    ["mascot", "0"],
   ] as const)("keeps a %s crop (%s) and does not force rounded-full", (crop: BotAvatarCrop, radius: string) => {
     const markup = renderCircle(bot({
       avatarCrop: crop,
-      avatarUrl: crop === "mascot" ? undefined : "/api/attachments/cat.webp",
+      avatarUrl: "/api/attachments/cat.webp",
     }));
     const clipped = frame(markup);
     expect(clipped).toContain(`border-radius:${radius}`);

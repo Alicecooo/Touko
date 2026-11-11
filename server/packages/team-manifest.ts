@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import { schemaIssue, type JsonValue } from "../config/schema.ts";
 import type { MausColor } from "../storage/store.ts";
-import { botMascotBody, type MascotBodyId } from "../../shared/mascot-bodies.ts";
 import { takeImportName } from "../../shared/import-name.ts";
 import { BOT_PROFILE_LIMITS } from "../../shared/bot-profile.ts";
 import { optionalText, requiredText } from "../../shared/package-format.ts";
@@ -170,7 +169,6 @@ export function parseTeamManifest(value: TeamManifestInput): ParsedTeamManifest 
     seenKeys.add(member.key);
     const appearance: TeamManifestMember["appearance"] = { color: member.appearance.color };
     if (member.appearance.mascotExpression) appearance.mascotExpression = member.appearance.mascotExpression;
-    if (member.appearance.mascotBody) appearance.mascotBody = member.appearance.mascotBody;
     return {
       key: member.key,
       name: member.name,
@@ -214,7 +212,6 @@ export interface ImportedMemberProfile {
   soul?: string;
   color: MausColor;
   mascotExpression?: string;
-  mascotBody?: MascotBodyId;
 }
 
 /** Everything an untrusted manifest may seed into a new bot, and nothing else:
@@ -235,8 +232,6 @@ export function importedMemberProfile(
     color: member.appearance.color,
   };
   if (member.appearance.mascotExpression) profile.mascotExpression = member.appearance.mascotExpression;
-  // Free text in the manifest: safe-parsed so an untrusted value never reaches a BotRecord unvalidated.
-  if (member.appearance.mascotBody) profile.mascotBody = botMascotBody(member.appearance.mascotBody);
   return profile;
 }
 
@@ -266,7 +261,6 @@ export function createTeamManifest(team: ExportableTeam, bots: ExportableBot[]):
     const key = memberKey(bot.name, index, usedKeys);
     const appearance: TeamManifestMember["appearance"] = { color: bot.color };
     if (bot.mascotExpression) appearance.mascotExpression = bot.mascotExpression;
-    if (bot.mascotBody) appearance.mascotBody = bot.mascotBody;
     return {
       key,
       name: bot.name,

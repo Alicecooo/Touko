@@ -16,8 +16,6 @@ const fixture = vi.hoisted(() => ({
   setSidebarDensity: vi.fn(),
   notificationSounds: true,
   setNotificationSounds: vi.fn(),
-  advancedMode: false,
-  setAdvancedMode: vi.fn(),
   api: vi.fn(),
   dispatch: vi.fn(),
   switches: [] as ComponentProps<typeof Switch>[],
@@ -52,10 +50,6 @@ vi.mock("@/lib/notification-preferences", () => ({
   useFinishedNotifications: () => true,
   setFinishedNotifications: vi.fn(),
 }));
-vi.mock("@/lib/interface-mode", () => ({
-  useAdvancedMode: () => fixture.advancedMode,
-  setAdvancedMode: fixture.setAdvancedMode,
-}));
 vi.mock("@/lib/analytics", () => ({ analyticsEnabled: () => false, setAnalyticsEnabled: vi.fn() }));
 vi.mock("./SettingsPrimitives", async (importOriginal) => {
   const original = await importOriginal<typeof import("./SettingsPrimitives")>();
@@ -76,7 +70,6 @@ beforeEach(() => {
   fixture.sidebarDensity = "comfortable";
   fixture.notificationSounds = true;
   // these pin the Advanced rail; Simple has its own suite (SettingsModal.simple.test.ts)
-  fixture.advancedMode = true;
   fixture.switches = [];
   fixture.ownerOrAdmin = null;
   vi.stubGlobal("window", {});

@@ -5,12 +5,11 @@ import Markdown, { defaultUrlTransform, type Components, type ExtraProps } from 
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { fromMarkdown, type Options as MarkdownParseOptions } from "mdast-util-from-markdown";
-import { Check, Copy, Download, LoaderCircle, RotateCcw, WrapText, X } from "lucide-react";
-import { useCopyFeedback } from "@/lib/copy-text";
+import { Check, Download, LoaderCircle, RotateCcw } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { remarkMentions, sameMentionPerson, type MentionPeer, type MentionPerson } from "@/lib/mentions";
 
-import { countLines, downloadSnippetFile, formatLineCount, getLanguageDisplayName, getSnippetFileName, parseFenceInfo } from "../lib/code-block";
+import { parseFenceInfo } from "../lib/code-block";
 import { markdownImageName, markdownImageOpenUrl } from "../lib/markdown-image";
 import { repairMarkdownTables } from "../lib/markdown-tables";
 import { TRANSCRIPT_WINDOW_SIZE } from "../lib/transcript-window";
@@ -293,129 +292,33 @@ export interface CodeBlockProps {
 
 export function CodeBlock({ code, lang, initialWrap = false }: CodeBlockProps) {
   const highlightable = code.length <= HIGHLIGHT_MAX_CHARS;
-  const [html, setHtml] = useState<string | null>(() => highlightable ? highlightCache.get(highlightKey(lang, code)) ?? null : null);
-  // React compares dangerouslySetInnerHTML by identity: a fresh object each render rebuilds the highlighted DOM.
+  const key = highlightKey(lang, code);
+  const [highlight, setHighlight] = useState<{ key: string; html: string | null }>(() => ({ key, html: highlightable ? highlightCache.get(key) ?? null : null }));
+  const html = highlightable ? (highlight.key === key ? highlight.html : highlightCache.get(key) ?? null) : null;
   const markup = useMemo(() => (html ? { __html: html } : null), [html]);
-  const { state: copied, copy } = useCopyFeedback(code);
-  const [wrapLines, setWrapLines] = useState(initialWrap);
   useEffect(() => {
-    setWrapLines(initialWrap);
-  }, [initialWrap]);
-
-  useEffect(() => {
-    if (!highlightable) return setHtml(null);
-    const key = highlightKey(lang, code);
+    if (!highlightable) return;
     const cached = highlightCache.get(key);
-    if (cached) return setHtml(cached);
+    if (cached) return setHighlight({ key, html: cached });
     let alive = true;
     highlightFence(code, lang || "text")
       .then((out) => {
         if (!alive) return;
         rememberHighlight(key, out);
-        setHtml(out);
+        setHighlight({ key, html: out });
       })
       .catch(() => {
       });
     return () => {
       alive = false;
     };
-  }, [code, lang, highlightable]);
+  }, [code, lang, key, highlightable]);
 
-  const download = () => {
-    const filename = getSnippetFileName(lang);
-    downloadSnippetFile(filename, code);
-  };
-
-  const displayLanguage = getLanguageDisplayName(lang);
-  const lineCount = countLines(code);
-
-  return (
-    <div dir="ltr" className="my-2 overflow-hidden rounded-lg border border-hairline/40 bg-inset">
-      <div className="flex items-center justify-between gap-2 border-b border-hairline/30 bg-raised/30 px-3 py-1.5 text-xs">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span title={displayLanguage} className="min-w-0 truncate rounded border border-hairline/40 bg-raised px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-ink select-none">
-            {displayLanguage}
-          </span>
-          {lineCount > 0 && (
-            <span className="shrink-0 whitespace-nowrap text-[11px] text-ink-secondary select-none">
-              {formatLineCount(lineCount)}
-            </span>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-          <button
-            type="button"
-            onClick={() => setWrapLines((w) => !w)}
-            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-colors ${
-              wrapLines
-                ? "bg-accent/15 text-accent font-medium"
-                : "text-ink-secondary hover:bg-raised hover:text-ink"
-            }`}
-            title={wrapLines ? t("codeBlock.disableWrap") : t("codeBlock.wrapLong")}
-            aria-label={wrapLines ? t("codeBlock.disableWrap") : t("codeBlock.wrapLong")}
-            aria-pressed={wrapLines}
-          >
-            <WrapText size={12} aria-hidden="true" />
-            <span className="hidden sm:inline">{wrapLines ? t("codeBlock.unwrap") : t("codeBlock.wrap")}</span>
-          </button>
-          <button
-            type="button"
-            onClick={download}
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-ink-secondary hover:bg-raised hover:text-ink transition-colors"
-            title={t("ui.label.downloadSnippetAsFile")}
-            aria-label={t("ui.label.downloadSnippetAsFile")}
-          >
-            <Download size={12} aria-hidden="true" />
-            <span className="hidden sm:inline">{t("common.save")}</span>
-          </button>
-          <button
-            type="button"
-            onClick={copy}
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-ink-secondary hover:bg-raised hover:text-ink transition-colors"
-            title={copied === "copied" ? t("codeBlock.copied") : copied === "failed" ? t("common.copyFailed") : t("codeBlock.copy")}
-            aria-label={copied === "copied" ? t("codeBlock.copiedAria") : copied === "failed" ? t("common.copyFailed") : t("codeBlock.copyAria")}
-          >
-            {copied === "failed" ? (
-              <>
-                <X size={12} className="text-danger" aria-hidden="true" />
-                <span className="text-danger font-medium hidden sm:inline">{t("common.copyFailed")}</span>
-              </>
-            ) : copied === "copied" ? (
-              <>
-                <Check size={12} className="text-success" aria-hidden="true" />
-                <span className="text-success font-medium hidden sm:inline">{t("ui.copied")}</span>
-              </>
-            ) : (
-              <>
-                <Copy size={12} aria-hidden="true" />
-                <span className="hidden sm:inline">{t("cloudMove.suggest.move")}</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-      {markup ? (
-        <div
-          className={`text-[13px] leading-relaxed [&_pre]:!bg-transparent [&_pre]:m-0 [&_pre]:p-3 ${
-            wrapLines
-              ? "whitespace-pre-wrap break-words overflow-x-hidden [&_pre]:!whitespace-pre-wrap [&_pre]:!break-words [&_code]:!whitespace-pre-wrap [&_code]:!break-words"
-              : "overflow-x-auto"
-          }`}
-          dangerouslySetInnerHTML={markup}
-        />
-      ) : (
-        <pre
-          className={`p-3 text-[13px] leading-relaxed text-ink ${
-            wrapLines
-              ? "whitespace-pre-wrap break-words overflow-x-hidden"
-              : "overflow-x-auto"
-          }`}
-        >
-          {code}
-        </pre>
-      )}
-    </div>
-  );
+  const wrapping = initialWrap ? "whitespace-pre-wrap break-words [&_pre]:!whitespace-pre-wrap [&_code]:!whitespace-pre-wrap [overflow-wrap:anywhere]" : "whitespace-pre";
+  return <div dir="ltr" className="chat-code overflow-hidden rounded-xl bg-inset">
+    {markup ? <div className={"overflow-x-auto text-[13px] leading-6 [&_pre]:!bg-transparent [&_pre]:m-0 [&_pre]:px-4 [&_pre]:py-3 " + wrapping} dangerouslySetInnerHTML={markup} />
+      : <pre className={"overflow-x-auto px-4 py-3 text-[13px] leading-6 text-ink " + wrapping}><code>{code}</code></pre>}
+  </div>;
 }
 
 function mermaidScheme(element: HTMLElement | null): "dark" | "light" {
@@ -443,8 +346,6 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
     mermaidCache.get(mermaidKey(mermaidScheme(typeof document === "undefined" ? null : document.documentElement), code)) ?? null);
   const markup = useMemo(() => (svg ? { __html: svg } : null), [svg]);
   const [error, setError] = useState<string | null>(null);
-  const [showSource, setShowSource] = useState(false);
-  const { state: copied, copy } = useCopyFeedback(code);
 
   useEffect(() => {
     if (typeof MutationObserver === "undefined" || typeof document === "undefined") return;
@@ -497,51 +398,6 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
 
   return (
     <div ref={frame} dir="ltr" className="my-2 overflow-hidden rounded-lg border border-hairline/40 bg-inset">
-      <div className="flex items-center justify-between gap-2 border-b border-hairline/30 bg-raised/30 px-3 py-1.5 text-xs">
-        <span title={t("ui.diagram.title")} className="min-w-0 truncate rounded border border-hairline/40 bg-raised px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-ink select-none">
-          {t("ui.diagram.title")}</span>
-        <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-          <button
-            type="button"
-            onClick={() => setShowSource((visible) => !visible)}
-            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-colors ${
-              showSource
-                ? "bg-accent/15 text-accent font-medium"
-                : "text-ink-secondary hover:bg-raised hover:text-ink"
-            }`}
-            title={showSource ? "Hide diagram source" : "Show diagram source"}
-            aria-label={showSource ? "Hide diagram source" : "Show diagram source"}
-            aria-pressed={showSource}
-          >
-            <WrapText size={12} aria-hidden="true" />
-            <span className="hidden sm:inline">{showSource ? "Hide source" : "Show source"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={copy}
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-ink-secondary hover:bg-raised hover:text-ink transition-colors"
-            title={copied === "copied" ? t("codeBlock.copied") : copied === "failed" ? t("common.copyFailed") : t("codeBlock.copyDiagram")}
-            aria-label={copied === "copied" ? t("codeBlock.copiedDiagram") : copied === "failed" ? t("common.copyFailed") : t("codeBlock.copyDiagramAria")}
-          >
-            {copied === "failed" ? (
-              <>
-                <X size={12} className="text-danger" aria-hidden="true" />
-                <span className="text-danger font-medium hidden sm:inline">{t("common.copyFailed")}</span>
-              </>
-            ) : copied === "copied" ? (
-              <>
-                <Check size={12} className="text-success" aria-hidden="true" />
-                <span className="text-success font-medium hidden sm:inline">{t("ui.copied")}</span>
-              </>
-            ) : (
-              <>
-                <Copy size={12} aria-hidden="true" />
-                <span className="hidden sm:inline">{t("cloudMove.suggest.move")}</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
       {error && (
         <p role="alert" className="px-3 pt-2 text-[12px] text-danger">
           {t("ui.diagram.failed")}{error}
@@ -553,7 +409,7 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
           dangerouslySetInnerHTML={markup}
         />
       )}
-      {(showSource || !svg || error) && (
+      {(!svg || error) && (
         <pre className="overflow-x-auto p-3 text-[13px] leading-relaxed text-ink">{code}</pre>
       )}
     </div>
@@ -913,7 +769,7 @@ const MARKDOWN_COMPONENTS: Components = {
   },
   th({ children }: { children?: ReactNode }) {
     return (
-      <th className="border-b border-hairline/40 px-2 py-1.5 text-start font-semibold">{children}</th>
+      <th className="border-b border-hairline/40 px-2 py-1.5 text-start font-medium">{children}</th>
     );
   },
   td({ children }: { children?: ReactNode }) {
@@ -929,22 +785,22 @@ const MARKDOWN_COMPONENTS: Components = {
     return <ol dir={blockDirection(node)} className="list-decimal space-y-1 ps-5">{children}</ol>;
   },
   h1({ node, children }: BlockProps) {
-    return <div dir={blockDirection(node)} className="mt-2 text-[16px] font-semibold">{children}</div>;
+    return <h1 dir={blockDirection(node)}>{children}</h1>;
   },
   h2({ node, children }: BlockProps) {
-    return <div dir={blockDirection(node)} className="mt-2 text-[15.5px] font-semibold">{children}</div>;
+    return <h2 dir={blockDirection(node)}>{children}</h2>;
   },
   h3({ node, children }: BlockProps) {
-    return <div dir={blockDirection(node)} className="mt-1.5 font-semibold">{children}</div>;
+    return <h3 dir={blockDirection(node)}>{children}</h3>;
   },
   h4({ node, children }: BlockProps) {
-    return <div dir={blockDirection(node)} className="mt-1.5 font-semibold">{children}</div>;
+    return <h4 dir={blockDirection(node)}>{children}</h4>;
   },
   h5({ node, children }: BlockProps) {
-    return <div dir={blockDirection(node)} className="mt-1.5 text-[14px] font-semibold">{children}</div>;
+    return <h5 dir={blockDirection(node)}>{children}</h5>;
   },
   h6({ node, children }: BlockProps) {
-    return <div dir={blockDirection(node)} className="mt-1.5 text-[13.5px] font-semibold text-ink-secondary">{children}</div>;
+    return <h6 dir={blockDirection(node)}>{children}</h6>;
   },
   blockquote({ node, children }: BlockProps) {
     return (
@@ -990,7 +846,7 @@ function ChatMarkdownComponent({ text, message, mentionPeers = NO_MENTION_PEERS,
   const mathPlugin = needsMath && katexReady ? katexPlugin : null;
   return (
     <MessageScopeContext.Provider value={{ message, imageOffsets, threads, currentBotId, delivered }}>
-      <div className="chat-md min-w-0 [&>*+*]:mt-2">
+      <div className="chat-md min-w-0">
         <Markdown
           remarkPlugins={[remarkGfm, remarkMath, remarkWindowsPathDestinations, unwrapLinkedImages, remarkGithubRefs, [remarkMentions, { peers: mentionPeers, everyone, person: mentionPerson }], remarkThreadRefs(threads, currentBotId)]}
           rehypePlugins={mathPlugin ? [mathPlugin] : []}

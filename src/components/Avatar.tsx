@@ -1,225 +1,35 @@
-import { forwardRef, memo, useEffect, useImperativeHandle, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { MAUS_COLORS, type MausColor, type MausMotion, type MausState } from "@/lib/mascot";
-import { CursorAvatar, type CursorAvatarHandle } from "./CursorAvatar";
+import { useEffect, useState } from "react";
+import type { MausColor } from "@/lib/bot-appearance";
+import { normalizeState } from "@/lib/bot-appearance";
 import { avatarCropRadius, botAvatarProfile, clampAvatarFocus, clampAvatarZoom, type BotAvatarCrop } from "../../shared/bot-avatar";
-import { MASCOT_BODIES, botMascotBody, type MascotBodyId } from "../../shared/mascot-bodies";
+import { defaultPortraitCharacter, portraitAvatarUrl, portraitFromAvatarUrl, type PortraitCharacter, type PortraitExpression } from "../../shared/portrait-avatars";
 
-export const EYE_SCALE = 1.12;
-export const MOUTH_WEIGHT = 11;
-
-const POINTER_GAZE = { forward: 1, authored: 0.25 };
-
-interface MotionFaces
-  extends Partial<
-    Record<Exclude<MausMotion, "none">, { state?: MausState; blink?: boolean; spin?: number }>
-  > {}
-
-const MOTION_FACE: MotionFaces = {
-  arrive: { state: "spawning", spin: 900 },
-  switch: { state: "waking", spin: 620 },
-  customize: { state: "proud", blink: true },
-  alert: { state: "alerting" },
-  thinking: { state: "thinking" },
-  working: { state: "working" },
-  launch: { state: "loading" },
-  success: { state: "happy", blink: true },
-  celebrate: { state: "celebrate", spin: 700 },
-  blink: { blink: true },
-  surprise: { state: "surprised", blink: true },
-  failure: { state: "sad" },
-};
-
-const MOTION_FACE_MS = 1400;
-
-function mix(hex: string, toward: string, t: number): string {
-  const a = Number.parseInt(hex.slice(1), 16);
-  const b = Number.parseInt(toward.slice(1), 16);
-  const channel = (shift: number) => {
-    const va = (a >> shift) & 0xff;
-    const vb = (b >> shift) & 0xff;
-    return Math.round(va + (vb - va) * t);
-  };
-  return `#${[channel(16), channel(8), channel(0)]
-    .map((part) => part.toString(16).padStart(2, "0"))
-    .join("")}`;
-}
-
-const gradientFor = (color: MausColor): [string, string, string] => {
-  const fill = MAUS_COLORS[color] ?? MAUS_COLORS.green;
-  return [mix(fill, "#ffffff", 0.55), fill, mix(fill, "#000000", 0.42)];
-};
-
-export function roomAvatarGradient(color: MausColor): [string, string, string] {
-  const fill = `var(--identity-${color})`;
-  return [
-    `color-mix(in srgb, ${fill} 82%, #ffffff)`,
-    fill,
-    `color-mix(in srgb, ${fill} 82%, #000000)`,
-  ];
-}
-
-export type MausAvatarHandle = CursorAvatarHandle;
-
-export type MausAvatarProps = {
-  color: MausColor;
-  state?: MausState;
-  expression?: number;
+export type BotAvatarProps = {
   size?: number;
   label?: string;
-  motion?: MausMotion;
-  motionKey?: number;
-  turn?: number;
-  gaze?: { x?: number; y?: number };
-  spring?: number;
-  eyeScale?: number;
-  showMouth?: boolean;
-  mouthStroke?: number;
-  forward?: boolean;
-  lookAround?: number;
-  trackPointer?: boolean;
-  animated?: boolean;
-  bodyId?: MascotBodyId;
-  gradient?: [string, string, string];
-};
-
-function MausAvatarComponent(
-  {
-    color,
-    state = "idle",
-    expression,
-    size = 44,
-    label,
-    motion = "none",
-    motionKey = 0,
-    turn,
-    gaze,
-    spring,
-    eyeScale,
-    showMouth,
-    mouthStroke,
-    forward = true,
-    lookAround,
-    trackPointer = true,
-    animated = true,
-    bodyId,
-    gradient,
-  }: MausAvatarProps,
-  ref: React.Ref<MausAvatarHandle>,
-) {
-  const silhouette = MASCOT_BODIES[botMascotBody(bodyId)];
-  const inner = useRef<CursorAvatarHandle>(null);
-  useImperativeHandle(ref, () => ({
-    blink: () => inner.current?.blink(),
-    spin: (durationMs?: number) => inner.current?.spin(durationMs),
-    setExpression: (index: number) => inner.current?.setExpression(index),
-  }));
-
-  const [motionState, setMotionState] = useState<MausState | null>(null);
-  useEffect(() => {
-    if (motion === "none" || !animated) return;
-    const beat = MOTION_FACE[motion];
-    if (!beat) return;
-    if (beat.blink) inner.current?.blink();
-    if (beat.spin) inner.current?.spin(beat.spin);
-    if (!beat.state) return;
-    setMotionState(beat.state);
-    const timer = setTimeout(() => setMotionState(null), MOTION_FACE_MS);
-    return () => clearTimeout(timer);
-  }, [motion, motionKey, animated]);
-
-  const [pointer, setPointer] = useState({ x: 0, y: 0 });
-  const range = forward ? POINTER_GAZE.forward : POINTER_GAZE.authored;
-  const onPointerMove = (event: ReactPointerEvent<HTMLSpanElement>) => {
-    if (!trackPointer || !animated) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    setPointer({
-      x: Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width) * 2 - 1)) * range,
-      y: Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height) * 2 - 1)) * range,
-    });
-  };
-  const onPointerLeave = () => setPointer({ x: 0, y: 0 });
-
-  return (
-    <span
-      className="inline-flex shrink-0"
-      onPointerMove={trackPointer && animated ? onPointerMove : undefined}
-      onPointerLeave={trackPointer && animated ? onPointerLeave : undefined}
-    >
-      <CursorAvatar
-        ref={inner}
-        state={motionState ?? state}
-        expression={expression}
-        size={size}
-        silhouette={silhouette}
-        gradient={gradient ?? gradientFor(color)}
-        title={label ?? null}
-        lookAround={lookAround ?? (forward ? 0 : 1)}
-        gaze={{ x: (gaze?.x ?? 0) + pointer.x, y: (gaze?.y ?? 0) + pointer.y }}
-        turn={turn}
-        spring={spring}
-        eyeScale={eyeScale}
-        showMouth={showMouth}
-        mouthStroke={mouthStroke}
-        paused={!animated}
-      />
-    </span>
-  );
-}
-
-export const MausAvatar = memo(forwardRef(MausAvatarComponent));
-
-export type BotAvatarProps = Omit<MausAvatarProps, "color" | "gradient"> & {
-  readable?: boolean;
   bot: {
-    name?: string;
-    color: MausColor;
-    avatarUrl?: string | null;
-    avatarCrop?: BotAvatarCrop;
-    avatarZoom?: number;
-    avatarFocusX?: number;
-    avatarFocusY?: number;
-    mascotBody?: MascotBodyId | null;
+    id?: string; busy?: boolean; name?: string; color: MausColor;
+    avatarUrl?: string | null; avatarCrop?: BotAvatarCrop;
+    avatarZoom?: number; avatarFocusX?: number; avatarFocusY?: number;
+    mascotExpression?: string | null;
   };
 };
 
-export type BotAvatarOutcome = "flatImage" | "gradientMascot";
-
-/** Mirrored name for name by resolveBotAvatarOutcome in ios/Sources/CompanionCore/BotAvatarRendering.swift. */
-export function resolveBotAvatarOutcome(params: {
-  avatarCrop: BotAvatarCrop;
-  hasUrl: boolean;
-  imageFailed: boolean;
-}): BotAvatarOutcome {
-  const { avatarCrop, hasUrl, imageFailed } = params;
-  if (!hasUrl) return "gradientMascot";
-  if (avatarCrop === "mascot") return "gradientMascot";
-  if (imageFailed) return "gradientMascot";
-  return "flatImage";
-}
-
-export function BotAvatar({ bot, size = 44, label, readable = false, ...mascotProps }: BotAvatarProps) {
+export function BotAvatar({ bot, size = 44, label }: BotAvatarProps) {
   const profile = botAvatarProfile(bot);
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => setImageFailed(false), [profile.avatarUrl]);
 
-  const outcome = resolveBotAvatarOutcome({
-    avatarCrop: profile.avatarCrop,
-    hasUrl: Boolean(profile.avatarUrl),
-    imageFailed,
-  });
 
-  if (outcome !== "flatImage") {
-    return (
-      <MausAvatar
-        bodyId={bot.mascotBody ?? undefined}
-        {...mascotProps}
-        color={bot.color}
-        gradient={readable ? roomAvatarGradient(bot.color) : undefined}
-        size={size}
-        label={label ?? bot.name}
-      />
-    );
+  const portrait = portraitFromAvatarUrl(profile.avatarUrl);
+  if (portrait || !profile.avatarUrl || imageFailed) {
+    return <PortraitAvatar
+      character={portrait?.character ?? defaultPortraitCharacter(bot.id || bot.name || bot.color)}
+      expression={normalizeState(bot.mascotExpression) ?? portrait?.expression ?? "idle"}
+      size={size}
+      label={label ?? bot.name ?? "Bot"}
+    />;
   }
 
   const radius = avatarCropRadius(profile.avatarCrop);
@@ -250,6 +60,25 @@ export function BotAvatar({ bot, size = 44, label, readable = false, ...mascotPr
       />
     </span>
   );
+}
+
+export function PortraitAvatar({ character, expression = "idle", size = 44, label = "Bot" }: {
+  character: PortraitCharacter;
+  expression?: PortraitExpression;
+  size?: number;
+  label?: string;
+}) {
+  const source = portraitAvatarUrl(character, expression);
+  const [failedSource, setFailedSource] = useState<string | null>(null);
+  const [neutralFailed, setNeutralFailed] = useState(false);
+  useEffect(() => { setFailedSource(null); setNeutralFailed(false); }, [character]);
+  if (neutralFailed) return <InitialsAvatar initials={label.slice(0, 1)} size={size} />;
+  const shown = failedSource === source ? portraitAvatarUrl(character) : source;
+  return <span className="relative inline-block shrink-0 overflow-hidden rounded-[22%] bg-raised" style={{ width: size, height: size }}>
+    <img src={shown} alt={label} width={size} height={size} draggable={false}
+      className="block size-full object-cover"
+      onError={() => { if (shown === portraitAvatarUrl(character)) setNeutralFailed(true); else setFailedSource(source); }} />
+  </span>;
 }
 
 export function InitialsAvatar({

@@ -1,15 +1,11 @@
 import { z } from "zod";
 
-/**
- * `mascot` draws the animated mascot body, filled with the bot's colour
- * gradient. `circle`, `rounded`, and `square` crop the bot's own image
- * instead, shown as it is, with no mascot at all.
- */
-export const BOT_AVATAR_CROPS = ["mascot", "circle", "rounded", "square"] as const;
-export const botAvatarCropSchema = z.enum(BOT_AVATAR_CROPS);
+/** Images use one of three crops. The retired mascot value is read as the default image crop. */
+export const BOT_AVATAR_CROPS = ["circle", "rounded", "square"] as const;
+export const botAvatarCropSchema = z.preprocess(value => value === "mascot" ? "rounded" : value, z.enum(BOT_AVATAR_CROPS));
 export type BotAvatarCrop = z.infer<typeof botAvatarCropSchema>;
 
-/** CSS radius for a profile crop. Mascot is drawn, not photo-cropped, so it is not clipped. */
+/** CSS radius for a profile image. */
 export function avatarCropRadius(crop: BotAvatarCrop): string {
   if (crop === "circle") return "50%";
   if (crop === "rounded") return "22%";
@@ -69,7 +65,7 @@ export interface BotAvatarProfile {
 
 export function botAvatarProfile(value: BotAvatarProfileInput): BotAvatarProfile {
   const profile: BotAvatarProfile = {
-    avatarCrop: botAvatarCropSchema.safeParse(value.avatarCrop).data ?? "mascot",
+    avatarCrop: botAvatarCropSchema.safeParse(value.avatarCrop).data ?? "rounded",
   };
   const url = botAvatarUrlSchema.safeParse(value.avatarUrl);
   if (url.success) profile.avatarUrl = url.data;

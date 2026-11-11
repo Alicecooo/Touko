@@ -15,7 +15,6 @@ describe("rich table rendering", () => {
     expect(html).toContain("code");
     expect(html).toContain("text-align:right");
     expect(html).not.toContain("<script>");
-    expect(html).toContain("2 of 2 rows");
     expect(html).toContain('scope="col"');
   });
   it("bounds the DOM for a large table", () => {

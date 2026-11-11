@@ -1,17 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import en from "@/locales/en.json";
-import { BOT_SECTIONS } from "../bot-settings/sections";
-import { PAGE_IDS, PAGES, PANEL_TABS, sectionTarget, setupTarget, TAB_LABEL } from "./page-registry";
+import { PAGE_IDS, PAGES, PANEL_TABS, setupTarget, TAB_LABEL } from "./page-registry";
 
 describe("the bot panel's page registry", () => {
-  it("lands every settings section on a tab, and on a page that lives on that tab", () => {
-    for (const { id } of BOT_SECTIONS) {
-      const target = sectionTarget(id);
-      expect(PANEL_TABS).toContain(target.tab);
-      if (target.page) expect(PAGES[target.page].home, id).toBe(target.tab);
-    }
-  });
 
   it("sends each setup idea to the page that sets it up", () => {
     expect(setupTarget("soul")).toEqual({ tab: "details", page: "instructions" });

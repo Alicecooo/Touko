@@ -15,10 +15,6 @@ beforeAll(() => {
   // The skin picker reads the attribute main.tsx stamps before first paint.
   (globalThis as { document?: unknown }).document ??= { documentElement: { dataset: {} } };
 });
-
-// Pinned to Advanced: these cover the Advanced rail. Analytics (mocked below) boots PostHog on import, which wants a
-// real browser.
-vi.mock("@/lib/interface-mode", () => ({ useAdvancedMode: () => true, setAdvancedMode: () => {} }));
 vi.mock("@/lib/analytics", () => ({
   analyticsEnabled: () => false,
   setAnalyticsEnabled: () => {},
@@ -50,7 +46,6 @@ describe("Settings → General", () => {
     for (const key of [
       "settings.group.you", "settings.group.computers", "settings.group.account",
       "settings.section.appearance", "settings.section.backups",
-      "settings.advancedMode.title",
     ] as const) {
       expect(locales.ja[key], key).toBeTruthy();
       expect(locales.ja[key], key).not.toBe(en[key]);

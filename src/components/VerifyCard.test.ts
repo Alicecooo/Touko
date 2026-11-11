@@ -41,10 +41,6 @@ describe("VerifyCard", () => {
     expect(markup).toContain(t("chat.verify.save"));
   });
 
-  it("explains under Save that it fills the message instead of sending", () => {
-    expect(render()).toMatch(new RegExp(`${t("chat.verify.save")}</button><span class="text-\\[12px\\] text-ink-secondary">${t("chat.verify.saveHint")}</span>`));
-  });
-
   it("announces the summary and makes the step list reachable by keyboard", () => {
     const markup = render();
     expect(markup).toMatch(/<span role="status" aria-live="polite" aria-atomic="true"[^>]*>3 steps · 2 verified · 1 failed · 1 running</);

@@ -82,7 +82,6 @@ function hostileState(): SnapshotState {
       vps: { configured: true, sshAlias: HOSTILE }, rooms: { turnTimeoutMinutes: 30 }, localVm: { mode: "per-bot", maxInstances: 2 },
       opencodeGo: { configured: true, providerKeys: [HOSTILE] },
       decider: { provider: "jev", model: HOSTILE, configured: true, enabled: true, jobs: { roomRouting: true } },
-      imageGen: { configured: true, provider: "custom", model: HOSTILE, customUrl: `https://${HOSTILE}.example.com`, customModel: HOSTILE, customKeyConfigured: true },
       profile: { name: HOSTILE, email: `${HOSTILE}@example.com`, aboutMe: HOSTILE },
       language: "ja",
       edition: { edition: "enterprise", features: [HOSTILE] },
@@ -173,8 +172,8 @@ describe("the daily usage snapshot", () => {
     expect(await snapshot.sendDailySnapshot(hostileState(), hostileSources(), DAY)).toBe(true);
     const [sent] = snapshots();
     expect(sent).toEqual({
-      key_providers: ["anthropic", "openai_compat", "composio", "opencode_go", "jev", "custom_image"],
-      key_count: 6, bots: 9, bots_this_computer: 1, bots_browser: 1, bots_off: 1, bots_auto: 2,
+      key_providers: ["anthropic", "openai_compat", "composio", "opencode_go", "jev"],
+      key_count: 5, bots: 9, bots_this_computer: 1, bots_browser: 1, bots_off: 1, bots_auto: 2,
       rooms: 2, bot_channels: 1, teams: 2,
       routines: 4, routines_enabled: 3, routines_cloud: 1, routines_room_goal: 1, routines_once: 1, routines_daily: 1, routines_interval: 1, routines_cron: 1,
       webhooks: 1, engines: ["claude", "openai_compat", "other"], engine_count: 4, custom_endpoints: 1, trial_credit: "used_up",
@@ -239,7 +238,7 @@ describe("the daily usage snapshot", () => {
     for (const key of ["apps", "apps_connected", "members"]) {
       expect(sent, key).not.toHaveProperty(key);
     }
-    expect(sent).toMatchObject({ bots: 9, key_count: 6 });
+    expect(sent).toMatchObject({ bots: 9, key_count: 5 });
   });
 });
 
@@ -286,10 +285,7 @@ describe("what counts as a key, a computer source and an app", () => {
     expect(buildUsageSnapshot(minimal({}, { apps: { services, authoritative: true } }))).toMatchObject({ apps: ["gmail"], apps_connected: 1 });
   });
 
-  it("counts one xAI key once, though avatar images can use it too", () => {
-    const imageGen = { configured: false, provider: "openai" as const, openaiConfigured: false, xaiConfigured: true, customKeyConfigured: false };
-    expect(buildUsageSnapshot(minimal({ xai: { configured: true }, imageGen }))).toMatchObject({ key_providers: ["xai"], key_count: 1 });
-  });
+
 
   it("leaves archived bots out of every bot count", () => {
     const bots = [{ computer: "cloud", hidden: true }, { computer: "cloud", cloudBackend: "vps", hidden: true }, { computer: "local", hidden: false }, { computer: "cloud" }] as UsageInput["bots"];

@@ -173,14 +173,14 @@ describe("bot patch queue", () => {
       bot(),
     );
     await vi.advanceTimersByTimeAsync(200);
-    queue.enqueue("bot-1", { avatarUrl: null, avatarCrop: "mascot" }, bot());
+    queue.enqueue("bot-1", { avatarUrl: null, avatarCrop: "rounded" }, bot());
     await vi.advanceTimersByTimeAsync(399);
     expect(sent).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(1);
 
-    expect(sent).toEqual([{ avatarUrl: null, avatarCrop: "mascot" }]);
+    expect(sent).toEqual([{ avatarUrl: null, avatarCrop: "rounded" }]);
     expect(authoritative).toHaveBeenLastCalledWith(
-      expect.objectContaining({ avatarUrl: null, avatarCrop: "mascot" }),
+      expect.objectContaining({ avatarUrl: null, avatarCrop: "rounded" }),
       {},
     );
   });

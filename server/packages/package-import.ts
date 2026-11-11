@@ -125,9 +125,7 @@ export function memberFromAgent(agent: PackageAgent): TeamManifestMember {
     ...(agent.soul !== undefined ? { soul: agent.soul } : {}),
     appearance: {
       color: agent.appearance.color,
-      ...(agent.appearance.mascotExpression ? { mascotExpression: agent.appearance.mascotExpression } : {}),
-      ...(agent.appearance.mascotBody ? { mascotBody: agent.appearance.mascotBody } : {}),
-    },
+      ...(agent.appearance.mascotExpression ? { mascotExpression: agent.appearance.mascotExpression } : {}),    },
   };
 }
 
@@ -355,7 +353,8 @@ function runImport(source: ImportSource, options: PackageImportOptions, deps: Pa
           look: {
             color: written.color,
             mascotExpression: written.mascotExpression ?? null,
-            mascotBody: written.mascotBody ?? null,
+            // Keep the established package stamp shape while retiring the bot setting.
+            mascotBody: null,
             avatar: avatarHash,
             crop: written.avatarCrop ?? null,
           },

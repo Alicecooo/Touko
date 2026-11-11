@@ -168,9 +168,6 @@ describe("§2 lifecycle", () => {
     w.rt.tick();
     expect(get(w, child.id).status).toBe("running");
     expect(w.runner.running.has(child.id)).toBe(true);
-    expect(w.rt.liveEdges()).toEqual([
-      expect.objectContaining({ sourceBotId: "chief", targetBotId: "dev", state: "running", threadId: child.assignee.destination.threadId }),
-    ]);
     expect(w.rt.outstanding(chiefOwner).map((a) => a.id)).toEqual([child.id]);
     invariants(w);
 
@@ -214,7 +211,6 @@ describe("§2 lifecycle", () => {
     expect(r.status).toBe("completed");
     expect(r.outcome).toBe("done");
     expect(r.executions).toBe(2);
-    expect(w.rt.liveEdges()).toEqual([]);
     expect(w.rt.outstanding(chiefOwner)).toEqual([]);
 
     const ck = kinds(w, child.id);
@@ -402,7 +398,6 @@ describe("§2 lifecycle", () => {
     expect(w.runner.running.size).toBe(0);
     expect(kinds(w, child.id)).toContain("parked");
     expect(get(w, root.id).status).toBe("waiting");
-    expect(w.rt.liveEdges()).toEqual([expect.objectContaining({ targetBotId: "dev", state: "needs_input" })]);
     invariants(w);
 
     w.clock.advance(120_000);
@@ -709,7 +704,6 @@ describe("§6 budgets and clocks", () => {
     expect(w.runner.runs(root.id)).toHaveLength(0);
     expect(w.runner.reports(root.id)).toHaveLength(1);
     expect(w.store.all({ nonTerminal: true })).toEqual([]);
-    expect(w.rt.liveEdges()).toEqual([]);
     invariants(w);
   });
 
@@ -824,7 +818,6 @@ describe("§2 cancel and stop awaiting", () => {
     expect(w.runner.runs(root.id)).toHaveLength(0);
     expect(w.runner.runs(child.id)).toHaveLength(1);
     expect(w.runner.runs(grand.id)).toHaveLength(1);
-    expect(w.rt.liveEdges()).toEqual([]);
     expect(w.rt.outstanding(chiefOwner)).toEqual([]);
     invariants(w);
   });
@@ -960,7 +953,6 @@ describe("§2 admission", () => {
     expect(events).toHaveLength(2);
     expect(events[0].kind).toBe("enqueued");
     expect(events[1].kind).not.toBe("started");
-    expect(w.rt.liveEdges()).toEqual([expect.objectContaining({ targetBotId: "dev", state: "queued" })]);
     invariants(w);
 
     w.runner.setCanStart("dev", true);

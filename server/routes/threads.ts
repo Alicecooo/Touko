@@ -340,7 +340,7 @@ export function createThreadRoutes(deps: ThreadRouteDeps): RouteHandler {
       }
     }
 
-    // Name-locked to the attachments dir: readAttachment refuses anything but a bare generated filename.
+    // Bare attachment filenames and exact bundled portrait catalog names only.
     m = path.match(/^\/api\/attachments\/([\w.-]+)$/);
     if (m && method === "GET") {
       const attachment = readAttachment(m[1]!);

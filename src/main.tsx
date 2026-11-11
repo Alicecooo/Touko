@@ -6,16 +6,14 @@ import { bootstrapBrand } from "./lib/brand";
 import { applySkin, readSkin } from "./lib/skins";
 import { applyChatWidth, readChatWidth } from "./lib/chat-width";
 import { applyFont, readFont } from "./lib/fonts";
-import { settleAdvancedModeDefault } from "./lib/interface-mode";
 
 import { LoginPage } from "./pair/LoginPage";
 import { setLocale } from "./lib/i18n";
 import { languageChoice } from "./lib/language-preference";
 import "./styles.css";
 
-// Before first paint; settleAdvancedModeDefault must run before applySkin writes omb-skin.
+// Apply display preferences before first paint.
 setLocale(languageChoice() || navigator.language);
-settleAdvancedModeDefault();
 applySkin(readSkin());
 applyFont(readFont());
 applyChatWidth(readChatWidth());

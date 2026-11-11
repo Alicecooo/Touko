@@ -6,8 +6,6 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import type { AppState, Bot, InstanceInfo } from "@/state/store";
 import { setLocale, t } from "@/lib/i18n";
 
-const fixture = vi.hoisted(() => ({ advanced: true }));
-
 vi.mock("./DesktopCapabilities", async (importOriginal) => ({
   ...await importOriginal<typeof import("./DesktopCapabilities")>(),
   useCaptionChrome: () => ({ padClass: undefined }),
@@ -21,7 +19,6 @@ vi.mock("./DesktopCapabilities", async (importOriginal) => ({
     },
   }),
 }));
-vi.mock("@/lib/interface-mode", () => ({ useAdvancedMode: () => fixture.advanced, setAdvancedMode: () => {} }));
 vi.mock("@/lib/use-owner-or-admin", () => ({ useOwnerOrAdmin: () => true }));
 
 vi.mock("./bot-settings/RoutinesSection", () => ({ RoutinesSection: () => null }));
@@ -74,7 +71,6 @@ const open = async (bot: Bot) => {
 };
 const tabs = () => [...document.querySelectorAll<HTMLButtonElement>('[data-testid="computer-tabs"] [role="tab"]')];
 const tab = (label: string) => tabs().find((candidate) => candidate.textContent?.trim() === label)!;
-const tabLabels = () => tabs().map((candidate) => candidate.textContent?.trim());
 const selected = () => tabs().find((candidate) => candidate.getAttribute("aria-selected") === "true")?.textContent?.trim();
 const tabStops = () => tabs().filter((candidate) => candidate.getAttribute("tabindex") === "0").map((candidate) => candidate.textContent?.trim());
 const tabListName = () => document.querySelector('[data-testid="computer-tabs"]')?.getAttribute("aria-label");
@@ -95,7 +91,6 @@ beforeEach(() => {
     setItem: (key: string, value: string) => void saved.set(key, value),
     removeItem: (key: string) => void saved.delete(key),
   });
-  fixture.advanced = true;
 });
 afterEach(() => {
   root?.unmount();
@@ -165,14 +160,6 @@ describe("Computer panel tab", () => {
     await settle();
     expect(selected()).toBe("Files");
     expect(document.activeElement).toBe(tab("Files"));
-  });
-
-  it("ends at Data in Simple mode", async () => {
-    fixture.advanced = false; await open(makeBot());
-    expect(tabLabels()).toEqual(["Files", "Data"]);
-    press("Files", "End"); await settle();
-    expect(selected()).toBe("Data");
-    expect(document.activeElement).toBe(tab("Data"));
   });
 
   it("points every selected trigger at its panel and the panel back", async () => {

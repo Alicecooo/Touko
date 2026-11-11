@@ -59,17 +59,6 @@ export interface ConfigStatus {
     enabled: boolean;
     jobs: { roomRouting: boolean };
   };
-  /** Shared write-only credential for on-demand GPT Image avatars. */
-  imageGen?: {
-    configured: boolean;
-    provider?: "openai" | "xai" | "custom";
-    model?: string;
-    customUrl?: string;
-    customModel?: string;
-    openaiConfigured?: boolean;
-    xaiConfigured?: boolean;
-    customKeyConfigured?: boolean;
-  };
   /** who's using the app — collected in onboarding, shown in the sidebar */
   profile?: { name: string; email: string; aboutMe?: string };
   /** UI language override; "" (or absent) follows the system language. */

@@ -25,8 +25,6 @@ const fixture = vi.hoisted(() => ({
   setSendKey: vi.fn(),
   colorUserBubbles: false,
   setColorUserBubbles: vi.fn(),
-  advancedMode: false,
-  setAdvancedMode: vi.fn(),
   api: vi.fn(),
   dispatch: vi.fn(),
   switches: [] as ComponentProps<typeof Switch>[],
@@ -72,10 +70,6 @@ vi.mock("@/lib/user-bubble-preference", () => ({
   useColorUserBubbles: () => fixture.colorUserBubbles,
   setColorUserBubbles: fixture.setColorUserBubbles,
 }));
-vi.mock("@/lib/interface-mode", () => ({
-  useAdvancedMode: () => fixture.advancedMode,
-  setAdvancedMode: fixture.setAdvancedMode,
-}));
 vi.mock("@/lib/analytics", () => ({ analyticsEnabled: () => false, setAnalyticsEnabled: vi.fn() }));
 vi.mock("./SettingsPrimitives", async (importOriginal) => {
   const original = await importOriginal<typeof import("./SettingsPrimitives")>();
@@ -99,7 +93,6 @@ beforeEach(() => {
   fixture.sendKey = "enter";
   fixture.colorUserBubbles = false;
   // these pin the Advanced rail; Simple has its own suite (SettingsModal.simple.test.ts)
-  fixture.advancedMode = true;
   fixture.switches = [];
   vi.stubGlobal("window", {});
   vi.stubGlobal("document", { documentElement: { dataset: {} } });
@@ -114,29 +107,6 @@ afterEach(() => {
 const render = () => renderToStaticMarkup(createElement(SettingsModal));
 
 describe("Settings → Appearance", () => {
-  it.each([true, false])("flips Advanced mode from the top of General when the switch is %s", (enabled) => {
-    fixture.section = "general";
-    fixture.advancedMode = enabled;
-    const html = render();
-    expect(html.indexOf('aria-label="Advanced mode"')).toBeLessThan(html.indexOf("Language"));
-    expect(html).toContain('aria-label="Advanced mode"');
-    expect(html).toContain("Nothing is deleted either way");
-    const toggle = fixture.switches.find((props) => props["aria-label"] === "Advanced mode")!;
-    expect(toggle.checked).toBe(enabled);
-    toggle.onClick!({} as never);
-    expect(fixture.setAdvancedMode).toHaveBeenCalledWith(!enabled);
-    expect(fixture.api).not.toHaveBeenCalled();
-    expect(fixture.dispatch).not.toHaveBeenCalled();
-  });
-
-  it("keeps the Advanced mode switch reachable from a paired remote client", () => {
-    vi.stubGlobal("window", { ogb: { remoteClient: { active: true } } });
-    expect(render()).toContain('aria-label="Advanced mode"');
-  });
-
-  it("does not repeat the Advanced mode switch in Appearance on this computer", () => {
-    expect(render()).not.toContain('aria-label="Advanced mode"');
-  });
 
 
   it("groups skins, thread visibility, and tool-call display with preservation copy", () => {
@@ -197,25 +167,9 @@ describe("Settings → Appearance", () => {
     expect(fixture.dispatch).not.toHaveBeenCalled();
   });
 
-  it("offers the tools layout row right under the density row", () => {
-    const html = render();
-    expect(html).toContain('aria-label="Choose tools layout"');
-    expect(html).toContain("Tools layout");
-    expect(html).toContain("Icons density always shows icons");
-    expect(html).toContain('<option value="rows" selected="">Rows</option>');
-    expect(html).toContain('<option value="toolbar">Toolbar</option>');
-    expect(html.indexOf('aria-label="Choose sidebar density"')).toBeLessThan(
-      html.indexOf('aria-label="Choose tools layout"'),
-    );
-    expect(fixture.setSidebarToolsLayout).not.toHaveBeenCalled();
-  });
 
-  it("appearance search finds the tools layout row via toolbar", () => {
-    const appearance = SECTIONS.find((entry) => entry.id === "appearance")!;
-    for (const query of ["toolbar", "tools layout", "footer", "routines", "triggers", "team map"]) {
-      expect(sectionMatches(appearance, query)).toBe(true);
-    }
-  });
+
+
 
   it.each([
     ["enter", "Enter"],

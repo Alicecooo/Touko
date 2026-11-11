@@ -92,25 +92,14 @@ describe("parseBotProfilePatch (both modes)", () => {
   it("maps an avatarCrop issue to the readable message", () => {
     expect(parseBotProfilePatch({ avatarCrop: "hexagon" } as never, true)).toEqual({
       ok: false,
-      error: "avatarCrop must be mascot, circle, rounded, or square",
+      error: "avatarCrop must be circle, rounded, or square",
     });
   });
 });
 
-describe("mascotBody", () => {
-  it("accepts a known body", () => {
-    expect(parseBotProfilePatch({ mascotBody: "blob" } as never, true)).toEqual({
-      ok: true,
-      patch: { mascotBody: "blob" },
-    });
-  });
-
-  it("maps an unknown body to a readable message", () => {
-    expect(parseBotProfilePatch({ mascotBody: "hexagram" } as never, true)).toEqual({
-      ok: false,
-      error:
-        "mascotBody must be cursor, blob, circle, squircle, capsule, drop, shield, hexagon, diamond, or star",
-    });
+describe("retired shape metadata", () => {
+  it("ignores historical body selections when reading old defaults", () => {
+    expect(parseBotProfilePatch({ mascotBody: "blob" }, true)).toEqual({ ok: true, patch: {} });
   });
 });
 

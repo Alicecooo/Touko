@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import type { BeginTurnRequest, Coordinator, CoordinatorHost, CoordinatorOptions, HandoffOptions, HandoffView, HostTurnResult, LiveHandoffEdge, RoomAddress } from "./coordinator.ts";
+import type { BeginTurnRequest, Coordinator, CoordinatorHost, CoordinatorOptions, HandoffOptions, HandoffView, HostTurnResult, RoomAddress } from "./coordinator.ts";
 import type { WorkOrigin } from "./peer-provenance.ts";
 import { composeEnvelope, composeReport, composeResume, composeRootTurn, continuationLine, envelopeNote } from "../runtime/envelope.ts";
 import { Runtime } from "../runtime/runtime.ts";
@@ -368,14 +368,6 @@ export class RuntimeCoordinator implements Coordinator {
       if (parent && !isTerminal(parent) && this.direct(parent, threadId)) out.push(view(n, parent));
     }
     return out;
-  }
-
-  liveEdges(): LiveHandoffEdge[] {
-    this.ready();
-    return this.runtime.liveEdges().map(edge => ({
-      sourceBotId: edge.sourceBotId, targetBotId: edge.targetBotId, state: edge.state === "queued" ? "queued" : "running",
-      threadId: edge.threadId, ...(edge.groupId !== undefined ? { groupId: edge.groupId } : {}),
-    }));
   }
 
   continuesAfterRestart(threadId: string): boolean {

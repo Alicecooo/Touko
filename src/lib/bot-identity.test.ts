@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { contrastRatio, mixSrgb, toneForSurface } from "./color-contrast";
-import { MAUS_COLORS, MAUS_COLOR_NAMES } from "./mascot";
+import { BOT_COLORS, MAUS_COLOR_NAMES } from "./bot-appearance";
 import { SKIN_IDS } from "./skins";
 
 const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../styles.css"), "utf8");
@@ -26,7 +26,7 @@ describe("room speaker colors", () => {
       const tokens = skin(id);
       const ink = tokens[`--identity-${color}`];
       const app = tokens["--color-app"];
-      expect(ink, id).toBe(toneForSurface(MAUS_COLORS[color], app!));
+      expect(ink, id).toBe(toneForSurface(BOT_COLORS[color], app!));
       expect(contrastRatio(ink!, app!)).toBeGreaterThanOrEqual(4.5);
       const highlight = mixSrgb("#ffffff", ink!, 0.18);
       const shadow = mixSrgb("#000000", ink!, 0.18);

@@ -412,15 +412,11 @@ export function presetFromDefaults(defaults: NewBotDefaults | undefined, options
     ...(trimmed(profile.description) ? { description: profile.description!.trim() } : {}),
     ...(trimmed(profile.soul) ? { soul: profile.soul! } : {}),
   };
-  const mascotExpression = profile.mascotExpression?.trim() || undefined;
-  const mascotBody = profile.mascotBody?.trim() || undefined;
-  if (profile.color || mascotExpression || mascotBody || options.avatar) {
+  const mascotExpression = profile.mascotExpression?.trim() || undefined;  if (profile.color || mascotExpression || options.avatar) {
     const crop = profile.avatarCrop === "rounded" || profile.avatarCrop === "square" ? profile.avatarCrop : "circle";
     bot.appearance = {
       color: profile.color ?? "green",
-      ...(mascotExpression ? { mascotExpression } : {}),
-      ...(mascotBody ? { mascotBody } : {}),
-      ...(options.avatar ? { avatar: { ...options.avatar, crop } } : {}),
+      ...(mascotExpression ? { mascotExpression } : {}),      ...(options.avatar ? { avatar: { ...options.avatar, crop } } : {}),
     };
   }
   const skills: ExportablePackageSkill[] = [];

@@ -68,11 +68,11 @@ describe("failed turn text", () => {
 
   it("keeps technical tool names in Advanced mode and Data titles in both modes", () => {
     const tool = { name: "mcp__omb__computer_batch", ok: true };
-    expect(activityPreview(tool, engine(), undefined, true)).toBe(tool.name);
-    expect(activityPreview({ name: "notice: Switched model" }, engine(), undefined, true)).toBe("notice: Switched model");
+    expect(activityPreview(tool, engine(), undefined)).toBe(tool.name);
+    expect(activityPreview({ name: "notice: Switched model" }, engine(), undefined)).toBe("notice: Switched model");
     const dataResult = { botId: "bot", cardId: "result", title: "Revenue", kind: "chart" as const };
-    for (const advanced of [false, true]) {
-      expect(activityPreview(tool, engine(), dataResult, advanced)).toBe("Revenue");
+    {
+      expect(activityPreview(tool, engine(), dataResult)).toBe("Revenue");
     }
   });
 

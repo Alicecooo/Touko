@@ -7,11 +7,6 @@ import { initialState, type Bot } from "@/state/store";
 vi.mock("./DesktopCapabilities", () => ({
   useDesktopCapabilities: () => ({}),
 }));
-// Advanced mode's rows: Simple mode keeps one conversation per bot, so its rows have no thread controls.
-vi.mock("@/lib/interface-mode", async (original) => ({
-  ...await original<typeof import("@/lib/interface-mode")>(),
-  useAdvancedMode: () => true,
-}));
 
 import { ConfirmDialogCard } from "./ConfirmDialog";
 import { BotDeleteMenuItem, BotListItem, botConfirmCopy, botRowProps, currentArchivableBot } from "./Sidebar";
@@ -86,13 +81,6 @@ describe("BotListItem", () => {
     expect(preview).not.toContain("waiting-dot");
   });
 
-  it("offers direct New thread and New folder icons and a keyboard-accessible bot menu", () => {
-    const markup = renderRow(bot());
-    expect(markup).toContain('aria-label="New thread"');
-    expect(markup).toContain('aria-label="New folder under Atlas"');
-    expect(markup).toContain('aria-label="Actions for Atlas"');
-    expect(markup).toContain('aria-haspopup="menu"');
-  });
   const twoThreads = (): Partial<Bot> => ({
     tasks: [{ threadId: "thread-atlas", title: "Current", createdAt: 2 }, { threadId: "thread-earlier", title: "Earlier", createdAt: 1 }],
   });
@@ -264,14 +252,6 @@ describe("BotListItem", () => {
     expect(markup).not.toContain('data-testid="teammate-wait-dot"');
   });
 
-  it("keeps Archive in the Actions menu and reveals quiet row controls on focus as well as hover", () => {
-    const markup = renderRow(bot());
-    expect(markup).not.toContain('aria-label="Archive Atlas"');
-    expect(markup).toContain('aria-label="Actions for Atlas"');
-    expect(markup).toContain("group-focus-within:opacity-100");
-    expect(markup).toContain("group-hover:pointer-events-auto");
-    expect(markup).not.toContain("pr-[92px]");
-  });
 });
 
 describe("archive / delete confirmation", () => {

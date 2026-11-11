@@ -1,25 +1,18 @@
 import { t } from "@/lib/i18n";
 import { useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 
-import { useStore, type Bot } from "@/state/store";
+import { type Bot } from "@/state/store";
 import { imageAttachmentFromFile } from "@/lib/composer-attachments";
 import { useOrganizationBranding } from "@/lib/use-organization-branding";
-import { AVATAR_FOCUS_CENTER, AVATAR_ZOOM_MAX, AVATAR_ZOOM_MIN, botAvatarUrlFromStoredPath, clampAvatarFocus, clampAvatarZoom, type BotAvatarCrop } from "../../shared/bot-avatar";
+import { AVATAR_FOCUS_CENTER, AVATAR_ZOOM_MAX, AVATAR_ZOOM_MIN, botAvatarProfile, botAvatarUrlFromStoredPath, clampAvatarFocus, clampAvatarZoom } from "../../shared/bot-avatar";
 import { BotAvatar } from "./Avatar";
 import { useBotEditor } from "./bot-settings/BotEditorContext";
 
 export type AvatarPatch = Partial<
-  Pick<Bot, "avatarCrop" | "avatarUrl" | "avatarZoom" | "avatarFocusX" | "avatarFocusY" | "color" | "mascotExpression" | "mascotBody">
+  Pick<Bot, "avatarCrop" | "avatarUrl" | "avatarZoom" | "avatarFocusX" | "avatarFocusY" | "mascotExpression" >
 >;
 
-export const RESET_MASCOT_PATCH: AvatarPatch = { avatarCrop: "mascot", color: "green", mascotExpression: null, mascotBody: "cursor" };
 
-export const CROP_LABEL = {
-  mascot: "Mascot",
-  circle: "Circle",
-  rounded: "Rounded",
-  square: "Square",
-} satisfies Record<BotAvatarCrop, string>;
 
 const FRAME_SIZE = 168;
 
@@ -35,7 +28,6 @@ export function AvatarFraming({
   const zoom = clampAvatarZoom(bot.avatarZoom ?? AVATAR_ZOOM_MIN);
   const focusX = clampAvatarFocus(bot.avatarFocusX ?? AVATAR_FOCUS_CENTER);
   const focusY = clampAvatarFocus(bot.avatarFocusY ?? AVATAR_FOCUS_CENTER);
-  const framed = zoom !== AVATAR_ZOOM_MIN || focusX !== AVATAR_FOCUS_CENTER || focusY !== AVATAR_FOCUS_CENTER;
   const drag = useRef<{ x: number; y: number; focusX: number; focusY: number; pointer: number } | null>(null);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -70,7 +62,7 @@ export function AvatarFraming({
         onPointerCancel={endDrag}
         onWheel={onWheel}
       >
-        <BotAvatar bot={bot} size={FRAME_SIZE} animated={false} label={`${bot.name} avatar preview`} />
+        <BotAvatar bot={bot} size={FRAME_SIZE} label={`${bot.name} avatar preview`} />
       </div>
       <div className="mb-1.5 mt-4 flex items-baseline justify-between">
         <span className="text-[12px] font-medium uppercase tracking-[0.08em] text-ink-secondary">{t("ui.zoom")}</span>
@@ -93,15 +85,6 @@ export function AvatarFraming({
       />
       <div className="mt-1.5 flex items-center justify-between gap-3 text-[11.5px] text-ink-secondary">
         <span>{t("ui.avatar.positionHint")}</span>
-        {framed && (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => onPatch({ avatarZoom: AVATAR_ZOOM_MIN, avatarFocusX: AVATAR_FOCUS_CENTER, avatarFocusY: AVATAR_FOCUS_CENTER })}
-            className="shrink-0 rounded-md px-2 py-1 text-ink hover:bg-control disabled:opacity-50"
-          >
-            {t("ui.avatar.reset")}</button>
-        )}
       </div>
     </div>
   );
@@ -122,17 +105,14 @@ export function OrganizationAvatarIcons({ busy, onUpload }: { busy: boolean; onU
 }
 
 export function useAvatarImage(bot: Bot, onPatch: (patch: AvatarPatch) => void) {
-  const { flushBotPatches } = useStore();
-  const { request: api, uploadAvatar } = useBotEditor();
+  const { uploadAvatar } = useBotEditor();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [savingConnection, setSavingConnection] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const crop = bot.avatarCrop ?? "mascot";
+  const crop = botAvatarProfile(bot).avatarCrop;
   const cropRef = useRef(crop);
   cropRef.current = crop;
-  const busy = uploading || generating || savingConnection;
+  const busy = uploading;
 
   const upload = async (file: File | undefined) => {
     if (!file || busy) return;
@@ -145,7 +125,7 @@ export function useAvatarImage(bot: Bot, onPatch: (patch: AvatarPatch) => void) 
       const latestCrop = cropRef.current;
       onPatch({
         avatarUrl,
-        avatarCrop: latestCrop === "mascot" ? "circle" : latestCrop,
+        avatarCrop: latestCrop,
         avatarZoom: AVATAR_ZOOM_MIN,
         avatarFocusX: AVATAR_FOCUS_CENTER,
         avatarFocusY: AVATAR_FOCUS_CENTER,
@@ -162,40 +142,13 @@ export function useAvatarImage(bot: Bot, onPatch: (patch: AvatarPatch) => void) 
     setError(null);
     onPatch({
       avatarUrl: null,
-      avatarCrop: "mascot",
+      avatarCrop: "rounded",
+      mascotExpression: null,
       avatarZoom: AVATAR_ZOOM_MIN,
       avatarFocusX: AVATAR_FOCUS_CENTER,
       avatarFocusY: AVATAR_FOCUS_CENTER,
     });
   };
 
-  const generate = async (direction: string) => {
-    if (busy) return;
-    setGenerating(true);
-    setError(null);
-    try {
-      // Commit debounced profile edits first, then feed the generated avatar back through the same serialized mutation
-      // lane as upload and remove.
-      const cropAtStart = cropRef.current;
-      await flushBotPatches(bot.id);
-      const result: { avatarUrl: string; bot: Bot } = await api(`/api/bots/${bot.id}/avatar/generate`, {
-        method: "POST",
-        body: JSON.stringify({ prompt: direction.trim() }),
-      });
-      const latestCrop = cropRef.current;
-      onPatch({
-        avatarUrl: result.avatarUrl,
-        avatarCrop:
-          latestCrop === cropAtStart
-            ? (result.bot.avatarCrop ?? "circle")
-            : latestCrop,
-      });
-    } catch (generateError) {
-      setError(generateError instanceof Error ? generateError.message : String(generateError));
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  return { fileRef, crop, uploading, generating, setSavingConnection, busy, error, upload, removeImage, generate };
+  return { fileRef, crop, uploading, busy, error, upload, removeImage };
 }

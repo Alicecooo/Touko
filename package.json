@@ -42,7 +42,6 @@
     "check:desktop-control-container": "node tests/checks/desktop-control-container.check.mjs",
     "check:electron-syntax": "node tests/checks/electron-module-syntax.check.mjs",
     "preview": "vite preview",
-    "generate:avatar-shapes": "node --experimental-strip-types scripts/generators/generate-avatar-shapes.ts",
     "build:server": "tsc -p tsconfig.server.build.json && node scripts/build/bundle-server.mjs",
     "prepare:windows-desktop-control": "node scripts/setup/prepare-windows-desktop-control.mjs",
     "check:windows-desktop-control": "node tests/checks/windows-desktop-control.check.mjs",
@@ -71,7 +70,9 @@
     "check:model-catalog": "node tests/checks/model-catalog.check.mjs",
     "generate:translations": "node scripts/generators/generate-translations.mjs",
     "test:server:unit": "vitest run server --exclude \"tests/**\" --exclude \"src/**\" --exclude \"electron/**\" --exclude \"shared/**\"",
-    "test:server": "vitest run tests/server"
+    "test:server": "vitest run tests/server",
+    "generate:app-icons": "node scripts/generators/generate-app-icons.mjs",
+    "generate:portrait-preview": "node scripts/generators/generate-portrait-preview.mjs"
   },
   "dependencies": {
     "@1password/sdk": "0.5.0",

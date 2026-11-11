@@ -269,7 +269,6 @@ export const CLIENT_ALLOW: ReadonlyArray<{ methods: readonly string[]; path: Reg
   { methods: ["GET"], path: /^\/api\/events$/ },
   // reads that carry no secrets
   { methods: ["GET"], path: /^\/api\/bots$/ },
-  { methods: ["GET"], path: /^\/api\/team-map$/ },
   // a link into the organisation's Admin: identifiers only, and Admin authorizes its own visitor
   { methods: ["GET"], path: /^\/api\/bots\/[\w-]+\/slack-management$/ },
   { methods: ["GET"], path: /^\/api\/search$/ },
@@ -347,7 +346,7 @@ export function requiredScope(method: string, path: string, features: { sharedCo
 
 /** A client may change how a bot looks, never what it may do. */
 const CLIENT_BOT_PATCH_FIELDS = new Set([
-  "unread", "pinned", "pinnedMessageId", "color", "mascotExpression", "mascotBody",
+  "unread", "pinned", "pinnedMessageId", "color", "mascotExpression",
   "avatarUrl", "avatarCrop", "avatarZoom", "avatarFocusX", "avatarFocusY",
 ]);
 export function clientBotPatchViolation(body: unknown): string | null {

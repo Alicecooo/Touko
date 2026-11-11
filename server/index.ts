@@ -45,7 +45,6 @@ import { appendDecision, bindDecisionRetention, decisionRetentionDays, flushDeci
 import { inMyFolderCwd, validateBotCwd } from "./bots/bot-cwd.ts";
 import { ATTACHMENTS_DIR, attachmentExists, cleanupStaleAttachmentPartials, deleteAttachment, saveImage } from "./workspace/attachments.ts";
 import { messageFileRoots } from "./storage/message-file.ts";
-import { avatarGenerationRequestSchema, generateAvatarImage, avatarImageStatus } from "./bots/avatar-image.ts";
 import { fitsOnOneLine, parseBotProfilePatch } from "./bots/bot-profile.ts";
 import { routeDirectTurn } from "./agent/turn-route.ts";
 import { groupTurnCwd } from "./teams/room-cwd.ts";
@@ -10671,7 +10670,6 @@ function configStatus() {
 
     opencodeGo: { configured: Boolean(cfg.opencodeGo?.apiKey), providerKeys: Object.keys(openCodeProviderKeys(cfg)) },
     decider: describeDecider(cfg),
-    imageGen: avatarImageStatus(cfg),
     profile: { name: cfg.profile?.name ?? "", email: cfg.profile?.email ?? "", aboutMe: cfg.profile?.aboutMe ?? "" },
     managedPolicy: managedPolicy.summary(),
     ...({}),
@@ -13235,36 +13233,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       return json(res, 404, { error: "unknown internal endpoint" });
     }
 
-    // Prompts and replies never leave their transcripts: this projection carries only ids, relationships, labels and timestamps.
-    if (method === "GET" && path === "/api/team-map") {
-      const mapped = new Set(store.bots.filter((bot) => !bot.hidden && visible.bot(bot.id)).map((bot) => bot.id));
-      const collaborations = store.groups
-        .filter(
-          (group) =>
-            group.dm === true &&
-            group.memberIds.length === 2 &&
-            group.memberIds.every((botId) => mapped.has(botId)),
-        )
-        .map((group) => ({
-          groupId: group.id,
-          botIds: [group.memberIds[0], group.memberIds[1]] as [string, string],
-          lastAt: store.messagesFor(group.threadId).at(-1)?.at ?? group.createdAt,
-        }))
-        .sort((a, b) => b.lastAt - a.lastAt);
-      const handoffs = coordinator.liveEdges()
-        .filter((edge) =>
-          mapped.has(edge.sourceBotId)
-          && mapped.has(edge.targetBotId)
-          && (!edge.groupId || visible.group(edge.groupId)));
-      const links = (state: "queued" | "running") =>
-        handoffs.flatMap(({ state: edgeState, ...link }) => edgeState === state ? [link] : []);
-      return json(res, 200, {
-        collaborations,
-        queued: links("queued"),
-        running: links("running"),
-      });
-    }
-
     if (path === "/api/routines" && method === "GET") {
       const fromParam = url.searchParams.get("from");
       const toParam = url.searchParams.get("to");
@@ -13581,19 +13549,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         skills.push(template.data);
       }
       return json(res, 200, { skills });
-    }
-    if (method === "POST" && path === "/api/bot-defaults/avatar") {
-      const body = await readBody(req);
-      if (!body || typeof body !== "object" || Array.isArray(body)) return json(res, 400, { error: "avatar preview must be a JSON object" });
-      const profile = parseBotProfilePatch(body.profile, true);
-      if (!profile.ok) return json(res, 400, { error: profile.error });
-      const checked = avatarGenerationRequestSchema.safeParse({ prompt: body.prompt });
-      if (!checked.success) return json(res, 400, { error: checked.error.message });
-      const { prompt } = checked.data;
-      const generated = await generateAvatarImage(cfg, {
-        name: profile.patch.name ?? "", title: profile.patch.title ?? "", description: profile.patch.description ?? "",
-      }, prompt);
-      return json(res, 200, { dataUrl: `data:${generated.mime};base64,${generated.bytes.toString("base64")}` });
     }
 
     m = path.match(/^\/api\/bots\/([\w-]+)\/soul$/);

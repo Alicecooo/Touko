@@ -15,12 +15,11 @@ import { showToolCallsEnabled } from "@/lib/feature-flags";
 import { CompactionChip, DigestChip } from "./DigestChip";
 import { roomActivityVisible } from "@/lib/room-activity";
 import { StatusActivityRow } from "@/components/StatusActivityRow";
-import { MAUS_COLOR_NAMES, normalizeState, type MausColor } from "@/lib/mascot";
+import { MAUS_COLOR_NAMES, type MausColor } from "@/lib/bot-appearance";
 import { botTextShowsSpeaker, laterTextOwns, runShowsSpeaker } from "@/lib/room-speaker";
 import { defaultResponderName, effectiveDefaultResponder, groupResponseHint, jevRoomRoutingOn } from "@/lib/group-routing";
 import { ChatMarkdown } from "./ChatMarkdown";
-import { CopyButton, FailedTurnRow, MessageBoundary, ReplyAction, SIMPLE_BUBBLE } from "./ChatView";
-import { useAdvancedMode } from "@/lib/interface-mode";
+import { CopyButton, FailedTurnRow, MessageBoundary, ReplyAction } from "./ChatView";
 import { MESSAGE_ROW, MessageActions, messageActionClass } from "./MessageActions";
 import { useBotMessageMenu, userMessageMenu, type PinAction } from "./message-menu";
 import { RawMarkdownView, RawToggleAction } from "./RawMarkdownToggle";
@@ -105,7 +104,7 @@ export function RoomToolChip({ message, roomId }: { message: Message; roomId?: s
           title={t("room.openBot", { name: comm.withName })}
           className="ui-pill"
         >
-          <BotAvatar bot={withBot ?? { name: comm.withName, color: comm.withColor }} state="happy" size={16} animated={false} />
+          <BotAvatar bot={withBot ?? { name: comm.withName, color: comm.withColor }} size={16} />
           <span className="max-w-[480px] truncate">{tool.name}</span>
           <ChevronRight size={13} />
         </button>
@@ -121,7 +120,7 @@ export function RoomToolChip({ message, roomId }: { message: Message; roomId?: s
           tool.ok === false && "text-danger",
         )}
       >
-        {comm && <BotAvatar bot={state.bots.find(b => b.id === comm.withBotId) ?? { name: comm.withName, color: comm.withColor }} state="happy" size={16} animated={false} />}
+        {comm && <BotAvatar bot={state.bots.find(b => b.id === comm.withBotId) ?? { name: comm.withName, color: comm.withColor }} size={16} />}
         <span className={cn("max-w-[480px] truncate", !comm && "font-mono")}>{tool.name}</span>
       </div>
     </div>
@@ -138,12 +137,7 @@ function ClusterLabel({ bot, name, color }: { bot?: Bot; name: string; color: st
     <div className="mt-1 flex items-center gap-1.5 pl-0.5">
       <BotAvatar
         bot={bot ?? { name, color: color as Bot["color"] }}
-        state={normalizeState(bot?.mascotExpression) ?? "happy"}
         size={16}
-        motion="none"
-        motionKey={0}
-        animated={false}
-        readable={known}
       />
       <span
         className={cn("text-[11px] font-medium", known ? "bot-identity" : "text-ink-secondary")}
@@ -195,7 +189,6 @@ function RoomTextMessage({
   const focusedSearch = focus?.messageId === m.id && Boolean(focus.matchText) && focus.threadId === group.threadId;
   const collapsible = user && !expanded && (display.length > USER_COLLAPSE_CHARS || display.split("\n").length > USER_COLLAPSE_LINES);
   useEffect(() => { if (focusedSearch && collapsible) setExpanded(true); }, [focusedSearch, collapsible, focus?.nonce]);
-  const simple = !useAdvancedMode();
   const botText = rawText;
   const pin = roomPin(group, m, dispatch);
   const botMenu = useBotMessageMenu({
@@ -221,7 +214,7 @@ function RoomTextMessage({
             !user && emerging && "turn-answer",
             !user && !m.text?.trim() && !m.replyToId && m.attachments?.length
               ? "text-ink"
-              : cn(user ? "chat-text whitespace-pre-wrap bg-bubble-user px-4 py-2.5 text-ink" : "bg-card px-4 py-2.5 text-ink", simple && SIMPLE_BUBBLE),
+              : cn(user ? "chat-text whitespace-pre-wrap bg-bubble-user px-4 py-2.5 text-ink" : "bg-card px-4 py-2.5 text-ink", false),
           )}
           title={new Date(m.at).toLocaleString()}
         >
@@ -973,9 +966,7 @@ function RoomSetup({ group, members }: { group: Group; members: Bot[] }) {
                         >
                           <BotAvatar
                             bot={member}
-                            state={normalizeState(member.mascotExpression) ?? "happy"}
                             size={24}
-                            animated={false}
                           />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-[13px] font-medium text-ink">{member.name}</span>
@@ -1129,7 +1120,6 @@ export function GroupView({ group }: { group: Group }) {
   const setupPending = !remoteClient && roomNeedsSetup(group);
 
   const lastGroupMessage = group.messages.at(-1);
-  const toolInFlight = lastGroupMessage?.kind === "activity" && lastGroupMessage.tool?.ok === undefined;
   const activity = liveActivityPhrases(lastGroupMessage);
   const awaited = members.find(
     (b) => b.id === awaitedMemberId(threadWorking, group.busyBotId, lastGroupMessage),
@@ -1247,7 +1237,7 @@ export function GroupView({ group }: { group: Group }) {
         )}
       >
         <span className={cn("inline-flex", held && "opacity-50 grayscale")}>
-          <BotAvatar bot={b} state={normalizeState(b.mascotExpression) ?? "happy"} size={24} animated={false} />
+          <BotAvatar bot={b} size={24} />
         </span>
         {held && !busy && (
           <span
@@ -1473,11 +1463,7 @@ export function GroupView({ group }: { group: Group }) {
                   <BotAvatar
                     key={b.id}
                     bot={b}
-                    state="happy"
                     size={44}
-                    motion="none"
-                    motionKey={0}
-                    animated={false}
                   />
                 ))}
               </div>
@@ -1521,11 +1507,7 @@ export function GroupView({ group }: { group: Group }) {
               avatar={
                 <BotAvatar
                   bot={presenceSpeaker ?? { color: "green" }}
-                  state={toolInFlight && !awaited ? "working" : "thinking"}
                   size={36}
-                  forward={false}
-                  lookAround={1}
-                  trackPointer={false}
                 />
               }
               visible={presenceVisible}

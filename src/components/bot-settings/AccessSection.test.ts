@@ -82,8 +82,6 @@ function makeDerived(overrides: Partial<ReturnType<typeof useBotSettingsDerived>
     activeBotRoutines: 0,
     localSelectable: false,
     localDisabledReason: null,
-    activeState: "idle",
-    mascotMotion: null,
     ...overrides,
   } as ReturnType<typeof useBotSettingsDerived>;
 }

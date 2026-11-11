@@ -10,7 +10,7 @@ import { failedTurnTool } from "../../shared/failed-turn";
 const fixture = vi.hoisted(() => {
   vi.stubGlobal("window", {});
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => {} });
-  return { showThreads: true, advanced: true, menus: [] as { ariaLabel: string; items: { key: string; disabled?: boolean; heading?: string; active?: boolean }[] }[], dispatch: vi.fn(), showToolCalls: false, platform: "other", localReasonCode: "cua-driver-unavailable", localMessage: "", model: null as ComponentProps<typeof ModelPicker> | null,
+  return { showThreads: true, menus: [] as { ariaLabel: string; items: { key: string; disabled?: boolean; heading?: string; active?: boolean }[] }[], dispatch: vi.fn(), showToolCalls: false, platform: "other", localReasonCode: "cua-driver-unavailable", localMessage: "", model: null as ComponentProps<typeof ModelPicker> | null,
     approval: null as ComponentProps<typeof ApprovalModeSelector> | null };
 });
 vi.mock("@/state/store", async (importOriginal) => {
@@ -31,7 +31,6 @@ vi.mock("@/lib/thread-preferences", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/thread-preferences")>(),
   useShowThreads: () => fixture.showThreads,
 }));
-vi.mock("@/lib/interface-mode", () => ({ useAdvancedMode: () => fixture.advanced, setAdvancedMode: vi.fn() }));
 // The trigger still renders, so the markup assertions in this file see the same header.
 vi.mock("./SidebarPopoverMenu", async (importOriginal) => ({
   ...await importOriginal<typeof import("./SidebarPopoverMenu")>(),
@@ -73,45 +72,7 @@ describe("the header's right side", () => {
     return { markup, controls: markup.slice(markup.indexOf("data-chathead-controls"), markup.indexOf("role=\"log\"")) };
   };
 
-  it("shows only what applies in Simple mode: no model, computer or ⋯, which the bot panel holds", () => {
-    fixture.advanced = false;
-    const { markup, controls } = header();
-    expect(markup).not.toContain("data-test-model-control");
-    expect(fixture.model).toBeNull();
-    expect(markup).not.toContain('data-tour="computer"');
-    expect(markup).not.toContain('data-testid="chat-more"');
-    expect(fixture.menus.find((menu) => menu.ariaLabel === "More")).toBeUndefined();
-    expect(controls).not.toContain("<button");
-    expect(markup).toContain("data-chathead-pill");
-    fixture.advanced = true;
-  });
-
-  it("keeps more actions in a remote client's Simple header", () => {
-    fixture.advanced = false;
-    window.ogb = { remoteClient: { active: true } } as NonNullable<Window["ogb"]>;
-    try {
-      const { markup } = header();
-      expect(markup).not.toContain("data-test-model-control");
-      expect(markup).not.toContain('data-tour="computer"');
-      expect(markup).toContain('data-testid="chat-more"');
-      const more = fixture.menus.find((menu) => menu.ariaLabel === "More")!;
-      expect(more.items.map((item) => item.key)).toEqual(["find", "new-thread", "copy", "download"]);
-    } finally {
-      delete window.ogb;
-      fixture.advanced = true;
-    }
-  });
-
-  it("keeps Stop in the Simple header while a turn runs", () => {
-    fixture.advanced = false;
-    const { controls } = header({ ...bot, busy: true, tasks: (bot.tasks ?? []).map((task) => ({ ...task, busy: true })) });
-    expect(controls).toContain('title="Stop this turn"');
-    expect(controls.match(/<button/g)).toHaveLength(1);
-    fixture.advanced = true;
-  });
-
   it("keeps Advanced actions and the inspector with models in the bot panel", () => {
-    fixture.advanced = true;
     const { markup } = header();
     expect(markup).not.toContain("data-test-model-control");
     expect(markup).not.toContain('data-tour="computer"');
@@ -125,20 +86,17 @@ describe("the header's right side", () => {
 });
 
 describe("header name", () => {
-  it.each([false, true])("opens the bot panel without an inline rename entry (advanced=%s)", advanced => {
-    fixture.advanced = advanced;
+  it("opens the bot panel without an inline rename entry", () => {
     const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
     expect(markup).not.toContain('aria-label="Rename Pepper"');
     const pill = markup.match(/<button[^>]*data-chathead-pill="true"[^>]*>([\s\S]*?)<\/button>/);
     expect(pill?.[0]).toContain('aria-label="Open Pepper&#x27;s profile"');
     expect(pill?.[1]).toContain(">Pepper</span>");
     expect(pill?.[0]).toContain("rounded-full");
-    fixture.advanced = true;
-  });
+});
 
   it("draws no working dots in the header pill, keeping one width, while a status still tells a screen reader", () => {
-    for (const advanced of [true, false]) {
-      fixture.advanced = advanced;
+    {
       const busyMarkup = renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, busy: true, tasks: (bot.tasks ?? []).map((task) => ({ ...task, busy: true })) } }));
       const idleMarkup = renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, busy: false } }));
       const pillOf = (markup: string) => {
@@ -151,7 +109,6 @@ describe("header name", () => {
       expect(idleMarkup).toMatch(/<span role="status" class="sr-only" data-chathead-status="true"><\/span>/);
       expect(busyMarkup).toContain('title="Stop this turn"');
     }
-    fixture.advanced = true;
   });
 
 
@@ -176,13 +133,11 @@ describe("glass header", () => {
 });
 
 describe("thread control placement", () => {
-  it.each([true, false])("leaves All threads out of the header in both modes (advanced: %s)", (advanced) => {
-    fixture.advanced = advanced;
+  it("leaves All threads out of the header in the interface", () => {
     const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
     expect(markup).not.toContain('aria-label="All threads"');
-    expect(markup.includes('data-testid="chat-more"')).toBe(advanced);
-    fixture.advanced = true;
-  });
+    expect(markup.includes('data-testid="chat-more"')).toBe(true);
+});
 
   it("gives the editor its own row in a narrow chat", () => {
     const markup = renderToStaticMarkup(createElement(ChatView, { bot }));

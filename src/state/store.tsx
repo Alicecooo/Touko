@@ -11,12 +11,11 @@ export { awayFromMainThread, botOpensTo, openBot, openBotThread, openNotificatio
 import type { TurnDigest } from "../../shared/digest";
 import type { ToolScope } from "../../shared/tool-scope";
 import type { ModelVariantOption, RuntimeEvent } from "../../shared/runtime-events";
-import type { MausColor, MausMotion } from "@/lib/mascot";
+import type { MausColor } from "@/lib/bot-appearance";
 import type { BotAvatarCrop } from "../../shared/bot-avatar";
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
 import { desktopCapabilitiesNow } from "@/lib/desktop";
 import { sameModelSelection } from "../../shared/thread-model";
-import type { MascotBodyId } from "../../shared/mascot-bodies";
 import type { QuestionRequestCardData } from "../../shared/ask-question";
 import type { ProfileRequestCardData } from "../../shared/profile-request";
 import type { ModelRequestCardData } from "../../shared/model-request";
@@ -62,7 +61,7 @@ function trimRoutineRuns(runs: readonly RoutineRun[]): RoutineRun[] {
   });
 }
 
-export type { MausColor } from "@/lib/mascot";
+export type { MausColor } from "@/lib/bot-appearance";
 export type { RoutineRunCardData } from "../../shared/routine-run";
 
 export interface OptionCardData extends Pick<WireOptionCard, "fixedOptions" | "webhookRequest"> {
@@ -291,7 +290,7 @@ export interface Bot {
   notifications: boolean;
   color: MausColor;
   mascotExpression?: string | null;
-  mascotBody?: MascotBodyId | null;
+
   avatarUrl?: string | null;
   avatarCrop?: BotAvatarCrop;
   avatarZoom?: number;
@@ -422,7 +421,7 @@ export type { ConfigStatus, ManagedPolicySummary };
 // A section left out here is wiped from state.config whenever a config frame lands.
 export type ConfigStatusFrame = Pick<
   ConfigStatus,
-  "xai" | "mistral" | "cerebras" | "groq" | "meta" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "fleet" | "composio" | "box" | "rooms" | "mcp" | "threads" | "automaticRecovery" | "cacheKeepWarm" | "opencodeGo" | "decider" | "imageGen" | "profile" | "language" | "features" | "onboarding" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
+  "xai" | "mistral" | "cerebras" | "groq" | "meta" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "fleet" | "composio" | "box" | "rooms" | "mcp" | "threads" | "automaticRecovery" | "cacheKeepWarm" | "opencodeGo" | "decider" | "profile" | "language" | "features" | "onboarding" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
 >;
 
 export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
@@ -446,7 +445,6 @@ export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
     cacheKeepWarm: frame.cacheKeepWarm,
     opencodeGo: frame.opencodeGo,
     decider: frame.decider,
-    imageGen: frame.imageGen,
     profile: frame.profile,
     language: frame.language,
     features: frame.features,
@@ -579,7 +577,7 @@ export interface AppState {
   modelVariantSessions: Record<string, ModelVariantSession>;
   config: ConfigStatus | null;
   selectedId: string;
-  activeView: "chat" | "team-map" | "routines" | "files";
+  activeView: "chat" | "routines" | "files";
   /** Folders a finished move left on this computer, for Files to offer sharing. */
   filesSuggest: string[] | null;
   routines: Routine[];
@@ -625,11 +623,6 @@ export interface AppState {
   error: string | null;
   notice: { kind: "thread-gone" | "bot-gone" | "steer-images"; botName: string | null } | null;
   revealThread: { threadId: string; nonce: number } | null;
-  mascotMotion: {
-    botId: string;
-    nonce: number;
-    kind: Exclude<MausMotion, "none">;
-  } | null;
   pendingQueued: Record<string, Array<{ queueId: string; text: string; reason?: SteerQueueReason }>>;
   consumedQueueIds: Record<string, true>;
   backgroundThreadEvents: Record<string, Array<Extract<Action, { type: "messageAdded" | "messagePatched" | "threadActive" | "optimisticMessageRemoved" }>>>;
@@ -718,7 +711,6 @@ export type Action =
  | { type: "sections"; sections: string[] }
  | { type: "sectionDeleted"; section: string; sections: string[] }
  | { type: "showRoutines"; section?: "schedule" | "logs"; view?: "calendar" | "list"; botId?: string; routineId?: string; runStatus?: RoutineRunStatusFilter }
- | { type: "showTeamMap" }
  | { type: "showFiles"; suggest?: string[] }
  | { type: "showChat" }
  | { type: "routinesHydrated"; routines: Routine[]; runs: RoutineRun[] }
@@ -896,21 +888,6 @@ function updateBot(state: AppState, botId: string, fn: (b: Bot) => Bot): AppStat
   return { ...state, bots: state.bots.map((b) => (b.id === botId ? fn(b) : b)) };
 }
 
-function withMascotMotion(
-  state: AppState,
-  botId: string,
-  kind: Exclude<MausMotion, "none">,
-): AppState {
-  return {
-    ...state,
-    mascotMotion: {
-      botId,
-      nonce: (state.mascotMotion?.nonce ?? 0) + 1,
-      kind,
-    },
-  };
-}
-
 function withPatchedCard(messages: Message[], messageId: string, patch: Partial<OptionCardData>): Message[] {
   return messages.map((m) => (m.id === messageId && m.card ? { ...m, card: { ...m.card, ...patch } } : m));
 }
@@ -1056,12 +1033,11 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     case "showChat":
       return state.activeView === "chat" ? state : { ...state, activeView: "chat" };
-    case "showTeamMap":
     case "showFiles":
       return {
         ...state,
-        activeView: action.type === "showFiles" ? "files" : "team-map",
-        filesSuggest: action.type === "showFiles" && action.suggest?.length ? action.suggest : null,
+        activeView: "files",
+        filesSuggest: action.suggest?.length ? action.suggest : null,
         settingsOpen: false, computerOpen: false, inspectorOpen: false, activityOpen: false, appSettingsOpen: false, pluginsOpen: false,
       };
     case "routinesHydrated":
@@ -1156,8 +1132,7 @@ export function reducer(state: AppState, action: Action): AppState {
       }
       const opened = state.bots.find((b) => b.id === action.id);
       return updateBot(
-        withMascotMotion(
-          {
+        {
             ...state,
             unreadDivider: opened
               ? openedUnreadDivider(state, opened.threadId, threadOpensUnread(opened), visibleMessages(opened), threadReadCursor(opened))
@@ -1165,9 +1140,6 @@ export function reducer(state: AppState, action: Action): AppState {
             activeView: "chat",
             selectedId: action.id,
           },
-          action.id,
-          "switch",
-        ),
         action.id,
         (b) => ({ ...b, unread: Boolean(b.tasks?.some((task) => task.threadId !== b.threadId && task.unread)), tasks: b.tasks?.map((task) => task.threadId === b.threadId ? { ...task, unread: false } : task) }),
       );
@@ -1176,14 +1148,10 @@ export function reducer(state: AppState, action: Action): AppState {
       if (action.groupId) return patchGroupCard(state, action.groupId, action.messageId, { answered: action.answer });
       const bot = state.bots.find((candidate) => candidate.id === action.botId);
       const card = bot?.messages.find((message) => message.id === action.messageId)?.card;
-      return withMascotMotion(
-        patchCard(state, action.botId, action.messageId, {
+      return patchCard(state, action.botId, action.messageId, {
           answered: action.answer,
           ...(card?.requestId ? {} : { dismissed: true }),
-        }),
-        action.botId,
-        "working",
-      );
+        });
     }
     case "dismissCard":
       if (action.groupId) return patchGroupCard(state, action.groupId, action.messageId, { dismissed: true });
@@ -1191,12 +1159,12 @@ export function reducer(state: AppState, action: Action): AppState {
     case "decideRequest":
       return state;
     case "botAdded":
-      return withMascotMotion({
+      return {
         ...state,
         // The HTTP response and its SSE broadcast race; fold both without showing the bot twice.
         bots: [action.bot, ...state.bots.filter((bot) => bot.id !== action.bot.id)],
         ...(action.preserveSelection ? {} : { activeView: "chat" as const, selectedId: action.bot.id }),
-      }, action.bot.id, "arrive");
+      };
     case "deleteBot": {
       const bots = state.bots.filter((b) => b.id !== action.botId);
       const selectedId =
@@ -1214,7 +1182,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, deletingBots };
     }
     case "markUnread":
-      return updateBot(withMascotMotion(state, action.botId, "surprise"), action.botId, (b) => ({ ...b, unread: true }));
+      return updateBot(state, action.botId, (b) => ({ ...b, unread: true }));
     case "botPatched": {
       const before = state.bots.find((b) => b.id === action.bot.id);
       if (!before) {
@@ -1224,27 +1192,18 @@ export function reducer(state: AppState, action: Action): AppState {
         };
         return reconcileSnapshotQueues(added, [action.bot]);
       }
-      const kind =
-        action.bot.unread && !before?.unread
-          ? "surprise"
-          : action.bot.busy === true && !before?.busy
-            ? "working"
-            : action.bot.busy === false && before?.busy
-              ? "celebrate"
-              : null;
-      const motioned = kind ? withMascotMotion(state, action.bot.id, kind) : state;
-      const animated = action.bot.busy === false && before?.busy && motioned.computerStarts[action.bot.id]
-        ? reducer(motioned, { type: "computerStart", botId: action.bot.id, start: null }) : motioned;
+      const updatedState = action.bot.busy === false && before?.busy && state.computerStarts[action.bot.id]
+        ? reducer(state, { type: "computerStart", botId: action.bot.id, start: null }) : state;
       const next = action.bot.chiefOfStaff
         ? {
-            ...animated,
-            bots: animated.bots.map((b) =>
+            ...updatedState,
+            bots: updatedState.bots.map((b) =>
               b.id === action.bot.id || (b.section?.trim() || "") !== (action.bot.section?.trim() || "")
                 ? b
                 : { ...b, chiefOfStaff: false },
             ),
           }
-        : animated;
+        : updatedState;
       const switchedThread =
         typeof action.bot.threadId === "string" && action.bot.threadId !== before.threadId &&
         !action.bot.tasks?.some((task) => task.threadId === before.threadId);
@@ -1330,22 +1289,7 @@ export function reducer(state: AppState, action: Action): AppState {
         const adoptsLeaf = (action.message.parentId ?? null) === (b.activeLeafId ?? null);
         return { ...b, messages: [...b.messages, action.message], activeLeafId: adoptsLeaf ? action.message.id : b.activeLeafId };
       });
-      const motion =
-        action.message.role === "user" && action.message.kind === "text" && Boolean(action.message.queueId)
-          ? "working"
-          : action.message.kind === "options"
-          ? "thinking"
-          : action.message.kind === "activity"
-            ? action.message.tool?.ok === false
-              ? "failure"
-              : action.message.tool?.ok === true
-                ? "success"
-                : "working"
-            : action.message.role === "bot" && action.message.kind === "text"
-              ? "blink"
-              : null;
-      const animated = motion ? withMascotMotion(next, bot.id, motion) : next;
-      return animated;
+      return next;
     }
     case "optimisticMessageRemoved": {
       const id = optimisticMessageId(action.sendId);
@@ -1397,15 +1341,7 @@ export function reducer(state: AppState, action: Action): AppState {
           ),
         };
       }
-      const motion =
-        action.message.kind === "activity"
-          ? action.message.tool?.ok === false
-            ? "failure"
-            : action.message.tool?.ok === true
-              ? "success"
-              : "working"
-          : null;
-      const next = motion ? withMascotMotion(stamped, bot.id, motion) : stamped;
+      const next = stamped;
       return updateBot(next, bot.id, (b) => ({
         ...b,
         messages: b.messages.map((m) => (m.id === action.message.id ? action.message : m)),
@@ -1414,7 +1350,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case "computerStart": {
       const { [action.botId]: _ended, ...others } = state.computerStarts;
       return {
-        ...(action.start ? withMascotMotion(state, action.botId, "launch") : state),
+        ...state,
         computerStarts: action.start ? { ...others, [action.botId]: action.start } : others,
       };
     }
@@ -1470,9 +1406,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, connected: action.value };
     case "error":
       return {
-        ...(action.message && state.selectedId
-          ? withMascotMotion(state, state.selectedId, "alert")
-          : state),
+        ...state,
         error: action.message,
       };
     case "toggleSettings": {
@@ -1621,24 +1555,18 @@ export function reducer(state: AppState, action: Action): AppState {
     }
 
     case "updateBot": {
-      const mascotChanged =
-        Object.prototype.hasOwnProperty.call(action.patch, "color") ||
-        Object.prototype.hasOwnProperty.call(action.patch, "mascotExpression");
-      const animated = mascotChanged
-        ? withMascotMotion(state, action.botId, "customize")
-        : state;
-      const target = animated.bots.find((bot) => bot.id === action.botId);
+      const target = state.bots.find((bot) => bot.id === action.botId);
       const chiefSection = (action.patch.section ?? target?.section)?.trim() || "";
       const next = action.patch.chiefOfStaff
         ? {
-            ...animated,
-            bots: animated.bots.map((b) =>
+            ...state,
+            bots: state.bots.map((b) =>
               b.id === action.botId || (b.section?.trim() || "") !== chiefSection
                 ? b
                 : { ...b, chiefOfStaff: false },
             ),
           }
-        : animated;
+        : state;
       const {
         acknowledgeLocalAuto: _localAck,
         applyToAllThreads: _allThreads,
@@ -1735,16 +1663,12 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, pendingQueued };
     }
     case "send": {
-      const animated = withMascotMotion(
-        dismissOnboardingCard(state, action.botId),
-        action.botId,
-        "working",
-      );
-      if (!action.sendId) return animated;
-      const bot = animated.bots.find((candidate) => candidate.id === action.botId);
+      const updatedState = dismissOnboardingCard(state, action.botId);
+      if (!action.sendId) return updatedState;
+      const bot = updatedState.bots.find((candidate) => candidate.id === action.botId);
       const threadId = action.threadId ?? bot?.threadId;
-      if (!bot || threadId !== bot.threadId) return animated;
-      if (bot.messages.some((message) => message.sendId === action.sendId)) return animated;
+      if (!bot || threadId !== bot.threadId) return updatedState;
+      if (bot.messages.some((message) => message.sendId === action.sendId)) return updatedState;
       const message = optimisticUserMessage(
         action.text,
         action.sendId,
@@ -1752,21 +1676,21 @@ export function reducer(state: AppState, action: Action): AppState {
         bot.activeLeafId,
       );
       message.optimisticThreadOrderAt = bot.tasks?.find((task) => task.threadId === threadId)?.lastThreadOrderAt;
-      return bumpThreadUpdatedAt(updateBot(animated, bot.id, (current) => ({
+      return bumpThreadUpdatedAt(updateBot(updatedState, bot.id, (current) => ({
         ...current,
         messages: [...current.messages, message],
         activeLeafId: message.id,
       })), threadId, message.at, true);
     }
     case "editMessage": {
-      const animated = withMascotMotion(state, action.botId, "working");
-      if (!action.sendId) return animated;
-      const bot = animated.bots.find((candidate) => candidate.id === action.botId);
+      const updatedState = state;
+      if (!action.sendId) return updatedState;
+      const bot = updatedState.bots.find((candidate) => candidate.id === action.botId);
       const threadId = action.threadId ?? bot?.threadId;
-      if (!bot || threadId !== bot.threadId) return animated;
-      if (bot.messages.some((message) => message.sendId === action.sendId)) return animated;
+      if (!bot || threadId !== bot.threadId) return updatedState;
+      if (bot.messages.some((message) => message.sendId === action.sendId)) return updatedState;
       const source = bot.messages.find((message) => message.id === action.messageId);
-      if (!source || source.role !== "user" || source.kind !== "text") return animated;
+      if (!source || source.role !== "user" || source.kind !== "text") return updatedState;
       const message = optimisticUserMessage(
         action.text.trim(),
         action.sendId,
@@ -1774,7 +1698,7 @@ export function reducer(state: AppState, action: Action): AppState {
         source.parentId ?? null,
       );
       message.optimisticThreadOrderAt = bot.tasks?.find((task) => task.threadId === threadId)?.lastThreadOrderAt;
-      return bumpThreadUpdatedAt(updateBot(animated, bot.id, (current) => ({
+      return bumpThreadUpdatedAt(updateBot(updatedState, bot.id, (current) => ({
         ...current,
         messages: [...current.messages, message],
         activeLeafId: message.id,
@@ -1995,7 +1919,6 @@ export const initialState: AppState = {
   error: null,
   notice: null,
   revealThread: null,
-  mascotMotion: null,
   pendingQueued: {},
   consumedQueueIds: {}};
 
@@ -2382,7 +2305,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
 
     const wrapped: React.Dispatch<Action> = (action) => {
-      if (["select", "newTask", "switchTask", "newGroupTask", "switchGroupTask", "showChat", "showRoutines", "showTeamMap", "showFiles"].includes(action.type)) selectionRevision++;
+      if (["select", "newTask", "switchTask", "newGroupTask", "switchGroupTask", "showChat", "showRoutines", "showFiles"].includes(action.type)) selectionRevision++;
       // Pin before any await or optimistic state change.
       action = pinBotThreadAction(action, stateRef.current.bots);
       if (action.type === "taskSwitched") action = { ...action, bot: withTaskWrites(action.bot) as Bot };

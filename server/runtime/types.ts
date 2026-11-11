@@ -330,14 +330,6 @@ export const DEFAULT_LIMITS: Limits = {
   inputWaitMs: 30 * 60_000,
 };
 
-export interface LiveEdge {
-  sourceBotId: string;
-  targetBotId: string;
-  state: "queued" | "running" | "needs_input" | "waiting";
-  threadId: string;
-  groupId?: string;
-}
-
 export interface StatusView {
   assignment: Assignment;
   children: Assignment[];

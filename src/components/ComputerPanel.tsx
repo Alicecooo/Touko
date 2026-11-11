@@ -3,7 +3,6 @@ import { Settings, X } from "lucide-react";
 import { currentTaskBot, useStore, type Bot } from "@/state/store";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
-import { useAdvancedMode } from "@/lib/interface-mode";
 
 import { computerPanelTabs, readComputerPanelView, resolveComputerPanelView, writeComputerPanelView, type ComputerPanelView } from "@/lib/computer-panel-view";
 import { useCaptionChrome } from "./DesktopCapabilities";
@@ -86,10 +85,9 @@ export function ComputerPanel({
   };
   const { state, dispatch } = useStore();
   const bot = currentTaskBot(profileBot);
-  const advanced = useAdvancedMode();
   const [storedPanelView, setPanelView] = useState<ComputerPanelView>(() => readComputerPanelView(bot.id));
-  const panelTabs = computerPanelTabs({ advanced });
-  const panelView = resolveComputerPanelView(storedPanelView, { advanced });
+  const panelTabs = computerPanelTabs();
+  const panelView = resolveComputerPanelView(storedPanelView);
   const requestedDataResult = state.dataResultFocus?.botId === bot.id ? state.dataResultFocus : undefined;
   const [dataRequest, setDataRequest] = useState<{ id: string; requestId: number }>();
 

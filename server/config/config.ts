@@ -4,7 +4,6 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
-import { normalizeImageGenerationUrl, type ImageGenerationConfig } from "../../shared/image-generation.ts";
 
 import { writeFileAtomic } from "../storage/atomic.ts";
 import { withoutComputerEngine } from "../computers/computer-engine-removal.ts";
@@ -206,23 +205,6 @@ const appConfigSchema = z.object( {
   /** OpenCode key, plus `providerKeys` for its other providers by the env name OpenCode reads; both write-only and only for its child. */
   opencodeGo: z.object({ apiKey: optionalText, providerKeys: z.record(z.string(), z.string()).optional() }).optional(),
   decider: deciderConfigSchema.optional(),
-  /** Avatar provider credentials stay separate; choosing a router never reuses a cloud key. */
-  imageGen: z.object({
-    provider: z.enum(["openai", "xai", "custom"]).optional(),
-    key: optionalText,
-    customApiKey: optionalText,
-    customUrl: z.string().trim().max(2048).transform((value, ctx) => {
-      if (!value) return "";
-      try { return normalizeImageGenerationUrl(value); } catch (error) {
-        ctx.addIssue({ code: "custom", message: (error as Error).message });
-        return z.NEVER;
-      }
-    }).optional(),
-    customModel: z.string().trim().max(200).refine(
-      (value) => !["\r", "\n", "\0"].some((character) => value.includes(character)),
-      "Use a model ID without control characters",
-    ).optional(),
-  }).optional(),
   /** Non-secret profile details; aboutMe is shared with every bot. */
   profile: z.object({ name: optionalText, email: optionalText, aboutMe: z.string().max(24_000).optional() }).optional(),
   /** UI language override (BCP-47, lowercase); absent follows the system. */
@@ -303,7 +285,6 @@ export interface AppConfig extends HelperConfig {
 
   opencodeGo?: { apiKey?: string; providerKeys?: Record<string, string> };
   decider?: DeciderConfig;
-  imageGen?: ImageGenerationConfig;
   profile?: { name?: string; email?: string; aboutMe?: string };
   rooms?: { turnTimeoutMinutes: number };
   mcp?: { callTimeoutMinutes?: number };
@@ -522,9 +503,6 @@ export function loadConfig(): AppConfig {
   cfg.decider = { ...cfg.decider };
   if (process.env.OMB_JEV_API_KEY !== undefined) cfg.decider.key = process.env.OMB_JEV_API_KEY;
   if (process.env.OMB_OPENROUTER_DECIDER_KEY !== undefined) cfg.decider.openrouterKey = process.env.OMB_OPENROUTER_DECIDER_KEY;
-  cfg.imageGen = { ...cfg.imageGen };
-  if (process.env.OMB_OPENAI_IMAGE_KEY !== undefined) cfg.imageGen.key = process.env.OMB_OPENAI_IMAGE_KEY;
-  if (process.env.OMB_CUSTOM_IMAGE_KEY !== undefined) cfg.imageGen.customApiKey = process.env.OMB_CUSTOM_IMAGE_KEY;
   const splitEmails = (value: string) => value.split(/[,\s]+/).map((entry) => entry.trim().toLowerCase()).filter(Boolean);
   if (process.env.OMB_SIGNIN_EMAILS !== undefined || process.env.OMB_SIGNIN_MEMBER_EMAILS !== undefined) {
     cfg.signIn = { ...cfg.signIn };
@@ -565,9 +543,7 @@ export function syncCredentialEnv(patch: Partial<Omit<AppConfig, "threads" | "ne
 [patch.composio?.apiKey, "COMPOSIO_API_KEY"],
 [patch.opencodeGo?.apiKey, "OPENCODE_API_KEY"],
 [patch.decider?.key, "OMB_JEV_API_KEY"],
-[patch.decider?.openrouterKey, "OMB_OPENROUTER_DECIDER_KEY"],
-[patch.imageGen?.key, "OMB_OPENAI_IMAGE_KEY"],
-[patch.imageGen?.customApiKey, "OMB_CUSTOM_IMAGE_KEY"]];
+[patch.decider?.openrouterKey, "OMB_OPENROUTER_DECIDER_KEY"]];
   for (const [value, name] of secrets) {
     if (value === undefined) continue;
     if (value) process.env[name] = value;
@@ -605,6 +581,7 @@ export const WORKSPACE_CREDENTIAL_ENV = [
   "OPENCODE_API_KEY",
   "OMB_JEV_API_KEY",
   "OMB_OPENROUTER_DECIDER_KEY",
+  // Retired avatar credentials must not reach agent child processes.
   "OMB_OPENAI_IMAGE_KEY",
   "OMB_CUSTOM_IMAGE_KEY",
   "COMPOSIO_API_KEY",
@@ -741,7 +718,8 @@ export function saveConfig(
   const before = configSaveListeners.size ? structuredClone(disk) : disk;
 
   delete disk.localVm;
-  for (const key of ["xai", "anthropic", "mistral", "cerebras", "groq", "meta", "openai", "openrouter", "openaiCompat", "composio", "opencodeGo", "decider", "imageGen", "profile", "rooms", "mcp", "threads", "context", "memory", "features", "budgets", "billing", "decisions", "loopGuard", "onboarding", "newBots", "safetyFloor"] as const) {
+  delete disk.imageGen;
+  for (const key of ["xai", "anthropic", "mistral", "cerebras", "groq", "meta", "openai", "openrouter", "openaiCompat", "composio", "opencodeGo", "decider", "profile", "rooms", "mcp", "threads", "context", "memory", "features", "budgets", "billing", "decisions", "loopGuard", "onboarding", "newBots", "safetyFloor"] as const) {
     const section = checkedPatch[key];
     if (!section) continue;
     const current = jsonObjectSchema.safeParse(disk[key]);

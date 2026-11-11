@@ -27,7 +27,7 @@ export type PlaceSource = "works-on" | "pin" | "auto-pin" | "routine" | "room";
  * stored row, one sentence a phone can read. */
 export const PLACE_ACTIONS = [
   "choose-model", "open-tools", "sign-in", "start", "wake", "watch", "see-plan", "manage-computers",
-  "try-again", "open-my-cloud", "add-boat-key", "turn-on-browser", "open-team-map",
+  "try-again", "open-my-cloud", "add-boat-key", "turn-on-browser",
   "clear-pin", "change-routine", "open-computer-panel",
 ] as const;
 export type PlaceActionId = (typeof PLACE_ACTIONS)[number];
@@ -98,7 +98,6 @@ export interface PlaceFacts {
   /** The built-in browser is switched on for this installation and bot. */
   browserOn: boolean;
   role: "admin" | "user";
-  mode?: "simple" | "advanced";
   /** The cloud computer as last seen; unknown reads as not made yet. */
   computer?: "none" | "starting" | "waking" | "on" | "asleep";
   /** Auto uses a team's shared cloud computer by this name. */
@@ -181,7 +180,6 @@ export const PLACE_EN = {
   "place.action.openMyCloud": "Open My Cloud",
   "place.action.addBoatKey": "Add Boat key",
   "place.action.turnOnBrowser": "Turn on the browser",
-  "place.action.openTeamMap": "Open Team map",
   "place.action.clearPin": "Clear this conversation's place",
   "place.action.usePlace": "Use {place}",
   "place.action.changeRoutine": "Change where it runs",
@@ -207,7 +205,6 @@ export const PLACE_WORDS: Record<PlaceActionId, string> = {
   "open-my-cloud": "Open My Cloud from the menu at the top of the sidebar.",
   "add-boat-key": "Add a Boat key in Settings → API keys.",
   "turn-on-browser": "Turn on the built-in browser in the Computer panel.",
-  "open-team-map": "Open Team map to manage it.",
   "clear-pin": "Clear this conversation's place in the composer to continue.",
   "change-routine": "Change where this routine runs.",
   "open-computer-panel": "Check it in the Computer panel.",
@@ -226,7 +223,7 @@ export const english: PlaceTranslate = (key, params) => fill(PLACE_EN[key], para
 /** Each state's key segment, short and line keys, and own action. */
 const STATE: Record<PlaceState, { key: string; action: PlaceActionId | null }> = {
   auto: { key: "auto", action: null },
-  "auto-team": { key: "autoTeam", action: "open-team-map" },
+  "auto-team": { key: "autoTeam", action: "manage-computers" },
   "cc-cannot": { key: "ccCannot", action: "choose-model" },
   "cc-tools-off": { key: "ccToolsOff", action: "open-tools" },
   "cc-sign-in": { key: "ccSignIn", action: "sign-in" },
@@ -261,7 +258,7 @@ const PASSING: ReadonlySet<PlaceState> = new Set(["cc-unavailable", "cc-no-start
  * them, so the line ends "Ask an Admin to change it." instead. */
 const ADMIN_ONLY: ReadonlySet<PlaceActionId> = new Set([
   "choose-model", "open-tools", "sign-in", "see-plan", "manage-computers", "open-my-cloud",
-  "add-boat-key", "turn-on-browser", "open-team-map", "change-routine",
+  "add-boat-key", "turn-on-browser", "change-routine",
 ]);
 /** Starting or waking a computer early: a User's own message does it, so
  * there is nothing to ask anyone for. */
@@ -280,7 +277,6 @@ const ACTION_KEY: Record<PlaceActionId, PlaceKey> = {
   "open-my-cloud": "place.action.openMyCloud",
   "add-boat-key": "place.action.addBoatKey",
   "turn-on-browser": "place.action.turnOnBrowser",
-  "open-team-map": "place.action.openTeamMap",
   "clear-pin": "place.action.clearPin",
   "change-routine": "place.action.changeRoutine",
   "open-computer-panel": "place.action.openComputerPanel",
@@ -373,7 +369,6 @@ export interface PlaceContext {
   role: "admin" | "user";
   mode?: "simple" | "advanced";
   source?: PlaceSource;
-  /** Simple mode words a pin's way back as "Use {place}", the grid's own label. */
   worksOnLabel?: string;
   translate?: PlaceTranslate;
   locale?: string;
@@ -394,12 +389,7 @@ export function placeViewOf(state: PlaceState, params: PlaceParams, context: Pla
     action = null;
     line = `${line} ${translate("place.askAdmin")}`;
   }
-  // Simple mode has no composer chip, so a pin's way back is the grid's
-  // choice, by the grid's own name for it.
-  const label = !action ? null
-    : action === "clear-pin" && context.mode === "simple" && context.worksOnLabel
-      ? translate("place.action.usePlace", { place: context.worksOnLabel })
-      : translate(ACTION_KEY[action], values);
+  const label = action ? translate(ACTION_KEY[action], values) : null;
   return {
     state,
     params,
@@ -412,7 +402,7 @@ export function placeViewOf(state: PlaceState, params: PlaceParams, context: Pla
 /** The view of a place from its facts. */
 export function placeView(facts: PlaceFacts, options: { translate?: PlaceTranslate; locale?: string } = {}): PlaceView {
   const { state, params } = placeState(facts);
-  return placeViewOf(state, params, { server: facts.server, role: facts.role, mode: facts.mode, ...options });
+  return placeViewOf(state, params, { server: facts.server, role: facts.role, ...options });
 }
 
 /** A stored failed-turn row, worded for this reader. */

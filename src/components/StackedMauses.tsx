@@ -12,7 +12,7 @@ export function StackedMauses({ members, density, large = false }: { members: Bo
     const b = members[0];
     return (
       <div className={cn("flex shrink-0 items-center justify-center", slotSize)}>
-        {b ? <BotAvatar bot={b} state="happy" size={singleSize} animated={false} /> : <Users size={24} className="text-ink-secondary" />}
+        {b ? <BotAvatar bot={b} size={singleSize} /> : <Users size={24} className="text-ink-secondary" />}
       </div>
     );
   }
@@ -22,7 +22,7 @@ export function StackedMauses({ members, density, large = false }: { members: Bo
     <div className={cn("flex shrink-0 items-center justify-center", slotSize)}>
       <div className="flex items-center -space-x-2.5">
         {shown.map((b) => (
-          <BotAvatar key={b.id} bot={b} state="happy" size={iconOnly ? 30 : large ? 26 : 20} animated={false} />
+          <BotAvatar key={b.id} bot={b} size={iconOnly ? 30 : large ? 26 : 20} />
         ))}
         {extra > 0 && (
           <span className="z-10 flex size-4 items-center justify-center rounded-full border border-hairline/40 bg-raised text-[9px] font-medium text-ink-secondary">

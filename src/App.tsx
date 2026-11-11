@@ -10,7 +10,7 @@ import { ChatView } from "@/components/ChatView";
 import { GroupView } from "@/components/GroupView";
 import { SIDEBAR_AND_PANEL_FIT, TWO_SIDE_PANELS_FIT, useMediaQuery } from "@/lib/use-media-query";
 import { PluginsPanel, preloadConnectedApps } from "@/components/PluginsPanel";
-import { ActivityPanel, BotSettingsDialog, ComputerPanel, InspectorPanel, NewBotDialog, preloadScreens, SettingsModal, TeamMapPage, TriggersPage } from "@/components/lazy-screens";
+import { ActivityPanel, BotSettingsDialog, ComputerPanel, InspectorPanel, NewBotDialog, preloadScreens, SettingsModal, TriggersPage } from "@/components/lazy-screens";
 import { WorkspaceBackupRecovery } from "@/components/WorkspaceBackupSettings";
 import { NotificationRail, NotificationsPanel } from "@/components/NotificationsPanel";
 import { useNotificationFeed } from "@/lib/notification-preferences";
@@ -47,8 +47,6 @@ function Shell() {
     setLocaleEpoch((epoch) => epoch + 1);
   }, [language]);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const previousViewRef = useRef(state.activeView);
-  const calendarOriginRef = useRef<"chat" | "team-map">("chat");
   const group = state.groups.find((g) => g.id === state.selectedId);
   const bot = group ? undefined : (state.bots.find((b) => b.id === state.selectedId) ?? state.bots[0]);
   const notificationFeed = useNotificationFeed() && !remoteClient;
@@ -106,18 +104,7 @@ function Shell() {
     setDrawerOpen(false);
   }, [state.selectedId, bot?.threadId, group?.threadId, state.activeView, state.pluginsOpen, state.settingsOpen]);
 
-  useEffect(() => {
-    if (state.activeView === "routines" && previousViewRef.current !== "routines") {
-      calendarOriginRef.current = previousViewRef.current === "team-map" ? "team-map" : "chat";
-    }
-    previousViewRef.current = state.activeView;
-  }, [state.activeView]);
-
   const closeCalendar = useCallback(() => {
-    if (calendarOriginRef.current === "team-map") {
-      dispatch({ type: "showTeamMap" });
-      return;
-    }
     dispatch({ type: "select", id: state.selectedId });
   }, [dispatch, state.selectedId]);
   const openCalendarRoom = useCallback((id: string) => {
@@ -177,9 +164,7 @@ function Shell() {
           menuButtonRef.current?.focus();
         }}
       />}
-      {state.activeView === "team-map" ? (
-        <TeamMapPage />
-      ) : state.activeView === "routines" ? (
+      {state.activeView === "routines" ? (
         <TriggersPage onBack={closeCalendar} onOpenRoom={openCalendarRoom} />
       ) : noEngines ? (
         <NoEngines />

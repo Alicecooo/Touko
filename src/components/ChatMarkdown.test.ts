@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
-import { act, createElement } from "react";
+import { createElement } from "react";
 import * as React from "react";
-import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -809,92 +808,13 @@ describe("ChatMarkdown attachments", () => {
   });
 });
 
-describe("ChatMarkdown code blocks", () => {
-  it.each([
-    ["tsx", "TypeScript (TSX)"],
-    ["averylongunknownlanguageidentifier", "Averylongunknownlanguageidentifier"],
-  ])("lets the %s badge shrink without wrapping the count or controls", (lang, label) => {
-    const html = renderToStaticMarkup(createElement(CodeBlock, {
-      code: "first\nsecond", lang,
-    }));
-    const badge = html.match(/<span[^>]*title="[^"]*"[^>]*>/)?.[0];
-    expect(badge).toContain(`title="${label}"`);
-    expect(badge).toContain("min-w-0 truncate");
-    expect(html).toContain("flex min-w-0 flex-1 items-center gap-2");
-    expect(html).toMatch(/<span class="[^"]*shrink-0 whitespace-nowrap[^"]*">2 lines<\/span>/);
-    expect(html).toContain("flex shrink-0 items-center gap-1 whitespace-nowrap");
-    expect(html).toContain('aria-label="Copy code to clipboard"');
-    expect(html).toContain('aria-label="Wrap long lines"');
-  });
-
-  it.each([["c++", "C++"], ["c#", "C#"]])("preserves punctuation in the %s fence label", (lang, label) => {
-    const html = renderToStaticMarkup(createElement(ChatMarkdown, {
-      text: `\`\`\`${lang}\nint value = 1;\n\`\`\``,
-    }));
-    expect(html).toContain(`>${label}</span>`);
-  });
-
-  it("counts deliberate blank lines before the closing fence", () => {
-    const html = renderToStaticMarkup(createElement(ChatMarkdown, {
-      text: "```ts\nconst x = 1;\n\n```",
-    }));
-    expect(html).toContain("2 lines");
-    expect(html).toContain("const x = 1;\n</pre>");
-  });
-
-  it("renders normalized language badge, line count, and accessible buttons for fenced code", () => {
-    const html = renderToStaticMarkup(createElement(ChatMarkdown, {
-      text: "```ts\nconst x: number = 42;\nconsole.log(x);\n```",
-    }));
-
-    expect(html).toContain("TypeScript");
-    expect(html).toContain("2 lines");
-    expect(html).toContain('aria-label="Copy code to clipboard"');
-    expect(html).toContain('aria-label="Wrap long lines"');
-    expect(html).toContain('aria-label="Download snippet as file"');
-    expect(html).toContain('title="Copy code"');
-    expect(html).toContain('title="Download snippet as file"');
-    expect(html).toContain('type="button"');
-  });
-
-  it("renders singular line count and handles unknown or omitted language identifiers", () => {
-    const htmlUnknown = renderToStaticMarkup(createElement(ChatMarkdown, {
-      text: "```zig\nconst std = @import(\"std\");\n```",
-    }));
-    expect(htmlUnknown).toContain("Zig");
-    expect(htmlUnknown).toContain("1 line");
-
-    const htmlOmitted = renderToStaticMarkup(createElement(ChatMarkdown, {
-      text: "```\necho plain\n```",
-    }));
-    expect(htmlOmitted).toContain("Code");
-    expect(htmlOmitted).toContain("1 line");
-  });
-
-  it("renders CodeBlock component directly with proper structure and accessibility", () => {
-    const html = renderToStaticMarkup(createElement(CodeBlock, {
-      code: "line1\nline2\nline3\n",
-      lang: "py",
-    }));
-
-    expect(html).toContain("Python");
-    expect(html).toContain("4 lines");
-    expect(html).toContain('aria-label="Copy code to clipboard"');
-    expect(html).toContain('aria-label="Wrap long lines"');
-    expect(html).toContain('aria-label="Download snippet as file"');
-    expect(html).toContain("line1\nline2\nline3");
-  });
-});
-
 describe("a fence's wrap directive", () => {
   it("a fence with a trailing wrap token opens wrapped on first render", () => {
     const html = renderToStaticMarkup(createElement(ChatMarkdown, {
       text: "```text wrap\nalpha beta gamma\n```",
     }));
 
-    expect(html).toContain("whitespace-pre-wrap break-words overflow-x-hidden");
-    expect(html).toContain('aria-pressed="true"');
-    expect(html).not.toContain("overflow-x-auto");
+    expect(html).toContain("whitespace-pre-wrap break-words");
   });
 
   it("a fence with a leading wrap token opens wrapped and keeps the real language", async () => {
@@ -908,9 +828,7 @@ describe("a fence's wrap directive", () => {
         text: "```wrap text\nalpha beta\n```",
       }));
 
-      expect(html).toContain("whitespace-pre-wrap break-words overflow-x-hidden");
-      expect(html).toContain('aria-pressed="true"');
-      expect(html).toContain('title="Text"');
+      expect(html).toContain("whitespace-pre-wrap break-words");
       expect(html).not.toContain('title="Wrap"');
       for (const callback of effects.splice(0)) cleanup.push(callback());
       await vi.waitFor(() => expect(shiki.codeToHtml).toHaveBeenCalledWith(
@@ -939,7 +857,6 @@ describe("a fence's wrap directive", () => {
 
     expect(html).toContain("overflow-x-auto");
     expect(html).not.toContain("whitespace-pre-wrap");
-    expect(html).toContain('aria-pressed="false"');
   });
 
   it("a mermaid fence carrying a wrap token still renders the diagram", () => {
@@ -947,11 +864,9 @@ describe("a fence's wrap directive", () => {
       text: "```mermaid wrap\nflowchart LR\n  Ship-->Sea\n```",
     }));
 
-    expect(html).toContain('title="Mermaid diagram"');
     expect(html).toContain("flowchart LR");
     expect(html).not.toContain('aria-label="Wrap long lines"');
     expect(html).not.toContain('aria-label="Download snippet as file"');
-    expect(html).not.toContain('aria-label="Copy code to clipboard"');
   });
 
   it("the Save filename derives from the resolved language", () => {
@@ -959,63 +874,12 @@ describe("a fence's wrap directive", () => {
     expect(getSnippetFileName(parseFenceInfo("text", "wrap").lang)).toBe("snippet.text");
   });
 
-  const wrapButton = (host: HTMLElement) =>
-    host.querySelector<HTMLButtonElement>('button[aria-pressed]')!;
 
-  it("a block already on screen opens wrapped when the fence gains a wrap token", async () => {
-    const host = document.createElement("div");
-    document.body.append(host);
-    const root = createRoot(host);
-    try {
-      await act(async () => root.render(createElement(ChatMarkdown, { text: "```text\nalpha beta\n```" })));
-      expect(wrapButton(host).getAttribute("aria-pressed")).toBe("false");
-      expect(host.innerHTML).toContain("overflow-x-auto");
 
-      await act(async () => root.render(createElement(ChatMarkdown, { text: "```text wrap\nalpha beta\n```" })));
-      expect(wrapButton(host).getAttribute("aria-pressed")).toBe("true");
-      expect(host.innerHTML).toContain("whitespace-pre-wrap break-words overflow-x-hidden");
-      expect(host.innerHTML).not.toContain("overflow-x-auto");
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-    }
-  });
 
-  it("a block already on screen unwraps when the fence loses its wrap token", async () => {
-    const host = document.createElement("div");
-    document.body.append(host);
-    const root = createRoot(host);
-    try {
-      await act(async () => root.render(createElement(ChatMarkdown, { text: "```text wrap\nalpha beta\n```" })));
-      expect(wrapButton(host).getAttribute("aria-pressed")).toBe("true");
 
-      await act(async () => root.render(createElement(ChatMarkdown, { text: "```text\nalpha beta\n```" })));
-      expect(wrapButton(host).getAttribute("aria-pressed")).toBe("false");
-      expect(host.innerHTML).toContain("overflow-x-auto");
-      expect(host.innerHTML).not.toContain("whitespace-pre-wrap break-words overflow-x-hidden");
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-    }
-  });
 
-  it("a code-only update keeps the Wrap toggle the person chose", async () => {
-    const host = document.createElement("div");
-    document.body.append(host);
-    const root = createRoot(host);
-    try {
-      await act(async () => root.render(createElement(ChatMarkdown, { text: "```text wrap\nalpha\n```" })));
-      await act(async () => wrapButton(host).click());
-      expect(wrapButton(host).getAttribute("aria-pressed")).toBe("false");
 
-      await act(async () => root.render(createElement(ChatMarkdown, { text: "```text wrap\nalpha beta gamma\n```" })));
-      expect(wrapButton(host).getAttribute("aria-pressed")).toBe("false");
-      expect(host.innerHTML).toContain("overflow-x-auto");
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-    }
-  });
 });
 
 describe("bidi: message content carries its own direction", () => {
@@ -1162,16 +1026,8 @@ describe("mermaid diagrams", () => {
     const html = renderToStaticMarkup(createElement(ChatMarkdown, {
       text: "```mermaid\nflowchart LR\n  Ship-->Sea\n```",
     }));
-    expect(html).toContain('title="Mermaid diagram"');
     expect(html).toContain("flowchart LR");
     expect(html).not.toContain('aria-label="Wrap long lines"');
-  });
-
-  it("matches the fence tag case-insensitively", () => {
-    const html = renderToStaticMarkup(createElement(ChatMarkdown, {
-      text: "```Mermaid\nflowchart LR\n  Ship-->Sea\n```",
-    }));
-    expect(html).toContain('title="Mermaid diagram"');
   });
 
   it("keeps ordinary fenced code on the highlighter path", () => {
@@ -1179,7 +1035,6 @@ describe("mermaid diagrams", () => {
       text: "```ts\nconst sea = true;\n```",
     }));
     expect(html).not.toContain("Mermaid diagram");
-    expect(html).toContain('aria-label="Copy code to clipboard"');
   });
 });
 

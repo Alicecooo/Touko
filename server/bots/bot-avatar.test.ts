@@ -11,11 +11,12 @@ import {
 } from "../../shared/bot-avatar.ts";
 
 describe("bot avatar profile schema", () => {
-  it("accepts the four supported display shapes", () => {
-    for (const crop of ["mascot", "circle", "rounded", "square"]) {
+  it("accepts image crops and migrates the historical mascot value", () => {
+    for (const crop of ["circle", "rounded", "square"]) {
       expect(botAvatarCropSchema.parse(crop)).toBe(crop);
     }
     expect(botAvatarCropSchema.safeParse("hexagon").success).toBe(false);
+    expect(botAvatarCropSchema.parse("mascot")).toBe("rounded");
   });
 
   it("only accepts app-owned raster attachments", () => {
@@ -48,15 +49,14 @@ describe("bot avatar profile schema", () => {
     expect(clampAvatarFocus(undefined)).toBe(0.5);
   });
 
-  it("uses the photo crop's radius and does not round a mascot", () => {
+  it("uses the photo crop's radius", () => {
     expect(avatarCropRadius("circle")).toBe("50%");
     expect(avatarCropRadius("rounded")).toBe("22%");
     expect(avatarCropRadius("square")).toBe("0");
-    expect(avatarCropRadius("mascot")).toBe("0");
   });
 
   it("falls back safely for malformed persisted data", () => {
     expect(botAvatarProfile({ avatarUrl: "https://example.test/pixel.png", avatarCrop: "round" }))
-      .toEqual({ avatarCrop: "mascot" });
+      .toEqual({ avatarCrop: "rounded" });
   });
 });

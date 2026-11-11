@@ -88,10 +88,8 @@ describe("live frames the store does not keep", () => {
   it("clear a computer's setting-up state with the first screen frame", async () => {
     await send({ kind: "computer", botId: "bot", state: "provisioning" });
     expect(seen.computerStarts.bot).toEqual({ state: "provisioning" });
-    const mascot = seen.mascotMotion;
     await send({ kind: "screen", botId: "bot", threadId: "thread", png: "BBBB" });
     expect(seen.computerStarts.bot).toBeUndefined();
-    expect(seen.mascotMotion).toBe(mascot);
     const before = seen;
     await send({ kind: "screen", botId: "bot", threadId: "thread", png: "CCCC" });
     expect(seen).toBe(before);

@@ -96,7 +96,6 @@ describe("Runtime: one tree, one lane", () => {
     expect(root.executions).toBe(1);
     const child = ok(w.runtime.enqueue(toBot("builder", root.id)));
     expect(child).toMatchObject({ status: "queued", depth: 1, rootId: root.id, parentId: root.id, level: "auto", levelSource: "chief" });
-    expect(w.runtime.liveEdges()).toEqual([{ sourceBotId: "chief", targetBotId: "builder", state: "queued", threadId: "builder-work" }]);
     w.runtime.tick();
     expect(w.runner.runs).toHaveLength(1);
     expect(w.runner.runs[0]!.input).toMatchObject({ resumed: false, restartNote: "", level: "auto", mode: "work" });
@@ -402,7 +401,6 @@ describe("Runtime: one tree, one lane", () => {
     expect(w.store.get(lead.id)).toMatchObject({ status: "cancelled", outcome: "stopped" });
     expect(signals.every(s => s.aborted)).toBe(true);
     expect(w.runner.reports.map(r => r.a.id)).toEqual([helper.id, lead.id]);
-    expect(w.runtime.liveEdges()).toEqual([]);
     const other = ok(w.runtime.enqueue(toBot("other", root.id)));
     w.runtime.cancel(other.id, "Provider reloaded", "failed");
     expect(w.store.get(other.id)).toMatchObject({ status: "failed", outcome: "interrupted", outcomeDetail: "Provider reloaded" });

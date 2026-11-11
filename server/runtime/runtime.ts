@@ -6,7 +6,7 @@ import { assignmentLevel } from "./level.ts";
 import type { RuntimeStore } from "./store.ts";
 import { awaited, childrenSince, clip, continuations, CUT_TWICE, duration, isTerminal, loopStop, nextGuard, outwardDetail, ownsConversation, path, restartNote, wakeOwner } from "./tree.ts";
 import { DEFAULT_LIMITS, type Assignment, type Assignee, type Clock, type EndResult, type EnqueueRequest, type EnqueueResult, type EnvelopeNames,
-  type EventKind, type InboxItem, type InboxKind, type Level, type Limits, type LiveEdge, type Origin, type Outcome, type Owner,
+  type EventKind, type InboxItem, type InboxKind, type Level, type Limits, type Origin, type Outcome, type Owner,
   type Reply, type Requester, type RunInput, type RunResult, type StatusView, type TurnRunner } from "./types.ts";
 
 export interface RuntimeOptions {
@@ -545,19 +545,6 @@ export class Runtime {
     if (owner.threadId === undefined && owner.runId !== undefined) return live.filter(n => ownsConversation(n, owner));
     const mine = new Set(live.filter(n => ownsConversation(n, owner)).map(n => n.id));
     return live.filter(n => n.parentId !== undefined && mine.has(n.parentId) && n.reply !== "none");
-  }
-
-  liveEdges(): LiveEdge[] {
-    const edges: LiveEdge[] = [];
-    for (const n of this.store.all({ nonTerminal: true })) {
-      if (!n.parentId) continue;
-      const parent = this.store.get(n.parentId);
-      if (!parent || parent.assignee.botId === n.assignee.botId) continue;
-      const state: LiveEdge["state"] = n.status === "resume" ? "waiting" : n.status as LiveEdge["state"];
-      edges.push({ sourceBotId: parent.assignee.botId, targetBotId: n.assignee.botId, state, threadId: n.assignee.destination.threadId,
-        ...(n.assignee.destination.groupId ? { groupId: n.assignee.destination.groupId } : {}) });
-    }
-    return edges;
   }
 
   /** Undelivered inbox items for this owner, marked delivered now. */

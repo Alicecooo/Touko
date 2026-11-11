@@ -5,7 +5,7 @@ import { openBot, visibleMessages, type Bot, type Message } from "@/state/store"
 import { avatarCropRadius, botAvatarProfile } from "../../shared/bot-avatar";
 import { liveActivityLabel } from "@/lib/live-activity";
 import { BotAvatar } from "./Avatar";
-import { stateForBot } from "@/lib/mascot";
+
 import { cn } from "@/lib/cn";
 import { searchMatchesThreads, useSearchDisclosure } from "@/lib/search-disclosure";
 import { lastNonReceipt } from "@/lib/receipts";
@@ -102,9 +102,9 @@ export const PinnedBotCircle = memo(function PinnedBotCircle({
   nextId,
   ...props
 }: BotRowProps & PinnedCircleDragProps & { threadPanelHost?: HTMLElement | null }) {
-  const { bot, selected, mascotMotion, pendingQueued, reveal, density, query, dispatch, onMenu } = props;
+  const { bot, selected, pendingQueued, reveal, density, query, dispatch, onMenu } = props;
   const showThreads = useShowThreads();
-  const visible = useVisibleMessages(bot);
+
   const [threadsOpen, setThreadsOpen] = useSearchDisclosure(`bot:${bot.id}`, showThreads ? query : "", searchMatchesThreads(query, bot.tasks, bot.projects));
   // nonce, not the thread id: a second jump to the same thread opens it again
   useEffect(() => {
@@ -179,11 +179,7 @@ export const PinnedBotCircle = memo(function PinnedBotCircle({
           >
             <BotAvatar
               bot={bot}
-              state={stateForBot({ ...bot, messages: visible })}
               size={64}
-              motion={mascotMotion?.kind ?? "none"}
-              motionKey={mascotMotion?.nonce ?? 0}
-              animated={working || Boolean(bot.unread) || (mascotMotion?.kind ?? "none") !== "none"}
             />
           </span>
           {unread && (

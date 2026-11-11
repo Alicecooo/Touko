@@ -90,19 +90,7 @@ describe("configuration boundaries", () => {
     }
   });
 
-  it("keeps avatar providers and credentials separate, normalizing a router endpoint", () => {
-    const parsed = parseConfigPatch({ imageGen: {
-      provider: "custom", key: "openai-kept", customApiKey: "router-only",
-      customUrl: "http://127.0.0.1:4000/v1/", customModel: " local/image ",
-    } });
-    expect(parsed.imageGen).toEqual({ provider: "custom", key: "openai-kept", customApiKey: "router-only", customUrl: "http://127.0.0.1:4000/v1", customModel: "local/image" });
-    expect(parseStoredConfig({ imageGen: { key: "legacy" } }).imageGen).toEqual({ key: "legacy" });
-    expect(() => parseConfigPatch({ imageGen: { provider: "unknown" } })).toThrow("provider");
-    expect(() => parseConfigPatch({ imageGen: { customUrl: "https://user:secret@router.example/v1" } })).toThrow("customUrl");
-    const childEnv = { OMB_CUSTOM_IMAGE_KEY: "must-not-reach-bot" };
-    stripWorkspaceCredentialEnv(childEnv);
-    expect(childEnv).not.toHaveProperty("OMB_CUSTOM_IMAGE_KEY");
-  });
+
   it("persists a custom domain but excludes it from generic config patches", () => {
     expect(parseStoredConfig({ customDomain: "https://bots.example.com" })).toEqual({ customDomain: "https://bots.example.com" });
     expect(parseConfigPatch({ customDomain: "https://unverified.example.com", language: "en" })).toEqual({ language: "en" });
@@ -1004,17 +992,14 @@ describe("credential env preference", () => {
       JSON.stringify({
         xai: { key: "file-xai", url: "https://api.example.test/v1" },
         opencodeGo: { apiKey: "file-ocg" },
-        imageGen: { key: "file-image" },
       }),
     );
     process.env.XAI_API_KEY = "env-xai";
     process.env.BOX_TOKEN = "env-box";
     process.env.OPENCODE_API_KEY = "env-ocg";
-    process.env.OMB_OPENAI_IMAGE_KEY = "env-image";
     const cfg = loadConfig();
     expect(cfg.xai).toEqual({ key: "env-xai", url: "https://api.example.test/v1" });
     expect(cfg.opencodeGo).toEqual({ apiKey: "env-ocg" });
-    expect(cfg.imageGen).toEqual({ key: "env-image" });
   });
 
   it("saves and removes the verified domain without replacing existing settings", () => {
@@ -1067,11 +1052,10 @@ describe("credential env preference", () => {
   it("falls back to the config file when the env var is unset (dev mode)", () => {
     writeFileSync(
       join(DATA_DIR, "config.json"),
-      JSON.stringify({ xai: { key: "file-xai" }, imageGen: { key: "file-image" } }),
+      JSON.stringify({ xai: { key: "file-xai" } }),
     );
     const cfg = loadConfig();
     expect(cfg.xai?.key).toBe("file-xai");
-    expect(cfg.imageGen?.key).toBe("file-image");
   });
 
   it("persists a default selection without changing the fleet or unrelated settings", () => {

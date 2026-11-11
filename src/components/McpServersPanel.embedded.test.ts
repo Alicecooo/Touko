@@ -48,15 +48,15 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Your MCP servers inside the Apps pop-up", () => {
-  it("lists each server with Test, Edit and an on/off switch, plus Add MCP server", () => {
+  it("lists internally configured servers with connection controls", () => {
     const html = render(true);
-    expect(html).toContain("Your MCP servers");
+    expect(html).toContain("MCP servers");
     expect(html).not.toContain("Paste config");
-    expect(html).toContain("Add MCP server");
+    expect(html).not.toContain("Add MCP server");
     expect(html.match(/role="switch"/g)).toHaveLength(2);
     expect(html).toMatch(/aria-label="Turn notes off" type="button" role="switch" aria-checked="true"/);
     expect(html).toMatch(/aria-label="Turn docs on" type="button" role="switch" aria-checked="false"/);
-    expect(html).toContain('aria-label="Edit notes"');
+    expect(html).not.toContain('aria-label="Edit notes"');
     expect(html.match(/> Test</g)).toHaveLength(2);
     expect(html).not.toContain("overflow-y-auto");
   });
@@ -64,7 +64,7 @@ describe("Your MCP servers inside the Apps pop-up", () => {
   it("keeps its own scroll and wording when shown on its own", () => {
     const html = render(false);
     expect(html).toContain("overflow-y-auto");
-    expect(html).toContain("Add MCP server");
+    expect(html).not.toContain("Add MCP server");
   });
 
   it("offers Whop setup with no API key form or forced installation", () => {
@@ -75,7 +75,7 @@ describe("Your MCP servers inside the Apps pop-up", () => {
     expect(html).toContain("no API key needed");
     expect(html).toContain("admin access across businesses");
     expect(html).not.toContain("<textarea");
-    expect(html).not.toContain("Your MCP servers");
+    expect(html).not.toContain("MCP servers");
     expect(html).not.toContain("Paste config");
   });
 

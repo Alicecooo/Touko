@@ -33,7 +33,7 @@ const secretCard = (secret: Record<string, unknown>): Message => ({
   at: 1,
   text: "Securely provide the OpenAI API key.",
   secret: {
-    target: "openaiImageApiKey",
+    target: "xaiApiKey",
     label: "OpenAI API key",
     description: "Generate a key at platform.openai.com. Scout can use it but never read it back.",
     placeholder: "sk-…",

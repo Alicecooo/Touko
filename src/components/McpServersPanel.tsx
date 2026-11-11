@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Check, CheckCircle2, FlaskConical, Globe, Loader2, LogIn, LogOut, Pencil, Plus, ServerCog, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, FlaskConical, Globe, Loader2, LogIn, LogOut, ServerCog } from "lucide-react";
 
 import { openExternalLink } from "@/lib/app-links";
 import { cn } from "@/lib/cn";
@@ -10,10 +9,9 @@ import { updateMcpServers } from "@/lib/mcp-servers";
 import { completeMcpSignIn, mcpSignInLink, runMcpSignIn, type McpSignInStatus } from "@/lib/mcp-sign-in";
 import { api, useStore } from "@/state/store";
 
-import { Select } from "./Select";
 import { Switch } from "./SettingsPrimitives";
 import { WhopIcon } from "./WhopIcon";
-import { McpResultBudgetField, resultBudgetDraft, withResultBudget, type McpMessage, type McpResultBudgetDraft, type McpResultBudgetListing } from "./McpResultBudgetField";
+import type { McpMessage, McpResultBudgetListing } from "./McpResultBudgetField";
 import { WHOP_MCP_URL, isWhopServer, whopServerName } from "@/lib/whop-integration";
 import { openBotSettings } from "./bot-panel/panel-link";
 
@@ -46,23 +44,6 @@ export function isRemoteMcpListing(server: McpServerListing): server is RemoteMc
   return "url" in server;
 }
 
-type McpTransport = "stdio" | "remote";
-
-interface McpDraft extends McpResultBudgetDraft {
-  name: string;
-  transport: McpTransport;
-  command: string;
-  args: string;
-  env: string;
-  type: "http" | "sse";
-  url: string;
-  headers: string;
-  oauthClientId: string;
-  oauthClientSecret: string;
-  oauthScopes: string;
-  oauthForgetSecret: boolean;
-}
-
 export interface ProbeResult {
   ok: boolean;
   tools?: Array<{ name: string; description?: string }>;
@@ -88,72 +69,6 @@ export async function signedInToolsCheck(
   return { ...tested, error: t("whop.testFailed", { reason: reason && !/[.!?]$/.test(reason) ? `${reason}.` : reason }) };
 }
 
-const EMPTY_DRAFT: McpDraft = {
-  name: "", transport: "stdio", command: "", args: "", env: "", type: "http", url: "", headers: "",
-  oauthClientId: "", oauthClientSecret: "", oauthScopes: "", oauthForgetSecret: false, resultBudget: "",
-};
-const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,128}$/;
-
-export function parseMcpArguments(value: string): string[] {
-  return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-}
-
-export function parseMcpEnvironment(
-  value: string,
-  savedKeys: readonly string[] = [],
-): { ok: true; env: Record<string, string | true> } | { ok: false; error: McpMessage } {
-  const saved = new Set(savedKeys);
-  const env: Record<string, string | true> = {};
-  for (const original of value.split(/\r?\n/)) {
-    const line = original.trim();
-    if (!line) continue;
-    const equals = line.indexOf("=");
-    if (equals <= 0) return { ok: false, error: { key: "mcp.env.useKeyValue", params: { line } } };
-    const key = line.slice(0, equals).trim();
-    const secret = line.slice(equals + 1);
-    if (!ENV_NAME.test(key)) return { ok: false, error: { key: "mcp.env.invalidName", params: { key } } };
-    if (Object.hasOwn(env, key)) return { ok: false, error: { key: "mcp.env.duplicate", params: { key } } };
-    env[key] = secret === "" && saved.has(key) ? true : secret;
-  }
-  return { ok: true, env };
-}
-
-export function parseMcpHeaders(
-  value: string,
-  savedKeys: readonly string[] = [],
-): { ok: true; headers: Record<string, string | true> } | { ok: false; error: McpMessage } {
-  const saved = new Set(savedKeys);
-  const headers: Record<string, string | true> = {};
-  for (const original of value.split(/\r?\n/)) {
-    const line = original.trim();
-    if (!line) continue;
-    const colon = line.indexOf(":");
-    if (colon <= 0) return { ok: false, error: { key: "mcp.headers.useColon", params: { line } } };
-    const key = line.slice(0, colon).trim();
-    const secret = line.slice(colon + 1).trim();
-    if (!HEADER_NAME.test(key)) return { ok: false, error: { key: "mcp.headers.invalidName", params: { key } } };
-    if (Object.hasOwn(headers, key)) return { ok: false, error: { key: "mcp.headers.duplicate", params: { key } } };
-    headers[key] = secret === "" && saved.has(key) ? true : secret;
-  }
-  return { ok: true, headers };
-}
-
-export function parseMcpOAuthClient(
-  input: { clientId: string; clientSecret: string; scopes: string; forgetSecret: boolean },
-  saved?: { clientSecretConfigured: boolean },
-): { clientId: string; clientSecret?: string | true; scopes?: string[] } | undefined {
-  const clientId = input.clientId.trim();
-  if (!clientId) return undefined;
-  const secret = input.clientSecret.trim();
-  const scopes = input.scopes.split(/[\s,]+/).filter(Boolean);
-  return {
-    clientId,
-    ...(secret ? { clientSecret: secret } : saved?.clientSecretConfigured && !input.forgetSecret ? { clientSecret: true as const } : {}),
-    ...(scopes.length ? { scopes } : {}),
-  };
-}
-
 function probeToolsLabel(tools: ProbeResult["tools"], total?: number): string {
   if (!tools?.length) return t("mcp.probe.noTools");
   const count = Math.max(total ?? 0, tools.length);
@@ -163,36 +78,10 @@ function probeToolsLabel(tools: ProbeResult["tools"], total?: number): string {
     : t("mcp.probe.toolsMany", { count, names });
 }
 
-function draftFor(server: McpServerListing): McpDraft {
-  // Security: the server never returns values; a blank value beside a saved key keeps it (write-only).
-  if (isRemoteMcpListing(server)) {
-    return {
-      ...EMPTY_DRAFT,
-      name: server.name,
-      transport: "remote",
-      type: server.type,
-      url: server.url,
-      headers: server.headerKeys.map((key) => `${key}: `).join("\n"),
-      oauthClientId: server.oauth?.clientId ?? "",
-      oauthScopes: server.oauth?.scopes.join(" ") ?? "",
-      resultBudget: resultBudgetDraft(server),
-    };
-  }
-  return {
-    ...EMPTY_DRAFT,
-    name: server.name,
-    command: server.command,
-    args: server.args.join("\n"),
-    env: server.envKeys.map((key) => `${key}=`).join("\n"),
-    resultBudget: resultBudgetDraft(server),
-  };
-}
-
-export function McpServersPanel({ embedded = false, whopCard = false, hideWhop = false, refreshKey = 0, onWhopConnection, actionContainer, showContent = true, onAddServer }: {
+/** Server definitions come from internal MCP configuration; this view manages connection state only. */
+export function McpServersPanel({ embedded = false, whopCard = false, hideWhop = false, refreshKey = 0, onWhopConnection, showContent = true }: {
   embedded?: boolean;
-  actionContainer?: HTMLElement | null;
   showContent?: boolean;
-  onAddServer?: () => void;
   whopCard?: boolean;
   hideWhop?: boolean;
   refreshKey?: number;
@@ -202,8 +91,6 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
   const policy = store.config?.managedPolicy;
   const restricted = Boolean(policy && !policy.mcp.allowCustom);
   const [servers, setServers] = useState<McpServerListing[] | null>(null);
-  const [editing, setEditing] = useState<string | "new" | null>(null);
-  const [draft, setDraft] = useState<McpDraft>(EMPTY_DRAFT);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | McpMessage | null>(null);
   const [notice, setNotice] = useState<(McpMessage & { stateKey?: LocaleKey }) | null>(null);
@@ -245,68 +132,6 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
     void load();
     return () => { mounted.current = false; loadGeneration.current += 1; };
   }, [load, refreshKey]);
-
-  const closeEditor = () => {
-    setEditing(null);
-    setDraft(EMPTY_DRAFT);
-  };
-
-  const draftBody = (
-    existing: McpServerListing | undefined,
-  ): { ok: true; body: Record<string, unknown> } | { ok: false; error: McpMessage } => {
-    const name = draft.name.trim();
-    if (draft.transport === "remote") {
-      const url = draft.url.trim();
-      if (!name || !/^https?:\/\//i.test(url)) return { ok: false, error: { key: "mcp.err.nameAndUrl" } };
-      const parsed = parseMcpHeaders(draft.headers, existing && isRemoteMcpListing(existing) ? existing.headerKeys : []);
-      if (!parsed.ok) return parsed;
-      const oauth = parseMcpOAuthClient(
-        { clientId: draft.oauthClientId, clientSecret: draft.oauthClientSecret, scopes: draft.oauthScopes, forgetSecret: draft.oauthForgetSecret },
-        existing && isRemoteMcpListing(existing) ? existing.oauth : undefined,
-      );
-      return { ok: true, body: { type: draft.type, url, headers: parsed.headers, ...(oauth ? { oauth } : {}) } };
-    }
-    const command = draft.command.trim();
-    if (!name || !command) return { ok: false, error: { key: "mcp.err.nameAndCommand" } };
-    const parsed = parseMcpEnvironment(draft.env, existing && !isRemoteMcpListing(existing) ? existing.envKeys : []);
-    if (!parsed.ok) return parsed;
-    return { ok: true, body: { command, args: parseMcpArguments(draft.args), env: parsed.env } };
-  };
-
-  const save = async () => {
-    const name = draft.name.trim();
-    const existing = editing === "new" ? undefined : servers?.find((server) => server.name === editing);
-    const prepared = withResultBudget(draft.resultBudget, () => draftBody(existing));
-    if (!prepared.ok) {
-      setError(prepared.error);
-      return;
-    }
-    setBusy("save");
-    loadGeneration.current += 1;
-    setError(null);
-    setNotice(null);
-    try {
-      const result = await api(
-        editing === "new" ? "/api/mcp/servers" : `/api/mcp/servers/${encodeURIComponent(name)}`,
-        {
-          method: editing === "new" ? "POST" : "PUT",
-          body: JSON.stringify({
-            ...(editing === "new" ? { name } : {}),
-            ...prepared.body,
-            ...(existing ? { enabled: existing.enabled } : {}),
-          }),
-        },
-      );
-      setServers(result.servers ?? []);
-      updateMcpServers(result.servers ?? []);
-      setNotice({ key: editing === "new" ? "mcp.saved" : "mcp.updated", params: { name } });
-      closeEditor();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusy(null);
-    }
-  };
 
   const toggle = async (server: McpServerListing) => {
     setBusy(`toggle:${server.name}`);
@@ -471,32 +296,6 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
 
   useEffect(() => () => signInAbort.current?.abort(), []);
 
-  const remove = async (server: McpServerListing) => {
-    if (!window.confirm(t("mcp.removeConfirm", { name: server.name }))) return;
-    setBusy(`delete:${server.name}`);
-    loadGeneration.current += 1;
-    setError(null);
-    try {
-      const result = await api(`/api/mcp/servers/${server.name}`, { method: "DELETE" });
-      setServers(result.servers ?? []);
-      updateMcpServers(result.servers ?? []);
-      setProbe((current) => {
-        const next = { ...current };
-        delete next[server.name];
-        return next;
-      });
-      if (editing === server.name) closeEditor();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const editingServer = editing && editing !== "new" ? servers?.find((server) => server.name === editing) : undefined;
-  const savedOAuth = editingServer && isRemoteMcpListing(editingServer) ? editingServer.oauth : undefined;
-  const secretKept = Boolean(savedOAuth?.clientSecretConfigured && !draft.oauthForgetSecret);
-
   function renderPasteBack(server: McpServerListing) {
     return (
       <>
@@ -576,36 +375,16 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
 
   const visibleServers = servers?.filter((server) => !hideWhop || !isRemoteMcpListing(server) || !isWhopServer(server));
 
-  const addButton = (
-    <button
-      type="button"
-      disabled={busy !== null || (restricted && !policy?.mcp.allowlist.length)}
-      title={restricted && policy ? t("policy.managedBy", { organization: policy.organizationName }) : undefined}
-      aria-expanded={editing === "new"}
-      onClick={() => {
-        onAddServer?.();
-        setEditing("new");
-        setDraft(EMPTY_DRAFT);
-        setError(null);
-        setNotice(null);
-      }}
-      className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full bg-accent px-2.5 text-[12px] font-medium text-white disabled:opacity-40"
-    >
-      <Plus size={12} /> {t("apps.mcp.add")}
-    </button>
-  );
-
   return (
     <>
-    {actionContainer && createPortal(addButton, actionContainer)}
     {showContent && <section
       data-mcp-servers
       aria-labelledby="mcp-servers-title"
-      className={embedded ? cn((servers === null || restricted || error || notice || editing || visibleServers?.length) && "mb-5") : "min-h-0 flex-1 overflow-y-auto px-6 pb-7 pt-5 sm:px-8"}
+      className={embedded ? "mb-5" : "min-h-0 flex-1 overflow-y-auto px-6 pb-7 pt-5 sm:px-8"}
     >
       <div className={embedded ? "" : "mx-auto max-w-[840px]"}>
         <h3 id="mcp-servers-title" className="sr-only">{t("mcp.title")}</h3>
-        {actionContainer === undefined && <div className="flex justify-end">{addButton}</div>}
+        <p className="text-[12.5px] leading-relaxed text-ink-secondary">{t("mcp.internalConfig")}</p>
 
         {restricted && policy && <p role="status" className="mt-3 text-[12.5px] leading-relaxed text-ink-secondary">{t("policy.mcpRestricted", { organization: policy.organizationName })}</p>}
 
@@ -615,173 +394,9 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
           ...(notice.stateKey ? { state: t(notice.stateKey) } : {}),
         })}</div>}
 
-        {editing && (
-          <div className="mt-4 rounded-2xl border border-hairline/60 bg-card p-4 sm:p-5">
-            <div className="text-[14px] font-medium text-ink">{editing === "new" ? t("mcp.editorNew") : t("mcp.editorEdit", { name: editing })}</div>
-            {editing === "new" && (
-              <div className="mt-3 inline-flex rounded-lg bg-raised p-0.5" role="radiogroup" aria-label={t("mcp.field.type")}>
-                {(["stdio", "remote"] as const).map((transport) => (
-                  <button
-                    key={transport}
-                    type="button"
-                    role="radio"
-                    aria-checked={draft.transport === transport}
-                    onClick={() => setDraft((current) => ({ ...current, transport }))}
-                    className={cn(
-                      "rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors",
-                      draft.transport === transport ? "bg-card text-ink shadow-sm" : "text-ink-secondary hover:text-ink",
-                    )}
-                  >
-                    {t(transport === "stdio" ? "mcp.transport.stdio" : "mcp.transport.remote")}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-[12px] font-medium text-ink-secondary">{t("mcp.field.name")}</span>
-                <input
-                  autoFocus={editing === "new"}
-                  disabled={editing !== "new"}
-                  value={draft.name}
-                  maxLength={32}
-                  onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value.toLowerCase() }))}
-                  placeholder="github"
-                  className="mt-1.5 w-full rounded-lg border border-hairline/60 bg-raised px-3 py-2.5 text-[13px] text-ink outline-none focus:border-accent disabled:opacity-60"
-                />
-              </label>
-              {draft.transport === "remote" ? (
-                <>
-                  <label className="block">
-                    <span className="text-[12px] font-medium text-ink-secondary">{t("mcp.field.url")}</span>
-                    <input
-                      autoFocus={editing !== "new"}
-                      value={draft.url}
-                      onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))}
-                      placeholder="https://mcp.example.com/mcp"
-                      className="mt-1.5 w-full rounded-lg border border-hairline/60 bg-raised px-3 py-2.5 text-[13px] text-ink outline-none focus:border-accent"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-[12px] font-medium text-ink-secondary">{t("mcp.field.type")}</span>
-                    <Select className="mt-1.5 w-full" value={draft.type}
-                      onChange={(event) => setDraft((current) => ({ ...current, type: event.target.value === "sse" ? "sse" : "http" }))}>
-                      <option value="http">{t("mcp.type.http")}</option>
-                      <option value="sse">{t("mcp.type.sse")}</option>
-                    </Select>
-                  </label>
-                  <label className="block sm:col-span-2">
-                    <span className="text-[12px] font-medium text-ink-secondary">{t("mcp.field.headers")}</span>
-                    <textarea
-                      value={draft.headers}
-                      onChange={(event) => setDraft((current) => ({ ...current, headers: event.target.value }))}
-                      placeholder="Authorization: Bearer …"
-                      rows={4}
-                      className="mt-1.5 w-full resize-y rounded-lg border border-hairline/60 bg-raised px-3 py-2.5 font-mono text-[12px] text-ink outline-none focus:border-accent"
-                    />
-                    <span className="mt-1.5 block text-[11px] text-ink-secondary">{t("mcp.headersHint")}</span>
-                  </label>
-                  <div className="sm:col-span-2">
-                    <div className="text-[12px] font-medium text-ink">{t("mcp.oauth.title")}</div>
-                    <p className="mt-1 text-[11px] leading-relaxed text-ink-secondary">
-                      {savedOAuth ? t("mcp.oauth.hintRedirect", { uri: savedOAuth.redirectUri }) : t("mcp.oauth.hint")}
-                    </p>
-                    <div className="mt-2 grid gap-4 sm:grid-cols-2">
-                      <label className="block">
-                        <span className="text-[12px] font-medium text-ink-secondary">{t("mcp.oauth.clientId")}</span>
-                        <input
-                          value={draft.oauthClientId}
-                          onChange={(event) => setDraft((current) => ({ ...current, oauthClientId: event.target.value }))}
-                          spellCheck={false}
-                          autoComplete="off"
-                          className="mt-1.5 w-full rounded-lg border border-hairline/60 bg-raised px-3 py-2.5 font-mono text-[12px] text-ink outline-none focus:border-accent"
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="flex items-center justify-between gap-2 text-[12px] font-medium text-ink-secondary">
-                          {t("mcp.oauth.clientSecret")}
-                          {secretKept && (
-                            <button type="button" onClick={() => setDraft((current) => ({ ...current, oauthClientSecret: "", oauthForgetSecret: true }))} className="text-[11px] font-normal text-ink-secondary underline-offset-2 hover:text-ink hover:underline">
-                              {t("mcp.oauth.removeSecret")}
-                            </button>
-                          )}
-                        </span>
-                        <input
-                          type="password"
-                          value={draft.oauthClientSecret}
-                          onChange={(event) => setDraft((current) => ({ ...current, oauthClientSecret: event.target.value }))}
-                          placeholder={secretKept ? t("mcp.oauth.secretSaved") : t("mcp.oauth.secretOptional")}
-                          autoComplete="new-password"
-                          className="mt-1.5 w-full rounded-lg border border-hairline/60 bg-raised px-3 py-2.5 font-mono text-[12px] text-ink outline-none focus:border-accent"
-                        />
-                      </label>
-                      <label className="block sm:col-span-2">
-                        <span className="text-[12px] font-medium text-ink-secondary">{t("mcp.oauth.scopes")}</span>
-                        <input
-                          value={draft.oauthScopes}
-                          onChange={(event) => setDraft((current) => ({ ...current, oauthScopes: event.target.value }))}
-                          placeholder="offline_access api://my-app/mcp.read"
-                          spellCheck={false}
-                          className="mt-1.5 w-full rounded-lg border border-hairline/60 bg-raised px-3 py-2.5 font-mono text-[12px] text-ink outline-none focus:border-accent"
-                        />
-                      </label>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-              <label className="block">
-                <span className="text-[12px] font-medium text-ink-secondary">{t("mcp.field.command")}</span>
-                <input
-                  autoFocus={editing !== "new"}
-                  value={draft.command}
-                  onChange={(event) => setDraft((current) => ({ ...current, command: event.target.value }))}
-                  placeholder="npx"
-                  className="mt-1.5 w-full rounded-lg border border-hairline/60 bg-raised px-3 py-2.5 text-[13px] text-ink outline-none focus:border-accent"
-                />
-              </label>
-              <label className="block">
-                <span className="text-[12px] font-medium text-ink-secondary">{t("mcp.field.args")}</span>
-                <textarea
-                  value={draft.args}
-                  onChange={(event) => setDraft((current) => ({ ...current, args: event.target.value }))}
-                  placeholder={"-y\n@modelcontextprotocol/server-github"}
-                  rows={5}
-                  className="mt-1.5 w-full resize-y rounded-lg border border-hairline/60 bg-raised px-3 py-2.5 font-mono text-[12px] text-ink outline-none focus:border-accent"
-                />
-              </label>
-              <label className="block">
-                <span className="text-[12px] font-medium text-ink-secondary">{t("mcp.field.env")}</span>
-                <textarea
-                  value={draft.env}
-                  onChange={(event) => setDraft((current) => ({ ...current, env: event.target.value }))}
-                  placeholder="GITHUB_TOKEN=…"
-                  rows={5}
-                  className="mt-1.5 w-full resize-y rounded-lg border border-hairline/60 bg-raised px-3 py-2.5 font-mono text-[12px] text-ink outline-none focus:border-accent"
-                />
-                {editing !== "new" && <span className="mt-1.5 block text-[11px] text-ink-secondary">{t("mcp.envHint")}</span>}
-              </label>
-                </>
-              )}
-              <McpResultBudgetField value={draft.resultBudget} onChange={(resultBudget) => setDraft((current) => ({ ...current, resultBudget }))} />
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={closeEditor} className="rounded-lg px-3 py-2 text-[12.5px] text-ink-secondary hover:bg-raised">{t("mcp.cancel")}</button>
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void save()}
-                className="flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-[12.5px] font-medium text-white disabled:opacity-50"
-              >
-                {busy === "save" && <Loader2 size={13} className="animate-spin" />} {t("mcp.save")}
-              </button>
-            </div>
-          </div>
-        )}
-
         {servers === null ? (
           <div className="flex items-center justify-center gap-2 py-24 text-[13px] text-ink-secondary"><Loader2 size={14} className="animate-spin" /> {t("mcp.loading")}</div>
-        ) : visibleServers?.length === 0 && !editing ? null : (
+        ) : visibleServers?.length === 0 ? null : (
           <div className="mt-5 space-y-3">
             {visibleServers?.map((server) => {
               const whop = isRemoteMcpListing(server) && isWhopServer(server);
@@ -826,8 +441,6 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
                       <button type="button" disabled={busy !== null || signingIn !== null} onClick={() => void test(server)} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[12px] text-ink-secondary hover:bg-raised hover:text-ink disabled:opacity-40">
                         {busy === `test:${server.name}` ? <Loader2 size={14} className="animate-spin" /> : <FlaskConical size={14} />} {t("mcp.test")}
                       </button>
-                      <button type="button" disabled={busy !== null || signingIn !== null} onClick={() => { setEditing(server.name); setDraft(draftFor(server)); setError(null); setNotice(null); }} className="rounded-lg p-2 text-ink-secondary hover:bg-raised hover:text-ink disabled:opacity-40" aria-label={t("mcp.editAria", { name: server.name })}><Pencil size={14} /></button>
-                      <button type="button" disabled={busy !== null || signingIn !== null} onClick={() => void remove(server)} className="rounded-lg p-2 text-ink-secondary hover:bg-danger/10 hover:text-danger disabled:opacity-40" aria-label={t("mcp.removeAria", { name: server.name })}><Trash2 size={14} /></button>
                       <span className="ml-1 flex items-center">
                         {busy === `toggle:${server.name}` && <Loader2 size={13} className="mr-1.5 animate-spin text-ink-secondary" />}
                         <Switch

@@ -48,7 +48,6 @@ let dispatch: (action: Action) => void;
 const { StoreProvider, useStore, openBot } = await import("./store");
 const { landOnSearchHit } = await import("@/lib/focus-message");
 const { threadsWhenTreeHidden } = await import("@/components/SidebarBotActivity");
-const { setAdvancedMode } = await import("@/lib/interface-mode");
 const { setShowThreads } = await import("@/lib/thread-preferences");
 
 let root: Root;
@@ -123,7 +122,7 @@ beforeEach(async () => {
 afterEach(() => flushSync(() => root.unmount()));
 
 const threadsShown = async (shown: boolean) => {
-  flushSync(() => { setAdvancedMode(true); setShowThreads(shown); });
+  flushSync(() => { void 0; setShowThreads(shown); });
   await settle();
 };
 const sent = () => requests.map((request) => request.body ? `${request.path} ${request.body}` : request.path);
@@ -203,7 +202,7 @@ describe("opening a bot with threads hidden", () => {
 describe("launching the app on a bot", () => {
   async function relaunch(shown: boolean) {
     flushSync(() => root.unmount());
-    flushSync(() => { setAdvancedMode(true); setShowThreads(shown); });
+    flushSync(() => { void 0; setShowThreads(shown); });
     firstBot = "scout";
     requests.length = 0;
     await launch();

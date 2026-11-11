@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { BookOpen, X } from "lucide-react";
 
 import { BotAvatar } from "./Avatar";
-import { normalizeState } from "@/lib/mascot";
+
 import type { Bot } from "@/state/store";
 import { t } from "@/lib/i18n";
 
@@ -51,7 +51,7 @@ export function BotInstructionsDialog({ bot, onClose, inline = false }: { bot: B
     };
   }, [close]);
 
-  const content = (
+  const content = 
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px] sm:p-6"
       onMouseDown={(event) => event.target === event.currentTarget && close()}
@@ -68,11 +68,7 @@ export function BotInstructionsDialog({ bot, onClose, inline = false }: { bot: B
           <div className="flex min-w-0 items-center gap-3">
             <BotAvatar
               bot={bot}
-              state={normalizeState(bot.mascotExpression) ?? "idle"}
               size={38}
-              motion="none"
-              motionKey={0}
-              animated={false}
             />
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-accent-text">
@@ -117,6 +113,6 @@ export function BotInstructionsDialog({ bot, onClose, inline = false }: { bot: B
         </footer>
       </div>
     </div>
-  );
+  ;
   return inline ? content : createPortal(content, document.body);
 }

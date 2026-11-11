@@ -246,7 +246,7 @@ function DraftSection({ active, draft, defaultsMode }: { active: Section; draft:
   const derived = useBotSettingsDerived(bot);
   if (active === "Identity") return <div className="space-y-4">
     <StartingRole draft={draft} defaultsMode={defaultsMode} />
-    <IdentitySection bot={bot} patch={derived.patch} activeState={derived.activeState} mascotMotion={null}
+    <IdentitySection bot={bot} patch={derived.patch}
       namePlaceholder={defaultsMode ? t("newBot.randomName") : undefined} />
     <label className="block text-[13px] text-ink-secondary">{t("newBot.team")}
       <Select size="lg" className="mt-1.5 w-full" value={bot.section ?? ""} onChange={event => draft.patch({ section: event.target.value })}>

@@ -43,15 +43,15 @@ describe("computer panel view persistence", () => {
 describe("computer panel view availability", () => {
 
   it("drops the tabs the current mode does not render", () => {
-    expect(resolveComputerPanelView("routines", { advanced: false })).toBe("files");
-    expect(resolveComputerPanelView("files", { advanced: true })).toBe("files");
+    expect(resolveComputerPanelView("routines")).toBe("routines");
+    expect(resolveComputerPanelView("files")).toBe("files");
   });
 
   it("keeps a view whose trigger is on the row", () => {
     for (const view of ["files", "data"] as const) {
-      expect(resolveComputerPanelView(view, { advanced: true })).toBe(view);
-      expect(resolveComputerPanelView(view, { advanced: false })).toBe(view);
+      expect(resolveComputerPanelView(view)).toBe(view);
+      expect(resolveComputerPanelView(view)).toBe(view);
     }
-    expect(resolveComputerPanelView("files", { advanced: false })).toBe("files");
+    expect(resolveComputerPanelView("files")).toBe("files");
   });
 });

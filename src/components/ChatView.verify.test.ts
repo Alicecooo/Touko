@@ -125,7 +125,6 @@ describe("The run card in the chat pane", () => {
     saveable();
     const markup = render(run);
     expect(markup).toContain(t("chat.verify.save"));
-    expect(markup).toContain(t("chat.verify.saveHint"));
     expect(fixture.verify?.canSave).toBe(true);
 
     fixture.verify!.onSave();

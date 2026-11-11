@@ -1,6 +1,5 @@
 import { useDesktopCapabilities } from "../DesktopCapabilities";
 
-import { stateForBot } from "@/lib/mascot";
 import { useStore, type Bot } from "@/state/store";
 import { approvalModeFor } from "../../../shared/approval-mode";
 import { connectorGrantsState, type ConnectorGrantsState } from "@/lib/connector-grants";
@@ -16,7 +15,6 @@ export type BotPatch = Partial<
     | "notifications"
     | "color"
     | "mascotExpression"
-    | "mascotBody"
     | "avatarUrl"
     | "avatarCrop"
     | "avatarZoom"
@@ -51,8 +49,6 @@ export function useBotSettingsDerived(bot: Bot) {
   const { state, dispatch } = useStore();
   const { capabilities } = useDesktopCapabilities();
   const patch = (p: BotPatch) => dispatch({ type: "updateBot", botId: bot.id, patch: p });
-  const activeState = stateForBot(bot);
-  const mascotMotion = state.mascotMotion?.botId === bot.id ? state.mascotMotion : null;
   const engine = state.instances.find((instance) => instance.instanceId === bot.modelSelection.instanceId);
   const approvalMode = approvalModeFor(bot);
   const trustedModesAvailable = Boolean(window.ogb?.approvals && capabilities.host.packaged);
@@ -89,7 +85,5 @@ export function useBotSettingsDerived(bot: Bot) {
     currentChief,
     botRoutines,
     activeBotRoutines,
-    activeState,
-    mascotMotion,
   };
 }

@@ -821,6 +821,27 @@
   font-family: "omb-chat", var(--font-sans);
 }
 
+/* Message content uses a quiet document rhythm, independent of interface labels. */
+.chat-md { font-size: 15px; font-weight: 400; line-height: 1.75; overflow-wrap: anywhere; }
+.chat-md strong, .chat-md b { font-weight: 500; }
+.chat-md > * + * { margin-top: 0.85em; }
+.chat-md > :first-child { margin-top: 0; }
+.chat-md > :last-child { margin-bottom: 0; }
+.chat-md :is(h1, h2, h3, h4, h5, h6) { font-size: 1em; font-weight: 500; line-height: 1.5; margin-top: 1.5em; margin-bottom: 0.5em; }
+.chat-md h1 { font-size: 1.15em; }
+.chat-md h2 { font-size: 1.08em; }
+.chat-md :is(h1, h2, h3, h4, h5, h6) strong { font-weight: inherit; }
+.chat-md li + li { margin-top: 0.3em; }
+.chat-md li > p + p { margin-top: 0.5em; }
+.chat-md li > :is(ul, ol) { margin-top: 0.4em; }
+.chat-md .ui-code-chip { font-weight: 400; font-size: 0.87em; border: 0; border-radius: 4px; padding: 0.1em 0.3em; }
+.chat-md .chat-code { margin-top: 1em; margin-bottom: 1em; }
+.chat-md .rich-table { margin-top: 1em; margin-bottom: 1em; }
+.chat-md .rich-table th { font-weight: 500; background: transparent; }
+.chat-md .rich-table td { font-weight: 400; }
+.chat-md blockquote { padding-block: 0.15em; }
+.chat-md hr { margin-block: 1.4em; }
+
 html,
 body,
 #root {
@@ -1101,7 +1122,7 @@ body {
    sits on, so at rest the bar reads as that surface, over a blur of whatever
    scrolls beneath. A top bar's inner edge fades out across --glass-edge, so
    content melts into the glass instead of meeting a hard line. A bottom bar
-   can be one short row (Simple mode's profile row), where a fade inside it
+   can be one short row (the profile row), where a fade inside it
    left a half-sharp strip of text showing above the row: its glass is solid
    to the bar's edge and reaches --glass-reach past it instead, fading there,
    and the list gets that much more room at its end so a resting row is never

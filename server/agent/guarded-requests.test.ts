@@ -54,7 +54,7 @@ describe("guarded request ancestry", () => {
     expect(requestNeedsInput(card)).toBe(false);
     expect(requestNeedsInput({ ...card, card: { ...card.card, answered: "done" } })).toBe(false);
     expect(requestNeedsInput({ ...card, card: { ...card.card, expired: true } })).toBe(false);
-    const secret = { ...reply, secret: { target: "openaiImageApiKey" as const, label: "Key", description: "", placeholder: "", helpUrl: "", requestKey: "key" } };
+    const secret = { ...reply, secret: { target: "xaiApiKey" as const, label: "Key", description: "", placeholder: "", helpUrl: "", requestKey: "key" } };
     expect(requestNeedsInput(secret)).toBe(true);
     expect(requestNeedsInput({ ...secret, secret: { ...secret.secret, superseded: true } })).toBe(false);
     expect(requestNeedsInput({ ...card, card: { ...card.card, requestType: "permission", tool: "Bash" } })).toBe(true);

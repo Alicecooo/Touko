@@ -87,7 +87,7 @@ describe("lazyScreen", () => {
     const warnings = vi.spyOn(console, "warn").mockImplementation(() => {});
     const reload = vi.spyOn(window.location, "reload").mockImplementation(() => {});
     const load = vi.fn((): Loaded => Promise.reject(new TypeError("Failed to fetch dynamically imported module")));
-    const Screen = lazyScreen("TeamMapPage", load);
+    const Screen = lazyScreen("TriggersPage", load);
     await expect(Screen.preload()).rejects.toThrow(TypeError);
     render(createElement("main", null, "chat", createElement(Screen, { text: "Team map" })));
     await settle();
@@ -97,7 +97,7 @@ describe("lazyScreen", () => {
     expect(document.body.textContent).not.toContain("Team map");
     expect(errors).not.toHaveBeenCalled();
     expect(warnings).toHaveBeenCalledTimes(2);
-    expect(String(warnings.mock.calls[0]![0])).toContain("TeamMapPage");
+    expect(String(warnings.mock.calls[0]![0])).toContain("TriggersPage");
     expect(reload).not.toHaveBeenCalled();
     notice!.querySelector("button")!.click();
     expect(reload).toHaveBeenCalledTimes(1);
@@ -236,7 +236,7 @@ describe("launch bundle", () => {
     const deferred = [
       "ActivityPanel", "BotSettingsDialog", "ComputerPanel", "InspectorPanel", "KeyboardShortcutsModal",
       "LocalVmWorkspace", "NewBotDialog", "RemoteAgentSettingsPanel", "remote-desktop-panel", "RoutineCalendarPage",
-      "RoutinesPage", "SettingsModal", "TeamMapPage", "TriggersPage", "WebhookTrigger",
+      "RoutinesPage", "SettingsModal", "TriggersPage", "TriggersPage", "WebhookTrigger",
     ].map((name) => `components/${name}.tsx`);
     expect(deferred.filter((file) => reached.has(file))).toEqual([]);
   });

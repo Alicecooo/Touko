@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
-import { MAUS_COLORS, type MausColor } from "@/lib/mascot";
+import { BOT_COLORS, type MausColor } from "@/lib/bot-appearance";
 import { Switch } from "../SettingsPrimitives";
 
 export const rowCls = "flex min-h-[46px] items-center gap-2.5 px-3.5 py-[11px]";
@@ -61,7 +61,7 @@ function RowIcon({ icon: Icon }: { icon: LucideIcon }) {
 }
 
 export function BotSwitch({ color, checked, ...props }: Parameters<typeof Switch>[0] & { color: MausColor }) {
-  return <Switch {...props} checked={checked} style={checked ? { backgroundColor: MAUS_COLORS[color] } : undefined} />;
+  return <Switch {...props} checked={checked} style={checked ? { backgroundColor: BOT_COLORS[color] } : undefined} />;
 }
 
 export function SwitchRow({ title, hint, checked, onChange, disabled, color, label, tooltip, extra, ...rest }: {
