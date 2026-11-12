@@ -6,7 +6,7 @@
 | --- | --- |
 | `build/` | 服务端打包、更新器组装、桌面依赖发布文件处理 |
 | `setup/` | 准备 Windows/Linux 桌面控制、HTTPS 隧道和数据库依赖 |
-| `generators/` | 生成头像数据、模型目录、翻译、依赖清单和固定测试样本 |
+| `generators/` | 生成人物头像总览、模型目录、翻译和桌面依赖清单 |
 | `dev/` | 隔离环境、开发 MCP 服务、外部浏览器 QA 工具和预览服务 |
 | `previews/` | 被现有开发环境或测试使用的组件预览页面 |
 | `benchmarks/` | 输出性能测量结果，不作通过或失败断言 |
@@ -24,7 +24,6 @@
 | `pnpm dev` / `pnpm dev:server` | 启动 Web 页面 / 开发服务端 |
 | `pnpm dev:desktop` | 启动桌面程序 |
 | `pnpm run dev:isolated --help` | 查看隔离开发环境的操作命令 |
-| `pnpm generate:app-icons` | 从符号 SVG 生成网页、桌面与安装图标 |
 | `pnpm generate:portrait-preview` | 生成人物头像与表情总览 |
 | `pnpm generate:translations <语言代码>` | 生成翻译草稿；需要本机 Claude CLI 登录 |
 | `pnpm prepare:duckdb` | 准备数据引擎 |

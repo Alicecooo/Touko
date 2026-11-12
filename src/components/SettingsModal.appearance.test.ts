@@ -92,7 +92,6 @@ beforeEach(() => {
   fixture.notificationSounds = true;
   fixture.sendKey = "enter";
   fixture.colorUserBubbles = false;
-  // these pin the Advanced rail; Simple has its own suite (SettingsModal.simple.test.ts)
   fixture.switches = [];
   vi.stubGlobal("window", {});
   vi.stubGlobal("document", { documentElement: { dataset: {} } });

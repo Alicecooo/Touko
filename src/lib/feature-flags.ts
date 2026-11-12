@@ -1,7 +1,7 @@
 
 
 export interface FeatureFlagConfig {
-  features?: { skillAuthoring?: boolean; showToolCalls?: boolean;  sharedComputers?: boolean; claudeUserMcp?: boolean; claudeUserSkills?: boolean; routinesInConversation?: boolean; llmThreadTitles?: boolean; skillsLibrary?: boolean; shareLearnedSkills?: "off" | "ask" | "auto"; roomMemoryCapture?: boolean };
+  features?: { skillAuthoring?: boolean; showToolCalls?: boolean; sharedComputers?: boolean; claudeUserMcp?: boolean; claudeUserSkills?: boolean; routinesInConversation?: boolean; llmThreadTitles?: boolean; skillsLibrary?: boolean; shareLearnedSkills?: "off" | "ask" | "auto"; roomMemoryCapture?: boolean };
 
 }
 
