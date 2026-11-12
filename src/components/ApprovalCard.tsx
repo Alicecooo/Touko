@@ -53,7 +53,6 @@ const PROFILE_FIELD_LABEL: Record<ProfileRequestField, LocaleKey> = {
   name: "approval.applied.field.name",
   title: "approval.applied.field.title",
   description: "approval.applied.field.description",
-  soul: "approval.applied.field.soul",
   cwd: "approval.applied.field.cwd",
   notifications: "approval.applied.field.notifications"};
 

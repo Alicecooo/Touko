@@ -1,8 +1,9 @@
 import { newId, type ModelSelection } from "../harness/contracts.ts";
 import { takeImportName } from "../../shared/import-name.ts";
 import { MAX_TEAM_BACKUP_BYTES, parseTeamBackup, type BackupTask, type TeamBackup } from "../../shared/team-backup.ts";
-import { helperModelAllowed, type BotVisibility } from "../../shared/wire.ts";
+import { helperModelAllowed } from "../../shared/wire.ts";
 import type { BotRecord, GroupRecord, Message, Store, TaskRecord } from "../storage/store.ts";
+import { roomHomeThreadId } from "../teams/room-home.ts";
 import type { Routine, RoutineManager } from "../automation/routines.ts";
 import { redactSecretsInText } from "../security/redact.ts";
 import { listMemoryLogs, listMemoryTopics, readMemoryFile, readMemoryLog, readMemoryTopic, writeMemoryFile, writeMemoryLog, writeMemoryTopic } from "../workspace/workspace.ts";
@@ -77,8 +78,7 @@ export function createTeamBackup(store: Store, routines: Routine[], name: string
       bulletin: group.bulletin, memberIds,
       defaultResponder: group.defaultResponder.kind === "member" && !memberIds.includes(group.defaultResponder.botId)
         ? { kind: "mentions" as const }
-        : group.defaultResponder.kind === "auto" && group.defaultResponder.fallbackBotId && !memberIds.includes(group.defaultResponder.fallbackBotId)
-          ? { kind: "auto" as const } : group.defaultResponder,
+        : group.defaultResponder,
       activeTask: group.threadId,
       tasks: history(group).map((task, index) =>
         group.dm && index === 0 && typeof group.turnTimeoutMinutes === "number"
@@ -97,7 +97,7 @@ export function createTeamBackup(store: Store, routines: Routine[], name: string
     format: "openmaus.backup", version: 1, name, exportedAt: Date.now(),
     warnings,
     bots: store.bots.map((bot) => ({
-      key: bot.id, name: bot.name, title: bot.title, description: bot.description, soul: bot.soul,
+      key: bot.id, name: bot.name, title: bot.title, description: bot.description,
       section: bot.section, color: bot.color,
       mascotExpression: bot.mascotExpression ?? undefined,
       chiefOfStaff: Boolean(bot.chiefOfStaff), hidden: Boolean(bot.hidden), playbooks: bot.playbooks ?? [],
@@ -123,7 +123,7 @@ export function createTeamBackup(store: Store, routines: Routine[], name: string
 }
 
 /** Always additive: rollback owns only the fresh records and cannot touch an existing bot or chat. */
-export function importTeamBackup(store: Store, routines: RoutineManager, input: unknown, selection: ModelSelection, options: { visibility?: BotVisibility } = {}) {
+export function importTeamBackup(store: Store, routines: RoutineManager, input: unknown, selection: ModelSelection) {
   const backup = parseTeamBackup(input);
   const bots: BotRecord[] = [];
   const groups: GroupRecord[] = [];
@@ -162,11 +162,9 @@ export function importTeamBackup(store: Store, routines: RoutineManager, input: 
     // Allocate all bot IDs before remapping any conversation participants.
     for (const source of backup.bots) {
       const bot = store.createBot({
-        name: takeImportName(source.name, takenNames), title: source.title, description: source.description, soul: source.soul,
+        name: takeImportName(source.name, takenNames), title: source.title, description: source.description,
         color: source.color, mascotExpression: source.mascotExpression,
         modelSelection: selection, section: sectionFor(source.section),
-        // who may see the imported team is the importing admin's choice
-        ...(options.visibility ? { visibility: options.visibility } : {}),
       }, { seedMessages: false });
       bots.push(bot);
       botIds.set(source.key, bot.id);
@@ -209,7 +207,10 @@ export function importTeamBackup(store: Store, routines: RoutineManager, input: 
           : {}),
         defaultResponder:
         responder.kind === "member" ? { kind: "member", botId: botIds.get(responder.botId)! }
-          : responder.kind === "auto" ? { kind: "auto", ...(responder.fallbackBotId ? { fallbackBotId: botIds.get(responder.fallbackBotId)! } : {}) }
+          : responder.kind === "auto"
+            ? source.memberIds.length > 0
+              ? { kind: "member", botId: botIds.get(responder.fallbackBotId ?? source.memberIds[0])! }
+              : { kind: "mentions" }
             : responder });
       const threads = source.tasks.map((task, i) => {
         if (i === 0) {
@@ -227,6 +228,7 @@ export function importTeamBackup(store: Store, routines: RoutineManager, input: 
           ...(task.titleFromFirstMessage ? { titleFromFirstMessage: true } : {}),
           ...(task.turnTimeoutMinutes != null ? { turnTimeoutMinutes: task.turnTimeoutMinutes } : {}),
         }));
+        group.homeThreadId = roomHomeThreadId(group);
         store.switchGroupTask(group.id, threads[source.tasks.findIndex((task) => task.key === source.activeTask)]);
       }
     }

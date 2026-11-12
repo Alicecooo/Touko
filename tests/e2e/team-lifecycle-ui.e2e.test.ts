@@ -76,9 +76,9 @@ if (!enabled) console.log("skipping team lifecycle UI e2e: set OMB_UI_E2E=1 to i
     const b = (await control("new-bot", "--name", "Engineer", "--section", "Engineering") as any).bot;
 
     await click("New or share");
-    await click("Create team");
+    await click("New Bot group");
     await type("Team name", "Delivery");
-    await click("Create team");
+    await click("New Bot group");
     await expect.poll(snapshot, { timeout: 10_000 }).toContain('button "Delivery"');
     expect((await api("/api/bots?messages=0")).sections).toContain("Delivery");
     const teamMenu = async (name: string) => ui("eval", "--js", `(() => {
@@ -110,14 +110,16 @@ if (!enabled) console.log("skipping team lifecycle UI e2e: set OMB_UI_E2E=1 to i
     await type("Team name", "Delivery");
     await click("Save name");
     await expect.poll(snapshot).toContain('button "Delivery"');
-    await click("Tools");
-    await click("Team map");
-    await manage("Delivery");
-    await click("Move bots to Delivery");
+    expect(await snapshot()).not.toContain('button "Add bots to Delivery"');
+    await click("New or share");
+    await click("Add or remove bots");
+    await click("Add or remove bots in Delivery");
     await click("Researcher");
     await click("Engineer");
     await click("Save");
     await expect.poll(async () => (await api("/api/bots?messages=0")).bots.filter((bot: any) => bot.section === "Delivery").length).toBe(2);
+    await click("Tools");
+    await click("Team map");
     await manage("Delivery");
     await click("Move bots to Delivery");
     await click("Researcher");

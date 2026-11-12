@@ -4,13 +4,12 @@ import { openBot, StoreProvider, useStore } from "@/state/store";
 import { useShowThreads } from "@/lib/thread-preferences";
 import { ThreadRefsProvider } from "@/components/ThreadRefs";
 import { initAnalytics } from "@/lib/analytics";
-import { parseComputerHelp } from "@/lib/computer-control";
 import { Sidebar } from "@/components/Sidebar";
 import { ChatView } from "@/components/ChatView";
 import { GroupView } from "@/components/GroupView";
 import { SIDEBAR_AND_PANEL_FIT, TWO_SIDE_PANELS_FIT, useMediaQuery } from "@/lib/use-media-query";
 import { PluginsPanel, preloadConnectedApps } from "@/components/PluginsPanel";
-import { ActivityPanel, BotSettingsDialog, ComputerPanel, InspectorPanel, NewBotDialog, preloadScreens, SettingsModal, TriggersPage } from "@/components/lazy-screens";
+import { ActivityPanel, BotSettingsDialog, InspectorPanel, NewBotDialog, preloadScreens, SettingsModal, TriggersPage } from "@/components/lazy-screens";
 import { WorkspaceBackupRecovery } from "@/components/WorkspaceBackupSettings";
 import { NotificationRail, NotificationsPanel } from "@/components/NotificationsPanel";
 import { useNotificationFeed } from "@/lib/notification-preferences";
@@ -50,7 +49,7 @@ function Shell() {
   const group = state.groups.find((g) => g.id === state.selectedId);
   const bot = group ? undefined : (state.bots.find((b) => b.id === state.selectedId) ?? state.bots[0]);
   const notificationFeed = useNotificationFeed() && !remoteClient;
-  const sidePanelOpen = (Boolean(bot) && (state.settingsOpen || state.computerOpen || state.inspectorOpen || state.activityOpen)) || (notificationFeed && state.notificationsOpen);
+  const sidePanelOpen = (Boolean(bot) && (state.settingsOpen || state.inspectorOpen || state.activityOpen)) || (notificationFeed && state.notificationsOpen);
   const collapseSidebar = sidePanelOpen && !sidebarAndPanelFit;
   const calendarFocus = state.activeView === "routines" && state.routinesFocus.view === "calendar";
 
@@ -113,28 +112,6 @@ function Shell() {
 
   useEffect(() => window.ogb?.onOpenAppSettings?.(() => dispatch({ type: "toggleAppSettings", open: true })), [dispatch]);
 
-  useEffect(() => {
-    return window.ogb?.desktopViewer?.onState((viewer) => {
-      if (viewer.open || !viewer.contextId) return;
-      const botId = viewer.contextId;
-      void fetch(`/api/bots/${botId}/computer/control`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "release" }),
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((snap) => {
-          if (snap) dispatch({ type: "computerControl", botId, held: snap.held === true, helpReason: snap.helpReason ?? null, help: parseComputerHelp(snap.help) });
-        })
-        .catch(() => {});
-      void fetch(`/api/bots/${botId}/computer/viewer-close`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: "{}",
-      }).catch(() => {});
-    });
-  }, [dispatch]);
-
   return (
     <div className="flex h-full flex-col">
       
@@ -189,9 +166,8 @@ function Shell() {
       )}
       {/* Sibling panels need distinct keys: two keyed `bot.id` collide in React's keyed reconciliation. */}
       {state.settingsOpen && bot && (
-        <BotSettingsDialog key={`settings:${bot.id}`} bot={bot} overlay={(state.inspectorOpen || state.computerOpen || (notificationFeed && state.notificationsOpen)) && !twoSidePanelsFit} />
+        <BotSettingsDialog key={`settings:${bot.id}`} bot={bot} overlay={(state.inspectorOpen || (notificationFeed && state.notificationsOpen)) && !twoSidePanelsFit} />
       )}
-      {state.computerOpen && bot && <ComputerPanel key={`computer:${bot.id}`} bot={bot} />}
       {state.inspectorOpen && bot && <InspectorPanel key={bot.threadId} bot={bot} />}
       {state.activityOpen && bot && <ActivityPanel key={`activity:${bot.id}`} bot={bot} />}
       {notificationFeed && !calendarFocus && state.notificationsOpen && <NotificationsPanel />}

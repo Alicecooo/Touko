@@ -7,7 +7,7 @@
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
-import { BOT_PROFILE_LIMITS, fitsOnOneLine } from "./bot-profile.ts";
+import { fitsOnOneLine } from "./bot-profile.ts";
 import { redactSecretsInText } from "./redact.ts";
 import { normalizeCronSchedule } from "./routine-schedule.ts";
 import { isSkillName, parseSkillMd, scanSkillText, SKILL_FILE_MAX_BYTES } from "./skill-md.ts";
@@ -90,9 +90,6 @@ const portableSkillSchema = z.object({
   license: optionalText(200),
   compatibility: optionalText(200),
   instructions: skillInstructions,
-});
-const soulSchema = z.string().refine((value) => utf8Bytes(value) <= BOT_PROFILE_LIMITS.soul, {
-  error: "standing instructions must be at most 24000 bytes",
 });
 const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const intervalWeekdays = z.array(z.number().int().min(0).max(6)).min(1).max(7).refine(
@@ -220,7 +217,6 @@ const packageDocumentV1Schema = z.object({
       name: requiredText(100),
       title: optionalText(200),
       description: optionalText(4_000),
-      soul: soulSchema.optional(),
       appearance: z.object({
         color: z.enum(COLORS, { error: "is not supported" }),
         mascotExpression: optionalText(80),
@@ -344,7 +340,6 @@ const agentSchema = z.object({
   name: oneLine(100),
   title: optionalLine(200),
   description: optionalText(4_000),
-  soul: soulSchema.optional(),
   appearance: appearanceSchema,
   /** A suggestion only: an imported bot starts at the workspace's default level (Full access outside a hosted company workspace). Record browser steps travels as set (no card). */
   approval: z.enum(["ask", "auto"], { error: "must be ask or auto" }).optional(), recordBrowserSteps: z.boolean().optional(),
@@ -383,7 +378,6 @@ const presetSchema = z.object({
     name: optionalLine(100),
     title: optionalLine(200),
     description: optionalText(4_000),
-    soul: soulSchema.optional(),
     appearance: appearanceSchema.optional(),
   }),
   playbooks: z.array(key).max(40).optional(),
@@ -481,7 +475,7 @@ export type PackageAvatar = NonNullable<PackageAgent["appearance"]["avatar"]>;
 export type PackageRoutineSchedule = PackageRoutine["schedule"];
 
 
-/** Lists whose items are named by `key` in part paths: agents[scout].soul. */
+/** Lists whose items are named by `key` in part paths. */
 const KEYED_LISTS = new Set(["agents", "rooms", "routines", "playbooks", "presets", "connections"]);
 
 function segmentsAfter(head: string, rest: ReadonlyArray<PropertyKey>): string {
@@ -495,7 +489,7 @@ function segmentsAfter(head: string, rest: ReadonlyArray<PropertyKey>): string {
 }
 
 /** Map a schema path onto the part-path grammar shared with Admin:
- * package.summary, team.brief, agents[scout].soul, skills[x].instructions,
+ * package.summary, team.brief, skills[x].instructions,
  * agents[scout].seed.memory["MEMORY.md"]. Keys come from the raw input. */
 function describePath(input: unknown, path: ReadonlyArray<PropertyKey>): string {
   if (path[0] !== "package") return path.map(String).join(".") || "package";

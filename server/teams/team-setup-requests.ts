@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { soulDiffLines } from "../../shared/line-diff.ts";
 import { newId, type ModelSelection } from "../harness/contracts.ts";
 import { fitsOnOneLine, parseBotProfilePatch } from "../bots/bot-profile.ts";
 import { profileSnapshot } from "../bots/profile-revision.ts";
@@ -18,7 +17,7 @@ const modelSelectionText = (selection: ModelSelection) =>
   `${selection.instanceId}/${selection.model}${selection.variant ? ` (variant ${selection.variant})` : " (no variant)"}${selection.effort ? ` (effort ${selection.effort})` : ""}`;
 const fieldsSchema = z.object({
   chiefOfStaff: z.boolean().optional(),
-  name: z.string().optional(), title: z.string().optional(), description: z.string().optional(), soul: z.string().optional(),
+  name: z.string().optional(), title: z.string().optional(), description: z.string().optional(),
   cwd: z.string().optional(),
   section: z.string().trim().max(60).refine(fitsOnOneLine).refine((value) => redactSecretsInText(value) === value, "Team names cannot contain credentials").optional(),
   modelSelection: z.object({ instanceId: z.string().trim().min(1), model: z.string().trim().min(1), effort: z.string().optional(), variant: z.string().optional() }).strict().optional(),
@@ -53,7 +52,6 @@ export function teamSetupRevision(bot: BotRecord, fields?: TeamSetupFields): str
   if (fields.name !== undefined) scope.name = snapshot.name;
   if (fields.title !== undefined) scope.title = snapshot.title;
   if (fields.description !== undefined) scope.description = snapshot.description;
-  if (fields.soul !== undefined) scope.soul = snapshot.soul;
   if (fields.section !== undefined) scope.section = section(bot.section);
   if (fields.modelSelection !== undefined) scope.modelSelection = bot.modelSelection;
   if (fields.chiefOfStaff !== undefined) scope.chiefOfStaff = Boolean(bot.chiefOfStaff);
@@ -152,7 +150,7 @@ export class TeamSetupRequestService {
       const target = this.options.store.bot(operation.botId);
       if (operation.action === "create") {
         if (target) throw new TeamSetupError("A proposed bot already exists. Review a new proposal.", 409);
-        if (!operation.fields.name?.trim() || !operation.fields.title?.trim() || !operation.fields.soul?.trim() || !operation.fields.modelSelection) throw new TeamSetupError("Each new bot needs a name, title, soul instructions, and exact model selection");
+        if (!operation.fields.name?.trim() || !operation.fields.title?.trim() || !operation.fields.modelSelection) throw new TeamSetupError("Each new bot needs a name, title, and exact model selection");
       } else {
         if (!target || target.hidden || !this.options.canAccessTeam(chief, target.section) || (target.id !== chief.id && Array.isArray(chief.peers) && !chief.peers.includes(target.id))) throw new TeamSetupError("A target bot is outside this Chief's authorized team and peer scope", 403);
         if (teamSetupRevision(target, operation.fields) !== operation.expectedRevision) throw new TeamSetupError(`@${target.name} changed. This setup was cancelled; review a new proposal.`, 409);
@@ -274,9 +272,7 @@ export class TeamSetupRequestService {
           lines.push(`Chief of Staff: ${current?.chiefOfStaff ? "Yes" : "No"} → ${value ? "Yes" : "No"}.${value ? " May coordinate and configure bots in this team." : " Additional managed-team access is removed."}`);
           continue;
         }
-        if (key === "soul") {
-          lines.push(...soulDiffLines(current?.soul ?? "", value as string));
-        } else if (key === "modelSelection") {
+        if (key === "modelSelection") {
           lines.push(`Default engine/model: ${current ? `${modelSelectionText(current.modelSelection)} → ` : ""}${modelSelectionText(value as ModelSelection)}`);
           if (current && typeof value === "object" && value !== null &&
               (value as ModelSelection).instanceId !== current.modelSelection.instanceId && this.options.driverCapabilities) {

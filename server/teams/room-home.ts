@@ -3,16 +3,27 @@
 export interface RoomThreadHome {
   threadId: string;
   dm?: boolean;
+  homeThreadId?: string;
   tasks?: readonly { threadId: string; createdAt: number }[];
 }
 
-export function roomHomeThreadId(group: RoomThreadHome): string {
-  if (group.dm || !group.tasks?.length) return group.threadId;
-  let home = group.tasks[0]!;
-  for (const task of group.tasks) {
+function oldestTaskThreadId(tasks: readonly { threadId: string; createdAt: number }[]): string {
+  let home = tasks[0]!;
+  for (const task of tasks) {
     if (task.createdAt < home.createdAt || (task.createdAt === home.createdAt && task.threadId < home.threadId)) {
       home = task;
     }
   }
   return home.threadId;
+}
+
+export function roomHomeThreadId(group: RoomThreadHome): string {
+  if (group.dm) return group.threadId;
+  const tasks = group.tasks ?? [];
+  const known = new Set(tasks.map((task) => task.threadId));
+  if (group.homeThreadId && (known.has(group.homeThreadId) || (tasks.length === 0 && group.homeThreadId === group.threadId))) {
+    return group.homeThreadId;
+  }
+  if (tasks.length === 0) return group.threadId;
+  return oldestTaskThreadId(tasks);
 }

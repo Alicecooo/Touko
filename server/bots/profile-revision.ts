@@ -3,19 +3,18 @@ import { createHash } from "node:crypto";
 import type { ProfileRequestChanges } from "../../shared/profile-request.ts";
 
 export function profileSnapshot(
-  bot: { name: string; title: string; description: string; soul?: string; cwd?: string; notifications?: boolean; },
+  bot: { name: string; title: string; description: string; cwd?: string; notifications?: boolean; },
 ): Required<ProfileRequestChanges> {
   return {
     name: bot.name,
     title: bot.title,
     description: bot.description,
-    soul: bot.soul ?? "",
     cwd: bot.cwd ?? "",
     notifications: bot.notifications ?? true};
 }
 
 export function profileRevision(
-  bot: { name: string; title: string; description: string; soul?: string; cwd?: string; notifications?: boolean; lastProfileRequestId?: string },
+  bot: { name: string; title: string; description: string; cwd?: string; notifications?: boolean; lastProfileRequestId?: string },
 ): string {
   // The private receipt stops an older, interrupted card from applying restored identical text twice.
   return createHash("sha256")

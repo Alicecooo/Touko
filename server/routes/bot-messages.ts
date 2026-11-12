@@ -8,7 +8,6 @@ import { admit } from "../agent/admission.ts";
 import { dismissQuestionCard } from "../agent/card-dismissal.ts";
 import { prepareWidgetPress, reopenCancelledPress } from "../agent/chat-widgets.ts";
 import type { ModelSelection, RequestOutcome, SteerOutcome } from "../harness/contracts.ts";
-import { parseDataContext, type DataContext } from "../data/context.ts";
 import type { Handoffs } from "../agent/delta-context.ts";
 import type { ProviderRegistry } from "../harness/registry.ts";
 import type { ReplyTarget } from "../agent/replies.ts";
@@ -53,14 +52,14 @@ export interface BotMessageRouteDeps {
   acceptDirectSend(
     input: {
       botId: string; threadId: string; text: string; sendId?: string; replyTo?: Message; sender?: ResolvedSender;
-      trigger: UsageTrigger; dataContext?: DataContext; personPresent: boolean;
+      trigger: UsageTrigger; personPresent: boolean;
     },
     guardedStart?: (currentAtStart: BotRecord) => Promise<DirectSendReceipt>,
   ): Promise<DirectSendReceipt>;
   directSendRefusal(botId: string, threadId: string): { status: number; body: Record<string, unknown> } | null;
   startTurn(botId: string, text: string, opts?: {
     threadId?: string; replyTo?: Message; sendId?: string; sender?: ResolvedSender; trigger?: UsageTrigger; relayed?: boolean;
-    dataContext?: DataContext; compactOnly?: boolean; cardContinuation?: boolean; editedMessageId?: string;
+    compactOnly?: boolean; cardContinuation?: boolean; editedMessageId?: string;
   }): Promise<Message>;
   usageTriggerFor(auth: RequestAuth): UsageTrigger;
   messageSender(auth: RequestAuth): ResolvedSender | undefined;
@@ -173,7 +172,6 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
       if (pressKey && pressesInFlight.has(pressKey) && !(sendId && pressesInFlight.get(pressKey) === sendId)) {
         return json(res, 409, { error: "That answer is already on its way." });
       }
-      const dataContext = press ? undefined : parseDataContext(body.dataContext);
       const sender = messageSender(auth);
       const guardedStart = guarded
         ? async (currentAtStart: BotRecord): Promise<DirectSendReceipt> => {
@@ -196,14 +194,14 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
             if (guardedAdmission.action === "refuse") {
               throw Object.assign(new Error("wait for a free thread slot before retrying this message"), { status: 409, code: "guarded_busy" });
             }
-            const message = await startTurn(bot.id, text, { threadId, replyTo, sendId, sender, trigger, relayed: true, dataContext });
+            const message = await startTurn(bot.id, text, { threadId, replyTo, sendId, sender, trigger, relayed: true });
             return { ok: true as const, threadId, message };
           }
         : undefined;
       if (pressKey) pressesInFlight.set(pressKey, sendId);
       try {
         const receipt = await acceptDirectSend({
-          botId: bot.id, threadId, text, sendId, replyTo, sender, trigger, dataContext,
+          botId: bot.id, threadId, text, sendId, replyTo, sender, trigger,
           // The bot's own shell reaches this route on a headless server (loopback is the owner), so only a
           // paired session or the desktop capability proves a person and lifts the webhook block.
           personPresent: auth.kind === "session" || DESKTOP_MANAGED,
@@ -278,7 +276,6 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
           text: item.text,
           replyToId: item.replyToId,
           sendId: item.sendId,
-          ...(item.dataContext ? { dataContext: item.dataContext } : {}),
           queueId: item.messageId,
           peerAsk: item.peerAsk,
           steered: true,
@@ -353,8 +350,7 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
       const rerunRefusal = policyModelRefusal(rerunInstance);
       if (rerunRefusal) return json(res, 409, { error: rerunRefusal });
       const replyTo = source.replyToId ? resolveReplyTarget(bot.threadId, source.replyToId) : undefined;
-      const dataContext = parseDataContext(body.dataContext) ?? (text === source.text ? source.dataContext : undefined);
-      const message = await startTurn(bot.id, text, { threadId: bot.threadId, editedMessageId: messageId, replyTo, sendId, trigger: usageTriggerFor(auth), dataContext,
+      const message = await startTurn(bot.id, text, { threadId: bot.threadId, editedMessageId: messageId, replyTo, sendId, trigger: usageTriggerFor(auth),
         ...(CLOUD_HOME ? { sender: messageSender(auth) } : {}) });
       return json(res, 202, { ok: true, message });
     }

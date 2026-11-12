@@ -1,5 +1,4 @@
 import type { ModelCatalog, ModelSelection } from "../harness/contracts.ts";
-import { isConversational, type ReplyStyle } from "../../shared/reply-style.ts";
 import type { EffortLevel } from "../../shared/wire.ts";
 
 export type TurnTier = "simple" | "complex";
@@ -88,7 +87,7 @@ export function routeTurn(input: RouteInput): RouteResult {
 
 /** Routines, webhooks, peer turns, card continuations and unattended runs pass `automated`. */
 export function routeDirectTurn(
-  bot: { replyStyle?: ReplyStyle; modelSelection: ModelSelection },
+  bot: { modelSelection: ModelSelection },
   task: { modelSelection?: ModelSelection; usage?: { context?: { tokens: number } } },
   path: readonly { role: string; kind?: string }[],
   message: { text: string; images: readonly unknown[] },
@@ -97,7 +96,7 @@ export function routeDirectTurn(
 ): RouteResult {
   const lastAsk = path.findLastIndex((m) => m.role === "user" && m.kind === "text");
   return routeTurn({
-    conversational: isConversational(bot.replyStyle),
+    conversational: true,
     followsBotModel: task.modelSelection === undefined,
     automated,
     signals: {

@@ -22,8 +22,7 @@ export function botEngine(bot: Bot | undefined, instances: InstanceInfo[]): Inst
   return bot && instances.find((instance) => instance.instanceId === bot.modelSelection.instanceId);
 }
 
-export function activityPreview(tool: ActivityTool, engine: InstanceInfo | undefined, dataResult?: Message["dataResult"]): string {
-  if (dataResult) return dataResult.title;
+export function activityPreview(tool: ActivityTool, engine: InstanceInfo | undefined): string {
   if (isStoppedTurnName(tool.name)) return t("chat.turnStopped");
   const cause = failedTurnCause(tool.name);
   if (cause !== null && isClientCancellation(cause)) return t("chat.turnStopped");

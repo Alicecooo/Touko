@@ -14,7 +14,6 @@ export interface BotPreset {
     name?: string;
     title?: string;
     description?: string;
-    soul?: string;
     appearance?: {
       color: NonNullable<BotDefaultsProfile["color"]>;
       mascotExpression?: string;
@@ -57,7 +56,6 @@ export function presetDraftPatch(preset: BotPreset): Partial<BotDefaultsProfile>
     name: preset.bot.name ?? preset.name,
     title: preset.bot.title ?? "",
     description: preset.bot.description ?? "",
-    soul: preset.bot.soul ?? "",
   };
   const look = preset.bot.appearance;
   if (look) {

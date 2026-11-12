@@ -1,6 +1,6 @@
 // Security: secrets are write-only; GET /api/config returns configured flags, never values.
 import { useEffect, useId, useRef, useState } from "react";
-import { Check, CircleHelp, ExternalLink, Loader2, TriangleAlert } from "lucide-react";
+import { CircleHelp, ExternalLink, Loader2, TriangleAlert } from "lucide-react";
 import { api, useStore, type ConfigStatus } from "@/state/store";
 import { cn } from "@/lib/cn";
 import { useMenuMotion } from "./MenuMotion";
@@ -9,7 +9,7 @@ import type { LocaleKey } from "@/locales";
 import { SECTION_PROVIDER, type KeyResult, type KeyVia } from "@/lib/analytics-allowlist";
 import { keyRemoved, keySaved, keySaveFailure, keyTestResult, savedKeyResult } from "@/lib/product-events";
 
-export type ConfigSection = "composio" | "opencodeGo" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "xai" | "mistral" | "cerebras" | "groq" | "meta";
+export type ConfigSection = "composio" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "xai" | "mistral" | "cerebras" | "groq" | "meta";
 export type TestableProvider = "anthropic" | "openai" | "openrouter" | "openaiCompat" | "xai" | "mistral" | "cerebras" | "groq" | "meta";
 
 const SECTIONS: Record<
@@ -26,8 +26,6 @@ const SECTIONS: Record<
     flag: (c) => c.composio.configured,
     ownKey: (c) => c.composio.mode === "self-hosted",
   },
-  
-  opencodeGo: { body: (v) => ({ opencodeGo: { apiKey: v } }), flag: (c) => c.opencodeGo?.configured ?? false },
   anthropic: {
     body: (v, firstKey) => ({ anthropic: { key: v, ...(firstKey && v ? { everyClaudeBot: false } : {}) } }),
     flag: (c) => c.anthropic?.configured ?? false,
@@ -43,10 +41,8 @@ const SECTIONS: Record<
 };
 
 // Provider keys have no desktop-shell slot yet; they go to the server's own 0600 config.
-const ELECTRON_CREDENTIAL: Partial<Record<ConfigSection, "composioApiKey" | "opencodeGoApiKey">> = {
+const ELECTRON_CREDENTIAL: Partial<Record<ConfigSection, "composioApiKey">> = {
   composio: "composioApiKey",
-  
-  opencodeGo: "opencodeGoApiKey",
 };
 
 const CREDENTIALS: Record<
@@ -69,15 +65,6 @@ const CREDENTIALS: Record<
     descriptionKey: "keys.composio.desc",
     href: "https://dashboard.composio.dev",
     linkLabelKey: "keys.composio.link",
-    optional: true,
-  },
-  
-  opencodeGo: {
-    labelKey: "keys.opencode.label",
-    placeholderKey: "keys.opencode.placeholder",
-    descriptionKey: "keys.opencode.desc",
-    href: "https://opencode.ai/docs/providers/",
-    linkLabelKey: "keys.opencode.link",
     optional: true,
   },
   anthropic: {
@@ -399,106 +386,6 @@ export function ApiKeyRow({
       {error && <div className="mt-1 text-[12px] text-danger">{error}</div>}
       {verdict && <div role="status" className="mt-1 text-[12px] text-ink-secondary">{verdict}</div>}
     </div>
-  );
-}
-
-/** Security: write-only; the server returns names, never keys, and hands the keys to OpenCode alone. */
-export function OpenCodeProviderKeys() {
-  const { state, dispatch } = useStore();
-  const names = state.config?.opencodeGo?.providerKeys ?? [];
-  const [name, setName] = useState("");
-  const [key, setKey] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [removing, setRemoving] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const busy = adding || removing !== null;
-
-  const put = (target: string, value: string) =>
-    api("/api/config", { method: "PUT", body: JSON.stringify({ opencodeGo: { providerKeys: { [target]: value } } }) })
-      .then((status: ConfigStatus) => dispatch({ type: "configStatus", config: status }));
-
-  const add = () => {
-    const target = name.trim().toUpperCase();
-    const value = key.trim();
-    if (busy || !target || !value) return;
-    if (!looksLikeKey(value)) {
-      setError(t("keys.notAKey"));
-      return;
-    }
-    setAdding(true);
-    setError(null);
-    put(target, value)
-      .then(() => { setName(""); setKey(""); })
-      .catch((e) => setError(e.message))
-      .finally(() => setAdding(false));
-  };
-
-  const remove = (target: string) => {
-    if (busy) return;
-    setRemoving(target);
-    setError(null);
-    put(target, "")
-      .catch((e) => setError(e.message))
-      .finally(() => setRemoving(null));
-  };
-
-  return (
-    <details data-opencode-provider-keys className="rounded-lg border border-hairline/40 bg-inset px-3 py-2" open={names.length > 0}>
-      <summary className="cursor-pointer text-[13px] text-ink-secondary">{t("keys.opencode.otherProviders.title")}</summary>
-      <div className="mt-3 flex flex-col gap-2">
-        <p className="text-[11.5px] leading-relaxed text-ink-secondary">{t("keys.opencode.otherProviders.hint")}</p>
-        {names.map((saved) => (
-          <div key={saved} data-opencode-provider-key={saved} className="flex items-center gap-2">
-            <span className="size-1.5 shrink-0 rounded-full bg-success" />
-            <code className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink">{saved}</code>
-            <span className="text-[11px] text-ink-secondary">{t("keys.configured")}</span>
-            <button
-              type="button"
-              onClick={() => remove(saved)}
-              disabled={busy}
-              aria-label={t("keys.opencode.otherProviders.removeAria", { name: saved })}
-              className="cursor-pointer flex w-[72px] shrink-0 items-center justify-center rounded-lg bg-control py-1.5 text-[13px] text-danger hover:bg-raised-hover disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {removing === saved ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : t("keys.clear")}
-            </button>
-          </div>
-        ))}
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => { setError(null); setName(e.target.value); }}
-            onKeyDown={(e) => e.key === "Enter" && add()}
-            disabled={busy}
-            placeholder="VENICE_API_KEY"
-            aria-label={t("keys.opencode.otherProviders.name")}
-            autoComplete="off"
-            spellCheck={false}
-            className="w-[44%] min-w-0 rounded-lg border border-hairline/40 bg-panel px-3 py-2 font-mono text-[12px] uppercase text-ink placeholder:normal-case placeholder:text-ink-secondary focus:outline-none"
-          />
-          <input
-            type="password"
-            value={key}
-            onChange={(e) => { setError(null); setKey(e.target.value); }}
-            onKeyDown={(e) => e.key === "Enter" && add()}
-            disabled={busy}
-            placeholder={t("keys.opencode.otherProviders.keyPlaceholder")}
-            aria-label={t("keys.opencode.otherProviders.key")}
-            autoComplete="off"
-            className="w-full min-w-0 rounded-lg border border-hairline/40 bg-panel px-3 py-2 text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={add}
-            disabled={busy || !name.trim() || !key.trim()}
-            className="cursor-pointer flex w-[72px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-control py-2 text-[13px] text-ink hover:bg-raised-hover disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {adding ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <><Check size={13} aria-hidden="true" />{t("common.save")}</>}
-          </button>
-        </div>
-        {error && <div role="alert" className="text-[12px] text-danger">{error}</div>}
-      </div>
-    </details>
   );
 }
 

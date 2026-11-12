@@ -3,8 +3,6 @@ import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import { splitConversationalReply } from "../../shared/reply-style";
 
-export { isConversational } from "../../shared/reply-style";
-
 /** A reply that arrives while its thread is open plays its parts in; parts already shown never replay. */
 export function useReplySegments(show: boolean, text: string, at: number, openedAt: number): { segments: string[]; firstNew: number } {
   const segments = useMemo(() => (show ? splitConversationalReply(text) : []), [show, text]);

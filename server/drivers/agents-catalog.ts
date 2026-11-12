@@ -342,7 +342,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "create_bot",
     description:
-      "Create a specialist bot in your section. Chief of Staff only. It is created immediately and the person can undo it. instructions become its soul. Omit modelSelection to use the workspace default, or choose exact IDs from list_team_setup. Connected apps start disabled and the bot runs at the workspace's default access level. Assign work through coordinate_bots. Maximum four new bots per turn.",
+      "Create a specialist bot in your section. Chief of Staff only. It is created immediately and the person can undo it. The role and description identify its job. Omit modelSelection to use the workspace default, or choose exact IDs from list_team_setup. Connected apps start disabled and the bot runs at the workspace's default access level. Assign work through coordinate_bots. Maximum four new bots per turn.",
     inputSchema: {
       type: "object",
       properties: {
@@ -385,7 +385,7 @@ const TOOL_DEFINITIONS = [
             fields: { type: "object", additionalProperties: false, properties: {
               name: { type: "string", maxLength: 100 }, title: { type: "string", maxLength: 200 },
               chiefOfStaff: { type: "boolean", description: "Appoint or remove this team's Chief. At most one Chief per team: explicitly demote the current Chief in the same plan when replacing them. Does not grant access to other teams or change execution permissions." },
-              description: { type: "string", maxLength: 4000 }, soul: { type: "string", description: "Standing instructions; required with name/title/modelSelection for every new bot." },
+              description: { type: "string", maxLength: 4000 },
               cwd: { type: "string", maxLength: 1024, description: "Create only: absolute path of the folder the new bot's tools read and write in. It must already exist. Leave it out for a private workspace." },
               section: { type: "string", maxLength: 60, description: "Exact authorized existing team, or a team explicitly named in newTeams. Empty string means General." },
               modelSelection: { type: "object", additionalProperties: false, properties: {
@@ -639,7 +639,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "propose_profile",
     description:
-      "Submit user-requested changes to your own name, title, description, standing instructions (SOUL.md), working folder (cwd), or your alert toggle (notifications). Keep SOUL.md short — who you are and the rules you never break; put step-by-step procedure into a skill instead." + CHIEF_PROFILE_TARGET + APPLIES_OUTCOME,
+      "Submit user-requested changes to your own name, title, description, working folder (cwd), or your alert toggle (notifications)." + CHIEF_PROFILE_TARGET + APPLIES_OUTCOME,
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -647,7 +647,6 @@ const TOOL_DEFINITIONS = [
         name: { type: "string", maxLength: 100, description: "New display name." },
         title: { type: "string", maxLength: 200, description: "New role or title." },
         description: { type: "string", maxLength: 4000, description: "New one-line blurb shown in rosters." },
-        soul: { type: "string", description: "Full replacement text for SOUL.md, at most 24000 bytes." },
         cwd: {
           type: "string",
           maxLength: 1024,

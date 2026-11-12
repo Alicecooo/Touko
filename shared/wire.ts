@@ -1,12 +1,10 @@
 /** The client-visible wire model for tasks, bots, messages and rooms. A field
  * here is one the server emits in every response and SSE frame that carries
  * the shape. */
-import type { DataBroadcast } from "./data-surface.ts";
 import type { ApprovalMode } from "./approval-mode.ts";
 import type { ToolScope } from "./tool-scope.ts";
 import type { TurnDigest } from "./digest.ts";
 import type { BotAvatarCrop } from "./bot-avatar.ts";
-import type { ReplyStyle } from "./reply-style.ts";
 import type { CredentialTargetId } from "./credential-request.ts";
 import type { TeamSetupRequest } from "./team-setup.ts";
 import type { RoutineRequestCardData } from "./routine-request.ts";
@@ -137,9 +135,6 @@ export interface WireTask {
    * Server-derived. Clients must not write it. */
   updatedAt?: number;
   lastThreadOrderAt?: number;
-  /** 0 means "until new activity"; a future epoch ms means "until then", and
-   * an expired value reads as absent. Absent = not snoozed. */
-  snoozedUntil?: number;
   /** The thread's own model when a person picked one in it, else its bot's.
    * Always the effective one on the wire. */
   modelSelection?: ModelSelection;
@@ -256,12 +251,6 @@ export interface WireBot {
   name: string;
   title: string;
   description: string;
-  /** Standing instructions — the persona body. */
-  soul?: string;
-  /** sha256 of soul, for spotting a SOUL.md edited outside the app. */
-  soulHash?: string;
-  /** The SOUL.md mirror differed from soul at the last turn dispatch. */
-  soulDrift?: boolean;
   notifications: boolean;
   color: MausColor;
   mascotExpression?: MausExpression | null;
@@ -293,8 +282,6 @@ export interface WireBot {
   approvalMode?: ApprovalMode;
   /** Tools this bot may always use without asking. */
   alwaysAllow?: string[];
-  /** How replies are shaped. Absent = "default". */
-  replyStyle?: ReplyStyle;
   /** Whether this bot uses native memory. Absent/true = enabled. */
   memoryEnabled?: boolean;
   /** Queue direct-chat messages behind outstanding delegated work. */
@@ -483,7 +470,6 @@ export interface WireMessage {
   /** A room reply whose speaker the decision model picked (an Auto room),
    * with how sure it was. Absent on every other message; clients that do
    * not know it ignore it. */
-  routedBy?: { provider: "jev" | "openrouter"; probability: number };
   /** On a conversational bot's user line: the picker label of the quick model its reply ran on. */
   quickModel?: string;
   /** Set on the user-role line another bot delivered into this bot's own
@@ -497,11 +483,6 @@ export interface WireMessage {
   comm?: { groupId: string; threadId?: string; withBotId: string; withName: string; withColor: string };
   /** thread chips: "Opened thread #Title on @X". */
   threadRef?: { botId: string; threadId: string; title: string };
-  /** A published Data result, linked to its bot's main viewer. */
-  dataResult?: { botId: string; cardId: string; title: string; kind: "table" | "chart" | "text"; sql?: string };
-  /** user messages: the Data result the person was viewing when they sent
-   * this. `text` stays exactly what they typed. */
-  dataContext?: { cardId: string; draftSql?: string };
   /** user messages waiting in the steer-queue while the bot is mid-turn. */
   queued?: boolean;
   /** steer-queue entry this drained user line came from. */
@@ -657,15 +638,11 @@ export interface ComputerHelpRef {
   place: Surface;
 }
 
-/** Who answers a room message nobody was @mentioned in. `auto` asks the
- * decision model and falls back to `fallbackBotId` (else the first member)
- * whenever it is off or unsure. Readers must treat any kind they do not know
- * as the default lead. */
+/** Who answers a room message nobody was @mentioned in. */
 export type GroupDefaultResponder =
   | { kind: "member"; botId: string }
   | { kind: "everyone" }
-  | { kind: "mentions" }
-  | { kind: "auto"; fallbackBotId?: string };
+  | { kind: "mentions" };
 
 /** One independent conversation inside a user-created channel. */
 export interface GroupTask {
@@ -825,8 +802,6 @@ export type ServerFrame =
    * one progress line until its first screen frame. */
   | { kind: "computer"; botId: string; state: "provisioning" | "waking"; place?: "cloud" }
   | { kind: "computer-control"; botId: string; held: boolean; helpReason: string | null; help?: ComputerHelpRef | null }
-  /** A bot's data sheet changed. Whole sheet each time. */
-  | DataBroadcast
   | { kind: "bot.deleted"; botId: string }
   /** The config status object spread flat into the frame. */
   | ({ kind: "config" } & Record<string, unknown>);

@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 import { BOT_PROFILE_LIMITS } from "../../../shared/bot-profile";
 import { BotProfileAvatarCard } from "../BotProfileAvatarCard";
 import { BotInstructionsDialog } from "../BotInstructionsDialog";
-import { Field, inputCls } from "./field";
+import { inputCls } from "./field";
 import type { BotPatch } from "./useBotSettingsDerived";
 import { useBotEditor } from "./BotEditorContext";
 import { PackageProvenance } from "./PackageProvenance";
@@ -14,7 +14,7 @@ import { ProposalStatus } from "./ProposalStatus";
 import { randomBotName } from "@/lib/random-bot-name";
 import { t } from "@/lib/i18n";
 
-export type IdentityPart = "avatar" | "provenance" | "name" | "title" | "blurb";
+export type IdentityPart = "avatar" | "provenance" | "name" | "blurb";
 
 export function IdentitySection({
   bot,
@@ -59,16 +59,6 @@ export function IdentitySection({
           onChange={(e) => patch({ name: e.target.value })}
         />
       </div>}
-      {shows("title") && <Field label={t("botSettings.identity.title")}>
-        <ProposalStatus bot={bot} kind="chief" />
-        <input
-          className={inputCls}
-          maxLength={BOT_PROFILE_LIMITS.title}
-          placeholder={t("botSettings.identity.titlePlaceholder")}
-          value={bot.title}
-          onChange={(e) => patch({ title: e.target.value })}
-        />
-      </Field>}
       {shows("blurb") && <div className="block">
         <div className="mb-1.5 flex items-center justify-between gap-3">
           <label htmlFor={`bot-instructions-${bot.id}`} className="text-[13px] text-ink-secondary">

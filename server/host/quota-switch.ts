@@ -1,6 +1,5 @@
 import type { ResolvedSender } from "../../shared/wire.ts";
 import type { InstanceConfigMap } from "../harness/contracts.ts";
-import type { DataContext } from "../data/context.ts";
 import type { ProviderRegistry } from "../harness/registry.ts";
 import type { hostedModelPolicy } from "../deployment/hosted-models.ts";
 import { resolvePeerComms, type ApprovalBus } from "../teams/peer-approval.ts";
@@ -21,7 +20,7 @@ export interface QuotaSwitchHostDeps extends Pick<QuotaSwitchDeps, "store" | "co
   directRequestOwners: { get(threadId: string): QuotaRequest | undefined };
   startOrQueueDirectMessage(
     botId: string, threadId: string, text: string, replyTo?: Message, sendId?: string, sender?: ResolvedSender,
-    trigger?: UsageTrigger, dataContext?: DataContext,
+    trigger?: UsageTrigger,
   ): Promise<unknown>;
 }
 
@@ -39,7 +38,7 @@ export function createQuotaSwitchHost(deps: QuotaSwitchHostDeps) {
     reset: (from, to) => hostedModels?.resetTask(from, to),
     busy: threadBusy,
     request: threadId => directRequestOwners.get(threadId),
-    resend: (botId, threadId, message, replyTo) => startOrQueueDirectMessage(botId, threadId, message.text ?? "", replyTo, undefined, message.sender, undefined, message.dataContext),
+    resend: (botId, threadId, message, replyTo) => startOrQueueDirectMessage(botId, threadId, message.text ?? "", replyTo, undefined, message.sender),
   });
 
   /** Settles a card the harness raised itself (a peer approval or a quota-switch offer); undefined for any other card. */

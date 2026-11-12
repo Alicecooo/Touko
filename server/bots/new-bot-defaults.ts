@@ -42,7 +42,7 @@ export const botDefaultsProfileSchema = profilePatchSchema.extend({
   parkDirectMessages: z.boolean().optional(),
   /** At creation, so a copy of a bot kept off the helper model is off it from its first moment. */
   helperModel: z.boolean().optional(),
-}).strict().transform(({ mascotBody: _retiredBody, ...profile }) => {
+}).strict().transform(({ mascotBody: _retiredBody, replyStyle: _retiredReplyStyle, ...profile }) => {
   // Accept old templates while always resolving their placement to Auto.
   if (profile.computer !== undefined) profile.computer = null;
   return profile;

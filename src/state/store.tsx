@@ -1,8 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
 
-import type { BotVisibility, CardAnswerer, ConnectorToolGrant, EffortLevel, InstalledPackageMetadata, ServerFrame, GroupThreadUsage, SteerQueueReason, WireGroup, OptionCardData as WireOptionCard } from "../../shared/wire";
+import type { CardAnswerer, ConnectorToolGrant, EffortLevel, InstalledPackageMetadata, ServerFrame, GroupThreadUsage, SteerQueueReason, WireGroup, OptionCardData as WireOptionCard } from "../../shared/wire";
 import { movesThreadToTop } from "../../shared/wire";
-import { DATA_ROUTES, type DataSheet, type DataTable } from "../../shared/data-surface";
 import type { NotificationLogEntry } from "../../shared/notification";
 import { reduceNotificationFeed, type NotificationFeedAction } from "./notification-feed";
 import { bumpThreadUpdatedAt, mergeTaskStamps, rewindThreadUpdatedAt } from "./thread-stamps";
@@ -125,7 +124,7 @@ export interface SecretRequestCardData {
 
 export type ComputerControlState = { held: boolean; helpReason: string | null; help?: import("../../shared/wire").ComputerHelpRef | null };
 
-export interface Message extends Pick<import("../../shared/wire").WireMessage, "widget" | "routedBy" | "quickModel"> {
+export interface Message extends Pick<import("../../shared/wire").WireMessage, "widget" | "quickModel"> {
   id: string;
   role: "bot" | "user";
   kind: "text" | "options" | "activity" | "screen" | "connector" | "secret" | "signin" | "routine.run" | "goal.run" | "digest" | "compaction" | "widget";
@@ -161,7 +160,6 @@ export interface Message extends Pick<import("../../shared/wire").WireMessage, "
   reactions?: Array<{ emoji: string; by: string }>;
   comm?: { groupId: string; threadId?: string; withBotId: string; withName: string; withColor: MausColor };
   threadRef?: { botId: string; threadId: string; title: string };
-  dataResult?: import("../../shared/wire").WireMessage["dataResult"];
   queued?: boolean;
   queueId?: string;
 }
@@ -248,7 +246,6 @@ export interface Task {
   openedBy?: ThreadOpener;
   closedBy?: ThreadCloser;
   archivedAt?: number;
-  snoozedUntil?: number;
 }
 
 export interface ThreadOpener {
@@ -285,8 +282,6 @@ export interface Bot {
   name: string;
   title: string;
   description: string;
-  soul?: string;
-  soulDrift?: boolean;
   notifications: boolean;
   color: MausColor;
   mascotExpression?: string | null;
@@ -306,7 +301,6 @@ export interface Bot {
   autoApprove?: boolean;
   approvalMode?: ApprovalMode;
   alwaysAllow?: string[];
-  replyStyle?: import("../../shared/wire").WireBot["replyStyle"];
   memoryEnabled?: boolean;
   pinned?: boolean;
   hidden?: boolean;
@@ -328,7 +322,6 @@ export interface Bot {
   helperModel?: boolean;
   mcpServers?: string[] | null;
   browserProfile?: string | null;
-  visibility?: BotVisibility;
   installedPackage?: InstalledPackageMetadata;
   messages: Message[];
   hasMore?: boolean;
@@ -378,18 +371,16 @@ export type TaskUpdatePatch = Partial<Pick<Task, "modelSelection" | "approvalMod
   resetApprovalToAsk?: boolean;
   projectId?: string | null;
   archivedAt?: number | null;
-  snoozedUntil?: number | null;
   surface?: Task["surface"] | null;
   pinned?: boolean;
   link?: string | null;
 };
 
 function taskPatchFields(patch: TaskUpdatePatch): Partial<Task> {
-  const { acknowledgeLocalAuto: _localAck, updateBotDefault: _modelDefault, resetApprovalToAsk, projectId, archivedAt, snoozedUntil, surface, pinned, link, ...fields } = patch;
+  const { acknowledgeLocalAuto: _localAck, updateBotDefault: _modelDefault, resetApprovalToAsk, projectId, archivedAt, surface, pinned, link, ...fields } = patch;
   return { ...fields, ...(resetApprovalToAsk ? { approvalMode: "ask", autoApprove: false, alwaysAllow: [] } : {}),
     ...(projectId === undefined ? {} : { projectId: projectId ?? undefined }),
     ...(archivedAt === undefined ? {} : { archivedAt: archivedAt ?? undefined }),
-    ...(snoozedUntil === undefined ? {} : { snoozedUntil: snoozedUntil ?? undefined }),
     ...(surface === undefined ? {} : { surface: surface ?? undefined, surfaceAuto: undefined }),
     ...(pinned === undefined ? {} : { pinned: pinned ? true : undefined }),
     ...(link === undefined ? {} : { link: link ?? undefined }) };
@@ -421,7 +412,7 @@ export type { ConfigStatus, ManagedPolicySummary };
 // A section left out here is wiped from state.config whenever a config frame lands.
 export type ConfigStatusFrame = Pick<
   ConfigStatus,
-  "xai" | "mistral" | "cerebras" | "groq" | "meta" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "fleet" | "composio" | "box" | "rooms" | "mcp" | "threads" | "automaticRecovery" | "cacheKeepWarm" | "opencodeGo" | "decider" | "profile" | "language" | "features" | "onboarding" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
+  "xai" | "mistral" | "cerebras" | "groq" | "meta" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "fleet" | "composio" | "box" | "rooms" | "mcp" | "threads" | "automaticRecovery" | "cacheKeepWarm" | "opencodeGo" | "profile" | "language" | "features" | "onboarding" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
 >;
 
 export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
@@ -444,7 +435,6 @@ export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
     automaticRecovery: frame.automaticRecovery,
     cacheKeepWarm: frame.cacheKeepWarm,
     opencodeGo: frame.opencodeGo,
-    decider: frame.decider,
     profile: frame.profile,
     language: frame.language,
     features: frame.features,
@@ -531,7 +521,6 @@ export type AppSettingsSection =
   | "appearance"
   | "connections"
   | "appConnections"
-  | "decisionModel"
   | "engines"
   | "companion"
   | "remote"
@@ -544,10 +533,8 @@ export type AppSettingsSection =
   | "skills";
 
 export type BotSettingsSection =
-  | "overview"
   | "identity"
   | "slack"
-  | "soul"
   | "skills"
   | "memory"
   | "routines"
@@ -555,8 +542,6 @@ export type BotSettingsSection =
   | "model"
   | "permissions"
   | "notifications"
-  | "visibility"
-  | "history"
   | "usage";
 
 export interface ModelVariantSession {
@@ -576,9 +561,7 @@ export interface AppState {
   modelVariantSessions: Record<string, ModelVariantSession>;
   config: ConfigStatus | null;
   selectedId: string;
-  activeView: "chat" | "routines" | "files";
-  /** Folders a finished move left on this computer, for Files to offer sharing. */
-  filesSuggest: string[] | null;
+  activeView: "chat" | "routines";
   routines: Routine[];
   routineRuns: RoutineRun[];
   routinesLoadState: "loading" | "ready" | "error";
@@ -591,7 +574,6 @@ export interface AppState {
   pluginsSurface: "apps" | "mcp";
   newBotOpen: boolean;
   botCreationPending: boolean;
-  computerOpen: boolean;
   inspectorOpen: boolean;
   activityOpen: boolean;
   /** Cross-bot, so a bot switch leaves it open; pinned, opening another side panel leaves it open too. */
@@ -610,11 +592,7 @@ export interface AppState {
   computerStarts: Record<string, ComputerStart>;
   deletingBots: Record<string, true>;
   computerControl: Record<string, ComputerControlState>;
-  dataSheets: Record<string, DataSheet>;
-  dataTables: Record<string, DataTable[]>;
-  dataResultFocus: { botId: string; id: string; requestId: number; consumed: boolean } | null;
   signInFocus: { botId: string; messageId: string; url: string; site: string; place: import("../../shared/wire").Surface; requestId: number; consumed: boolean } | null;
-  dataView: import("@/lib/composer-attachments").DataViewContext | null;
   focusMessage: { threadId: string; messageId: string; matchText?: string; nonce: number; consumed: boolean } | null;
   unreadDivider: { threadId: string; messageId: string } | null;
   connected: boolean;
@@ -710,7 +688,6 @@ export type Action =
  | { type: "sections"; sections: string[] }
  | { type: "sectionDeleted"; section: string; sections: string[] }
  | { type: "showRoutines"; section?: "schedule" | "logs"; view?: "calendar" | "list"; botId?: string; routineId?: string; runStatus?: RoutineRunStatusFilter }
- | { type: "showFiles"; suggest?: string[] }
  | { type: "showChat" }
  | { type: "routinesHydrated"; routines: Routine[]; runs: RoutineRun[] }
  | { type: "routinesLoadFailed" }
@@ -769,7 +746,6 @@ export type Action =
       sendId?: string;
       replyToId?: string;
       threadId?: string;
-      dataContext?: import("../../shared/data-context").DataContext;
       onError?: () => void;
     }
  | { type: "pendingQueued"; threadId: string; queueId: string; text: string; reason?: SteerQueueReason }
@@ -803,7 +779,7 @@ export type Action =
  | { type: "renameTask"; botId: string; threadId: string; title: string }
  | { type: "regenerateTaskTitle"; botId: string; threadId: string; onSettled?: (ok: boolean) => void }
  | { type: "deleteTask"; botId: string; threadId: string }
- | { type: "newBot"; role?: BotRole; visibility?: BotVisibility; section?: string; preserveSelection?: boolean; onCreated?: (bot: Bot) => void; onError?: (message: string) => void }
+ | { type: "newBot"; role?: BotRole; section?: string; preserveSelection?: boolean; onCreated?: (bot: Bot) => void; onError?: (message: string) => void }
  | { type: "botCreationPending"; on: boolean }
  | { type: "updateTask"; botId: string; threadId: string; patch: TaskUpdatePatch }
  | { type: "refreshTaskPermissions"; botId: string; threadId: string; acknowledgeLocalAuto?: boolean }
@@ -823,9 +799,6 @@ export type Action =
  | { type: "optimisticMessageRemoved"; threadId: string; sendId: string; restoreLeafId?: string | null }
  | { type: "computerStart"; botId: string; start: ComputerStart | null }
  | ({ type: "computerControl"; botId: string } & ComputerControlState)
- | { type: "dataSheet"; sheet: DataSheet; tables?: DataTable[] }
- | { type: "dataView"; view: AppState["dataView"] }
- | { type: "loadDataSheet"; botId: string; onError?: (message: string) => void }
  | { type: "modelVariantRuntime"; event: RuntimeEvent }
  | { type: "setModel"; botId: string; selection: ModelSelection; threadId?: string; updateBotDefault?: boolean; resetApprovalToAsk?: boolean }
  | { type: "interrupt"; botId: string; threadId?: string; onError?: () => void }
@@ -836,9 +809,6 @@ export type Action =
  | { type: "toggleSettings"; open?: boolean; section?: BotSettingsSection; botId?: string }
  | { type: "togglePlugins"; open?: boolean; surface?: "apps" | "mcp" }
  | { type: "toggleNewBot"; open?: boolean }
- | { type: "toggleComputer"; open?: boolean }
- | { type: "openDataResult"; botId: string; cardId: string }
- | { type: "dataResultFocusConsumed"; requestId: number }
  | { type: "openSignIn"; botId: string; messageId: string; url: string; site: string; place: import("../../shared/wire").Surface }
  | { type: "signInFocusConsumed"; requestId: number }
  | { type: "toggleInspector"; open?: boolean }
@@ -1023,7 +993,6 @@ export function reducer(state: AppState, action: Action): AppState {
         activeView: "routines",
         routinesFocus: { section: action.section, view: action.view, botId: action.botId, routineId: action.routineId, runStatus: action.runStatus, nonce: state.routinesFocus.nonce + 1 },
         settingsOpen: false,
-        computerOpen: false,
         inspectorOpen: false,
         activityOpen: false,
         notificationsOpen: false,
@@ -1032,13 +1001,6 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     case "showChat":
       return state.activeView === "chat" ? state : { ...state, activeView: "chat" };
-    case "showFiles":
-      return {
-        ...state,
-        activeView: "files",
-        filesSuggest: action.suggest?.length ? action.suggest : null,
-        settingsOpen: false, computerOpen: false, inspectorOpen: false, activityOpen: false, appSettingsOpen: false, pluginsOpen: false,
-      };
     case "routinesHydrated":
       return { ...state, routines: action.routines, routineRuns: trimRoutineRuns(action.runs), routinesLoadState: "ready" };
     case "routinesLoadFailed":
@@ -1464,42 +1426,21 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, focusMessage: { ...state.focusMessage, consumed: true } };
     case "unreadDividerDone":
       return state.unreadDivider?.threadId === action.threadId ? { ...state, unreadDivider: null } : state;
-    case "openDataResult": {
-      if (!state.bots.some((bot) => bot.id === action.botId)) return state;
-      const selected = reducer(reducer(state, { type: "select", id: action.botId }), { type: "toggleComputer", open: true });
-      return { ...selected, dataResultFocus: { botId: action.botId, id: action.cardId, requestId: (state.dataResultFocus?.requestId ?? 0) + 1, consumed: false } };
-    }
-    case "dataResultFocusConsumed":
-      return state.dataResultFocus?.requestId === action.requestId
-        ? { ...state, dataResultFocus: { ...state.dataResultFocus, consumed: true } } : state;
     case "openSignIn": {
       if (!state.bots.some((bot) => bot.id === action.botId)) return state;
-      const selected = reducer(reducer(state, { type: "select", id: action.botId }), { type: "toggleComputer", open: true });
+      const selected = reducer(state, { type: "select", id: action.botId });
       const { type: _, ...request } = action;
       return { ...selected, signInFocus: { ...request, requestId: (state.signInFocus?.requestId ?? 0) + 1, consumed: false } };
     }
     case "signInFocusConsumed":
       return state.signInFocus?.requestId === action.requestId
         ? { ...state, signInFocus: { ...state.signInFocus, consumed: true } } : state;
-    case "toggleComputer": {
-      const open = action.open ?? !state.computerOpen;
-      return {
-        ...state,
-        computerOpen: open,
-        settingsOpen: open ? false : state.settingsOpen,
-        inspectorOpen: open ? false : state.inspectorOpen,
-        activityOpen: open ? false : state.activityOpen,
-        appSettingsOpen: open ? false : state.appSettingsOpen,
-        notificationsOpen: open && !state.notificationsPinned ? false : state.notificationsOpen,
-      };
-    }
     case "toggleInspector": {
       const open = action.open ?? !state.inspectorOpen;
       return {
         ...state,
         inspectorOpen: open,
         settingsOpen: open ? false : state.settingsOpen,
-        computerOpen: open ? false : state.computerOpen,
         activityOpen: open ? false : state.activityOpen,
         appSettingsOpen: open ? false : state.appSettingsOpen,
         notificationsOpen: open && !state.notificationsPinned ? false : state.notificationsOpen,
@@ -1511,7 +1452,6 @@ export function reducer(state: AppState, action: Action): AppState {
         ...state,
         activityOpen: open,
         settingsOpen: open ? false : state.settingsOpen,
-        computerOpen: open ? false : state.computerOpen,
         inspectorOpen: open ? false : state.inspectorOpen,
         appSettingsOpen: open ? false : state.appSettingsOpen,
         notificationsOpen: open && !state.notificationsPinned ? false : state.notificationsOpen,
@@ -1523,7 +1463,6 @@ export function reducer(state: AppState, action: Action): AppState {
         ...state,
         notificationsOpen: open,
         settingsOpen: open ? false : state.settingsOpen,
-        computerOpen: open ? false : state.computerOpen,
         inspectorOpen: open ? false : state.inspectorOpen,
         activityOpen: open ? false : state.activityOpen,
         appSettingsOpen: open ? false : state.appSettingsOpen,
@@ -1546,7 +1485,6 @@ export function reducer(state: AppState, action: Action): AppState {
         appSettingsCloudLink: action.cloudLink && open ? state.appSettingsCloudLink + 1 : 0,
         appSettingsPhonePairing: action.phonePairing && open ? state.appSettingsPhonePairing + 1 : 0,
         settingsOpen: open ? false : state.settingsOpen,
-        computerOpen: open ? false : state.computerOpen,
         inspectorOpen: open ? false : state.inspectorOpen,
         pluginsOpen: open ? false : state.pluginsOpen,
         notificationsOpen: open && !state.notificationsPinned ? false : state.notificationsOpen,
@@ -1814,16 +1752,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case "markAllRoutineRunsSeen":
     case "refreshTaskPermissions":
     case "followBotModel":
-    case "loadDataSheet":
       return state;
-    case "dataSheet":
-      return {
-        ...state,
-        dataSheets: { ...state.dataSheets, [action.sheet.botId]: action.sheet },
-        ...(action.tables ? { dataTables: { ...state.dataTables, [action.sheet.botId]: action.tables } } : {}),
-      };
-    case "dataView":
-      return { ...state, dataView: action.view };
     case "sendGroup": {
       if (!action.sendId) return state;
       const group = state.groups.find((candidate) => candidate.id === action.groupId);
@@ -1850,20 +1779,6 @@ export function reducer(state: AppState, action: Action): AppState {
   }
 }
 
-export function dataTablesFromResponse(body: unknown): DataTable[] {
-  const tables = body && typeof body === "object" && "tables" in body ? (body as { tables: unknown }).tables : undefined;
-  return Array.isArray(tables) ? (tables as DataTable[]).filter((table) => table && typeof table.name === "string") : [];
-}
-
-export function dataSheetFromResponse(body: unknown, botId: string): DataSheet {
-  const candidate = body && typeof body === "object" && "sheet" in body ? (body as { sheet: unknown }).sheet : body;
-  if (candidate && typeof candidate === "object" && Array.isArray((candidate as DataSheet).cards)) {
-    const sheet = candidate as DataSheet;
-    return { ...sheet, botId: sheet.botId || botId, sources: Array.isArray(sheet.sources) ? sheet.sources : [] };
-  }
-  return { version: 1, botId, cards: [], sources: [], updatedAt: new Date(0).toISOString() };
-}
-
 export const initialState: AppState = {
   modelVariantSessions: {},
   backgroundThreadEvents: {},
@@ -1880,7 +1795,6 @@ export const initialState: AppState = {
   routineRuns: [],
   routinesLoadState: "loading",
   routinesFocus: { nonce: 0 },
-  filesSuggest: null,
   webhooks: [],
   webhookAttempts: [],
   webhookIngress: null,
@@ -1889,7 +1803,6 @@ export const initialState: AppState = {
   pluginsSurface: "apps",
   newBotOpen: false,
   botCreationPending: false,
-  computerOpen: false,
   inspectorOpen: false,
   activityOpen: false,
   notificationsOpen: false,
@@ -1900,18 +1813,14 @@ export const initialState: AppState = {
   appSettingsCloudLink: 0,
   appSettingsPhonePairing: 0,
 
-  botSettingsSection: "overview",
+  botSettingsSection: "identity",
   botSettingsExpandAccordion: false,
   botSettingsSectionStored: false,
   botSettingsExpandRemembered: false,
   computerStarts: {},
   deletingBots: {},
   computerControl: {},
-  dataSheets: {},
-  dataTables: {},
-  dataResultFocus: null,
   signInFocus: null,
-  dataView: null,
   focusMessage: null,
   unreadDivider: null,
   connected: false,
@@ -1932,10 +1841,8 @@ export class ApiError extends Error {
   }
 }
 
-/** `visibility` rides the create itself, so the bot is never announced to people who should not see it. */
-export async function createBotWithRole(role?: BotRole, request: typeof api = api, visibility?: BotVisibility, section?: string): Promise<{ bot: Bot; profileError?: string }> {
-  const restricted = visibility && visibility !== "everyone" ? { visibility } : {};
-  const fields = { ...(role ? { name: role.name, title: role.title, description: role.description } : {}), ...restricted,
+export async function createBotWithRole(role?: BotRole, request: typeof api = api, section?: string): Promise<{ bot: Bot; profileError?: string }> {
+  const fields = { ...(role ? { name: role.name, title: role.title, description: role.description } : {}),
     ...(section !== undefined ? { section } : {}) };
   const { bot } = await request("/api/bots", {
     method: "POST",
@@ -2304,7 +2211,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
 
     const wrapped: React.Dispatch<Action> = (action) => {
-      if (["select", "newTask", "switchTask", "newGroupTask", "switchGroupTask", "showChat", "showRoutines", "showFiles"].includes(action.type)) selectionRevision++;
+      if (["select", "newTask", "switchTask", "newGroupTask", "switchGroupTask", "showChat", "showRoutines"].includes(action.type)) selectionRevision++;
       // Pin before any await or optimistic state change.
       action = pinBotThreadAction(action, stateRef.current.bots);
       if (action.type === "taskSwitched") action = { ...action, bot: withTaskWrites(action.bot) as Bot };
@@ -2421,11 +2328,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         case "cancelRoutineRun":
           api(`/api/routine-runs/${action.runId}/cancel`, { method: "POST" }).catch(showError);
           break;
-        case "loadDataSheet":
-          api(DATA_ROUTES.sheet(action.botId))
-            .then((body) => rawDispatch({ type: "dataSheet", sheet: dataSheetFromResponse(body, action.botId), tables: dataTablesFromResponse(body) }))
-            .catch((error) => (action.onError ?? showError)(error instanceof Error ? error.message : String(error)));
-          break;
         case "markRoutineRunSeen":
           api(`/api/routine-runs/${action.runId}/seen`, { method: "POST" }).catch(showError);
           break;
@@ -2499,7 +2401,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           void waitForExecutionSettings(botBeforeSend ? [botBeforeSend] : [], threadId)
             .then(() => api(`/api/bots/${action.botId}/messages`, {
                 method: "POST",
-                body: JSON.stringify({ text: action.text, replyToId: action.replyToId, threadId, sendId, ...(action.dataContext ? { dataContext: action.dataContext } : {}) }),
+                body: JSON.stringify({ text: action.text, replyToId: action.replyToId, threadId, sendId }),
               }))
             .then((body) => {
               if (body?.message && typeof body.threadId === "string") {
@@ -2647,13 +2549,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (creatingBot) break;
           creatingBot = true;
           rawDispatch({ type: "botCreationPending", on: true });
-          void createBotWithRole(action.role, api, action.visibility, action.section)
+          void createBotWithRole(action.role, api, action.section)
             .then(({ bot, profileError }) => {
               rawDispatch({ type: "botAdded", bot, preserveSelection: action.preserveSelection });
               action.onCreated?.(bot);
               if (profileError) {
                 showError(t("newBot.profileFailed", { error: profileError }));
-                rawDispatch({ type: "toggleSettings", open: true, section: "soul" });
+                rawDispatch({ type: "toggleSettings", open: true, section: "identity" });
               }
             })
             .catch((error) => {
@@ -2673,7 +2575,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             name: `${source.name} copy`,
             title: source.title,
             description: source.description,
-            soul: source.soul,
             notifications: source.notifications,
             modelSelection: source.modelSelection,
             computer: source.computer,
@@ -2683,7 +2584,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             avatarFocusX: source.avatarFocusX,
             avatarFocusY: source.avatarFocusY,
           };
-          // A copy of a restricted bot is restricted from its first moment.
+          // Preserve the bot's tool restrictions from its first moment.
           api("/api/bots", {
             method: "POST",
             body: JSON.stringify(restrictedCopyRequest(source)),
@@ -2721,9 +2622,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             () => {},
           );
           break;
-        case "openDataResult":
         case "select": {
-          const id = action.type === "select" ? action.id : action.botId;
+          const id = action.id;
           const bot = stateRef.current.bots.find((b) => b.id === id);
           const group = stateRef.current.groups.find((g) => g.id === id);
           if (bot?.unread) {
@@ -3275,9 +3175,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             helpReason: typeof frame.helpReason === "string" ? frame.helpReason : null,
             help: parseComputerHelp(frame.help),
           });
-          break;
-        case "data":
-          rawDispatch({ type: "dataSheet", sheet: frame.sheet });
           break;
         case "bot.deleted":
           botPatchQueue.cancel(frame.botId);

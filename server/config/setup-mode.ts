@@ -16,13 +16,13 @@ export function expandSetupTurnText(userText: string): string {
     : "Set yourself up. Ask me what you need to know, then propose your configuration.";
 }
 
-export function setupModeActive(input: { soul?: string; description?: string; text: string }): boolean {
+export function setupModeActive(input: { description?: string; text: string }): boolean {
   return parseSetupCommand(input.text) !== null;
 }
 
 // skill_manage is mounted only with skill authoring on: never name a tool the model cannot call.
-const SKILL_MANAGE_ASIDE = "(keep SOUL.md short; put step-by-step procedure into a skill with skill_manage)";
-const NO_SKILL_MANAGE_ASIDE = "(keep SOUL.md short; describe procedures plainly in your standing instructions for now)";
+const SKILL_MANAGE_ASIDE = "(put step-by-step procedures into a skill with skill_manage)";
+const NO_SKILL_MANAGE_ASIDE = "(describe procedures plainly in the bot description for now)";
 
 function folderClause(cwd: string | undefined): string {
   return cwd
@@ -82,7 +82,7 @@ function buildSetupPrompt(profileAside: string, apps: SetupConnectedApps, cwd?: 
     ` First ask at most four questions that change what you would build: what the job is, when it should happen (on demand, on a schedule, or when something arrives), which apps or accounts it touches, and ${folderClause(cwd)}.` +
     " Then, before any tool call, tell the user in plain language what you intend: who you will be, what you will do and when, where you will work, what you will need from them, and what you will not do. Ask for missing choices, not an extra yes for already-requested actions: changes to your own profile and routines apply immediately, and the person sees each with an Undo." +
     " First send one message describing the changes you are about to request, then make the tool calls. Follow each result: if applied, continue without another confirmation; if pending, end the turn and wait for its in-app decision. Do not repeat the list or claim success from the permission mode alone." +
-    ` Use propose_profile for your identity, standing rules ${profileAside}, and the working folder (cwd), create_trigger for a schedule or webhook the user describes, and request_credential for any missing token.` +
+    ` Use propose_profile for your identity ${profileAside}, and the working folder (cwd), create_trigger for a schedule or webhook the user describes, and request_credential for any missing token.` +
     connectedAppsClause(apps) +
     SIGN_IN_CLAUSE +
     " Full Access does not supply answers, credentials, or broader permissions for another bot. A credential request still needs the user's secure entry. Report failed or cancelled changes honestly." +

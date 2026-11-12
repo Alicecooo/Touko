@@ -7,7 +7,7 @@
  * the user was shown; `expectedRevision` is a hash of the target's whole
  * profile at proposal time so a confirmation fails closed if anything moved.
  */
-export const PROFILE_REQUEST_FIELDS = ["name", "title", "description", "soul", "cwd", "notifications"] as const;
+export const PROFILE_REQUEST_FIELDS = ["name", "title", "description", "cwd", "notifications"] as const;
 export type ProfileRequestField = (typeof PROFILE_REQUEST_FIELDS)[number];
 export type ProfileRequestChanges = Partial<Record<Exclude<ProfileRequestField, "notifications">, string>> &
   Partial<Record<"notifications", boolean>>;

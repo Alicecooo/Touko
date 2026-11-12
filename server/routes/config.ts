@@ -1,7 +1,6 @@
 import * as composio from "../integrations/composio.ts";
-import { changedInstanceIds, engineLaunches, loadConfig, mergeOpenCodeProviderKeys, parseConfigPatch, saveConfig, syncCredentialEnv, type AppConfig } from "../config/config.ts";
+import { changedInstanceIds, engineLaunches, loadConfig, parseConfigPatch, saveConfig, syncCredentialEnv, type AppConfig } from "../config/config.ts";
 import type { InstanceConfigMap, ModelSelection } from "../harness/contracts.ts";
-import { deciderIncludedHere, deciderPatchKey, deciderSavePatch, deciderSharedKeyUsable, type Decider } from "../decider/index.ts";
 import type { ProviderRegistry } from "../harness/registry.ts";
 import { HOSTED_PROVIDER_SETTINGS_ERROR } from "../deployment/hosted-models.ts";
 import { forgetKey } from "../security/key-rejections.ts";
@@ -25,7 +24,6 @@ export interface ConfigRouteDeps {
   cfg: AppConfig;
   registry: Pick<ProviderRegistry, "get" | "forgetSnapshots">;
   sessions: Pick<SessionRegistry, "revalidateEmailSessions">;
-  decider: Pick<Decider, "testKey">;
 
   hostedModels: boolean;
 
@@ -44,7 +42,7 @@ export interface ConfigRouteDeps {
 }
 
 export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
-  const { cfg, registry, sessions, decider, hostedModels, providerConfigs, providerConfigBusy, checkedModelSelection, policyModelRefusal, configStatus, configForAccess, resyncOpenCodeProviderKeys, revokeEngineCapabilities, reloadProviders, broadcast, drainQueuedSends } = deps;
+  const { cfg, registry, sessions, hostedModels, providerConfigs, providerConfigBusy, checkedModelSelection, policyModelRefusal, configStatus, configForAccess, resyncOpenCodeProviderKeys, revokeEngineCapabilities, reloadProviders, broadcast, drainQueuedSends } = deps;
 
   return async ({ req, res, url, path, method, auth, json, readBody }) => {
     // API keys are never echoed back: booleans only.
@@ -81,11 +79,6 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
         patch.automaticRecovery.backup = checked.selection;
       }
       if (!Object.keys(patch).length) return json(res, 400, { error: "nothing to save" });
-      if (patch.decider) {
-        const planned = deciderSavePatch(patch.decider, cfg.decider, { included: deciderIncludedHere(), shared: deciderSharedKeyUsable(cfg) });
-        if (!planned.ok) return json(res, 400, { error: planned.error });
-        patch.decider = planned.patch;
-      }
       if (providerConfigBusy.get()) return json(res, 409, { error: "provider settings are already being updated" });
       providerConfigBusy.set(true);
       try {
@@ -102,23 +95,6 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
             patch.composio = { ...patch.composio, apiKey: "", sessionId: "" };
           }
         }
-        const deciderKey = patch.decider ? deciderPatchKey(patch.decider, cfg.decider) : null;
-        if (deciderKey) {
-          const check = await decider.testKey(deciderKey.check);
-          if (!check.ok && check.reason === "rejected") {
-            const error = deciderKey.provider === "openrouter"
-              ? "OpenRouter rejected this key. Check it at openrouter.ai/keys and paste it again."
-              : "Jev rejected this key. Check it at typesafe.ai and paste it again.";
-            return json(res, 400, { error, code: "decider_rejected" });
-          }
-        }
-        // Observed again after the awaits: catches an operation that already held a claim.
-        // Only the named keys change; merged with no await before the save.
-        if (patch.opencodeGo?.providerKeys) {
-          const merged = mergeOpenCodeProviderKeys(cfg, patch.opencodeGo.providerKeys);
-          if (!merged.ok) return json(res, 400, { error: merged.error });
-          patch.opencodeGo = { ...patch.opencodeGo, providerKeys: merged.keys };
-        }
         const resetKeys = PROVIDER_KEY_KINDS.flatMap((kind) => {
           const next = patch[kind]?.key;
           return next === undefined ? [] : [cfg[kind]?.key, next];
@@ -132,8 +108,6 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
           if (persisted.composio?.apiKey !== undefined) persisted.composio.apiKey = "";
 
           if (persisted.opencodeGo?.apiKey !== undefined) persisted.opencodeGo.apiKey = "";
-          if (persisted.decider?.key !== undefined) persisted.decider.key = "";
-          if (persisted.decider?.openrouterKey !== undefined) persisted.decider.openrouterKey = "";
           saveConfig(persisted);
 
           syncCredentialEnv(patch);

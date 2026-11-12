@@ -43,7 +43,6 @@ function instructionFiles(dataDir: string): string[] {
       else files.push(`${path}/${entry.name}`);
     }
   };
-  for (const bot of list("bots")) if (bot.isDirectory()) files.push(`bots/${bot.name}/SOUL.md`);
   for (const workspace of list("workspaces")) {
     if (!workspace.isDirectory()) continue;
     files.push(`workspaces/${workspace.name}/MEMORY.md`);
@@ -64,7 +63,6 @@ function rewrite(name: string, value: unknown, paths: Paths): void {
   if (name === "bots.json") {
     if (Array.isArray(value)) for (const bot of value) if (record(bot)) {
       paths.definitions(bot, String(bot.id));
-      if (typeof bot.soul === "string") bot.soul = paths.text(bot.soul);
     }
     return;
   }

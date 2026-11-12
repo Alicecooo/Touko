@@ -2,10 +2,6 @@
 export const CREDENTIAL_PATCH = {
   composioApiKey: (value) => ({ composio: { apiKey: value } }),
   xaiApiKey: (value) => ({ xai: { key: value } }),
-  
-  opencodeGoApiKey: (value) => ({ opencodeGo: { apiKey: value } }),
-  jevApiKey: (value) => ({ decider: { key: value } }),
-  openrouterDeciderKey: (value) => ({ decider: { openrouterKey: value } }),
 };
 
 /** Electron 43's ipcMain.handle sends a thrown error to the page as its toString(), so a key the provider refused travels as its name. */

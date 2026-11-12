@@ -1,28 +1,26 @@
 // propose_profile applies at once with an Undo. The owner's card (direct-apply.ts) is re-validated at confirm time, since it can sit open for days.
-import { soulDiffLines } from "../../shared/line-diff.ts";
-import { BOT_PROFILE_LIMITS } from "../../shared/bot-profile.ts";
 import { PROFILE_REQUEST_FIELDS, type ProfileRequestCardData, type ProfileRequestChanges } from "../../shared/profile-request.ts";
+import { BOT_PROFILE_LIMITS } from "../../shared/bot-profile.ts";
 import { parseBotProfilePatch, type BotProfilePatchInput } from "./bot-profile.ts";
 import { validateBotCwd } from "./bot-cwd.ts";
 import { newId } from "../harness/contracts.ts";
 import { UNDO_STALE, type DirectApply, type DirectApplyCheck } from "../agent/direct-apply.ts";
 import { profileRevision, profileSnapshot } from "./profile-revision.ts";
-import { recordProfileChange } from "./profile-versions.ts";
 import { redactSecretsInText } from "../security/redact.ts";
 import type { BotRecord } from "../storage/store.ts";
 
 const MAX_REASON = 500;
 const STALE = "This bot's profile changed after this card was prepared. Ask the bot to review it and propose again.";
 const NO_SUCH_BOT = "That bot no longer exists";
-const LABELS: Record<Exclude<(typeof PROFILE_REQUEST_FIELDS)[number], "soul" | "cwd">, string> = {
+const LABELS: Record<Exclude<(typeof PROFILE_REQUEST_FIELDS)[number], "cwd">, string> = {
   name: "Name",
   title: "Title",
   description: "Description",
   notifications: "Notifications"};
 const PRIVATE_WORKSPACE = "its private workspace";
-const CHOOSE_ONE = "Choose at least one of name, title, description, soul, cwd, notifications";
+const CHOOSE_ONE = "Choose at least one of name, title, description, cwd, notifications";
 const toggleText = (value: boolean | undefined): string => (value ? "on" : "off");
-const TEXT_FIELDS = ["name", "title", "description", "soul"] as const;
+const TEXT_FIELDS = ["name", "title", "description"] as const;
 
 export interface OptionCardLike {
   title: string;
@@ -52,7 +50,7 @@ export interface ProfileRequestStore {
     },
   ): { id: string };
   patchMessage(threadId: string, messageId: string, patch: { card: OptionCardLike }): { id: string } | null;
-  patchBotProfile(id: string, patch: Partial<Pick<BotRecord, "name" | "title" | "description" | "cwd" | "soul" | "notifications" | "lastProfileRequestId">>): BotRecord | null;
+  patchBotProfile(id: string, patch: Partial<Pick<BotRecord, "name" | "title" | "description" | "cwd" | "notifications" | "lastProfileRequestId">>): BotRecord | null;
 }
 
 export interface ProfileRequestServiceOptions {
@@ -144,15 +142,9 @@ function parseChanges(input: unknown): ProfileRequestChanges {
     if (typeof value !== "string") continue;
     const redacted = redactSecretsInText(value);
     // A redaction mask can be longer than the secret, so the cap is checked again after scrubbing.
-    if (field === "soul") {
-      if (Buffer.byteLength(redacted, "utf8") > BOT_PROFILE_LIMITS.soul) {
-        throw new ProfileRequestError("standing instructions must be at most 24000 bytes");
-      }
-    } else {
-      const limit = BOT_PROFILE_LIMITS[field];
-      if (redacted.length > limit) {
-        throw new ProfileRequestError(`${field} must be at most ${limit} characters`);
-      }
+    const limit = BOT_PROFILE_LIMITS[field];
+    if (redacted.length > limit) {
+      throw new ProfileRequestError(`${field} must be at most ${limit} characters`);
     }
     changes[field] = redacted;
   }
@@ -161,12 +153,12 @@ function parseChanges(input: unknown): ProfileRequestChanges {
 
 export function profileCardCopy(
   target: { name: string; crossBot: boolean },
-  fullProfile: { title: string; description: string; soul: string },
+  fullProfile: { title: string; description: string },
   before: ProfileRequestChanges,
   changes: ProfileRequestChanges,
   reason: string,
 ): ProfileCardCopy {
-  const isSetup = !fullProfile.title && !fullProfile.description && !fullProfile.soul;
+  const isSetup = !fullProfile.title && !fullProfile.description;
   const title = target.crossBot
     ? `Update @${target.name}'s profile?`
     : isSetup
@@ -175,7 +167,7 @@ export function profileCardCopy(
 
   const lines: string[] = target.crossBot ? [`Whose profile: @${target.name}`, `Why: ${reason}`] : [`Why: ${reason}`];
   for (const field of PROFILE_REQUEST_FIELDS) {
-    if (field === "soul" || field === "cwd") continue;
+    if (field === "cwd") continue;
     if (changes[field] === undefined) continue;
     if (field === "notifications") {
       lines.push(`${LABELS[field]}: ${toggleText(before[field] as boolean | undefined)} → ${toggleText(changes[field] as boolean | undefined)}`);
@@ -185,9 +177,6 @@ export function profileCardCopy(
   }
   if (changes.cwd !== undefined) {
     lines.push(`Working folder: ${before.cwd || PRIVATE_WORKSPACE} → ${changes.cwd || PRIVATE_WORKSPACE}`);
-  }
-  if (changes.soul !== undefined) {
-    lines.push(...soulDiffLines(before.soul ?? "", changes.soul));
   }
   const changesText = TEXT_FIELDS.some((field) => changes[field] !== undefined);
   if (changes.cwd !== undefined) lines.push(`${target.name}'s tools will read and write files in that folder.`);
@@ -364,7 +353,6 @@ export class ProfileRequestService {
       patch.cwd = checked.cwd ?? undefined;
     }
     if (!this.store.patchBotProfile(target.id, patch)) return cannot(NO_SUCH_BOT, 404);
-    recordProfileChange(target.id, "user", `undo:${message.id}`, payload.changes, payload.before);
     this.store.patchMessage(args.threadId, message.id, { card: { ...card, undone: true } });
     return { claimed: true, state: "undone", targetBotId: target.id };
   }
@@ -430,7 +418,6 @@ export class ProfileRequestService {
         patch.cwd = checked.cwd ?? undefined;
       }
       if (!this.store.patchBotProfile(target.id, patch)) throw new ProfileRequestError(NO_SUCH_BOT, 404);
-      recordProfileChange(target.id, "bot", `card:${message.id}`, payload.before, payload.changes);
 
       const appliedAt = this.now();
       const settled = this.store.patchMessage(args.threadId, message.id, {

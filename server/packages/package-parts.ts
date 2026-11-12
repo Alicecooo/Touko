@@ -7,7 +7,7 @@ import type { PackageAgent, PackageConnection, PackagePlaybook, PackageRoom, Pac
 
 export interface PartPair { r: string; w: string }
 
-export const AGENT_PARTS = ["name", "title", "description", "soul", "look", "playbooks", "skills", "connections", "approval"] as const;
+export const AGENT_PARTS = ["name", "title", "description", "look", "playbooks", "skills", "connections", "approval"] as const;
 export type AgentPart = typeof AGENT_PARTS[number];
 export const ROOM_PARTS = ["name", "bulletin", "members", "defaultResponder"] as const;
 export type RoomPart = typeof ROOM_PARTS[number];
@@ -53,7 +53,6 @@ export function agentReleaseValues(agent: PackageAgent, playbooks: ReadonlyMap<s
     name: agent.name,
     title: agent.title ?? "",
     description: agent.description ?? "",
-    soul: agent.soul ?? "",
     look: releaseLook(agent.appearance),
     playbooks: playbookValues((agent.playbooks ?? []).flatMap((key) => (playbooks.has(key) ? [playbooks.get(key)!] : []))),
     skills: [...(agent.skills ?? [])].sort(),

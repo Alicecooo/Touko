@@ -3,7 +3,7 @@ import path from "node:path";
 import { LICENSE_FILES } from "./linux-desktop-release-files.mjs";
 import { executableTarget, verifyCloudflaredExecutable } from "../setup/prepare-https-tunnel.mjs";
 import { fileURLToPath } from "node:url";
-import { pinnedDuckdbVersion, pinnedOnePasswordVersion, pinnedResvgVersion, verifyDuckdbTree } from "../setup/prepare-duckdb-runtime.mjs";
+import { pinnedOnePasswordVersion, verifyServerRuntime } from "../setup/prepare-server-runtime.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -65,20 +65,17 @@ async function validateCloudflared(resources, platform, required) {
   );
 }
 
-// The DuckDB binding the server requires at runtime (server/data/engine.ts):
-// the pinned packages and the native binding beside its library.
-async function validateDuckdb(resources, platform, arch, required) {
-  const duckdb = path.join(resources, "duckdb");
-  const present = await lstat(duckdb).then(() => true, (error) => {
+async function validateServerRuntime(resources, required) {
+  const runtime = path.join(resources, "server-runtime");
+  const present = await lstat(runtime).then(() => true, (error) => {
     if (error?.code === "ENOENT") return false;
     throw error;
   });
   // Unit fixtures carry only the resources they test; a real build fails
   // closed because electron-builder only warns about a missing `from`.
   if (!present && !required) return;
-  if (!arch) throw new Error(`Unsupported DuckDB package architecture: ${arch}`);
-  await requireRealDirectory(duckdb, platform === "win32" ? undefined : 0o755);
-  await verifyDuckdbTree(duckdb, platform, arch, pinnedDuckdbVersion(root), pinnedResvgVersion(root), pinnedOnePasswordVersion(root));
+  await requireRealDirectory(runtime);
+  await verifyServerRuntime(runtime, pinnedOnePasswordVersion(root));
 }
 
 // electron-builder normalizes copied resource directories to 0775. That is
@@ -90,8 +87,7 @@ export default async function afterPack(context) {
     path.join(context.appOutDir, "resources")
   );
   await validateCloudflared(resources, context.electronPlatformName, Boolean(context.packager));
-  const arch = { 1: "x64", 3: "arm64" }[context.arch];
-  await validateDuckdb(resources, context.electronPlatformName, arch, Boolean(context.packager));
+  await validateServerRuntime(resources, Boolean(context.packager));
   
 
   if (context.electronPlatformName !== "linux") return;

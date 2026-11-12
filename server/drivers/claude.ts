@@ -1132,8 +1132,9 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
         allowed.push("mcp__agents");
       }
 
-      for (const name of ["data", "highlevel"] as const) {
-        if (turn.integrations?.[name]) { mcpServers[name] = { ...turn.integrations[name] }; allowed.push(`mcp__${name}`); }
+      if (turn.integrations?.highlevel) {
+        mcpServers.highlevel = { ...turn.integrations.highlevel };
+        allowed.push("mcp__highlevel");
       }
       if (turn.integrations?.dweb) {
         mcpServers.dweb = {
@@ -2065,7 +2066,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
           computerMcp: true,
           composioMcp: true,
 
-          dataMcp: true, highlevelMcp: true,
+          highlevelMcp: true,
           images: true,
           nativeImageInput: true,
           effortLevels: ["low", "medium", "high", "xhigh", "max"],

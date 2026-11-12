@@ -2,8 +2,8 @@
   "date": "2026-11-10",
   "tool": "Built-in image_gen",
   "style": "Classic Japanese visual-novel illustration; fine contours, natural adult face proportions balanced between sharp and soft, restrained cel shading.",
-  "appSource": "public/app-icon.svg",
-  "appIconMethod": "Hand-authored vector symbol; character artwork is for bot avatars only.",
+  "appSource": "electron/resources/app-icon.png",
+  "appIconMethod": "User-supplied purple crescent, orbital ring and stars artwork, restored on 2026-11-12. Exterior black margin removed and rounded tile corners made transparent; desktop, Windows, web and Linux icons share this artwork.",
   "shyDirection": "No blush, cheek tint or hatching. Use averted gaze, reserved brows and a small bashful smile.",
   "assets": [
     {

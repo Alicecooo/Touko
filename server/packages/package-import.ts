@@ -10,7 +10,7 @@ import type { BotRecord, GroupRecord, InstalledPackageMetadata, Store } from "..
 import { importedMemberProfile, type ParsedTeamManifest, type TeamManifestMember } from "./team-manifest.ts";
 import { takeImportName } from "../../shared/import-name.ts";
 import { decodeBase64, type PackageAgent, type PackageDocument, type PackageTrust } from "../../shared/package-format.ts";
-import type { BotVisibility, ModelSelection } from "../../shared/wire.ts";
+import type { ModelSelection } from "../../shared/wire.ts";
 
 export const NO_BOTS_MESSAGE = "This package has no bots. Add it from your organization's shelf, or update OpenMausBot.";
 export const NO_PRESETS_MESSAGE = "This file has no bots or preset bots to add. Its skills can be added from your organization's shelf.";
@@ -77,8 +77,6 @@ export interface PackageImportOptions {
   mode: "add" | "project";
   cwd?: string | null;
   room?: string;
-  /** Who may see the new bots: the admin's choice, never the file's. */
-  visibility?: BotVisibility;
   org?: OrgImportContext;
 }
 
@@ -122,7 +120,6 @@ export function memberFromAgent(agent: PackageAgent): TeamManifestMember {
     name: agent.name,
     title: agent.title ?? "",
     description: agent.description ?? "",
-    ...(agent.soul !== undefined ? { soul: agent.soul } : {}),
     appearance: {
       color: agent.appearance.color,
       ...(agent.appearance.mascotExpression ? { mascotExpression: agent.appearance.mascotExpression } : {}),    },
@@ -285,7 +282,6 @@ function runImport(source: ImportSource, options: PackageImportOptions, deps: Pa
           ...importedMemberProfile(member, takenNames),
           modelSelection: selection,
           section,
-          ...(options.visibility ? { visibility: options.visibility } : {}),
         },
         { seedMessages: false },
       );
@@ -349,7 +345,6 @@ function runImport(source: ImportSource, options: PackageImportOptions, deps: Pa
           name: written.name,
           title: written.title ?? "",
           description: written.description ?? "",
-          soul: written.soul ?? "",
           look: {
             color: written.color,
             mascotExpression: written.mascotExpression ?? null,
@@ -381,7 +376,7 @@ function runImport(source: ImportSource, options: PackageImportOptions, deps: Pa
       const defaultResponder = responder.kind === "agent"
         ? { kind: "member" as const, botId: botIds.get(responder.agent)! }
         : responder.kind === "auto"
-          ? { kind: "auto" as const, ...(responder.agent ? { fallbackBotId: botIds.get(responder.agent)! } : {}) }
+          ? { kind: "member" as const, botId: botIds.get(responder.agent ?? room.members[0])! }
           : { kind: responder.kind };
       created = store.patchGroup(created.id, {
         bulletin: room.bulletin ?? "",

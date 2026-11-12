@@ -410,7 +410,6 @@ export function presetFromDefaults(defaults: NewBotDefaults | undefined, options
     ...(trimmed(profile.name) ? { name: profile.name!.trim() } : {}),
     ...(trimmed(profile.title) ? { title: profile.title!.trim() } : {}),
     ...(trimmed(profile.description) ? { description: profile.description!.trim() } : {}),
-    ...(trimmed(profile.soul) ? { soul: profile.soul! } : {}),
   };
   const mascotExpression = profile.mascotExpression?.trim() || undefined;  if (profile.color || mascotExpression || options.avatar) {
     const crop = profile.avatarCrop === "rounded" || profile.avatarCrop === "square" ? profile.avatarCrop : "circle";

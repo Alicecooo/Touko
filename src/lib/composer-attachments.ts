@@ -1,5 +1,4 @@
 import { isCitationAttachment, serializeCitation, type CitationAttachment } from "./citations.ts";
-export { dataContextFor, type DataContext, type DataViewContext } from "../../shared/data-context.ts";
 
 export type PasteAttachment = {
   kind: "paste";

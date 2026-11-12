@@ -1,4 +1,4 @@
-export const WORKSPACE_CREDENTIALS = [{ section: "xai", field: "key", name: "xaiApiKey", env: "XAI_API_KEY" }, { section: "decider", field: "key", name: "jevApiKey", env: "OMB_JEV_API_KEY" }, { section: "decider", field: "openrouterKey", name: "openrouterDeciderKey", env: "OMB_OPENROUTER_DECIDER_KEY" }, { section: "opencodeGo", field: "apiKey", name: "opencodeGoApiKey", env: "OPENCODE_API_KEY" }];
+export const WORKSPACE_CREDENTIALS = [{ section: "xai", field: "key", name: "xaiApiKey", env: "XAI_API_KEY" }];
 
 /** Moves plaintext secrets into the store and deletes the field. "" never drops a stored secret: every packaged
  * credential save writes an empty tombstone to config.json. The caller persists credentials before config. */

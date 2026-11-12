@@ -24,7 +24,6 @@ interface QueueEntry {
     prompt: string;
     replyToId?: string;
     sendId?: string;
-    dataContext?: Message["dataContext"];
     reason?: SteerQueueReason;
     /** Queued by a bot running unattended: the drained turn inherits it (a queue is a delay, not a person at the keyboard). */
     unattended?: boolean;
@@ -94,7 +93,7 @@ export function queueSteeredMessage(
   botId: string,
   threadId: string,
   text: string,
-  options: { prompt?: string; replyToId?: string; sendId?: string; dataContext?: Message["dataContext"]; reason?: SteerQueueReason; unattended?: boolean; peerAsk?: Message["peerAsk"]; origin?: WorkOrigin; sender?: ResolvedSender; trigger?: UsageTrigger; } = {},
+  options: { prompt?: string; replyToId?: string; sendId?: string; reason?: SteerQueueReason; unattended?: boolean; peerAsk?: Message["peerAsk"]; origin?: WorkOrigin; sender?: ResolvedSender; trigger?: UsageTrigger; } = {},
 ): QueuedSteer {
   const id = newId();
   const entry = queues.get(threadId) ?? { botId, items: [] };
@@ -105,7 +104,6 @@ export function queueSteeredMessage(
     prompt: options.prompt ?? text,
     replyToId: options.replyToId,
     sendId: options.sendId,
-    dataContext: options.dataContext,
     reason: options.reason,
     unattended: options.unattended,
     peerAsk: options.peerAsk,
@@ -184,7 +182,6 @@ export function drainSteeredMessages(
           text: item.text,
           replyToId: item.replyToId,
           sendId: item.sendId,
-          ...(item.dataContext ? { dataContext: item.dataContext } : {}),
           queueId: item.messageId,
           peerAsk: item.peerAsk,
           sender: item.sender}),

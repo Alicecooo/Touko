@@ -1,14 +1,12 @@
 // One relay URL + token pair per included service:
 //   OMB_CLOUD_BOAT_URL    + OMB_CLOUD_BOAT_TOKEN     the Boat relay, ending in /api/box/v1
-//   OMB_CLOUD_DECIDER_URL + OMB_CLOUD_DECIDER_TOKEN  the Jev relay, a Jev base URL
 //   OMB_CLOUD_AI_URL      + OMB_CLOUD_AI_TOKEN       the trial's Claude credit, an OpenAI-compatible base URL
 // The person's own key always wins and is resolved per request; an included token goes only to its relay and is never
 // written to config.json or reported to a client.
-import { JEV_DEFAULT_BASE_URL } from "../decider/jev.ts";
 
 export const BOAT_API_DEFAULT = "https://boat.dev/api/v1";
 /** Must also be on WORKSPACE_CREDENTIAL_ENV. */
-export const INCLUDED_TOKEN_ENV = ["OMB_CLOUD_BOAT_TOKEN", "OMB_CLOUD_DECIDER_TOKEN", "OMB_CLOUD_AI_TOKEN"] as const;
+export const INCLUDED_TOKEN_ENV = ["OMB_CLOUD_BOAT_TOKEN", "OMB_CLOUD_AI_TOKEN"] as const;
 
 export interface ServiceCredential {
   token: string;
@@ -19,7 +17,6 @@ export interface ServiceCredential {
 
 interface Included {
   boat: ServiceCredential | null;
-  decider: ServiceCredential | null;
   ai: ServiceCredential | null;
 }
 
@@ -31,7 +28,6 @@ function includedService(url: string | undefined, token: string | undefined): Se
 
 const includedFrom = (env: NodeJS.ProcessEnv): Included => ( {
   boat: includedService(env.OMB_CLOUD_BOAT_URL, env.OMB_CLOUD_BOAT_TOKEN),
-  decider: includedService(env.OMB_CLOUD_DECIDER_URL, env.OMB_CLOUD_DECIDER_TOKEN),
   ai: trialCreditService(env.OMB_CLOUD_AI_URL, env.OMB_CLOUD_AI_TOKEN)});
 
 /** The token is a key the chat engine sends here, so the address must be HTTPS (loopback for tests) and the token the Admin's shape. */
@@ -73,10 +69,3 @@ export function trialCreditCredential(env: NodeJS.ProcessEnv = process.env): Ser
   return (held ?? includedFrom(env)).ai;
 }
 
-export function deciderCredential(
-  own: string | undefined,
-  ownBaseUrl: string | undefined,
-  env: NodeJS.ProcessEnv = process.env,
-): ServiceCredential | null {
-  return resolve(own?.trim(), ownBaseUrl?.trim() || JEV_DEFAULT_BASE_URL, (held ?? includedFrom(env)).decider);
-}

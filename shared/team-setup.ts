@@ -4,7 +4,6 @@ export interface TeamSetupFields {
   name?: string;
   title?: string;
   description?: string;
-  soul?: string;
   /** Create only: the folder the new bot's tools work in. "" = private workspace. */
   cwd?: string;
   section?: string;

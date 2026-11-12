@@ -2,10 +2,9 @@
 import { helperModelAllowed } from "../../shared/wire";
 import type { Bot } from "@/state/store";
 
-export type RestrictedSource = Pick<Bot, "visibility" | "toolScope" | "helperModel">;
+export type RestrictedSource = Pick<Bot, "toolScope" | "helperModel">;
 
 export interface RestrictedCopyRequest {
-  visibility?: Bot["visibility"];
   settings?: { toolScope?: Bot["toolScope"]; helperModel?: false };
 }
 
@@ -15,7 +14,6 @@ export function restrictedCopyRequest(source: RestrictedSource): RestrictedCopyR
     ...(helperModelAllowed(source) ? {} : { helperModel: false as const }),
   };
   return {
-    ...(source.visibility && source.visibility !== "everyone" ? { visibility: source.visibility } : {}),
     ...(Object.keys(settings).length ? { settings } : {}),
   };
 }

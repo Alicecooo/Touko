@@ -1,11 +1,3 @@
-/** An absent style means "default". */
-export const REPLY_STYLES = ["default", "conversational"] as const;
-export type ReplyStyle = (typeof REPLY_STYLES)[number];
-
-export function isConversational(style: ReplyStyle | undefined): boolean {
-  return style === "conversational";
-}
-
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 const LIST_OR_TABLE = /^ {0,3}([-*+]\s|\d{1,3}[.)]\s|\|)/;
 

@@ -14,18 +14,19 @@ export function allow<const T extends string>(value: unknown, list: readonly T[]
 
 export const KEY_PROVIDER = [
   "anthropic", "openai", "openrouter", "openai_compat", "xai", "mistral", "cerebras", "groq", "meta", "composio",
-  "opencode_go", "custom_endpoint", "jev", "openrouter_decider",
+  "custom_endpoint",
 ] as const;
 export type KeyProvider = (typeof KEY_PROVIDER)[number];
 
 export const SECTION_PROVIDER = {
-  composio: "composio", opencodeGo: "opencode_go", anthropic: "anthropic", openai: "openai",
+  composio: "composio", anthropic: "anthropic", openai: "openai",
   openrouter: "openrouter", openaiCompat: "openai_compat", xai: "xai", mistral: "mistral", cerebras: "cerebras",
   groq: "groq", meta: "meta",
 } as const satisfies Record<string, KeyProvider>;
 
-const CREDENTIAL_PROVIDER = new Map<string, KeyProvider>(Object.entries( {
-   xaiApiKey: "xai", opencodeGoApiKey: "opencode_go"} satisfies Record<CredentialTargetId, KeyProvider>));
+const CREDENTIAL_PROVIDER = new Map<string, KeyProvider>(Object.entries({
+  xaiApiKey: "xai",
+} satisfies Record<CredentialTargetId, KeyProvider>));
 
 export function credentialProvider(target: unknown): KeyProvider | "other" {
   return (typeof target === "string" && CREDENTIAL_PROVIDER.get(target)) || "other";
@@ -76,7 +77,6 @@ export type BotSource = (typeof BOT_SOURCE)[number];
 export const CONNECTOR_RESULT = ["connected", "failed", "expired", "timed_out"] as const;
 export type ConnectorResult = (typeof CONNECTOR_RESULT)[number];
 export const ROOM_MODE = ["chat", "goal"] as const;
-export const DECIDER = ["jev", "openrouter", "off"] as const;
 export const CONNECTORS_MODE = ["managed", "self_hosted", "unavailable"] as const;
 export const LOCAL_VM_MODE = ["shared", "per_bot", "pool"] as const;
 export const TRIAL_CREDIT = ["active", "used_up", "ended", "none"] as const;

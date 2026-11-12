@@ -771,7 +771,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
           mountSelected("computer", "computer", turn.integrations.localComputer);
         }
 
-        for (const name of ["data", "highlevel"] as const) if (turn.integrations?.[name]) mountSelected(name, name, turn.integrations[name]);
+        if (turn.integrations?.highlevel) mountSelected("highlevel", "highlevel", turn.integrations.highlevel);
         // A `-c` override merges with a same-named server in config.toml, and stdio over url is
         // "invalid configuration" that kills the turn, so such a server mounts under its own name.
         const codexConfig = codexConfigMcp(env), declaredInCodexConfig = codexConfig.names;
@@ -1798,7 +1798,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
         agentsMcp: true,
       customMcp: true,
 
-        dataMcp: true, highlevelMcp: true,
+        highlevelMcp: true,
         images: true,
         nativeImageInput: true,
         effortLevels: ["low", "medium", "high", "xhigh", "max"],

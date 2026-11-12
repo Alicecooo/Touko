@@ -3,7 +3,7 @@
 
 import { engineReady } from "@/components/EngineLibrary";
 import { analyticsEnabled, track } from "@/lib/analytics";
-import { allow, APP, CONNECTORS_MODE, DECIDER, EDITION, engineForDriver, TRIAL_CREDIT, type EventProps, type KeyProvider, type PropValue } from "@/lib/analytics-allowlist";
+import { allow, APP, CONNECTORS_MODE, EDITION, engineForDriver, TRIAL_CREDIT, type EventProps, type KeyProvider, type PropValue } from "@/lib/analytics-allowlist";
 import { hasActiveConnection, type ConnectorStatus } from "@/lib/connector-status";
 import { addedServers } from "@/lib/openai-compat-endpoints";
 import type { Routine } from "@/lib/routines";
@@ -33,7 +33,6 @@ const count = (value: unknown): number | undefined => Number.isInteger(value) &&
 const tally = <T,>(items: readonly T[], test: (item: T) => boolean) => items.filter(test).length;
 
 function keyProviders(config: ConfigStatus): KeyProvider[] {
-  const ownDecider = config.decider?.configured === true && config.decider.included !== true;
   const configured: Array<[boolean | undefined, KeyProvider]> = [
     [config.anthropic?.configured, "anthropic"],
     [config.openai?.configured, "openai"],
@@ -45,9 +44,6 @@ function keyProviders(config: ConfigStatus): KeyProvider[] {
     [config.groq?.configured, "groq"],
     [config.meta?.configured, "meta"],
     [config.composio?.configured && config.composio.mode === "self-hosted", "composio"],
-    [config.opencodeGo?.configured, "opencode_go"],
-    [ownDecider && config.decider?.provider === "jev", "jev"],
-    [ownDecider && config.decider?.provider === "openrouter", "openrouter_decider"],
   ];
   return configured.flatMap(([on, provider]) => on === true ? [provider] : []);
 }
@@ -105,8 +101,6 @@ export function buildUsageSnapshot(input: UsageInput): EventProps {
     trial_credit: allow(instances.find((instance) => instance.trialCredit !== undefined)?.trialCredit ?? "none", TRIAL_CREDIT),
     ...appFacts(input.apps),
     connectors_mode: allow(config.composio?.mode?.replace("-", "_"), CONNECTORS_MODE),
-    decider: config.decider?.enabled ? allow(config.decider.provider, DECIDER) : "off",
-    decider_included: config.decider?.included === true,
     ...memberFacts(input.sessions),
     edition: allow(config.edition?.edition ?? "oss", EDITION),
     org_managed: Boolean(config.managedPolicy),

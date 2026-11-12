@@ -1,10 +1,8 @@
 // One builder for every turn's system prompt, so what a bot receives and the "what the model sees" preview are the same bytes.
-import { soulSystemPrompt } from "../bots/bot-folder.ts";
 import { agentsToolBridged } from "../drivers/agents-bridge.ts";
 import { teammateAvailabilityPrompt, type RosterMember } from "../teams/peer-roster.ts";
 import type { ConnectorToolGrant } from "../../shared/wire.ts";
 
-import { isConversational, type ReplyStyle } from "../../shared/reply-style.ts";
 
 export type PromptPart = { id: string; label: string; text: string };
 export type PromptSection = PromptPart & { bytes: number };
@@ -35,29 +33,26 @@ export const AGENTS_TOOL_BRIDGE_PROMPT =
 export const CONVERSATIONAL_STYLE_PROMPT =
   "\n\nReply style: conversational. Talk like a person in a chat. Keep replies short unless the person asks for detail. Use plain text with no headings, bullet lists, tables or bold unless the person asks for them or the content truly needs them; code always goes in a fenced code block. Send each distinct point as its own short message, separated by a blank line, in the order you find things. When it helps, end with one brief follow-up question. Match the person's language and roughly the length of their message.\n";
 
-export function replyStylePrompt(style: ReplyStyle | undefined): string {
-  return isConversational(style) ? CONVERSATIONAL_STYLE_PROMPT : "";
-}
-
 export function botPersona(bot: { name: string; title?: string; description?: string }): string {
-  return [`You are ${bot.name}, a personal bot in OpenMausBot.`, bot.title && `Role: ${bot.title}.`, bot.description && `About: ${bot.description}`]
+  return [
+    `You are ${bot.name}, a personal bot in Touko.`,
+    `This is your private chat with the user, a different conversation from named group rooms and from bot-to-bot channels. Speak only as ${bot.name}. Do not write the user's lines, another bot's lines, or a script of the conversation, and do not paste those other conversations in here.`,
+    bot.title && `Role: ${bot.title}.`,
+    bot.description && `About: ${bot.description}`,
+  ]
     .filter(Boolean)
     .join(" ");
 }
 
 export function buildSystemPrompt(
   persona: string,
-  soul: string,
   parts: PromptPart[],
   agents?: { env?: Record<string, string | undefined> },
-  opts?: { replyStyle?: ReplyStyle },
 ): { text: string; sections: PromptSection[]; stable: string; volatile: string } {
   const ordered: PromptPart[] = [
     { id: "persona", label: "Identity", text: persona },
-    { id: "soul", label: "Standing instructions (SOUL.md)", text: soulSystemPrompt(soul) },
-    // Right after the soul: on a direct turn, ahead of every section that names a tool.
     { id: "tool-bridge", label: "Tool search", text: agentsToolBridged(agents) ? AGENTS_TOOL_BRIDGE_PROMPT : "" },
-    { id: "reply-style", label: "Reply style", text: replyStylePrompt(opts?.replyStyle) },
+    { id: "conversation-style", label: "Conversation style", text: CONVERSATIONAL_STYLE_PROMPT },
     ...parts,
   ];
   const sections = ordered
@@ -149,7 +144,7 @@ export const WEBHOOK_PROMPT =
 export const TEAM_MEMORY_PROMPT =
   " When you learn who someone is, where something lives, what was decided, or what a term or nickname means, propose it with propose_team_memory. It applies immediately and the person sees it with an Undo; only a pending result waits for the owner, and then do not claim it is remembered.";
 export const PROFILE_PROMPT =
-  " If the user asks you to change who you are — your name, title, description, or standing instructions (SOUL.md) — or to set yourself up, use propose_profile. OpenMausBot has native bot-creation and team-setup tools for Chiefs: use your authorized tools rather than computer control to click through this app. Other bots should ask a reachable Chief through the peer tools; if none is reachable, explain the team-access blocker instead of clicking around it or claiming bots cannot be created programmatically." + APPLIED_RESULT_PROMPT;
+  " If the user asks you to change who you are — your name, title, or description — or to set yourself up, use propose_profile. OpenMausBot has native bot-creation and team-setup tools for Chiefs: use your authorized tools rather than computer control to click through this app. Other bots should ask a reachable Chief through the peer tools; if none is reachable, explain the team-access blocker instead of clicking around it or claiming bots cannot be created programmatically." + APPLIED_RESULT_PROMPT;
 
 export function mentionPrompt(tagged: ReadonlyArray<{ id: string; name: string }>): string {
   if (!tagged.length) return "";

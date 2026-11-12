@@ -85,7 +85,7 @@ export function selectGroupGoalCoordinator<Member extends GoalRunMember>(
   responder: GroupDefaultResponder,
 ): Member | null {
   const active = members.filter((member) => !member.hidden);
-  const lead = responder.kind === "member" ? responder.botId : responder.kind === "auto" ? responder.fallbackBotId : undefined;
+  const lead = responder.kind === "member" ? responder.botId : undefined;
   if (lead) {
     const explicit = active.find((member) => member.id === lead);
     if (explicit) return explicit;

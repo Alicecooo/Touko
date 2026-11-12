@@ -67,7 +67,6 @@ function ScreenUnavailable() {
 
 export const ActivityPanel = lazyScreen("ActivityPanel", async () => (await import("./ActivityPanel")).ActivityPanel);
 export const BotSettingsDialog = lazyScreen("BotSettingsDialog", async () => (await import("./BotSettingsDialog")).BotSettingsDialog);
-export const ComputerPanel = lazyScreen("ComputerPanel", async () => (await import("./ComputerPanel")).ComputerPanel);
 
 export const InspectorPanel = lazyScreen("InspectorPanel", async () => (await import("./InspectorPanel")).InspectorPanel);
 
@@ -76,7 +75,7 @@ export const NewBotDialog = lazyScreen("NewBotDialog", async () => (await import
 export const TriggersPage = lazyScreen("TriggersPage", async () => (await import("./TriggersPage")).TriggersPage);
 export const SettingsModal = lazyScreen("SettingsModal", async () => (await import("./SettingsModal")).SettingsModal);
 
-const SCREENS = [ActivityPanel, BotSettingsDialog, ComputerPanel, InspectorPanel, NewBotDialog, SettingsModal, TriggersPage];
+const SCREENS = [ActivityPanel, BotSettingsDialog, InspectorPanel, NewBotDialog, SettingsModal, TriggersPage];
 
 if (typeof location !== "undefined" && new URLSearchParams(location.search).has("desktop-settings")) {
   void SettingsModal.preload().catch(() => {});

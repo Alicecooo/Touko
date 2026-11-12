@@ -8,13 +8,10 @@ import { chosenPreset, presetDraftPatch, presetGroups, presetPictureFile, preset
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import type { LocaleKey } from "@/locales";
-import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
 import { botCreated } from "@/lib/product-events";
-import { visibilityFromForm, type VisibilityMode } from "./bot-settings/VisibilitySection";
 import type { NewBotDefaults } from "../../shared/new-bot-defaults";
 import type { Routine } from "@/lib/routines";
 import { IdentitySection } from "./bot-settings/IdentitySection";
-import { SoulSection } from "./bot-settings/SoulSection";
 import { SkillsSection } from "./bot-settings/SkillsSection";
 import { AccessSection } from "./bot-settings/AccessSection";
 import { ModelSection } from "./bot-settings/ModelSection";
@@ -28,10 +25,10 @@ import { LocalComputerAutoWarning } from "./LocalComputerAutoWarning";
 import { SettingRow } from "./SettingsPrimitives";
 import { Select } from "./Select";
 
-const SECTIONS = ["Identity", "Soul", "Skills", "Memory", "Routines", "Access", "Model", "Permissions", "Notifications"] as const;
+const SECTIONS = ["Identity", "Skills", "Memory", "Routines", "Access", "Model", "Permissions", "Notifications"] as const;
 type Section = typeof SECTIONS[number];
 const SECTION_KEYS: Record<Section, LocaleKey> = {
-  Identity: "botSettings.sections.identity", Soul: "botSettings.sections.soul", Skills: "botSettings.sections.skills",
+  Identity: "botSettings.sections.identity", Skills: "botSettings.sections.skills",
   Memory: "botSettings.sections.memory", Routines: "botSettings.sections.routines", Access: "botSettings.sections.access",
   Model: "botSettings.sections.model", Permissions: "botSettings.sections.permissions", "Notifications": "notifications.title",
 };
@@ -87,10 +84,6 @@ export function LocalNewBotDialog({ defaultsMode = false, onClose, section, onCr
   const alive = useRef(true);
   const [error, setError] = useState("");
   const [warning, setWarning] = useState<"local" | null>(null);
-  const [audience, setAudience] = useState<VisibilityMode>("everyone");
-  const [people, setPeople] = useState("");
-  const ownerOrAdmin = useOwnerOrAdmin();
-  const choosesVisibility = !defaultsMode && typeof window !== "undefined" && !window.ogb && ownerOrAdmin === true;
   const dialog = useRef<HTMLDivElement>(null);
   const closeRef = useRef(() => {});
   closeRef.current = () => {
@@ -141,14 +134,12 @@ export function LocalNewBotDialog({ defaultsMode = false, onClose, section, onCr
   const save = async () => {
     if (!ready || savingRef.current || parent.state.botCreationPending) return;
     if (!defaultsMode && draft.bot.approvalMode === "auto" && draft.bot.computer === "local" && !draft.consent.acknowledgeLocalAuto) { setWarning("local"); return; }
-    const visibility = choosesVisibility ? visibilityFromForm(audience, people) : null;
-    if (visibility && !visibility.ok) { setError(t("botSettings.visibility.needPeople")); return; }
     savingRef.current = true; setSaving(true); setError("");
     parent.dispatch({ type: "botCreationPending", on: true });
     try {
       if (defaultsMode) await api("/api/config", { method: "PATCH", body: JSON.stringify({ newBotDefaults: await preparedBotTemplate(draft) }) });
       else {
-        const { bot, warnings } = await createConfiguredBot(draft, undefined, undefined, undefined, visibility?.ok ? visibility.visibility : undefined);
+        const { bot, warnings } = await createConfiguredBot(draft);
         botCreated(draft.preset ? "preset" : draft.role ? "template" : "blank", draft.role);
         parent.dispatch({ type: "botAdded", bot, preserveSelection });
         if (warnings.length) parent.dispatch({ type: "error", message: warnings.join("\n") });
@@ -187,32 +178,6 @@ export function LocalNewBotDialog({ defaultsMode = false, onClose, section, onCr
         <button type="button" onClick={() => closeRef.current()} aria-label={t("common.close")}
           className="flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-secondary hover:bg-control hover:text-ink disabled:opacity-40"><X size={18} className="pointer-events-none" /></button>
       </div>
-        {choosesVisibility && (
-          <div className="flex flex-wrap items-center gap-2 px-5 pt-3 text-[13px] text-ink-secondary" data-new-bot-visibility>
-            <label className="flex items-center gap-2">
-              {t("botSettings.visibility.title")}
-              <Select size="sm"
-                value={audience}
-                disabled={saving}
-                onChange={(event) => setAudience(event.target.value as VisibilityMode)}
-              >
-                <option value="everyone">{t("botSettings.visibility.everyone")}</option>
-                <option value="admins">{t("botSettings.visibility.admins")}</option>
-                <option value="people">{t("botSettings.visibility.people")}</option>
-              </Select>
-            </label>
-            {audience === "people" && (
-              <input
-                value={people}
-                disabled={saving}
-                onChange={(event) => setPeople(event.target.value)}
-                placeholder={t("botSettings.visibility.peoplePlaceholder")}
-                aria-label={t("botSettings.visibility.peopleLabel")}
-                className="min-w-[16rem] flex-1 rounded-lg border border-hairline/40 bg-inset px-3 py-1.5 text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none"
-              />
-            )}
-          </div>
-        )}
       <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
         <nav aria-label={t("newBot.sections")} className="flex shrink-0 gap-1 overflow-x-auto border-b border-hairline/40 p-2 sm:w-40 sm:flex-col sm:border-b-0 sm:border-r">
           {SECTIONS.map(label => <button key={label} type="button" onClick={() => setActive(label)} aria-current={active === label ? "page" : undefined}
@@ -254,7 +219,6 @@ function DraftSection({ active, draft, defaultsMode }: { active: Section; draft:
       </Select>
     </label>
   </div>;
-  if (active === "Soul") return <SoulSection bot={bot} patch={derived.patch} />;
   if (active === "Skills") return <SkillsSection bot={bot} />;
   if (active === "Memory") return <DraftMemory draft={draft} />;
   if (active === "Routines") return <DraftRoutines draft={draft} />;

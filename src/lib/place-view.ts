@@ -107,7 +107,6 @@ export function openPlaceAction(
       dispatch({ type: "updateTask", botId: target.botId, threadId: target.threadId, patch: { surface: null } });
       return true;
     case "watch":
-    case "open-computer-panel":
       return false;
 
     default:

@@ -4,10 +4,9 @@ import { approvalModeFor, isApprovalMode, type ApprovalMode } from "../../shared
 import { normalizeConnectorScopes } from "../../shared/connector-scopes.ts";
 import { normalizeOutboundPolicy } from "../../shared/outbound.ts";
 import { parseToolScope, toolScopeWidens } from "../../shared/tool-scope.ts";
-import { isMausColor, MAUS_COLOR_NAMES, type WireBot, type WireGroup } from "../../shared/wire.ts";
+import { isMausColor, MAUS_COLOR_NAMES, type WireBot } from "../../shared/wire.ts";
 import { validateBotCwd } from "../bots/bot-cwd.ts";
 import { parseBotProfilePatch } from "../bots/bot-profile.ts";
-import { parseVisibility } from "../bots/bot-visibility.ts";
 
 import type { CacheKeepWarm } from "../agent/cache-keepwarm.ts";
 import * as composio from "../integrations/composio.ts";
@@ -18,8 +17,6 @@ import type { ProviderRegistry } from "../harness/registry.ts";
 import type { hostedModelPolicy } from "../deployment/hosted-models.ts";
 import { MAX_MCP_SERVERS, mcpServerNameError } from "../mcp/mcp-registry.ts";
 import type { MemoryUpkeep } from "../memory/memory-upkeep.ts";
-import { profileSnapshot } from "../bots/profile-revision.ts";
-import { recordProfileChange } from "../bots/profile-versions.ts";
 import { clientBotPatchViolation, requestSource } from "../auth/request-auth.ts";
 import type { RoutineManager } from "../automation/routines.ts";
 import type { SessionRegistry } from "../auth/sessions.ts";
@@ -45,10 +42,7 @@ export interface BotPatchRouteDeps {
   hostedFullAccessRefusal: string;
   desktopManaged: boolean;
   maxWorkspaceBots: number;
-  broadcast(payload: Record<string, unknown>): void;
   wireBot(bot: BotRecord): WireBot;
-  publicGroupState(group: GroupRecord): WireGroup;
-  audienceChanged(): void;
   storedAvatarExists(avatarUrl: string): boolean;
   requestedTaskBot(botId: string, rawThreadId: unknown): BotRecord;
   threadBusy(botId: string, threadId: string): boolean;
@@ -65,7 +59,7 @@ export interface BotPatchRouteDeps {
 }
 
 export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
-  const {store, cfg, registry, sessions,   memoryUpkeep, cacheKeepWarm, hostedModels, supportsApprovalMode, hostedWorkspace: HOSTED_WORKSPACE, hostedFullAccessRefusal: HOSTED_FULL_ACCESS_REFUSAL, desktopManaged: DESKTOP_MANAGED, maxWorkspaceBots: MAX_WORKSPACE_BOTS, broadcast, wireBot, publicGroupState, audienceChanged, storedAvatarExists, requestedTaskBot, threadBusy, activeGroupTurnForBot, checkedModelSelection, engineSwitchNeedsAsk,  interruptAllDirectThreads, cancelGroupTurnOperations, revokeInternalCapabilitiesForThread, runningTurnInstance, closeOpenApprovals, } = deps;
+  const {store, cfg, registry, sessions,   memoryUpkeep, cacheKeepWarm, hostedModels, supportsApprovalMode, hostedWorkspace: HOSTED_WORKSPACE, hostedFullAccessRefusal: HOSTED_FULL_ACCESS_REFUSAL, desktopManaged: DESKTOP_MANAGED, maxWorkspaceBots: MAX_WORKSPACE_BOTS, wireBot, storedAvatarExists, requestedTaskBot, threadBusy, activeGroupTurnForBot, checkedModelSelection, engineSwitchNeedsAsk,  interruptAllDirectThreads, cancelGroupTurnOperations, revokeInternalCapabilitiesForThread, runningTurnInstance, closeOpenApprovals, } = deps;
   const pinnedClientThread = pinnedClientThreadGuard(store);
   return async ({ req, res, path, method, auth, json, readBody }) => {
     let m: RegExpMatchArray | null = null;
@@ -88,6 +82,9 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
           });
         }
       }
+      if (Object.hasOwn(body, "visibility")) {
+        return json(res, 400, { error: "visibility can no longer be changed" });
+      }
       if (body.color !== undefined && !isMausColor(body.color)) {
         return json(res, 400, { error: `color must be ${MAUS_COLOR_NAMES.slice(0, -1).join(", ")}, or ${MAUS_COLOR_NAMES.at(-1)}` });
       }
@@ -105,8 +102,6 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
       }
       if (rawSelection !== undefined) requirePinnedClientThread(m[1], body.threadId);
       const selectedTask = existingBot ? requestedTaskBot(existingBot.id, body.threadId) : null;
-      const beforeProfile = existingBot ? profileSnapshot(existingBot) : undefined;
-      const beforeVisibility = existingBot?.visibility;
       if (body.requireAvailableModel !== undefined && typeof body.requireAvailableModel !== "boolean") {
         return json(res, 400, { error: "requireAvailableModel must be true or false" });
       }
@@ -434,12 +429,6 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
       }
       // Losing the role revokes its grants: no dormant authority returns if it is elected again.
       if (body.chiefOfStaff === false) patch.managedSections = [];
-      // "everyone" (default), "admins" or { people: [...] }; members' PATCHes never get here.
-      if (Object.hasOwn(body, "visibility")) {
-        const parsed = parseVisibility(body.visibility);
-        if (!parsed.ok) return json(res, 400, { error: parsed.error });
-        patch.visibility = parsed.visibility;
-      }
       if (body.alwaysAllow !== undefined) {
         if (!Array.isArray(body.alwaysAllow) || body.alwaysAllow.some((t: unknown) => typeof t !== "string")) {
           return json(res, 400, { error: "alwaysAllow must be a list of tool keys" });
@@ -553,7 +542,7 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
         }
       }
 
-      if (profile.patch.soul !== undefined) {
+      if (Object.keys(profile.patch).length) {
       // Runtime fields keep their fail-closed order; only the profile fields commit atomically.
         const runtimePatch = { ...patch };
         for (const field of Object.keys(profile.patch)) delete runtimePatch[field];
@@ -575,17 +564,6 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
           ? store.setChiefOfStaff(bot.id)
           : [];
       if (chiefChanges === null) return json(res, 404, { error: "no such bot" });
-      if (beforeProfile) {
-        const now = store.bot(bot.id)!;
-        recordProfileChange(bot.id, "user", "api", beforeProfile, profileSnapshot(now));
-      }
-      if (Object.hasOwn(patch, "visibility") && JSON.stringify(beforeVisibility ?? "everyone") !== JSON.stringify(bot.visibility ?? "everyone")) {
-        for (const group of store.groups.filter((candidate) => candidate.memberIds.includes(bot!.id))) {
-          broadcast({ kind: "group", group: publicGroupState(group) });
-        }
-        broadcast({ kind: "sections", sections: store.sections });
-        audienceChanged();
-      }
       return json(res, 200, { bot: wireBot(store.bot(bot.id)!) });
     }
     return PASS;

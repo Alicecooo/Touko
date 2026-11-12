@@ -5,7 +5,7 @@
 | 位置 | 用途 |
 | --- | --- |
 | `build/` | 服务端打包、更新器组装、桌面依赖发布文件处理 |
-| `setup/` | 准备 Windows/Linux 桌面控制、HTTPS 隧道和数据库依赖 |
+| `setup/` | 准备 Windows/Linux 桌面控制、HTTPS 隧道和桌面服务运行依赖 |
 | `generators/` | 生成人物头像总览、模型目录、翻译和桌面依赖清单 |
 | `dev/` | 隔离环境、开发 MCP 服务、外部浏览器 QA 工具和预览服务 |
 | `previews/` | 被现有开发环境或测试使用的组件预览页面 |
@@ -26,7 +26,7 @@
 | `pnpm run dev:isolated --help` | 查看隔离开发环境的操作命令 |
 | `pnpm generate:portrait-preview` | 生成人物头像与表情总览 |
 | `pnpm generate:translations <语言代码>` | 生成翻译草稿；需要本机 Claude CLI 登录 |
-| `pnpm prepare:duckdb` | 准备数据引擎 |
+| `pnpm prepare:server-runtime` | 准备桌面服务运行依赖 |
 | `pnpm prepare:https-tunnel` | 准备 HTTPS 隧道工具 |
 | `pnpm prepare:windows-desktop-control` | 准备 Windows 桌面控制依赖 |
 | `pnpm prepare:linux-desktop-control` | 准备 Linux 桌面控制依赖 |

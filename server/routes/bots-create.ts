@@ -1,7 +1,6 @@
 import type { WireBot } from "../../shared/wire.ts";
 import { validateBotCwd } from "../bots/bot-cwd.ts";
 import { parseBotProfilePatch } from "../bots/bot-profile.ts";
-import { parseVisibility } from "../bots/bot-visibility.ts";
 import type { AppConfig } from "../config/config.ts";
 import type { ModelSelection } from "../harness/contracts.ts";
 import type { hostedModelPolicy } from "../deployment/hosted-models.ts";
@@ -47,6 +46,9 @@ export function createBotCreateRoutes(deps: BotCreateRouteDeps): RouteHandler {
       let body = await readBody(req);
       if (!body || typeof body !== "object" || Array.isArray(body)) {
         return json(res, 400, { error: "bot must be a JSON object" });
+      }
+      if (Object.hasOwn(body, "visibility")) {
+        return json(res, 400, { error: "visibility can no longer be set when creating a bot" });
       }
       const template = resolveBotCreationDefaults(cfg.newBotDefaults, body);
       const settings = template.profile;
@@ -120,12 +122,8 @@ export function createBotCreateRoutes(deps: BotCreateRouteDeps): RouteHandler {
       if (store.bots.length >= MAX_WORKSPACE_BOTS) {
         return json(res, 409, { error: `this workspace is limited to ${MAX_WORKSPACE_BOTS} bots` });
       }
-      // Apply the audience before creation can announce the bot to members.
-      const created = body.visibility === undefined ? null : parseVisibility(body.visibility);
-      if (created && !created.ok) return json(res, 400, { error: created.error });
-      const bot = store.createBot({ ...profile.patch, soul: settings.soul, section, modelSelection: selection,
-        toolScope: settings.toolScope ?? undefined,
-        ...(created?.ok ? { visibility: created.visibility } : {}) });
+      const bot = store.createBot({ ...profile.patch, section, modelSelection: selection,
+        toolScope: settings.toolScope ?? undefined });
       const createdRoutines: Array<{ id: string; enabled: boolean }> = [];
       try {
         const { chiefOfStaff: _chief, managedSections: _managed, toolScope: _toolScope, ...ordinary } = settings;

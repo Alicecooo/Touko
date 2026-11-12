@@ -11,19 +11,12 @@ export const CREDENTIAL_TARGETS = {
     helpUrl: "https://console.x.ai/",
   },
   
-  opencodeGoApiKey: {
-    label: "OpenCode API key",
-    description: "Used for OpenCode Zen and Go.",
-    placeholder: "Paste your OpenCode API key",
-    helpUrl: "https://opencode.ai/docs/providers/",
-  },
 } as const;
 
 export type CredentialTargetId = keyof typeof CREDENTIAL_TARGETS;
 export type CredentialConfig = {
   xai?: { key?: string };
   
-  opencodeGo?: { apiKey?: string };
 };
 
 export function isCredentialTargetId(value: unknown): value is CredentialTargetId {
@@ -35,8 +28,6 @@ export function credentialConfigPatch(id: CredentialTargetId, value: string): Cr
     case "xaiApiKey":
       return { xai: { key: value } };
     
-    case "opencodeGoApiKey":
-      return { opencodeGo: { apiKey: value } };
   }
 }
 
@@ -45,8 +36,6 @@ export function credentialIsConfigured(config: CredentialConfig, id: CredentialT
     case "xaiApiKey":
       return Boolean(config.xai?.key);
     
-    case "opencodeGoApiKey":
-      return Boolean(config.opencodeGo?.apiKey);
   }
 }
 

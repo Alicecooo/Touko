@@ -171,7 +171,6 @@ const browserPictureTools: PictureTools = {
 };
 
 const FIELD_WORDS: Record<string, LocaleKey> = {
-  soul: "teamShare.field.soul",
   seed: "teamShare.field.notes",
   brief: "teamShare.field.brief",
   bulletin: "teamShare.field.bulletin",

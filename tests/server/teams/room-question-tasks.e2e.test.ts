@@ -33,6 +33,20 @@ it("keeps live room questions fenced but allows task changes after their turn se
     const created = await api<{ bot: WireBot }>("POST", "/api/bots", { name: "Room question holder" });
     expect(created.status).toBe(201);
     const bot = created.body.bot;
+    const homeRoomReply = await api<{ group: WireGroup }>("POST", "/api/groups", {
+      name: "Stable home room", memberIds: [bot.id],
+      setup: { bulletin: "", defaultResponder: { kind: "member", botId: bot.id } },
+    });
+    expect(homeRoomReply.status).toBe(201);
+    const homeRoom = homeRoomReply.body.group;
+    const homeTask = await api<{ task: GroupTask }>("POST", `/api/groups/${homeRoom.id}/tasks`, { title: "Side conversation" });
+    expect(homeTask.status).toBe(201);
+    expect((await api("POST", `/api/groups/${homeRoom.id}/tasks/${homeTask.body.task.threadId}`, {})).status).toBe(200);
+    const groupsPath = join(fixture.info.dataDir, "groups.json");
+    const savedHome = () => JSON.parse(readFileSync(groupsPath, "utf8")).find((group: any) => group.id === homeRoom.id);
+    expect(savedHome()).toMatchObject({ threadId: homeTask.body.task.threadId, homeThreadId: homeRoom.threadId });
+    expect((await api("DELETE", `/api/groups/${homeRoom.id}/tasks/${homeRoom.threadId}`)).status).toBe(200);
+    expect(savedHome()).toMatchObject({ threadId: homeTask.body.task.threadId, homeThreadId: homeTask.body.task.threadId });
     const roomReply = await api<{ group: WireGroup }>("POST", "/api/groups", {
       name: "Question room", memberIds: [bot.id],
       setup: { bulletin: "", defaultResponder: { kind: "member", botId: bot.id } },

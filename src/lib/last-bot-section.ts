@@ -3,10 +3,8 @@ import type { BotSettingsSection } from "@/state/store";
 export const LAST_BOT_SECTION_KEY = "openmausbot.lastBotSection.v1";
 
 export const BOT_SETTINGS_SECTION_IDS: readonly BotSettingsSection[] = [
-  "overview",
   "identity",
   "slack",
-  "soul",
   "skills",
   "memory",
   "routines",
@@ -14,8 +12,6 @@ export const BOT_SETTINGS_SECTION_IDS: readonly BotSettingsSection[] = [
   "model",
   "permissions",
   "notifications",
-  "visibility",
-  "history",
   "usage",
 ];
 

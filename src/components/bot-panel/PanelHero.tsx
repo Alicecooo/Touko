@@ -62,11 +62,6 @@ export function PanelHero({ bot, patch, editorOpen, onToggleEditor }: {
     const next = value.trim();
     if (next && next !== bot.name) patch({ name: next });
   });
-  const label = useInlineEdit((value) => {
-    const next = value.trim();
-    if (next !== bot.title.trim()) patch({ title: next });
-  });
-  const title = bot.title.trim();
 
   return (
     <div className="flex flex-col items-center text-center">
@@ -121,33 +116,6 @@ export function PanelHero({ bot, patch, editorOpen, onToggleEditor }: {
         )}
       </h2>
 
-      {label.draft !== null ? (
-        <input
-          autoFocus
-          data-panel-label-input
-          aria-label={t("botSettings.simple.job")}
-          placeholder={t("botSettings.simple.jobPlaceholder")}
-          maxLength={BOT_PROFILE_LIMITS.title}
-          value={label.draft}
-          onChange={(event) => label.setDraft(event.target.value)}
-          onKeyDown={label.onKeyDown}
-          onBlur={label.onBlur}
-          className={cn(inlineInputCls, "mt-[3px] w-[200px] max-w-full text-[12.5px]")}
-        />
-      ) : (
-        <button
-          ref={label.buttonRef}
-          type="button"
-          data-panel-label
-          onClick={() => label.start(bot.title)}
-          className={cn(
-            "mt-px max-w-full truncate rounded-md px-1.5 py-px text-[12.5px] hover:bg-ink/[0.04] hover:text-ink-secondary",
-            title ? "text-ink-secondary" : "text-ink-tertiary",
-          )}
-        >
-          {title || t("botPanel.addLabel")}
-        </button>
-      )}
     </div>
   );
 }

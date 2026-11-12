@@ -64,7 +64,7 @@ export const VERB_HELP: Record<string, string> = {
   --dry-run only prints the plan; --check exits 6 if anything would change. --prune deletes bots
   and rooms the file leaves out, in teams marked prune: true. Keys come from { env } or { file },
   and a key already set is kept unless --rotate-secrets. docs/headless-cli.md has the format.`,
-  "team export": "openmausbot team export [--team NAME]… --out FILE\n  Write the workspace (or some teams) as a team file; skills go beside it, keys as placeholders,\n  and a key written into a soul, brief or skill is taken out.",
+  "team export": "openmausbot team export [--team NAME]… --out FILE\n  Write the workspace (or some teams) as a team file; skills go beside it, keys as placeholders,\n  and a key written into a brief or skill is taken out.",
   engine: "openmausbot engine set KIND … | engine list   (see help engine set)",
   "engine set": `openmausbot engine set KIND (--key-env VAR | --key-file FILE) [--base-url URL] [--only-claude-api] [--install] [--rotate] [--dry-run]
   Give the workspace an engine key: claude, openai, openrouter, openai-compatible, xai, groq, mistral or cerebras.

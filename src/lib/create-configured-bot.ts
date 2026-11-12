@@ -2,7 +2,6 @@ import { api, desktopApprovalBridge, persistBotUpdate, persistTaskApproval, type
 import type { Routine } from "./routines";
 import type { BotCreationDraft } from "./bot-creation-draft";
 import { imageAttachmentFromFile } from "./composer-attachments";
-import type { BotVisibility } from "../../shared/wire";
 import { botAvatarUrlFromStoredPath } from "../../shared/bot-avatar";
 
 export async function preparedBotTemplate(draft: BotCreationDraft) {
@@ -23,7 +22,6 @@ export async function createConfiguredBot(
   request: typeof api = api,
   update: typeof persistBotUpdate = persistBotUpdate,
   approvals = desktopApprovalBridge(),
-  visibility?: BotVisibility,
 ): Promise<{ bot: Bot; warnings: string[] }> {
   const template = await preparedBotTemplate(draft);
   const { chiefOfStaff, managedSections, toolScope, ...profile } = template.profile;
@@ -32,7 +30,7 @@ export async function createConfiguredBot(
   const response = await request<{ bot: Bot }>("/api/bots", {
     method: "POST", body: JSON.stringify({ name: profile.name, title: profile.title,
       description: profile.description, modelSelection: profile.modelSelection, section: profile.section,
-      requireAvailableModel: true, useDefaults: false, ...(visibility !== undefined ? { visibility } : {}),
+      requireAvailableModel: true, useDefaults: false,
       ...(Object.hasOwn(template.profile, "toolScope") ? { settings: { toolScope } } : {}),
       ...(preset ? { preset: preset.id } : {}) }),
   });

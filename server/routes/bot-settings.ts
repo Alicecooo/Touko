@@ -5,8 +5,6 @@ import type { AppConfig } from "../config/config.ts";
 import type { ModelSelection } from "../harness/contracts.ts";
 import type { createApprovalModeSupport } from "../agent/harness-capabilities.ts";
 import type { hostedModelPolicy } from "../deployment/hosted-models.ts";
-import { profileSnapshot } from "../bots/profile-revision.ts";
-import { recordProfileChange } from "../bots/profile-versions.ts";
 import type { RequestAuth } from "../auth/request-auth.ts";
 import type { BotRecord, GroupRecord, Store } from "../storage/store.ts";
 import type { ModelSelectionCheck } from "./bots-create.ts";
@@ -17,7 +15,7 @@ export interface BotSettingsRouteDeps {
   store: Store;
   cfg: AppConfig;
   cloudHome: boolean;
-  cloudOwnerProfileFields: readonly ("name" | "title" | "description" | "soul" | "notifications")[];
+  cloudOwnerProfileFields: readonly ("name" | "title" | "description" | "notifications")[];
   hostedModels: ReturnType<typeof hostedModelPolicy>;
   supportsApprovalMode: ReturnType<typeof createApprovalModeSupport>;
   directTurnBots: { get(threadId: string): BotRecord | undefined };
@@ -59,12 +57,10 @@ export function createBotSettingsRoutes(deps: BotSettingsRouteDeps): RouteHandle
         const changed = CLOUD_OWNER_PROFILE_FIELDS.find((field) => parsed.patch[field] !== undefined && (field === "notifications"
           ? (parsed.patch.notifications !== false) !== (existingBot.notifications !== false)
           : parsed.patch[field] !== (existingBot[field] ?? "")));
-        if (changed) return json(res, 403, { error: "On this Cloud only its owner can change a bot's name, title, description, instructions or notifications." });
+        if (changed) return json(res, 403, { error: "On this Cloud only its owner can change a bot's name, title, description or notifications." });
       }
-      const beforeProfile = existingBot ? profileSnapshot(existingBot) : undefined;
       const bot = store.patchBotProfile(m[1], parsed.patch);
       if (!bot) return json(res, 404, { error: "no such bot" });
-      if (beforeProfile) recordProfileChange(bot.id, "user", "api", beforeProfile, profileSnapshot(bot));
       const visible = wireBot(bot);
       broadcast({ kind: "bot", bot: visible });
       return json(res, 200, { bot: visible });

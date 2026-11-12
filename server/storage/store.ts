@@ -5,7 +5,7 @@ import { writeFileAtomic, writeFileAtomicIfChanged } from "./atomic.ts";
 import { commitBotChange, keptRevocation, saveBotsFor } from "../bots/bots-save.ts";
 import { parseToolScope, toolScopeWidens } from "../../shared/tool-scope.ts";
 import { ensureSections, readSections, changeEmptySection } from "../teams/section-context.ts";
-import { removeBotFolder, soulFile, soulHash, writeSoulMirror } from "../bots/bot-folder.ts";
+import { removeBotFolder } from "../bots/bot-folder.ts";
 import type { BotProfilePatch } from "../bots/bot-profile.ts";
 import { peerAllowKey, type PeerAction } from "../teams/peer-approval-key.ts";
 import { DATA_DIR, EVENTS_DIR, NATIVE_DIR } from "../config/config.ts";
@@ -26,6 +26,7 @@ import type { ProfileRequestChanges } from "../../shared/profile-request.ts";
 import type { TeamSetupRequest, TeamSetupResult } from "../../shared/team-setup.ts";
 import type { GroupGoalRunCardData } from "../../shared/group-goal-run.ts";
 import { isMentionBoundary, isMentionNameContinuation } from "../../shared/mention-boundary.ts";
+import { roomHomeThreadId } from "../teams/room-home.ts";
 import type { HandedState } from "../agent/delta-context.ts";
 import type { AgentPart, PartPair, RoomPart } from "../packages/package-parts.ts";
 import type { BotActivity, GroupDefaultResponder, GroupTask as GroupTaskRecord, MausColor, OptionCardData, TaskClosedBy, TaskOpenedBy, TaskUsage, WireBot, WireGroup, WireMessage, WireTask, BotProject as BotProjectRecord } from "../../shared/wire.ts";
@@ -49,8 +50,12 @@ export interface GroupPackageStamp {
   parts: Record<RoomPart, PartPair>;
 }
 
-export type GroupRecord = Omit<WireGroup, "working" | "usage"> & { installedPackage?: GroupPackageStamp };
-export type GroupWirePrivateKeys = "installedPackage";
+export type GroupRecord = Omit<WireGroup, "working" | "usage"> & {
+  installedPackage?: GroupPackageStamp;
+  /** Conversation this room was created with. Not the task open in the client. */
+  homeThreadId?: string;
+};
+export type GroupWirePrivateKeys = "installedPackage" | "homeThreadId";
 export type GroupWireProjection = Omit<GroupRecord, GroupWirePrivateKeys> & Pick<WireGroup, "usage"> & { working: boolean };
 export type GroupWireProjectionIsExact = AssertExact<WireGroup, GroupWireProjection> & AssertSameKeys<WireGroup, GroupWireProjection>;
 export const groupWireProjectionIsExact: GroupWireProjectionIsExact = true;
@@ -96,7 +101,7 @@ const ASK_NOW = { approvalMode: "ask" as const, autoApprove: false, alwaysAllow:
 const TASK_PATCH_FIELDS = [
   "title", "projectId", "modelSelection", "approvalMode", "autoApprove", "alwaysAllow",
   "unread", "lastReadMessageId", "rewound", "archivedAt", "pinned", "pinnedMessageId", "resumeCursors", "lastInstanceId", "cwd",
-  "routineRunId", "surface", "surfaceSource", "snoozedUntil", "link", "linkAuto", "appliedCompactionId", "contextFloor", "lastContextModel",
+  "routineRunId", "surface", "surfaceSource", "link", "linkAuto", "appliedCompactionId", "contextFloor", "lastContextModel",
 ] as const satisfies readonly (keyof TaskRecord)[];
 export type TaskPatch = Partial<Pick<TaskRecord, typeof TASK_PATCH_FIELDS[number]>>;
 
@@ -111,11 +116,6 @@ function persistedPin<T extends { pinned?: boolean }>(task: T): T {
 function redactBotAuthored<T extends Omit<Message, "id" | "at"> & { at?: number }>(message: T): T {
   if (message.role !== "bot") return message;
   const out = { ...message };
-  if (out.dataResult) out.dataResult = {
-    ...out.dataResult,
-    title: redactSecretsInText(out.dataResult.title),
-    ...(out.dataResult.sql === undefined ? {} : { sql: redactSecretsInText(out.dataResult.sql) }),
-  };
   if (typeof out.text === "string") out.text = redactSecretsInText(out.text);
   if (out.compaction) out.compaction = { ...out.compaction, summary: redactSecretsInText(out.compaction.summary) };
   if (out.tool?.name) {
@@ -305,7 +305,7 @@ const GROUPS_FILE = join(DATA_DIR, "groups.json");
 const THREAD_MODEL_COPIES_CLEARED = join(DATA_DIR, "thread-model-copies-cleared");
 const ASKED_AT_FILLED = join(DATA_DIR, "asked-at-filled");
 
-/** Owner-only (0600): the registries hold souls, project paths and per-bot settings. Best effort; Windows has no POSIX mode bits. */
+/** Owner-only (0600): the registries hold project paths and per-bot settings. Best effort; Windows has no POSIX mode bits. */
 function tightenRegistryFile(file: string): void {
   if (process.platform === "win32") return;
   try {
@@ -360,9 +360,10 @@ export function normalizeGroupDefaultResponder(
     if (candidate.kind === "everyone") return { kind: "everyone" };
     if (candidate.kind === "mentions") return { kind: "mentions" };
     if (candidate.kind === "auto") {
-      return typeof candidate.fallbackBotId === "string" && memberIds.includes(candidate.fallbackBotId)
-        ? { kind: "auto", fallbackBotId: candidate.fallbackBotId }
-        : { kind: "auto" };
+      const fallback = typeof candidate.fallbackBotId === "string" && memberIds.includes(candidate.fallbackBotId)
+        ? candidate.fallbackBotId
+        : memberIds[0];
+      return fallback ? { kind: "member", botId: fallback } : { kind: "mentions" };
     }
     if (
       candidate.kind === "member" &&
@@ -399,10 +400,6 @@ export function roomResponders<T extends { id: string; name: string; hidden?: bo
   if (defaultResponder.kind === "member") {
     const lead = available.find((member) => member.id === defaultResponder.botId);
     return lead ? [lead] : [];
-  }
-  if (defaultResponder.kind === "auto") {
-    const fallback = available.find((member) => member.id === defaultResponder.fallbackBotId) ?? available[0];
-    return fallback ? [fallback] : [];
   }
   return [];
 }
@@ -473,19 +470,6 @@ export class Store {
       if (b.busy || (b.activity !== undefined && b.activity !== "idle")) botsMigrated = true;
       b.busy = false;
       b.activity = "idle";
-      if (typeof b.soul !== "string") {
-        b.soul = "";
-        botsMigrated = true;
-      }
-      if (b.soulHash !== soulHash(b.soul)) {
-        b.soulHash = soulHash(b.soul);
-        botsMigrated = true;
-      }
-      if (!existsSync(soulFile(b.id))) {
-        try { writeSoulMirror(b.id, b.soul); } catch (e) {
-          console.warn(`[bot-folder] could not create SOUL.md for ${b.id}: ${(e as Error).message}`);
-        }
-      }
       if (b.browserProfile !== undefined || b.browser !== undefined || b.recordBrowserSteps !== undefined || b.computer === "browser") {
         delete b.browserProfile; delete b.browser; delete b.recordBrowserSteps;
         if (b.computer === "browser") b.computer = "off";
@@ -541,6 +525,10 @@ export class Store {
       }
       if ("mascotBody" in b) {
         delete (b as BotRecord & { mascotBody?: unknown }).mascotBody;
+        botsMigrated = true;
+      }
+      if ("replyStyle" in b) {
+        delete (b as BotRecord & { replyStyle?: unknown }).replyStyle;
         botsMigrated = true;
       }
       const avatar = botAvatarProfile(b);
@@ -650,6 +638,11 @@ export class Store {
         if (g.pinnedCwd !== undefined) initialTask.pinnedCwd = g.pinnedCwd;
         if (g.pinnedMessageId) initialTask.pinnedMessageId = g.pinnedMessageId;
         g.tasks = [initialTask];
+        groupsMigrated = true;
+      }
+      const home = roomHomeThreadId(g);
+      if (g.homeThreadId !== home) {
+        g.homeThreadId = home;
         groupsMigrated = true;
       }
       let active = g.tasks.find((task) => task.threadId === g.threadId);
@@ -1002,6 +995,7 @@ export class Store {
       section,
     };
     if (!dm) {
+      group.homeThreadId = threadId;
       group.tasks = [{ threadId, title: UNTITLED_TASK, createdAt, updatedAt: createdAt }];
       group.setupCompletedAt = setup?.completed ? createdAt : null;
       group.setupSkippedAt = null;
@@ -1036,6 +1030,10 @@ export class Store {
     if (!group.dm && Object.prototype.hasOwnProperty.call(patch, "pinnedMessageId")) {
       const active = this.activeGroupTask(group.id);
       if (active) active.pinnedMessageId = patch.pinnedMessageId;
+    }
+    if (!group.dm) {
+      const home = roomHomeThreadId(group);
+      if (group.homeThreadId !== home) group.homeThreadId = home;
     }
     group.defaultResponder = normalizeGroupDefaultResponder(
       group.defaultResponder,
@@ -1237,6 +1235,8 @@ export class Store {
       group.pinnedCwd = next.pinnedCwd;
       group.pinnedMessageId = next.pinnedMessageId;
     }
+    const home = roomHomeThreadId(group);
+    if (group.homeThreadId !== home) group.homeThreadId = home;
     this.saveGroups();
     this.emit({ type: "group", groupId });
     return { group, deleted, missing };
@@ -1396,7 +1396,7 @@ export class Store {
     return pruned;
   }
 
-  branchMessage(threadId: string, sourceId: string, text: string, sendId?: string, sender?: Message["sender"], dataContext?: Message["dataContext"]): Message | null {
+  branchMessage(threadId: string, sourceId: string, text: string, sendId?: string, sender?: Message["sender"]): Message | null {
     const t = this.thread(threadId);
     const source = t.messages.find((m) => m.id === sourceId);
     if (!source) return null;
@@ -1410,7 +1410,6 @@ export class Store {
       replyToId: source.replyToId,
       ...(sendId ? { sendId } : {}),
       ...(sender ? { sender } : {}),
-      ...(dataContext ? { dataContext } : {}),
     };
     t.messages.push(full);
     t.activeLeafId = full.id;
@@ -1469,7 +1468,7 @@ export class Store {
     profile: Partial<
       Pick<
         BotRecord,
-        "name" | "title" | "description" | "soul" | "color" | "mascotExpression" | "modelSelection" | "section" | "cwd" | "visibility" | "toolScope"
+        "name" | "title" | "description" | "color" | "mascotExpression" | "modelSelection" | "section" | "cwd" | "visibility" | "toolScope"
       >
     > = {},
     opts: {
@@ -1487,8 +1486,6 @@ export class Store {
       name,
       title: profile.title ?? "",
       description: profile.description ?? "",
-      soul: profile.soul ?? "",
-      soulHash: soulHash(profile.soul ?? ""),
       notifications: true,
       color: profile.color ?? COLORS[this.bots.length % COLORS.length],
       ...(profile.mascotExpression ? { mascotExpression: profile.mascotExpression } : {}),      // Restricted from its first frame: no one else is ever told it exists.
@@ -1514,11 +1511,6 @@ export class Store {
     // Persist before publishing or greeting, so an interrupted creation cannot inherit tools.
     this.saveBots([bot, ...this.bots]);
     this.bots.unshift(bot);
-    try {
-      writeSoulMirror(bot.id, bot.soul ?? "");
-    } catch (e) {
-      console.warn(`[bot-folder] could not write SOUL.md mirror for ${bot.id}: ${(e as Error).message}`);
-    }
     // Before its transcript: clients need the bot/thread mapping to place either message.
     this.emit({ type: "bot", botId: bot.id });
     if (opts.seedMessages !== false) {
@@ -1548,7 +1540,7 @@ export class Store {
         const createdAt = Date.now();
         const modelSelection = this.newBotSelection(operation.fields.modelSelection);
         next = { id: operation.botId, threadId: operation.threadId, name: operation.fields.name,
-          title: "", description: "", soul: "", notifications: true, color: COLORS[nextBots.length % COLORS.length], unread: false,
+          title: "", description: "", notifications: true, color: COLORS[nextBots.length % COLORS.length], unread: false,
           resumeCursors: {}, createdAt, ...operation.fields, modelSelection,
           autoApprove: false, composio: false, approvePeerComms: false,
           // Absent would mean every tool once connected apps are turned on.
@@ -1569,7 +1561,6 @@ export class Store {
       }
       if (operation.fields.chiefOfStaff === false) delete next.managedSections;
       next.section = sectionKey(next.section) || undefined;
-      if (operation.fields.soul !== undefined) { next.soulHash = soulHash(operation.fields.soul); next.soulDrift = false; }
       changed.push(next);
     }
     const result: TeamSetupResult = { state: "applied", newTeams: request.newTeams, bots: changed.map((bot, index) => ({
@@ -1586,9 +1577,6 @@ export class Store {
     this.saveBots(nextBots);
     this.bots = nextBots;
     for (const bot of changed) {
-      try { writeSoulMirror(bot.id, bot.soul ?? ""); } catch (error) {
-        console.warn(`[bot-folder] could not refresh reviewed setup mirror for ${bot.id}: ${(error as Error).message}`);
-      }
       this.emit({ type: "bot", botId: bot.id });
     }
     this.emit({ type: "bot", botId: chief.id });
@@ -1714,23 +1702,10 @@ export class Store {
     const bot = this.bot(id);
     if (!bot) return null;
     const next = { ...bot, ...patch };
-    if (patch.soul !== undefined) {
-      next.soulHash = soulHash(patch.soul);
-      next.soulDrift = false;
-    }
     this.saveBots(this.bots.map((candidate) => candidate.id === id ? next : candidate));
     Object.assign(bot, next);
-    if (patch.soul !== undefined) {
-      try { writeSoulMirror(id, patch.soul); } catch (e) {
-        console.warn(`[bot-folder] could not write SOUL.md mirror for ${id}: ${(e as Error).message}`);
-      }
-    }
     this.emit({ type: "bot", botId: id });
     return bot;
-  }
-
-  setSoul(id: string, soul: string): BotRecord | null {
-    return this.patchBotProfile(id, { soul });
   }
 
   setBotsSection(
@@ -1824,10 +1799,6 @@ export class Store {
     task.busy = busy;
     if (busy && !wasBusy) task.turnStartedAt = Date.now();
     else if (!busy) delete task.turnStartedAt;
-    if (task.snoozedUntil === 0) {
-      task.snoozedUntil = undefined;
-      this.saveBots();
-    }
     this.refreshBotActivity(bot);
     this.emit({ type: "bot", botId });
     return bot;
@@ -2208,7 +2179,6 @@ export class Store {
           Object.assign(task, { [key]: structuredClone(patch[key]) });
         }
       }
-      if (task.snoozedUntil === 0 && patch.unread === true) task.snoozedUntil = undefined;
       if (typeof patch.title === "string") task.title = patch.title.trim().slice(0, 80) || UNTITLED_THREAD;
       if (Object.prototype.hasOwnProperty.call(patch, "pinned") && task.pinned !== true) delete task.pinned;
       if (task.routineRunId) task.unread = false;

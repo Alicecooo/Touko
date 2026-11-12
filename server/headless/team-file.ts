@@ -40,7 +40,6 @@ const botFields = {
   team: z.string().trim().min(1).max(60).optional(),
   title: oneLine("a title", BOT_PROFILE_LIMITS.title).optional(),
   description: z.string().max(BOT_PROFILE_LIMITS.description, `must be at most ${BOT_PROFILE_LIMITS.description} characters`).optional(),
-  soul: textOrFile.optional(),
   model: z.string().regex(/^[\w.-]+\/\S.*$/, "must be INSTANCE/MODEL, such as claude/claude-sonnet-5-5").optional(),
   effort: z.enum(["none", "low", "medium", "high", "xhigh", "max"]).optional(),
   approval: z.enum(["ask", "edits", "auto", "full"], { error: "must be ask, edits, auto or full (custom is set in the desktop app)" }).optional(),
@@ -89,7 +88,6 @@ export interface DesiredBot {
   /** true: the Chief of Staff of its team; false: not; absent: left as it is. */
   chief?: boolean;
   manages: string[];
-  soul?: string;
   model?: { instanceId: string; model: string };
   effort?: string;
   approval?: "ask" | "edits" | "auto" | "full";
@@ -208,9 +206,7 @@ export function checkTeamFile(input: TeamFileInput, file: string, dir: string): 
       cwd = serverFolder(bot.cwd);
       if (cwd === undefined) throw usageError(`${where}: cwd must be an absolute path on the server (/work/room, or C:\\work\\room on Windows)`);
     }
-    const soul = kept(text(dir, bot.soul, `${where} soul`), `${where}: its soul`);
     const description = kept(bot.description, `${where}: its description`);
-    if (soul !== undefined && Buffer.byteLength(soul.trimEnd(), "utf8") > BOT_PROFILE_LIMITS.soul) throw usageError(`${where}: soul is over ${BOT_PROFILE_LIMITS.soul} bytes`);
     let tools: ToolScope | null | undefined;
     if (bot.tools) {
       const scope = parseToolScope(bot.tools);
@@ -232,7 +228,7 @@ export function checkTeamFile(input: TeamFileInput, file: string, dir: string): 
     return {
       name: bot.name, ...(bot.was ? { was: bot.was } : {}), ...(bot.team ? { team: bot.team } : {}),
       ...(bot.title !== undefined ? { title: bot.title } : {}), ...(description !== undefined ? { description } : {}),
-      ...(bot.chief !== undefined ? { chief: bot.chief } : {}), manages: bot.manages ?? [], ...(soul !== undefined ? { soul } : {}),
+      ...(bot.chief !== undefined ? { chief: bot.chief } : {}), manages: bot.manages ?? [],
       ...(bot.model ? { model: { instanceId: bot.model.slice(0, slash), model: bot.model.slice(slash + 1) } } : {}),
       ...(bot.effort ? { effort: bot.effort } : {}), ...(bot.approval ? { approval: bot.approval } : {}),
       ...(bot.computer ? { computer: bot.computer } : {}), ...(cwd ? { cwd } : {}), ...(browser ? { browser } : {}),

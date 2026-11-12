@@ -1,7 +1,6 @@
 // Only a turn-scoped capability crosses into the agent process; engine commands, session names and provider credentials stay in OMB.
 import { pathToFileURL } from "node:url";
 
-import { DATA_INSTRUCTIONS } from "../data/instructions.ts";
 import { HIGHLEVEL_INSTRUCTIONS } from "../integrations/highlevel/instructions.ts";
 import { HARNESS_PROXY_TIMEOUT_MS } from "../agent/harness-budget.ts";
 import { harnessMcpTokenEnv } from "./harness-mcp-token.ts";
@@ -10,19 +9,18 @@ const MAX_INPUT_BYTES = 1_048_576;
 const MAX_OUTPUT_BYTES = 16_777_216;
 const MAX_PENDING = 16;
 type RpcId = string | number | null;
-export type HarnessMcpKind = "computer" | "data" | "highlevel";
+export type HarnessMcpKind = "computer" | "highlevel";
 
-const NAMES: Record<HarnessMcpKind, string> = {  computer: "Cloud computer", data: "Data", highlevel: "HighLevel" };
-const INSTRUCTIONS: Partial<Record<HarnessMcpKind, string>> = { data: DATA_INSTRUCTIONS, highlevel: HIGHLEVEL_INSTRUCTIONS };
+const NAMES: Record<HarnessMcpKind, string> = { computer: "Cloud computer", highlevel: "HighLevel" };
+const INSTRUCTIONS: Partial<Record<HarnessMcpKind, string>> = { highlevel: HIGHLEVEL_INSTRUCTIONS };
 const RECOVERY: Record<HarnessMcpKind, string> = {
 
   computer: " Keep working on the assigned cloud computer only; do not bypass a person's control of it, and take a fresh screenshot before repeating an action whose result is uncertain.",
-  data: " The tables already loaded are unchanged; check with data_describe or SHOW TABLES before repeating a load, and do not repeat a statement whose result is uncertain.",
   highlevel: " The CRM may or may not have taken the change; read the record back (HIGHLEVEL_GET_CONTACT, HIGHLEVEL_GET_OPPORTUNITY) before repeating a write, and never message anyone through the CRM.",
 };
 
 function parseHarnessMcpKind(value: unknown): HarnessMcpKind | null {
-  return value === "computer" || value === "data" || value === "highlevel" ? value : null;
+  return value === "computer" || value === "highlevel" ? value : null;
 }
 
 /** Node's fetch (undici) rejects with the socket error as its `cause`: refused before anything was sent, reset or closed after. */
@@ -143,7 +141,7 @@ function run(kind: HarnessMcpKind): void {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const kind = parseHarnessMcpKind(process.argv[2]);
   if (!kind) {
-    process.stderr.write("usage: harness-mcp-proxy browser|computer|data|highlevel\n");
+    process.stderr.write("usage: harness-mcp-proxy computer|highlevel\n");
     process.exitCode = 2;
   } else run(kind);
 }

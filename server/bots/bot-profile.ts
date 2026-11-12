@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import { AVATAR_ZOOM_MAX, AVATAR_ZOOM_MIN, BOT_AVATAR_CROPS, botAvatarCropSchema, botAvatarUrlSchema } from "../../shared/bot-avatar.ts";
 import { BOT_PROFILE_LIMITS, fitsOnOneLine } from "../../shared/bot-profile.ts";
-import { REPLY_STYLES } from "../../shared/reply-style.ts";
 
 import type { BotRecord } from "../storage/store.ts";
 
@@ -12,14 +11,12 @@ export const BOT_PROFILE_PATCH_FIELDS = [
   "name",
   "title",
   "description",
-  "soul",
   "notifications",
   "avatarUrl",
   "avatarCrop",
   "avatarZoom",
   "avatarFocusX",
-  "avatarFocusY",
-  "replyStyle"] as const;
+  "avatarFocusY"] as const;
 
 export const profilePatchSchema = z.object( {
   name: z
@@ -37,12 +34,6 @@ export const profilePatchSchema = z.object( {
     .string({ error: "description must be a string" })
     .max(BOT_PROFILE_LIMITS.description, { error: "description must be at most 4000 characters" })
     .optional(),
-  soul: z
-    .string({ error: "soul must be a string" })
-    .refine((value) => Buffer.byteLength(value, "utf8") <= BOT_PROFILE_LIMITS.soul, {
-      error: "standing instructions must be at most 24000 bytes",
-    })
-    .optional(),
   notifications: z.boolean({ error: "notifications must be true or false" }).optional(),
   avatarUrl: z
     .union([botAvatarUrlSchema, z.literal(""), z.null()], {
@@ -53,15 +44,15 @@ export const profilePatchSchema = z.object( {
   avatarZoom: z.number({ error: "avatarZoom must be a number from 1 to 3" }).finite().min(AVATAR_ZOOM_MIN).max(AVATAR_ZOOM_MAX).optional(),
   avatarFocusX: z.number({ error: "avatarFocusX must be a number from 0 to 1" }).finite().min(0).max(1).optional(),
   avatarFocusY: z.number({ error: "avatarFocusY must be a number from 0 to 1" }).finite().min(0).max(1).optional(),
-  // Read old defaults without retaining a retired shape in the resulting profile patch.
+  // Read retired fields from old bot/default records, but never retain them.
   mascotBody: z.string().max(40).optional(),
-  replyStyle: z.enum(REPLY_STYLES, { error: "replyStyle must be default or conversational" }).optional()});
+  replyStyle: z.enum(["default", "conversational"]).optional()});
 
 export type BotProfilePatchInput = z.input<typeof profilePatchSchema>;
 
 export type BotProfilePatch = Partial<
   Pick<
-    BotRecord, "name" | "title" | "description" | "soul" | "notifications" | "avatarUrl" | "avatarCrop" | "avatarZoom" | "avatarFocusX" | "avatarFocusY" | "replyStyle"
+    BotRecord, "name" | "title" | "description" | "notifications" | "avatarUrl" | "avatarCrop" | "avatarZoom" | "avatarFocusX" | "avatarFocusY"
   >
 >;
 
@@ -86,7 +77,7 @@ export function parseBotProfilePatch(input: BotProfilePatchInput, strict = false
     return { ok: false, error: issue?.message ?? "invalid profile patch" };
   }
 
-  const { avatarUrl, mascotBody: _retiredBody, ...fields } = parsed.data;
+  const { avatarUrl, mascotBody: _retiredBody, replyStyle: _retiredReplyStyle, ...fields } = parsed.data;
   const patch: BotProfilePatch = fields;
   if (avatarUrl !== undefined) patch.avatarUrl = avatarUrl || undefined;
   return { ok: true, patch };

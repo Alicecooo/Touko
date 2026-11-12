@@ -1,10 +1,9 @@
 import { z } from "zod";
 import { MAX_TEAM_BACKUP_BYTES } from "../../shared/team-backup.ts";
-import type { BotVisibility, WireBot, WireGroup } from "../../shared/wire.ts";
+import type { WireBot, WireGroup } from "../../shared/wire.ts";
 import { validateBotCwd } from "../bots/bot-cwd.ts";
 import { fetchBotDirectory, matchDirectoryBots, type MatchedDirectoryBot } from "../bots/bot-directory.ts";
 import { isBotPackage, packageSummary, parsePackageDocument, renderBotPackageMarkdown, type PackageDocument } from "../bots/bot-package.ts";
-import { parseVisibility } from "../bots/bot-visibility.ts";
 import type { AppConfig } from "../config/config.ts";
 import type { ModelSelection } from "../harness/contracts.ts";
 import type { OrgLibrary } from "../skills/org-library.ts";
@@ -290,26 +289,14 @@ export function createTeamRoutes(deps: TeamRouteDeps): RouteHandler {
           projectCwd = validated.cwd;
         }
       }
-      // The admin's choice, never the file's.
-      const rawVisibility = url.searchParams.get("visibility");
-      let importVisibility: BotVisibility | undefined;
-      if (rawVisibility !== null) {
-        let value: unknown = rawVisibility;
-        if (rawVisibility.trim().startsWith("{")) {
-          try {
-            value = JSON.parse(rawVisibility);
-          } catch {
-          }
-        }
-        const parsed = parseVisibility(value);
-        if (!parsed.ok) return json(res, 400, { error: parsed.error });
-        importVisibility = parsed.visibility;
+      if (url.searchParams.has("visibility")) {
+        return json(res, 400, { error: "visibility can no longer be set when importing bots" });
       }
       const body = await readBody(req, MAX_TEAM_BACKUP_BYTES);
       if (body?.format === "openmaus.backup") {
         if (importMode !== "add") return json(res, 400, { error: "Import backups alongside your existing bots; project mode is only for templates" });
         try {
-          const imported = importTeamBackup(store, routines!, body, await defaultSelection(), { visibility: importVisibility });
+          const imported = importTeamBackup(store, routines!, body, await defaultSelection());
           // A restore writes transcripts without store events: these frames carry the restored pages to other clients.
           const bots = imported.bots.map((bot) => publicBot(bot));
           const groups = imported.groups.map((group) => groupWithThread(group));
@@ -334,7 +321,6 @@ export function createTeamRoutes(deps: TeamRouteDeps): RouteHandler {
         mode: importMode as "add" | "project",
         cwd: projectCwd,
         room: url.searchParams.get("room") ?? undefined,
-        ...(importVisibility ? { visibility: importVisibility } : {}),
       };
       let imported: PackageImportResult;
       try {

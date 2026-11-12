@@ -24,14 +24,9 @@ function portableKey(value: string, fallback: string, used: Set<string>): string
 function packageRoomResponder(
   responder: GroupRecord["defaultResponder"],
   keys: ReadonlyMap<string, string>,
-  members: readonly string[],
 ): { kind: "agent"; agent: string } | { kind: "everyone" } | { kind: "mentions" } {
   if (responder.kind === "member" && keys.has(responder.botId)) return { kind: "agent", agent: keys.get(responder.botId)! };
   if (responder.kind === "everyone") return { kind: "everyone" };
-  if (responder.kind === "auto") {
-    const lead = responder.fallbackBotId ? keys.get(responder.fallbackBotId) : undefined;
-    return { kind: "agent", agent: lead ?? members[0]! };
-  }
   return { kind: "mentions" };
 }
 
@@ -149,7 +144,7 @@ export function createBotPackageExport(input: {
   for (const [index, group] of input.groups.filter((group) => !group.dm).entries()) {
     const members = group.memberIds.flatMap((id) => idToKey.has(id) ? [idToKey.get(id)!] : []);
     if (!members.length) continue;
-    const defaultResponder = packageRoomResponder(group.defaultResponder, idToKey, members);
+    const defaultResponder = packageRoomResponder(group.defaultResponder, idToKey);
     rooms.push({
       key: portableKey(group.name, `room-${index + 1}`, roomKeys),
       name: group.name,
@@ -187,7 +182,6 @@ export function createBotPackageExport(input: {
       name: bot.name,
       title: bot.title,
       description: bot.description,
-      ...(bot.soul !== undefined ? { soul: bot.soul } : {}),
       appearance,
     };
     const assigned = agentPlaybooks.get(bot.id);
@@ -550,7 +544,6 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
       name: bot.name,
       title: bot.title || undefined,
       description: bot.description || undefined,
-      ...(bot.soul ? { soul: bot.soul } : {}),
       appearance,
       ...(bot.recordBrowserSteps === true ? { recordBrowserSteps: true } : {}),
     };
@@ -585,7 +578,7 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
   for (const group of groups) {
     const members = group.memberIds.flatMap((id) => botKeys.has(id) ? [botKeys.get(id)!] : []);
     if (!members.length) continue;
-    const defaultResponder = packageRoomResponder(group.defaultResponder, botKeys, members);
+    const defaultResponder = packageRoomResponder(group.defaultResponder, botKeys);
     const key = roomKeys.get(group.id)!;
     rooms.push({ key, name: group.name, members, ...(group.bulletin ? { bulletin: group.bulletin } : {}), defaultResponder });
     roomMembers.set(group.id, new Set(members));

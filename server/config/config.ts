@@ -18,7 +18,6 @@ import { loopGuardConfigSchema, type LoopGuardConfig } from "../host/loop-guard.
 import { migrateLegacyFeatureFlags } from "./legacy-feature-flags.ts";
 import { isRemoteMcpServer, parseStoredMcpServer } from "../mcp/mcp-registry.ts";
 import { parseJson, schemaIssue, type JsonObject, type JsonValue } from "./schema.ts";
-import { deciderConfigSchema, type DeciderConfig } from "../decider/config.ts";
 
 import { roomContextSettings } from "../teams/room-context-settings.ts";
 
@@ -202,9 +201,8 @@ const appConfigSchema = z.object( {
   /** Composio project key; `userId`/`sessionId` reuse one Composio Session. */
   composio: z.object({ apiKey: optionalText, userId: optionalText, sessionId: optionalText }).optional(),
 
-  /** OpenCode key, plus `providerKeys` for its other providers by the env name OpenCode reads; both write-only and only for its child. */
-  opencodeGo: z.object({ apiKey: optionalText, providerKeys: z.record(z.string(), z.string()).optional() }).optional(),
-  decider: deciderConfigSchema.optional(),
+  /** OpenCode service key; write-only and only for its child. */
+  opencodeGo: z.object({ apiKey: optionalText }).optional(),
   /** Non-secret profile details; aboutMe is shared with every bot. */
   profile: z.object({ name: optionalText, email: optionalText, aboutMe: z.string().max(24_000).optional() }).optional(),
   /** UI language override (BCP-47, lowercase); absent follows the system. */
@@ -235,13 +233,6 @@ const appConfigSchema = z.object( {
   mcpServers: z.record(z.string(), z.unknown()).optional()});
 const storedAppConfigSchema = appConfigSchema.extend(helperStoredShape).extend({
 
-  /** Loose like mcpServers: a bad provider key is dropped later, never the whole file. */
-  opencodeGo: z.object({
-    apiKey: optionalText,
-    providerKeys: z.record(z.string(), z.unknown()).catch({})
-      .transform((keys) => Object.fromEntries(Object.entries(keys).filter((entry): entry is [string, string] => typeof entry[1] === "string")))
-      .optional(),
-  }).optional(),
 });
 const appConfigPatchSchema = appConfigSchema.omit({ instances: true, mcpServers: true, cliStartup: true, customDomain: true })
   .extend({ threads: threadsPatchSchema.optional(), newBots: newBotsPatchSchema.optional() });
@@ -283,8 +274,7 @@ export interface AppConfig extends HelperConfig {
   composio?: { apiKey?: string; userId?: string; sessionId?: string };
   /** Boat token (ascii.dev renamed Box to Boat); config key "box", env BOX_TOKEN. */
 
-  opencodeGo?: { apiKey?: string; providerKeys?: Record<string, string> };
-  decider?: DeciderConfig;
+  opencodeGo?: { apiKey?: string };
   profile?: { name?: string; email?: string; aboutMe?: string };
   rooms?: { turnTimeoutMinutes: number };
   mcp?: { callTimeoutMinutes?: number };
@@ -500,9 +490,6 @@ export function loadConfig(): AppConfig {
 
   cfg.opencodeGo = { ...cfg.opencodeGo };
   if (process.env.OPENCODE_API_KEY !== undefined) cfg.opencodeGo.apiKey = process.env.OPENCODE_API_KEY;
-  cfg.decider = { ...cfg.decider };
-  if (process.env.OMB_JEV_API_KEY !== undefined) cfg.decider.key = process.env.OMB_JEV_API_KEY;
-  if (process.env.OMB_OPENROUTER_DECIDER_KEY !== undefined) cfg.decider.openrouterKey = process.env.OMB_OPENROUTER_DECIDER_KEY;
   const splitEmails = (value: string) => value.split(/[,\s]+/).map((entry) => entry.trim().toLowerCase()).filter(Boolean);
   if (process.env.OMB_SIGNIN_EMAILS !== undefined || process.env.OMB_SIGNIN_MEMBER_EMAILS !== undefined) {
     cfg.signIn = { ...cfg.signIn };
@@ -542,8 +529,7 @@ export function syncCredentialEnv(patch: Partial<Omit<AppConfig, "threads" | "ne
 [patch.openrouter?.key, "OMB_OPENROUTER_API_KEY"],
 [patch.composio?.apiKey, "COMPOSIO_API_KEY"],
 [patch.opencodeGo?.apiKey, "OPENCODE_API_KEY"],
-[patch.decider?.key, "OMB_JEV_API_KEY"],
-[patch.decider?.openrouterKey, "OMB_OPENROUTER_DECIDER_KEY"]];
+];
   for (const [value, name] of secrets) {
     if (value === undefined) continue;
     if (value) process.env[name] = value;
@@ -579,15 +565,12 @@ export const WORKSPACE_CREDENTIAL_ENV = [
   "OMB_OPENROUTER_API_KEY",
   "BOX_TOKEN",
   "OPENCODE_API_KEY",
-  "OMB_JEV_API_KEY",
-  "OMB_OPENROUTER_DECIDER_KEY",
   // Retired avatar credentials must not reach agent child processes.
   "OMB_OPENAI_IMAGE_KEY",
   "OMB_CUSTOM_IMAGE_KEY",
   "COMPOSIO_API_KEY",
   "OMB_COMPOSIO_BROKER_TOKEN",
   "OMB_CLOUD_BOAT_TOKEN",
-  "OMB_CLOUD_DECIDER_TOKEN",
   "OMB_CLOUD_AI_TOKEN",
   "OMB_CLOUD_CONNECTED_APPS_GRANT",
   // Not credentials, but they point a shell-capable agent at app-owned state.
@@ -645,52 +628,6 @@ export const OPENCODE_PROVIDER_ENV = [
   "GROQ_API_KEY",
 ] as const;
 
-export const OPENCODE_PROVIDER_KEY_LIMIT = 20;
-const OPENCODE_PROVIDER_KEY_NAME = /^[A-Z][A-Z0-9_]{0,59}_(?:API_KEY|KEY|TOKEN)$/;
-const OPENCODE_PROVIDER_KEY_VALUE = /^[\x21-\x7e]{1,4096}$/;
-
-function openCodeProviderKeyNameRefusal(name: string): string | undefined {
-  if (!OPENCODE_PROVIDER_KEY_NAME.test(name)) {
-    return "Use the name the provider reads its key from: capitals, ending in _API_KEY, _KEY or _TOKEN, such as VENICE_API_KEY.";
-  }
-  if (name === "OPENCODE_API_KEY") return "Save the OpenCode key in the OpenCode API key box instead.";
-  const reserved = name.startsWith("OPENCODE_") || name.startsWith("OMB_")
-    || (WORKSPACE_CREDENTIAL_ENV as readonly string[]).includes(name)
-    || ((PROVIDER_CREDENTIAL_ENV as readonly string[]).includes(name) && !(OPENCODE_PROVIDER_ENV as readonly string[]).includes(name));
-  return reserved ? `OpenMaus keeps ${name} for itself, so OpenCode can't be given it here. Put this key in opencode.json instead.` : undefined;
-}
-
-export function openCodeProviderKeys(cfg: Pick<AppConfig, "opencodeGo">): Record<string, string> {
-  const saved = cfg.opencodeGo?.providerKeys ?? {};
-  const usable = Object.keys(saved).sort()
-    .filter((name) => !openCodeProviderKeyNameRefusal(name) && OPENCODE_PROVIDER_KEY_VALUE.test(saved[name] ?? ""))
-    .slice(0, OPENCODE_PROVIDER_KEY_LIMIT);
-  return Object.fromEntries(usable.map((name) => [name, saved[name]!]));
-}
-
-/** "" removes a key; every other saved key stays. */
-export function mergeOpenCodeProviderKeys(
-  cfg: Pick<AppConfig, "opencodeGo">,
-  change: Record<string, string>,
-): { ok: true; keys: Record<string, string> } | { ok: false; error: string } {
-  const keys = new Map(Object.entries(openCodeProviderKeys(cfg)));
-  for (const [name, raw] of Object.entries(change)) {
-    const value = raw.trim();
-    if (!value) {
-      keys.delete(name);
-      continue;
-    }
-    const refusal = openCodeProviderKeyNameRefusal(name);
-    if (refusal) return { ok: false, error: refusal };
-    if (!OPENCODE_PROVIDER_KEY_VALUE.test(value)) return { ok: false, error: "That doesn't look like a key. Paste only the key, with no spaces." };
-    keys.set(name, value);
-  }
-  if (keys.size > OPENCODE_PROVIDER_KEY_LIMIT) {
-    return { ok: false, error: `OpenCode can hold up to ${OPENCODE_PROVIDER_KEY_LIMIT} provider keys. Remove one you no longer use, then add this one.` };
-  }
-  return { ok: true, keys: Object.fromEntries([...keys].sort(([a], [b]) => (a < b ? -1 : 1))) };
-}
-
 const configSaveListeners = new Set<(before: JsonObject, after: JsonObject) => void>();
 
 /** Called synchronously after each saveConfig with the file before and after; a listener must not throw. */
@@ -719,7 +656,7 @@ export function saveConfig(
 
   delete disk.localVm;
   delete disk.imageGen;
-  for (const key of ["xai", "anthropic", "mistral", "cerebras", "groq", "meta", "openai", "openrouter", "openaiCompat", "composio", "opencodeGo", "decider", "profile", "rooms", "mcp", "threads", "context", "memory", "features", "budgets", "billing", "decisions", "loopGuard", "onboarding", "newBots", "safetyFloor"] as const) {
+  for (const key of ["xai", "anthropic", "mistral", "cerebras", "groq", "meta", "openai", "openrouter", "openaiCompat", "composio", "opencodeGo", "profile", "rooms", "mcp", "threads", "context", "memory", "features", "budgets", "billing", "decisions", "loopGuard", "onboarding", "newBots", "safetyFloor"] as const) {
     const section = checkedPatch[key];
     if (!section) continue;
     const current = jsonObjectSchema.safeParse(disk[key]);
@@ -925,7 +862,6 @@ function injectedEnvironment(cfg: AppConfig, instanceId: string, driver: string)
       environment.set("OPENAI_COMPAT_URL", cfg.openaiCompat.url);
   }
   if (driver === "opencodeGo") {
-    for (const [name, key] of Object.entries(openCodeProviderKeys(cfg))) environment.set(name, key);
     if (cfg.opencodeGo?.apiKey) environment.set("OPENCODE_API_KEY", cfg.opencodeGo.apiKey);
   }
   return environment;

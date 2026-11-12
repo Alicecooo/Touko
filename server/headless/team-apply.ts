@@ -56,10 +56,6 @@ export function botPatch(desired: DesiredBot, echo: Rec, team: string | undefine
   if (team !== undefined && key(echo.section) !== key(team)) { patch.section = team; changes.push(`team "${echo.section ?? "none"}" → "${team}"`); }
   if (desired.title !== undefined && (echo.title ?? "") !== desired.title) { patch.title = desired.title; changes.push(`title "${echo.title ?? ""}" → "${desired.title}"`); }
   if (desired.description !== undefined && (echo.description ?? "") !== desired.description) { patch.description = desired.description; changes.push("description changed"); }
-  if (desired.soul !== undefined && (echo.soul ?? "").trimEnd() !== desired.soul.trimEnd()) {
-    patch.soul = desired.soul.trimEnd();
-    changes.push(echo.soul ? `soul ${lines(changedLines(echo.soul ?? "", desired.soul))} changed` : `soul set (${lines(desired.soul.trimEnd().split("\n").length)})`);
-  }
   if (desired.model || desired.effort) {
     const current: Rec = echo.modelSelection ?? {};
     const instanceId = desired.model?.instanceId ?? current.instanceId;
@@ -403,7 +399,7 @@ export async function teamExportVerb(ctx: VerbContext): Promise<VerbOutcome> {
     names.add(key(bot.name));
   }
   const dir = dirname(resolve(out));
-  // A team file travels: a key written into a soul, a brief or a skill is taken out.
+  // A team file travels: a key written into a brief or skill is taken out.
   const redacted: string[] = [];
   const clean = (text: string, where: string): string => {
     const cleaned = redactSecretsInText(text);
@@ -422,7 +418,6 @@ export async function teamExportVerb(ctx: VerbContext): Promise<VerbOutcome> {
     const entry: Rec = { name: bot.name, ...(bot.section ? { team: bot.section } : {}), ...(bot.title ? { title: bot.title } : {}),
       ...(bot.description ? { description: clean(bot.description, `bot "${bot.name}" description`) } : {}) };
     if (bot.chiefOfStaff) Object.assign(entry, { chief: true, ...(bot.managedSections?.length ? { manages: bot.managedSections } : {}) });
-    if (bot.soul?.trim()) entry.soul = clean(bot.soul, `bot "${bot.name}" soul`);
     if (bot.modelSelection?.instanceId) {
       entry.model = `${bot.modelSelection.instanceId}/${bot.modelSelection.model}`;
       if (bot.modelSelection.effort) entry.effort = bot.modelSelection.effort;

@@ -7,10 +7,9 @@ import type { Bot, BotSettingsSection } from "@/state/store";
 import { ChatMoreMenu } from "@/components/ChatMoreMenu";
 import { useCaptionChrome } from "../DesktopCapabilities";
 import { MemorySection } from "../bot-settings/MemorySection";
-import { HistoryRollbackDialog, useBotHistory, useBotOverview } from "../bot-settings/useBotOverview";
+import { useBotPrompt } from "../bot-settings/useBotPrompt";
 import type { useBotSettingsDerived } from "../bot-settings/useBotSettingsDerived";
 import { AvatarEditorCard } from "./AvatarEditorCard";
-import { ComputerTab } from "./ComputerTab";
 import { DetailsTab } from "./DetailsTab";
 import { LibraryTab } from "./LibraryTab";
 import { PANEL_TABS, PAGES, TAB_LABEL, type PageId, type PanelTab, type PanelTarget } from "./page-registry";
@@ -44,19 +43,12 @@ export function BotPanel({ bot, derived, slackUrl = null, headerClassName, linke
   const [anchor, setAnchor] = useState<string | null>(() => initialTarget(linkedSection, link).anchor ?? null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [memoryMounted, setMemoryMounted] = useState(() => initialTarget(linkedSection, link).page === "memory");
-  const [query, setQuery] = useState("");
   const bodyRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const page = stack.at(-1) ?? null;
 
-  // Read when a view that shows it appears (the Details tab's setup row, the Setup and Overview pages), never while
-  // the Details tab's own fields are being typed into.
-  const overview = useBotOverview(bot, {
-    overview: (page === null && tab === "details") || page === "setup" || page === "overview",
-    prompt: page === "prompt" || page === "overview",
-    followEdits: false,
-  });
-  const history = useBotHistory(bot, page === "history");
+  // Load the prompt preview only when its settings page is opened.
+  const prompt = useBotPrompt(bot, page === "prompt");
 
   const scrollTop = () => bodyRef.current?.scrollTo({ top: 0 });
   const go = (target: PanelTarget) => {
@@ -115,12 +107,11 @@ export function BotPanel({ bot, derived, slackUrl = null, headerClassName, linke
     <PageHeader
       back={backLabel}
       title={t(PAGES[page].title, { name: bot.name })}
-      intro={page === "setup" ? t("botSetup.optional") : undefined}
       onBack={back}
     />
   ) : null;
 
-  const context = { bot, derived, slackUrl, overview, history, onOpen: openPage, onGo: go };
+  const context = { bot, derived, slackUrl, prompt, onOpen: openPage, onGo: go };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" onKeyDown={onKeyDown}>
@@ -167,11 +158,10 @@ export function BotPanel({ bot, derived, slackUrl = null, headerClassName, linke
               ))}
             </div>
             <div role="tabpanel">
-              {tab === "details" && <DetailsTab bot={bot} derived={derived} overview={overview.overview} onOpen={openPage} />}
+              {tab === "details" && <DetailsTab bot={bot} derived={derived} onOpen={openPage} />}
               {tab === "library" && <LibraryTab bot={bot} onOpen={openPage} />}
-              {tab === "computer" && <ComputerTab bot={bot} derived={derived} onOpen={openPage} />}
               {tab === "settings" && (
-                <SettingsTab bot={bot} derived={derived} slackUrl={slackUrl} query={query} onQuery={setQuery} onOpen={openPage} onGo={go} />
+                <SettingsTab bot={bot} derived={derived} slackUrl={slackUrl} onOpen={openPage} />
               )}
             </div>
           </>
@@ -193,7 +183,6 @@ export function BotPanel({ bot, derived, slackUrl = null, headerClassName, linke
           </div>
         )}
       </div>
-      <HistoryRollbackDialog history={history} />
     </div>
   );
 }

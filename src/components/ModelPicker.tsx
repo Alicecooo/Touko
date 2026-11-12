@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, KeyRound, Loader2, Plus, RefreshCw, Search, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, KeyRound, Loader2, RefreshCw, Search, X } from "lucide-react";
 import { useStore, currentTaskBot, type Bot, type InstanceInfo, type ModelSelection } from "@/state/store";
 import type { EffortLevel } from "../../shared/wire";
 import type { ModelVariantOption } from "../../shared/runtime-events";
 import { filterCustomModels, partitionCustomModels, suggestedModels } from "@/lib/custom-models";
 import { configuredModelInstances, isClaudeAccount, isCustomOnly, SIGN_IN_FAMILY_LABEL, signInFamily, splitEngineRail, type SignInFamily } from "@/lib/engine-rail";
 import { InstanceProviderMark } from "./ProviderIcons";
-import { EngineSetup, EngineUpdateNotice, hasSavedApiKey, needsCli, needsSignIn } from "./EngineSetup";
+import { EngineSetup, EngineUpdateNotice, needsCli, needsSignIn } from "./EngineSetup";
 import { EngineGroupLabel } from "./EngineGroupLabel";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ChatGptPlanStatus } from "./ChatGptPlanStatus";
@@ -96,7 +96,7 @@ export function EffortRow({
   if (compact) return (
     <label className={cn("flex items-center justify-between gap-3", className)}>
       {label}
-      <Select size="sm" className="max-w-[65%]" aria-label={t("model.effort.label")} value={selection.effort ?? ""}
+      <Select size="sm" className="max-w-[65%]" aria-label={t("model.effort.label")} value={selection.effort ?? ""} disabled={bot.busy}
         onChange={(event) => dispatch({ type: "setModel", botId: bot.id, threadId, ...(updateBotDefault ? { updateBotDefault: true } : {}),
           selection: { ...selection, effort: levels.find((level) => level === event.target.value) } })}>
         <option value="">{t("model.effort.default")}</option>
@@ -361,17 +361,12 @@ export function railProviders(instances: InstanceInfo[], selectedInstance: Insta
   return { subscription: subscription.map(entry), api: api.map(entry), custom: custom.map(entry) };
 }
 
-function apiKeysLabel(instances: InstanceInfo[]): string {
-  return t(instances.some(hasSavedApiKey) ? "model.addOrChangeApiKeys" : "model.addApiKeys");
-}
-
-export function ModelEngineRail({ instances, selectedInstance, claudeInstance, openaiInstance, onSelect, onAddApiKeys }: {
+export function ModelEngineRail({ instances, selectedInstance, claudeInstance, openaiInstance, onSelect }: {
   instances: InstanceInfo[];
   selectedInstance?: InstanceInfo;
   claudeInstance?: InstanceInfo;
   openaiInstance?: InstanceInfo;
   onSelect: (instance: InstanceInfo) => void;
-  onAddApiKeys?: () => void;
 }) {
   const { subscription, api, custom: local } = railProviders(instances, selectedInstance, claudeInstance, openaiInstance);
   const railButton = ({ instance, target, selected, label }: RailProvider) => {
@@ -401,20 +396,8 @@ export function ModelEngineRail({ instances, selectedInstance, claudeInstance, o
     <div className="flex w-14 shrink-0 flex-col gap-1 overflow-y-auto border-r border-hairline/40 bg-panel p-2">
       {subscription.length > 0 && <EngineGroupLabel className="px-0 pb-0.5 pt-0.5 text-center text-[9px]">{t("model.rail.cloud")}</EngineGroupLabel>}
       {subscription.map(railButton)}
-      {(api.length > 0 || onAddApiKeys) && <EngineGroupLabel className={cn("px-0 pb-0.5 text-center text-[9px] leading-tight", subscription.length > 0 ? "pt-2" : "pt-0.5")}>{t("model.rail.apiKeys")}</EngineGroupLabel>}
+      {api.length > 0 && <EngineGroupLabel className={cn("px-0 pb-0.5 text-center text-[9px] leading-tight", subscription.length > 0 ? "pt-2" : "pt-0.5")}>{t("model.rail.apiKeys")}</EngineGroupLabel>}
       {api.map(railButton)}
-      {onAddApiKeys && (
-        <button
-          type="button"
-          data-rail-add-api-key
-          onClick={onAddApiKeys}
-          aria-label={apiKeysLabel(instances)}
-          title={apiKeysLabel(instances)}
-          className="flex size-9 items-center justify-center rounded-lg border border-dashed border-hairline text-ink-secondary hover:bg-control/60 hover:text-ink"
-        >
-          <Plus size={16} aria-hidden="true" />
-        </button>
-      )}
       {local.length > 0 && <EngineGroupLabel className="px-0 pb-0.5 pt-2 text-center text-[9px]">{t("model.rail.local")}</EngineGroupLabel>}
       {local.map(railButton)}
     </div>
@@ -606,11 +589,6 @@ export function ModelPicker({
     lookForLocal(instance);
   };
 
-  const openApiKeys = () => {
-    setOpen(false);
-    dispatch({ type: "toggleAppSettings", open: true, section: "connections" });
-  };
-
   const selectRail = (instance: InstanceInfo) => {
     if (isClaudeAccount(instance)) lastClaudeIdRef.current = instance.instanceId;
     if (signInFamily(instance) === "openai") lastOpenaiIdRef.current = instance.instanceId;
@@ -734,6 +712,7 @@ export function ModelPicker({
       aria-haspopup="dialog"
       className={cn(
         "flex items-center gap-1.5 rounded-full border border-hairline/40 bg-control/60 py-1 pl-2 pr-2.5 text-[13px] text-ink hover:bg-raised-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-control/60",
+        contained && "min-w-0 max-w-[75%]",
         !contained && active && !showActiveAccount && COMPACT_SQUARE,
       )}
       title={bot.busy ? `${summary}${followLine}\n${t(threadId ? "model.threadBusy" : "model.busy")}` : `${summary}${followLine}`}
@@ -752,18 +731,18 @@ export function ModelPicker({
             <span className="text-ink-secondary"> · {modelProvider(active, selection.model)}</span>
           )}
         </span>
-        {selectedVariantLabel !== undefined ? (
+        {(!contained || threadId) && (selectedVariantLabel !== undefined ? (
           <span data-model-variant className="max-w-[120px] truncate text-ink-secondary">· {selectedVariantLabel}</span>
         ) : selection.effort && (
           <span data-model-effort className="shrink-0 text-ink-secondary">
             · {effortLabel(selection.effort)}
           </span>
-        )}
+        ))}
       </span>
       <ChevronDown
         size={14}
         className={cn(
-          "text-ink-secondary transition-transform",
+          "shrink-0 text-ink-secondary transition-transform",
           open && "rotate-180",
           !contained && active && "@max-4xl/chathead:hidden",
         )}
@@ -803,8 +782,7 @@ export function ModelPicker({
           <div className="flex min-h-0 min-w-0 flex-1">
           {
           <>
-          {pickerInstances.length > 0 && <ModelEngineRail instances={pickerInstances} selectedInstance={railInstance} claudeInstance={claudeRailInstance} openaiInstance={openaiRailInstance} onSelect={selectRail}
-            onAddApiKeys={window.ogb?.remoteClient?.active === true ? undefined : openApiKeys} />}
+          {pickerInstances.length > 0 && <ModelEngineRail instances={pickerInstances} selectedInstance={railInstance} claudeInstance={claudeRailInstance} openaiInstance={openaiRailInstance} onSelect={selectRail} />}
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
             {threadId && (
@@ -817,9 +795,11 @@ export function ModelPicker({
                     </button>
                   ))}
                 </div>
-                <p className="mt-1 text-[11px] text-ink-secondary">
-                  {scope === "bot" ? t("model.scope.botHelp") : t("model.scope.threadHelp")}
-                </p>
+                {!contained && (
+                  <p className="mt-1 text-[11px] text-ink-secondary">
+                    {scope === "bot" ? t("model.scope.botHelp") : t("model.scope.threadHelp")}
+                  </p>
+                )}
               </div>
             )}
             {railInstance ? (

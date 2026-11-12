@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { t } from "@/lib/i18n";
 import type { LocaleKey } from "@/locales";
 import { useStore } from "@/state/store";
-import { AnthropicEveryClaudeBot, ApiKeyRow, OpenAiCompatUrl, OpenCodeProviderKeys } from "./ApiKeys";
+import { AnthropicEveryClaudeBot, ApiKeyRow, OpenAiCompatUrl } from "./ApiKeys";
 import { ApiConnectionSettings } from "./ApiConnectionSettings";
 import { Card } from "./SettingsPrimitives";
 
@@ -30,14 +30,8 @@ function ConnectionCard({ title, description, children }: {
 }
 
 export function ModelApiSettings() {
-  const { state, dispatch } = useStore();
+  const { state } = useStore();
   return <>
-    <div className="flex flex-col items-start gap-2 rounded-xl border border-hairline/50 px-4 py-3 text-[12px] leading-relaxed text-ink-secondary sm:flex-row sm:items-center sm:gap-4">
-      <p className="flex-1">{t("settings.api.accountsHint")}</p>
-      <button type="button" className="ui-button shrink-0" onClick={() => dispatch({ type: "toggleAppSettings", open: true, section: "engines" })}>
-        {t("settings.api.manageAccounts")}
-      </button>
-    </div>
     <ConnectionCard title="settings.api.modelsTitle" description="settings.api.modelsDescription">
       <ApiConnectionSettings />
     </ConnectionCard>
@@ -52,22 +46,6 @@ export function ModelApiSettings() {
       </div>
     </details>}
   </>;
-}
-
-export function OpenCodeConnectionSettings() {
-  const { state } = useStore();
-  return (
-    <ConnectionCard title="settings.api.opencodeTitle" description="settings.api.opencodeDescription">
-      <div className="flex flex-col gap-3">
-        <ApiKeyRow section="opencodeGo" />
-        {state.config?.cloudHome !== true && <p className="text-[12px] leading-relaxed text-ink-secondary">
-          {t("keys.opencode.providersHint").split("{command}").flatMap((part, index) =>
-            index === 0 ? [part] : [<code key={index} className="font-mono">opencode auth login</code>, part])}
-        </p>}
-        <OpenCodeProviderKeys />
-      </div>
-    </ConnectionCard>
-  );
 }
 
 export function AppConnectionSettings() {

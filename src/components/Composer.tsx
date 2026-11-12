@@ -15,9 +15,9 @@ import { splitTranscriptCitations, type CitationAttachment } from "@/lib/citatio
 import { LocalComputerAutoWarning } from "./LocalComputerAutoWarning";
 import { ApprovalModeSelector } from "./ApprovalModeSelector";
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
-import { appendPastedText, handoffAttachmentImagePreview, clipboardHasImages, clipboardImageFiles, composeMessage, dataContextFor, composerShouldRefocus, composerTakesFocusOnOpen, imageAttachmentFromFile, replyTargetTakesFocus, intakeFiles, isLongPaste, optimisticImageAttachment, pasteAttachment, releaseAttachmentImagePreview, type Attachment, type PasteAttachment } from "@/lib/composer-attachments";
+import { appendPastedText, handoffAttachmentImagePreview, clipboardHasImages, clipboardImageFiles, composeMessage, composerShouldRefocus, composerTakesFocusOnOpen, imageAttachmentFromFile, replyTargetTakesFocus, intakeFiles, isLongPaste, optimisticImageAttachment, pasteAttachment, releaseAttachmentImagePreview, type Attachment, type PasteAttachment } from "@/lib/composer-attachments";
 
-import { goalCoordinatorForComposer, groupComposerHint, jevRoomRoutingOn, openTaskWorking, roomRespondersForComposer } from "@/lib/group-routing";
+import { goalCoordinatorForComposer, groupComposerHint, openTaskWorking, roomRespondersForComposer } from "@/lib/group-routing";
 import { PendingApprovalActions, PendingApprovalPanel, pendingApprovals } from "./PendingApproval";
 import { GoalToggle } from "./GoalToggle";
 import { useDesktopCapabilities } from "./DesktopCapabilities";
@@ -496,7 +496,6 @@ export function Composer({
     const composed = composeMessage(serializeThreadRefs(effectiveText, threads, currentBotId), attachments);
     if (!composed) return;
     const body = restoredRequestText(draftId) ?? composed;
-    const dataContext = dataContextFor(body, state.computerOpen ? state.dataView : null, !group && bot ? { botId: bot.id, threadId } : undefined);
     const sentDraft: ComposerDraftSnapshot = {
       draftId,
       revision: draftRevision(draftId),
@@ -529,7 +528,6 @@ export function Composer({
         sendId: sentDraft.sendId,
         replyToId: replyTo?.id,
         threadId,
-        dataContext,
         onError: () => restoreDraft(sentDraft),
       });
       directMessageSent(state.instances, bot.modelSelection?.instanceId, busy && !canSteer);
@@ -929,7 +927,7 @@ export function Composer({
                     ? t("composer.placeholder.goal", { name: group.name })
                     : t("composer.placeholder.group", {
                         name: group.name,
-                        hint: groupComposerHint(group, members ?? [], { jevOn: jevRoomRoutingOn(state.config) }),
+                        hint: groupComposerHint(group, members ?? []),
                       })
                   : t("composer.placeholder.bot", { name: bot?.name ?? "" })
           }

@@ -33,8 +33,10 @@ export function botThreads(store: RecentWorkStore, bot: Pick<BotRecord, "id" | "
   for (const group of store.groups) {
     if (!group.memberIds.includes(bot.id)) continue;
     const where = `room ${JSON.stringify(group.name)}`;
-    add({ threadId: group.threadId, where, title: null, private: group.dm === true });
-    for (const task of group.tasks ?? []) add({ threadId: task.threadId, where, title: task.title, private: group.dm === true });
+    const privateChat = group.dm === true;
+    const openTask = group.tasks?.find((task) => task.threadId === group.threadId);
+    add({ threadId: group.threadId, where, title: openTask?.title ?? null, private: privateChat });
+    for (const task of group.tasks ?? []) add({ threadId: task.threadId, where, title: task.title, private: privateChat });
   }
   return out;
 }

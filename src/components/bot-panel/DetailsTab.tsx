@@ -1,25 +1,21 @@
 import { useState } from "react";
-import { ChevronRight, FileText, Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
-import type { BotOverview } from "@/lib/bot-overview-types";
 import { friendlyEffort, simpleEffortLevels } from "@/lib/model-friendly";
 import type { Routine } from "@/lib/routines";
 import { routineFinished, routineNextLabel } from "@/lib/routine-display";
 import { scheduleLabel } from "@/lib/schedule-label";
-import { firstSentence } from "@/lib/soul";
 import { currentTaskBot, useStore, type Bot } from "@/state/store";
 import type { ApprovalMode } from "../../../shared/approval-mode";
 import type { EffortLevel } from "../../../shared/wire";
-import type { ReplyStyle } from "../../../shared/reply-style";
 import { approvalModeOptionsFor } from "../ApprovalModeSelector";
 import { LocalComputerAutoWarning } from "../LocalComputerAutoWarning";
 import { OutboundControl } from "../bot-settings/PermissionsSection";
 import { useBotEditor } from "../bot-settings/BotEditorContext";
 import { ModelPicker } from "../ModelPicker";
 import { RoutineEditor } from "../RoutinesPage";
-import { SoulField } from "../SoulField";
 import { ThreadModelsLine } from "../ThreadModelsLine";
 import { useBotApps } from "../bot-settings/useBotApps";
 import type { BotPatch, useBotSettingsDerived } from "../bot-settings/useBotSettingsDerived";
@@ -32,12 +28,10 @@ type Derived = ReturnType<typeof useBotSettingsDerived>;
 export function DetailsTab({ bot, derived, onOpen }: {
   bot: Bot;
   derived: Derived;
-  overview: BotOverview | null;
   onOpen: (page: PageId) => void;
 }) {
   const { state, dispatch } = useStore();
   const { draft } = useBotEditor();
-  const [editingSoul, setEditingSoul] = useState(false);
   const [localAutoWarning, setLocalAutoWarning] = useState<{ botId: string; patch: BotPatch } | null>(null);
   const [editingRoutine, setEditingRoutine] = useState<Routine | "new" | null>(null);
   const apps = useBotApps(bot);
@@ -68,11 +62,10 @@ export function DetailsTab({ bot, derived, onOpen }: {
 
   const routines = [...derived.botRoutines].sort((a, b) =>
     Number(b.enabled) - Number(a.enabled) || (a.nextRunAt ?? Infinity) - (b.nextRunAt ?? Infinity) || a.name.localeCompare(b.name));
-  const soulOpen = editingSoul || Boolean(bot.soulDrift);
   return (
     <div data-panel-tabpanel="details">
       <Card label={t("model.simple.model")} anchor="model">
-        <div className={cn(rowCls, "block", thinkingLevels.length > 0 && "[&_[data-simple-effort]]:hidden")} data-simple-default-model>
+        <div className={cn(rowCls, "block")}>
           {/* The open thread: a Cloud guest changes only their own conversation. */}
           <ModelPicker
             key={bot.threadId}
@@ -87,64 +80,12 @@ export function DetailsTab({ bot, derived, onOpen }: {
           <SegmentedRow
             attr="data-thinking-choice"
             title={t("botSettings.simple.thinking")}
-            hint={t(bot.modelSelection.effort === undefined ? "botSettings.simple.thinkingDefault" : "botSettings.simple.thinkingHint")}
             label={t("botSettings.simple.thinkingAria", { name: bot.name })}
             value={bot.modelSelection.effort}
             onChange={chooseEffort}
             options={thinkingLevels.map((level) => ({ value: level, label: friendlyEffort(level), disabled: Boolean(bot.busy) }))}
           />
         )}
-        <LinkRow data-panel-link="model" onClick={() => onOpen("model")}>{t("botPanel.moreModel")}</LinkRow>
-      </Card>
-
-      <Card label={t("botSettings.simple.instructions")} anchor="instructions">
-        {soulOpen ? (
-          <ColRow data-panel-row="soul">
-            <SoulField
-              bot={bot}
-              onPatch={patch}
-              simple={{
-                label: t("botSettings.simple.instructions"),
-                placeholder: t("botSettings.simple.instructionsPlaceholder", { name: bot.name }),
-              }}
-            />
-            {editingSoul && (
-              <div className="flex justify-end">
-                <button type="button" data-panel-done="soul" onClick={() => setEditingSoul(false)} className={buttonCls}>
-                  {t("botSettings.simple.done")}
-                </button>
-              </div>
-            )}
-          </ColRow>
-        ) : (
-          <button
-            type="button"
-            data-panel-edit="soul"
-            aria-label={`${t("botSettings.simple.edit")}: ${t("botSettings.simple.instructions")}`}
-            onClick={() => setEditingSoul(true)}
-            className={cn(rowCls, "w-full text-left hover:bg-ink/[0.03]")}
-          >
-            <span className={cn("line-clamp-2 min-w-0 flex-1 text-[13px]", bot.soul?.trim() ? "text-ink" : "text-ink-secondary")}>
-              {firstSentence(bot.soul ?? "") || t("botSettings.simple.noInstructions")}
-            </span>
-            <span className="inline-flex shrink-0 items-center gap-0.5 text-[13.5px] text-ink">
-              {t("botSettings.simple.edit")}
-              <ChevronRight size={14} aria-hidden="true" />
-            </span>
-          </button>
-        )}
-        <SegmentedRow
-          attr="data-reply-style-choice"
-          title={t("botSettings.replyStyle.title")}
-          label={t("botSettings.replyStyle.title")}
-          value={bot.replyStyle ?? "default"}
-          onChange={(replyStyle: ReplyStyle) => patch({ replyStyle })}
-          options={[
-            { value: "default", label: t("botSettings.replyStyle.default"), tooltip: t("botSettings.replyStyle.defaultHint") },
-            { value: "conversational", label: t("botSettings.replyStyle.conversational"), tooltip: t("botSettings.replyStyle.conversationalHint") },
-          ]}
-        />
-        <LinkRow data-panel-link="instructions" onClick={() => onOpen("instructions")}>{t("botPanel.soulAndVersions")}</LinkRow>
       </Card>
 
       <Card label={t("botSettings.simple.beforeActs", { name: bot.name })} anchor="approval">

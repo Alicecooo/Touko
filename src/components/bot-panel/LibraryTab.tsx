@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AppWindow, FileText, Image as ImageIcon } from "lucide-react";
+import { FileText, Image as ImageIcon } from "lucide-react";
 
 import { t } from "@/lib/i18n";
 import type { LocaleKey } from "@/locales";
@@ -8,15 +8,14 @@ import { useStore, type Bot } from "@/state/store";
 import { SkillReviewDialog, useManagedSkills } from "../bot-settings/SkillsSection";
 import { botLibraryItems, isPageItem, memoryEntries, type LibraryItem } from "./library-items";
 import type { PageId } from "./page-registry";
-import { Card, LabelAction, LinkRow, NoteRow, rowCls, SwitchRow } from "./rows";
+import { Card, LabelAction, LinkRow, NoteRow, SwitchRow } from "./rows";
 
-export type LibraryFilter = "all" | "memories" | "files" | "pages" | "skills";
+export type LibraryFilter = "all" | "memories" | "files" | "skills";
 
 const FILTERS: ReadonlyArray<readonly [LibraryFilter, LocaleKey]> = [
   ["all", "botPanel.library.all"],
   ["memories", "botPanel.library.memories"],
   ["files", "botPanel.library.files"],
-  ["pages", "botPanel.library.pages"],
   ["skills", "botSettings.simple.skills"],
 ];
 
@@ -33,7 +32,6 @@ export function LibraryTab({ bot, onOpen }: { bot: Bot; onOpen: (page: PageId) =
   const memoryOn = bot.memoryEnabled !== false;
   const items = useMemo(() => botLibraryItems(bot), [bot]);
   const files = items.filter((item) => !isPageItem(item));
-  const pages = items.filter(isPageItem);
   const shows = (part: LibraryFilter) => filter === "all" || filter === part;
 
   useEffect(() => {
@@ -128,27 +126,6 @@ export function LibraryTab({ bot, onOpen }: { bot: Bot; onOpen: (page: PageId) =
             </div>
           </section>
         )
-      )}
-
-      {shows("pages") && (
-        <Card label={t("botPanel.library.pagesTitle")} anchor="pages">
-          {pages.length === 0 ? (
-            <NoteRow>{t("botPanel.library.pagesEmpty", { name: bot.name })}</NoteRow>
-          ) : pages.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              data-library-item={item.messageId}
-              title={t("botSettings.simple.libraryOpen", { name: item.name })}
-              onClick={() => openItem(item)}
-              className={`${rowCls} w-full text-left hover:bg-ink/[0.03]`}
-            >
-              <AppWindow size={15} className="shrink-0 text-ink-secondary" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate text-[13.5px] text-ink">{item.name}</span>
-              <span className="shrink-0 text-[12px] text-ink-tertiary">{dateLabel(item.at)}</span>
-            </button>
-          ))}
-        </Card>
       )}
 
       {shows("skills") && (

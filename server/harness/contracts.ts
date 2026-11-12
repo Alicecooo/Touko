@@ -133,8 +133,6 @@ export interface SendTurnInput {
     /** Peer-agent MCP proxy (list_bots / coordinate_bots); the harness owns turns, permissions and recursion limits. */
     agents?: { command: string; args: string[]; env: Record<string, string> };
 
-    /** The Data tools' MCP proxy: DuckDB on this bot's own database. */
-    data?: { command: string; args: string[]; env: Record<string, string> };
     /** The HighLevel CRM tools' MCP proxy: the harness holds the tokens and the per-bot verdict. */
     highlevel?: { command: string; args: string[]; env: Record<string, string> };
     /** dweb daemon tools; `url` is the dweb HTTP base. */
@@ -187,7 +185,6 @@ export interface ProviderAdapter {
     composioMcp?: boolean;
 
     /** The driver can mount the Data tools MCP. */
-    dataMcp?: boolean;
     /** The driver can mount the HighLevel CRM tools MCP. */
     highlevelMcp?: boolean;
     /** The engine accepts images in the prompt (gates composer paste). */

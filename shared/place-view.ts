@@ -28,7 +28,7 @@ export type PlaceSource = "works-on" | "pin" | "auto-pin" | "routine" | "room";
 export const PLACE_ACTIONS = [
   "choose-model", "open-tools", "sign-in", "start", "wake", "watch", "see-plan", "manage-computers",
   "try-again", "open-my-cloud", "add-boat-key", "turn-on-browser",
-  "clear-pin", "change-routine", "open-computer-panel",
+  "clear-pin", "change-routine",
 ] as const;
 export type PlaceActionId = (typeof PLACE_ACTIONS)[number];
 
@@ -183,7 +183,6 @@ export const PLACE_EN = {
   "place.action.clearPin": "Clear this conversation's place",
   "place.action.usePlace": "Use {place}",
   "place.action.changeRoutine": "Change where it runs",
-  "place.action.openComputerPanel": "Open Computer panel",
   "place.askAdmin": "Ask an Admin to change it.",
   "place.backOnAuto": "This conversation is back on Auto.",
 } as const;
@@ -196,18 +195,17 @@ export const PLACE_WORDS: Record<PlaceActionId, string> = {
   "choose-model": "Choose another model in {bot}'s settings.",
   "open-tools": "Change what {bot} can use in its settings.",
   "sign-in": "Sign in to {engine} in Settings.",
-  start: "Start it from the Computer panel.",
-  wake: "Wake it from the Computer panel.",
-  watch: "Watch it from the Computer panel.",
+  start: "Try the task again to start it.",
+  wake: "Try the task again to wake it.",
+  watch: "It will stay on while the bot is working.",
   "see-plan": "See your plan on the Plan page.",
   "manage-computers": "Manage your cloud computers in Settings.",
   "try-again": "Try again.",
   "open-my-cloud": "Open My Cloud from the menu at the top of the sidebar.",
   "add-boat-key": "Add a Boat key in Settings → API keys.",
-  "turn-on-browser": "Turn on the built-in browser in the Computer panel.",
+  "turn-on-browser": "Turn on the built-in browser in Settings.",
   "clear-pin": "Clear this conversation's place in the composer to continue.",
   "change-routine": "Change where this routine runs.",
-  "open-computer-panel": "Check it in the Computer panel.",
 };
 
 /** The words a person reads, in some language: the app passes its t(), the
@@ -246,7 +244,7 @@ const STATE: Record<PlaceState, { key: string; action: PlaceActionId | null }> =
   "browser-cannot": { key: "browserCannot", action: "choose-model" },
   local: { key: "local", action: null },
   "local-unavailable": { key: "localUnavailable", action: null },
-  "place-failed": { key: "placeFailed", action: "open-computer-panel" },
+  "place-failed": { key: "placeFailed", action: "try-again" },
   off: { key: "off", action: null },
 };
 
@@ -279,7 +277,6 @@ const ACTION_KEY: Record<PlaceActionId, PlaceKey> = {
   "turn-on-browser": "place.action.turnOnBrowser",
   "clear-pin": "place.action.clearPin",
   "change-routine": "place.action.changeRoutine",
-  "open-computer-panel": "place.action.openComputerPanel",
 };
 
 export function placeState(facts: PlaceFacts): { state: PlaceState; params: PlaceParams } {
@@ -321,9 +318,9 @@ export function placeState(facts: PlaceFacts): { state: PlaceState; params: Plac
 /** Where the person goes when a passing cause stops a place: try again in
  * place, clear the pin that holds this conversation, change where the
  * routine runs. A room member's turn has no retry of its own. */
-function sourceAction(source: PlaceSource, state: PlaceState): PlaceActionId | null {
+function sourceAction(source: PlaceSource): PlaceActionId | null {
   switch (source) {
-    case "works-on": return state === "place-failed" ? "open-computer-panel" : "try-again";
+    case "works-on": return "try-again";
     case "auto-pin": return "try-again";
     case "pin": return "clear-pin";
     case "routine": return "change-routine";
@@ -380,7 +377,7 @@ export function placeViewOf(state: PlaceState, params: PlaceParams, context: Pla
   const values = templateParams(params, context.locale ?? "en");
   const segment = STATE[state].key;
   let line = translate(lineKey(state, params, context.server), values);
-  let action: PlaceActionId | null = context.source && PASSING.has(state) ? sourceAction(context.source, state) : STATE[state].action;
+  let action: PlaceActionId | null = context.source && PASSING.has(state) ? sourceAction(context.source) : STATE[state].action;
   // A failed row never offers what only the panel can do on the spot.
   if (context.source && (action === "start" || action === "wake" || action === "watch")) action = null;
   if (context.source === "auto-pin") line = `${line} ${translate("place.backOnAuto")}`;

@@ -32,7 +32,7 @@ export class BotCreationDraft {
   get bot(): Bot {
     const { computer: _computer, cwd, peers, toolScope, ...profile } = this.template.profile;
     return {
-      id: this.id, threadId: this.id, name: "", title: "", description: "", soul: "",
+      id: this.id, threadId: this.id, name: "", title: "", description: "",
       color: "green", notifications: true, unread: false, messages: [],
       modelSelection: { instanceId: "", model: "" }, ...profile,
       computer: undefined, cwd: cwd ?? undefined, peers: peers ?? undefined,
@@ -114,8 +114,6 @@ export class BotCreationDraft {
     let result: unknown;
     if (path === base && method === "PATCH") {
       this.patch(body); result = { bot: this.bot };
-    } else if (path === `${base}/soul` && method === "GET") {
-      result = { soul: this.bot.soul, revision: "draft", bytes: new TextEncoder().encode(this.bot.soul).length, limit: 24000, file: "", drift: false };
     } else if (path === `${base}/skills` && method === "GET") {
       result = { skills: this.template.skills, staged: [] };
     } else if (path === `${base}/skills` && method === "POST") {

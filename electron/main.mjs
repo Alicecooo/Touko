@@ -802,6 +802,8 @@ async function startServerOn(port, dataDir = runningDataDir ?? startupEnvironmen
     OMB_CREDENTIAL_STORE: credentialStoreUnavailable ? "unavailable" : "ok",
     ...workspaceCredentialEnv(secureCredentials),
   });
+  const serverRuntimeModules = path.join(process.resourcesPath, "server-runtime", "node_modules");
+  childEnv.NODE_PATH = [serverRuntimeModules, childEnv.NODE_PATH].filter(Boolean).join(path.delimiter);
   delete childEnv.OMB_BROWSER_CONNECTION;
   delete childEnv.OMB_SERVER_COMPILE_CACHE;
   if (compileCacheDir) childEnv.OMB_SERVER_COMPILE_CACHE = compileCacheDir;
