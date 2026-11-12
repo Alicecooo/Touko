@@ -1,0 +1,323 @@
+--- a/server/teams/room-home.ts
++++ b/server/teams/room-home.ts
+@@ -1,18 +1,35 @@
+-/** The conversation a room was created with. The open task is only what the
+- * client is showing, so posts and cross-room work must not follow it. */
++/** The conversation a room was created with. `threadId` is only the task the
++ * client is showing, so posts, cross-room work, and "did a person speak in
++ * this room" must not follow it. `homeThreadId` is that conversation once it
++ * has been stored. A missing or dangling value falls back to the oldest task
++ * so rooms saved before the field existed still have one stable home. */
+ export interface RoomThreadHome {
+   threadId: string;
+   dm?: boolean;
++  homeThreadId?: string;
+   tasks?: readonly { threadId: string; createdAt: number }[];
+ }
+ 
+-export function roomHomeThreadId(group: RoomThreadHome): string {
+-  if (group.dm || !group.tasks?.length) return group.threadId;
+-  let home = group.tasks[0]!;
+-  for (const task of group.tasks) {
++function oldestTaskThreadId(tasks: readonly { threadId: string; createdAt: number }[]): string {
++  let home = tasks[0]!;
++  for (const task of tasks) {
+     if (task.createdAt < home.createdAt || (task.createdAt === home.createdAt && task.threadId < home.threadId)) {
+       home = task;
+     }
+   }
+   return home.threadId;
+ }
++
++export function roomHomeThreadId(group: RoomThreadHome): string {
++  if (group.dm) return group.threadId;
++  const tasks = group.tasks ?? [];
++  const known = new Set(tasks.map((task) => task.threadId));
++  if (
++    group.homeThreadId &&
++    (known.has(group.homeThreadId) || (tasks.length === 0 && group.homeThreadId === group.threadId))
++  ) {
++    return group.homeThreadId;
++  }
++  if (tasks.length === 0) return group.threadId;
++  return oldestTaskThreadId(tasks);
++}
+
+--- a/server/teams/room-home.test.ts
++++ b/server/teams/room-home.test.ts
+@@ -30,4 +30,27 @@
+       ],
+     })).toBe("a");
+   });
++
++  it("keeps the stored home when the client is showing another task, even if that task is older", () => {
++    expect(roomHomeThreadId({
++      threadId: "open",
++      homeThreadId: "home",
++      tasks: [
++        { threadId: "open", createdAt: 1 },
++        { threadId: "side", createdAt: 1 },
++        { threadId: "home", createdAt: 50 },
++      ],
++    })).toBe("home");
++  });
++
++  it("does not keep a home thread that was deleted", () => {
++    expect(roomHomeThreadId({
++      threadId: "open",
++      homeThreadId: "gone",
++      tasks: [
++        { threadId: "open", createdAt: 20 },
++        { threadId: "older", createdAt: 10 },
++      ],
++    })).toBe("older");
++  });
+ });
+
+--- a/server/storage/store.ts
++++ b/server/storage/store.ts
+@@ -26,6 +26,7 @@
+ import type { TeamSetupRequest, TeamSetupResult } from "../../shared/team-setup.ts";
+ import type { GroupGoalRunCardData } from "../../shared/group-goal-run.ts";
+ import { isMentionBoundary, isMentionNameContinuation } from "../../shared/mention-boundary.ts";
++import { roomHomeThreadId } from "../teams/room-home.ts";
+ import type { HandedState } from "../agent/delta-context.ts";
+ import type { AgentPart, PartPair, RoomPart } from "../packages/package-parts.ts";
+ import type { BotActivity, GroupDefaultResponder, GroupTask as GroupTaskRecord, MausColor, OptionCardData, TaskClosedBy, TaskOpenedBy, TaskUsage, WireBot, WireGroup, WireMessage, WireTask, BotProject as BotProjectRecord } from "../../shared/wire.ts";
+
+--- a/server/storage/store.ts
++++ b/server/storage/store.ts
+@@ -50,8 +50,12 @@
+   parts: Record<RoomPart, PartPair>;
+ }
+ 
+-export type GroupRecord = Omit<WireGroup, "working" | "usage"> & { installedPackage?: GroupPackageStamp };
+-export type GroupWirePrivateKeys = "installedPackage";
++export type GroupRecord = Omit<WireGroup, "working" | "usage"> & {
++  installedPackage?: GroupPackageStamp;
++  /** Conversation this room was created with. Not the task open in the client. */
++  homeThreadId?: string;
++};
++export type GroupWirePrivateKeys = "installedPackage" | "homeThreadId";
+ export type GroupWireProjection = Omit<GroupRecord, GroupWirePrivateKeys> & Pick<WireGroup, "usage"> & { working: boolean };
+ export type GroupWireProjectionIsExact = AssertExact<WireGroup, GroupWireProjection> & AssertSameKeys<WireGroup, GroupWireProjection>;
+ export const groupWireProjectionIsExact: GroupWireProjectionIsExact = true;
+
+--- a/server/storage/store.ts
++++ b/server/storage/store.ts
+@@ -657,6 +657,11 @@
+         g.tasks = [initialTask];
+         groupsMigrated = true;
+       }
++      const home = roomHomeThreadId(g);
++      if (g.homeThreadId !== home) {
++        g.homeThreadId = home;
++        groupsMigrated = true;
++      }
+       let active = g.tasks.find((task) => task.threadId === g.threadId);
+       if (!active) {
+         active = g.tasks[0]!;
+
+--- a/server/storage/store.ts
++++ b/server/storage/store.ts
+@@ -1012,6 +1012,7 @@
+       section,
+     };
+     if (!dm) {
++      group.homeThreadId = threadId;
+       group.tasks = [{ threadId, title: UNTITLED_TASK, createdAt, updatedAt: createdAt }];
+       group.setupCompletedAt = setup?.completed ? createdAt : null;
+       group.setupSkippedAt = null;
+
+--- a/server/storage/store.ts
++++ b/server/storage/store.ts
+@@ -1248,6 +1248,8 @@
+       group.pinnedCwd = next.pinnedCwd;
+       group.pinnedMessageId = next.pinnedMessageId;
+     }
++    const home = roomHomeThreadId(group);
++    if (group.homeThreadId !== home) group.homeThreadId = home;
+     this.saveGroups();
+     this.emit({ type: "group", groupId });
+     return { group, deleted, missing };
+
+--- a/server/packages/team-backup.ts
++++ b/server/packages/team-backup.ts
+@@ -3,6 +3,7 @@
+ import { MAX_TEAM_BACKUP_BYTES, parseTeamBackup, type BackupTask, type TeamBackup } from "../../shared/team-backup.ts";
+ import { helperModelAllowed, type BotVisibility } from "../../shared/wire.ts";
+ import type { BotRecord, GroupRecord, Message, Store, TaskRecord } from "../storage/store.ts";
++import { roomHomeThreadId } from "../teams/room-home.ts";
+ import type { Routine, RoutineManager } from "../automation/routines.ts";
+ import { redactSecretsInText } from "../security/redact.ts";
+ import { listMemoryLogs, listMemoryTopics, readMemoryFile, readMemoryLog, readMemoryTopic, writeMemoryFile, writeMemoryLog, writeMemoryTopic } from "../workspace/workspace.ts";
+
+--- a/server/packages/team-backup.ts
++++ b/server/packages/team-backup.ts
+@@ -228,6 +228,9 @@
+           ...(task.titleFromFirstMessage ? { titleFromFirstMessage: true } : {}),
+           ...(task.turnTimeoutMinutes != null ? { turnTimeoutMinutes: task.turnTimeoutMinutes } : {}),
+         }));
++        // The new group's creation thread is whichever backup task was first in the list, not the room's original conversation.
++        delete group.homeThreadId;
++        group.homeThreadId = roomHomeThreadId(group);
+         store.switchGroupTask(group.id, threads[source.tasks.findIndex((task) => task.key === source.activeTask)]);
+       }
+     }
+
+--- a/server/index.ts
++++ b/server/index.ts
+@@ -3789,7 +3789,7 @@
+ 
+ function publicGroupState(record: GroupRecord): WireGroup {
+   // The organization library's part hashes stay server-side.
+-  const { installedPackage: _installedPackage, ...group } = record;
++  const { installedPackage: _installedPackage, homeThreadId: _homeThreadId, ...group } = record;
+   let usage: WireGroup["usage"];
+   try { usage = groupUsageReader.forThread(group.threadId); } catch {}
+   const openHandoffs = coordinator.active().filter(n => n.groupId === group.id && !ENDED.has(n.status) && !(n.status === "waiting" && n.cards?.length));
+
+--- a/server/index.ts
++++ b/server/index.ts
+@@ -4236,9 +4236,7 @@
+         : Boolean(store.groupTaskByThread(group.id, threadId));
+       if (ownsThread) return { group, threadId };
+     }
+-    if (group.busyBotId === botId) {
+-      return { group, threadId: group.threadId };
+-    }
++    // busyBotId is not a thread. The open task is whatever the client is showing, so a stale flag must not claim that task.
+   }
+   return null;
+ }
+
+--- a/server/index.ts
++++ b/server/index.ts
+@@ -10105,12 +10105,17 @@
+ 
+ /** Read fresh every time; a line stamped via the HTTP API does not count, so a bot cannot re-arm the ceiling it just spent. */
+ function lastHumanRoomMessageAt(group: GroupRecord): number | undefined {
+-  const messages = store.messagesFor(group.threadId);
+-  for (let i = messages.length - 1; i >= 0; i -= 1) {
+-    const message = messages[i];
+-    if (message.role === "user" && message.kind === "text" && !message.via) return message.at;
++  let newest: number | undefined;
++  for (const threadId of roomThreadIds(group)) {
++    const messages = store.messagesFor(threadId);
++    for (let i = messages.length - 1; i >= 0; i -= 1) {
++      const message = messages[i];
++      if (message.role !== "user" || message.kind !== "text" || message.via || message.at === undefined) continue;
++      if (newest === undefined || message.at > newest) newest = message.at;
++      break;
++    }
+   }
+-  return undefined;
++  return newest;
+ }
+ 
+ /** Refuses cross-section rooms outright, so a tool is never the way one section speaks to another; membership comes from the record, never a tool argument. */
+
+--- a/server/index.ts
++++ b/server/index.ts
+@@ -8865,10 +8865,10 @@
+     `Room members: ${roster}, and ${userName} (the human).`,
+     readyGroup.bulletin.trim() && `Room bulletin (shared instructions for everyone):\n${readyGroup.bulletin.trim()}`,
+     readyGroup.dm
+-      ? `This is a direct 1:1 conversation, separate from group rooms. Speak only as ${bot.name}. Never write ${userName}'s lines, another bot's lines, or a script of the conversation.`
++      ? `This is a bot-to-bot channel with its own conversation, separate from ${userName}'s private chats and from named group rooms. Speak only as ${bot.name}. Never write ${userName}'s lines, another bot's lines, or a script of the conversation. @Name invites that member into this channel. Do not copy this channel into a private chat.`
+       : orchestration
+-        ? `Speak only as ${bot.name}. Never write ${userName}'s lines, another participant's lines, or a script of the conversation. This turn is yours because you were addressed or assigned: answer it yourself. To bring a teammate in, mention them like @Name.`
+-        : `Speak only as ${bot.name}. Never write ${userName}'s lines, another participant's lines, or a script of the conversation. Reply when you were @mentioned, when the room was asked with @everyone, or when you have something new to add. Otherwise reply with exactly (pass) and nothing else. Staying silent is a complete answer. Mention a teammate like @Name to bring them in, or @everyone to ask the room. To get ${userName}'s attention or ask them something blocking, write @you.`,
++        ? `This named room is its own conversation, separate from each member's private chat with ${userName} and from bot-to-bot channels. Speak only as ${bot.name}. Never write ${userName}'s lines, another participant's lines, or a script of the conversation. This turn is yours because you were addressed or assigned: answer it yourself. To bring a teammate in, mention them like @Name. Do not file this room into a private chat.`
++        : `This named room is its own conversation, separate from each member's private chat with ${userName} and from bot-to-bot channels. Speak only as ${bot.name}. Never write ${userName}'s lines, another participant's lines, or a script of the conversation. Reply when you were @mentioned, when the room was asked with @everyone, or when you have something new to add. Otherwise reply with exactly (pass) and nothing else. Staying silent is a complete answer. Mention a teammate like @Name to bring them in, or @everyone to ask the room. To get ${userName}'s attention or ask them something blocking, write @you. Do not file this room into a private chat.`,
+     outsideRoom.length > 0 && roomPeerRosterSystemPrompt(outsideRoom),
+     integrations.agents && (CREDENTIAL_PROMPT + (orchestration && !orchestration.roomHandoffId ? THREADS_PROMPT : "")).trim(),
+     integrations.agents && (!orchestration || orchestration.roomHandoffId) && "For actual OpenMausBot teamwork, discover IDs with list_room_targets and use coordinate_bots for advice or work in this or another room. Do not substitute native coding helpers for these named bots. Consult only when needed to make a decision; no discussion step is mandatory. Give concrete responsibilities, exact accessible paths and acceptance checks. End your turn after assigning; busy teammates queue and results automatically resume you. When they return, finish the requested verification and give the user one final answer. Native helper names are not evidence that an OpenMausBot teammate participated. Plain @mentions are only for conversational replies in this room." + requesterRule,
+
+--- a/server/agent/system-prompt.ts
++++ b/server/agent/system-prompt.ts
+@@ -40,7 +40,12 @@
+ }
+ 
+ export function botPersona(bot: { name: string; title?: string; description?: string }): string {
+-  return [`You are ${bot.name}, a personal bot in OpenMausBot.`, bot.title && `Role: ${bot.title}.`, bot.description && `About: ${bot.description}`]
++  return [
++    `You are ${bot.name}, a personal bot in OpenMausBot.`,
++    `This is your private chat with the user, a different conversation from named group rooms and from bot-to-bot channels. Speak only as ${bot.name}. Do not write the user's lines, another bot's lines, or a script of the conversation, and do not paste those other conversations in here.`,
++    bot.title && `Role: ${bot.title}.`,
++    bot.description && `About: ${bot.description}`,
++  ]
+     .filter(Boolean)
+     .join(" ");
+ }
+
+--- a/server/observability/recent-work.ts
++++ b/server/observability/recent-work.ts
+@@ -33,8 +33,10 @@
+   for (const group of store.groups) {
+     if (!group.memberIds.includes(bot.id)) continue;
+     const where = `room ${JSON.stringify(group.name)}`;
+-    add({ threadId: group.threadId, where, title: null, private: group.dm === true });
+-    for (const task of group.tasks ?? []) add({ threadId: task.threadId, where, title: task.title, private: group.dm === true });
++    const privateChat = group.dm === true;
++    const openTask = group.tasks?.find((task) => task.threadId === group.threadId);
++    add({ threadId: group.threadId, where, title: openTask?.title ?? null, private: privateChat });
++    for (const task of group.tasks ?? []) add({ threadId: task.threadId, where, title: task.title, private: privateChat });
+   }
+   return out;
+ }
+
+--- a/server/observability/recent-work.test.ts
++++ b/server/observability/recent-work.test.ts
+@@ -28,6 +28,26 @@
+ const me = { id: "me", threadId: "main", tasks: [task("t-inv", "Invoice reconciliation"), task("t-inv", "duplicate id")] };
+ 
+ describe("botThreads", () => {
++  it("names the open room task instead of filing it as an untitled room", () => {
++    const titled = botThreads({
++      ...store,
++      groups: [group({
++        id: "g1",
++        threadId: "room-ops-t1",
++        name: "Ops",
++        memberIds: ["me"],
++        tasks: [
++          { threadId: "room-ops-t1", title: "Deploy day", createdAt: 2 },
++          { threadId: "room-home", title: "Standup", createdAt: 1 },
++        ],
++      })],
++    }, me, "Milind");
++    expect(titled.filter((thread) => thread.where === 'room "Ops"')).toEqual([
++      { threadId: "room-ops-t1", where: 'room "Ops"', title: "Deploy day", private: false },
++      { threadId: "room-home", where: 'room "Ops"', title: "Standup", private: false },
++    ]);
++  });
++
+   it("lists the main chat, tasks, and the rooms the bot belongs to, each named for the bot", () => {
+     expect(botThreads(store, me, "Milind")).toEqual([
+       { threadId: "main", where: "1:1 with Milind", title: "Getting started", private: true },
+
+--- a/server/storage/group-tasks.test.ts
++++ b/server/storage/group-tasks.test.ts
+@@ -241,6 +241,21 @@
+     expect(store.group(channel.id)!.threadId).toBe(first);
+   });
+ 
++  it("keeps the room conversation when another task is open, and moves it only when that conversation is deleted", async () => {
++    const { store, Store } = await freshStore();
++    const bot = store.createBot();
++    const channel = store.createGroup("Product", [bot.id]);
++    const conversation = channel.threadId;
++    const side = store.createGroupTask(channel.id)!;
++    expect(store.group(channel.id)).toMatchObject({ threadId: side.threadId, homeThreadId: conversation });
++    store.switchGroupTask(channel.id, side.threadId);
++    expect(store.group(channel.id)?.homeThreadId).toBe(conversation);
++
++    const reloaded = new Store(() => ({ instanceId: "claude", model: "m" }));
++    expect(reloaded.group(channel.id)?.homeThreadId).toBe(conversation);
++    expect(reloaded.deleteGroupTasks(channel.id, [conversation])?.group.homeThreadId).toBe(side.threadId);
++  });
++
+   it("deleteGroupTasks ignores direct-message groups and unknown groups", async () => {
+     const { store } = await freshStore();
+     const bot = store.createBot();
