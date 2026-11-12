@@ -67,7 +67,7 @@ beforeAll(async () => {
         FAKE_CLAUDE_REPLIES: JSON.stringify([["Let me check with @Ann later.", "All done here."]]),
         FAKE_CLAUDE_REPLY_STATE: join(home, "narrator-replies.txt"),
       }),
-      // a turn that ends on "(pass)", then the re-ask's answer
+      // a turn that chooses to stay silent
       passer: fixture("Passing fixture", {
         FAKE_CLAUDE_MODE: "happy",
         FAKE_CLAUDE_REPLIES: JSON.stringify(["(pass)", "Result: the title is fixed."]),
@@ -242,20 +242,24 @@ describe("a member's room reply is its final message", { timeout: 60_000 }, () =
     }
   });
 
-  it("re-asks once for a short result when a turn ends without one", async () => {
+  it("stays silent when a member passes instead of forcing a summary", async () => {
     const pat = await createBot("Pat", "passer");
     const ann = await createBot("Ann", "quick");
     const room = await createRoom("Pass room", [pat.id, ann.id], { kind: "member", botId: pat.id });
+    const replyState = join(home, "passer-replies.txt");
     try {
       await send(room.id, "Did the title get fixed?");
       await expect.poll(async () => {
         const { room: current, messages } = await snapshot(room.id);
+        let consumed = 0;
+        try { consumed = Number(readFileSync(replyState, "utf8")) || 0; } catch { consumed = 0; }
         return {
           working: current?.working,
+          consumed,
           chip: chips(messages, "Pat finished without a summary — asking for a short result").length,
-          final: botTexts(messages, pat.id).at(-1)?.text,
+          texts: botTexts(messages, pat.id).map((message) => message.text),
         };
-      }, { timeout: 15_000 }).toEqual({ working: false, chip: 1, final: "Result: the title is fixed." });
+      }, { timeout: 15_000 }).toEqual({ working: false, consumed: 1, chip: 0, texts: [] });
       expect(botTexts((await snapshot(room.id)).messages, ann.id)).toHaveLength(0);
     } finally {
       await cleanup(room?.id, [pat.id, ann.id]);

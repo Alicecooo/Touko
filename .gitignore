@@ -68,8 +68,6 @@ Desktop.ini
 /test-results/
 /playwright-report/
 /blob-report/
-/evals/reports/runs/
-/evals/live/baselines/
 
 # Unused upstream screenshots and demo recordings; keep them local
 /docs/screenshots/

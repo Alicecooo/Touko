@@ -51,7 +51,11 @@ import { groupTurnCwd } from "./teams/room-cwd.ts";
 import { RoomTurnDeadline, RoomTurnStallRegistry, effectiveRoomTurnTimeoutMinutes, parseConversationTurnTimeout, roomTurnTimeoutMessage } from "./teams/room-turn-timeout.ts";
 import { roomTurnEnd, type RoomClaimEnd } from "./teams/room-turn-end.ts";
 import { applyHoldDirective, classifyHoldDirective, heldMemberLine, rememberHeldMessage, stopWordPlacement } from "./teams/room-holds.ts";
-import { finishedWithoutSummaryLine, ROOM_SUMMARY_REASK, roomTurnNarrationIds, roomTurnReply } from "./teams/room-reply.ts";
+import { roomHomeThreadId } from "./teams/room-home.ts";
+import {
+  asOwnVoice, finishedWithoutSummaryLine, isExplicitPass, otherVoices, ROOM_SUMMARY_REASK, roomTurnNarrationIds, roomTurnReply,
+  shouldReaskRoomSummary,
+} from "./teams/room-reply.ts";
 import { pickComputer } from "./computers/computer-selection.ts";
 import { chartRenderer, compileChart, dataEngine, validateVegaLite } from "./data/deps.ts";
 import { BUILT_IN_DATA_SYSTEM_PROMPT } from "./data/instructions.ts";
@@ -5502,8 +5506,17 @@ bus.subscribe((event: RuntimeEvent) => {
       pushStoppedTurn(turnId);
       return;
     }
-    pushMessage({ role: "bot", kind: "text", text: spoken.text, turnId });
-    lastReply.set(event.threadId, spoken.text);
+    let body = spoken.text;
+    if (group && speaker) {
+      body = asOwnVoice(body, speaker.name, otherVoices(
+        speaker.name,
+        group.memberIds.map((id) => store.bot(id)?.name ?? ""),
+        cfg.profile?.name?.trim() || "User",
+      ));
+      if (!body.trim() || isExplicitPass(body)) return;
+    }
+    pushMessage({ role: "bot", kind: "text", text: body, turnId });
+    lastReply.set(event.threadId, body);
   };
 
   if (coordinatorVisibleText) pushAssistantText(coordinatorVisibleText, completedTurnId);
@@ -8853,7 +8866,11 @@ async function runClaimedGroupMemberTurn(
     bot.description && `About: ${bot.description}`,
     `Room members: ${roster}, and ${userName} (the human).`,
     readyGroup.bulletin.trim() && `Room bulletin (shared instructions for everyone):\n${readyGroup.bulletin.trim()}`,
-    `Reply as yourself, briefly and conversationally. To bring a teammate in, mention them like @Name — they'll see the conversation and respond.${readyGroup.dm ? "" : ` To get ${userName}'s attention or ask them something blocking, write @you.`}`,
+    readyGroup.dm
+      ? `This is a direct 1:1 conversation, separate from group rooms. Speak only as ${bot.name}. Never write ${userName}'s lines, another bot's lines, or a script of the conversation.`
+      : orchestration
+        ? `Speak only as ${bot.name}. Never write ${userName}'s lines, another participant's lines, or a script of the conversation. This turn is yours because you were addressed or assigned: answer it yourself. To bring a teammate in, mention them like @Name.`
+        : `Speak only as ${bot.name}. Never write ${userName}'s lines, another participant's lines, or a script of the conversation. Reply when you were @mentioned, when the room was asked with @everyone, or when you have something new to add. Otherwise reply with exactly (pass) and nothing else. Staying silent is a complete answer. Mention a teammate like @Name to bring them in, or @everyone to ask the room. To get ${userName}'s attention or ask them something blocking, write @you.`,
     outsideRoom.length > 0 && roomPeerRosterSystemPrompt(outsideRoom),
     integrations.agents && (CREDENTIAL_PROMPT + (orchestration && !orchestration.roomHandoffId ? THREADS_PROMPT : "")).trim(),
     integrations.agents && (!orchestration || orchestration.roomHandoffId) && "For actual OpenMausBot teamwork, discover IDs with list_room_targets and use coordinate_bots for advice or work in this or another room. Do not substitute native coding helpers for these named bots. Consult only when needed to make a decision; no discussion step is mandatory. Give concrete responsibilities, exact accessible paths and acceptance checks. End your turn after assigning; busy teammates queue and results automatically resume you. When they return, finish the requested verification and give the user one final answer. Native helper names are not evidence that an OpenMausBot teammate participated. Plain @mentions are only for conversational replies in this room." + requesterRule,
@@ -8968,6 +8985,7 @@ async function runClaimedGroupMemberTurn(
     return false;
   }
   const turnTexts: string[] = [];
+  let didRoomWork = false;
   let turnCompletedOk = false;
   let providerTurnId: string | undefined;
   let abandoned = false;
@@ -9017,6 +9035,7 @@ async function runClaimedGroupMemberTurn(
       if (e.threadId !== threadId) return;
       if (providerTurnId && e.turnId && e.turnId !== providerTurnId) return;
       if (e.type === "item.completed" && e.itemType === "assistant_text") turnTexts.push(e.text);
+      else if ((e.type === "item.started" || e.type === "item.completed") && e.itemType === "tool") didRoomWork = true;
       else if (e.type === "turn.completed") {
         turnCompletedOk = e.ok;
         const end = roomTurnEnd(e, Boolean(orchestration), roomClaimFailure);
@@ -9125,7 +9144,12 @@ async function runClaimedGroupMemberTurn(
   });
   // Revoke before any chained teammate work, so a retained proxy cannot act during the next member's generation.
   revokeInternalCapabilityGeneration(threadId, internalGeneration);
-  const replyText = roomTurnReply(turnTexts);
+  const voicedReply = asOwnVoice(
+    turnTexts.at(-1) ?? "",
+    bot.name,
+    otherVoices(bot.name, readyGroup.memberIds.map((id) => store.bot(id)?.name ?? ""), userName),
+  );
+  const replyText = roomTurnReply([voicedReply]);
   const heldMidTurn = heldInterrupts.delete(`${threadId}:${bot.id}`);
   releaseRoomComputer();
   roomOutcome = outcome;
@@ -9204,7 +9228,7 @@ async function runClaimedGroupMemberTurn(
     !orchestration &&
     outcome === "settled" &&
     turnCompletedOk &&
-    !replyText &&
+    shouldReaskRoomSummary(voicedReply, { didWork: didRoomWork, direct: readyGroup.dm === true }) &&
     !isCancelled?.() &&
     !roomHeld(store.group(group.id), bot.id)
   ) {
@@ -10033,7 +10057,7 @@ function deliverCalendarCall(call: CalendarCall, scheduledFor: number): void {
   const threadIds = new Set([group.threadId, ...(group.tasks ?? []).map((task) => task.threadId)]);
   const messages = [...threadIds].flatMap((threadId) => store.messagesFor(threadId));
   if (messages.some((message) => message.sendId === sendId)) return;
-  startGroupTurn(group.id, text, undefined, sendId);
+  startGroupTurn(group.id, text, undefined, sendId, "chat", undefined, { threadId: roomHomeThreadId(group) });
 }
 
 function resolveReplyTarget(threadId: string, value: unknown): Message | undefined {
@@ -12256,7 +12280,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         }
         if (new Set(botIds).size !== botIds.length) return refuse(400, "bot_ids name the same teammate twice — send each teammate once");
         const targets = botIds.map(botId => ({ groupId: destination?.id,
-          threadId: destination ? destination.id === source?.id ? address.threadId : destination.threadId : store.bot(botId)?.threadId ?? "", botId,
+          threadId: destination ? destination.id === source?.id ? address.threadId : roomHomeThreadId(destination) : store.bot(botId)?.threadId ?? "", botId,
         }));
         for (const target of targets) {
             // Echo only the id the caller sent, never a bot's name.
@@ -12580,7 +12604,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         if (!decision.allowed) return json(res, 429, { error: decision.message });
         // Reading the mark keeps its window alive through a turn that only posts; an aged-out mark would hand the next hop to auto-approve.
         const unattended = isUnattended(poster.id, internalCapability.threadId);
-        const posted = store.appendMessage(room.threadId, {
+        const posted = store.appendMessage(roomHomeThreadId(room), {
           role: "bot",
           kind: "text",
           text: message,
