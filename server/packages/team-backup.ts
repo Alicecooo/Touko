@@ -3,7 +3,6 @@ import { takeImportName } from "../../shared/import-name.ts";
 import { MAX_TEAM_BACKUP_BYTES, parseTeamBackup, type BackupTask, type TeamBackup } from "../../shared/team-backup.ts";
 import { helperModelAllowed } from "../../shared/wire.ts";
 import type { BotRecord, GroupRecord, Message, Store, TaskRecord } from "../storage/store.ts";
-import { roomHomeThreadId } from "../teams/room-home.ts";
 import type { Routine, RoutineManager } from "../automation/routines.ts";
 import { redactSecretsInText } from "../security/redact.ts";
 import { listMemoryLogs, listMemoryTopics, readMemoryFile, readMemoryLog, readMemoryTopic, writeMemoryFile, writeMemoryLog, writeMemoryTopic } from "../workspace/workspace.ts";
@@ -46,8 +45,8 @@ function messageText(message: Message): string {
 export function createTeamBackup(store: Store, routines: Routine[], name: string): TeamBackup {
   const botIds = new Set(store.bots.map((bot) => bot.id));
   const warnings: string[] = [];
-  const history = (record: BotRecord | GroupRecord): BackupTask[] => {
-    const tasks = record.tasks?.length ? record.tasks : [{ threadId: record.threadId, title: "Conversation", createdAt: record.createdAt }];
+  const history = (record: BotRecord): BackupTask[] => {
+    const tasks: TaskRecord[] = record.tasks?.length ? record.tasks : [{ threadId: record.threadId, title: "Conversation", createdAt: record.createdAt } as TaskRecord];
     return tasks.map((task) => ({
       key: task.threadId, title: task.title, createdAt: task.createdAt,
       titleFromFirstMessage: "titleFromFirstMessage" in task && task.titleFromFirstMessage || undefined,
@@ -58,38 +57,24 @@ export function createTeamBackup(store: Store, routines: Routine[], name: string
       closedBy: "closedBy" in task && task.closedBy
         ? { botId: task.closedBy.botId, name: task.closedBy.name, at: task.closedBy.at }
         : undefined,
-      pinned: task.pinned === true ? true : undefined,
-      turnTimeoutMinutes: "turnTimeoutMinutes" in task && typeof task.turnTimeoutMinutes === "number"
-        ? task.turnTimeoutMinutes
-        : undefined,
+      pinned: "pinned" in task && task.pinned === true ? true : undefined,
       activeLeafId: store.activeLeaf(task.threadId),
       messages: store.messagesFor(task.threadId).map((message) => ({
         id: message.id, role: message.role, text: messageText(message), at: message.at,
         parentId: message.parentId ?? null, replyToId: message.replyToId,
-        from: message.from, peerPost: message.peerPost,
+        from: message.from,
       })),
     }));
   };
   const groups = store.groups.map((group) => {
     const memberIds = group.memberIds.filter((id) => botIds.has(id));
-    if (memberIds.length !== group.memberIds.length) warnings.push(`Room “${group.name}” contains deleted bots. Its conversation is included with the remaining members.`);
+    if (memberIds.length !== group.memberIds.length) warnings.push(`Group “${group.name}” contains deleted bots. Only remaining members are included.`);
     return {
-      key: group.id, name: group.name, section: group.section, dm: Boolean(group.dm) && memberIds.length === 2,
-      bulletin: group.bulletin, memberIds,
-      defaultResponder: group.defaultResponder.kind === "member" && !memberIds.includes(group.defaultResponder.botId)
-        ? { kind: "mentions" as const }
-        : group.defaultResponder,
-      activeTask: group.threadId,
-      tasks: history(group).map((task, index) =>
-        group.dm && index === 0 && typeof group.turnTimeoutMinutes === "number"
-          ? { ...task, turnTimeoutMinutes: group.turnTimeoutMinutes }
-          : task,
-      ),
+      key: group.id, name: group.name, section: group.section, memberIds,
     };
   });
   const validRoutines = routines.filter((routine) => {
-    const room = groups.find((group) => group.key === routine.groupId);
-    const valid = botIds.has(routine.botId) && (routine.target !== "room-goal" || (room && !room.dm && room.memberIds.includes(routine.botId)));
+    const valid = botIds.has(routine.botId);
     if (!valid) warnings.push(`Routine “${routine.name}” is not included because its bot, room or coordinator was deleted.`);
     return valid;
   });
@@ -112,7 +97,7 @@ export function createTeamBackup(store: Store, routines: Routine[], name: string
     groups,
     routines: validRoutines.map((routine) => ({
       name: routine.name, prompt: routine.prompt, target: routine.target, botId: routine.botId,
-      groupId: routine.groupId, runOn: routine.runOn, schedule: routine.schedule,
+      runOn: routine.runOn, schedule: routine.schedule,
       durationMinutes: routine.durationMinutes, timeoutMinutes: routine.timeoutMinutes,
     })),
   });
@@ -131,7 +116,6 @@ export function importTeamBackup(store: Store, routines: RoutineManager, input: 
   const existingBotIds = new Set(store.bots.map((bot) => bot.id));
   const existingGroupIds = new Set(store.groups.map((group) => group.id));
   const botIds = new Map<string, string>();
-  const groupIds = new Map<string, string>();
   const takenNames = new Set(store.bots.map((bot) => bot.name.trim().toLowerCase()));
   const takenGroups = new Set(store.groups.map((group) => group.name.trim().toLowerCase()));
   const takenSections = new Set([
@@ -154,7 +138,6 @@ export function importTeamBackup(store: Store, routines: RoutineManager, input: 
       ...(message.from && botIds.has(message.from.botId)
         ? { from: { ...message.from, botId: botIds.get(message.from.botId)! } }
         : message.from ? { text: `${message.from.name}:\n${message.text}` } : {}),
-      peerPost: message.peerPost,
     }));
     store.importTranscript(threadId, messages, task.activeLeafId ? ids.get(task.activeLeafId)! : null);
   };
@@ -195,46 +178,12 @@ export function importTeamBackup(store: Store, routines: RoutineManager, input: 
       source.tasks.forEach((task, i) => restore(task, tasks[i].threadId));
     }
     for (const source of backup.groups) {
-      const group = store.createGroup(takeImportName(source.name, takenGroups), source.memberIds.map((id) => botIds.get(id)!), source.dm, sectionFor(source.section));
+      const group = store.createGroup(takeImportName(source.name, takenGroups), source.memberIds.map((id) => botIds.get(id)!), false, sectionFor(source.section));
       groups.push(group);
-      groupIds.set(source.key, group.id);
-      const responder = source.defaultResponder;
-      store.patchGroup(group.id, {
-        bulletin: source.bulletin,
-        setupCompletedAt: Date.now(),
-        ...(source.dm && source.tasks[0]?.turnTimeoutMinutes != null
-          ? { turnTimeoutMinutes: source.tasks[0].turnTimeoutMinutes }
-          : {}),
-        defaultResponder:
-        responder.kind === "member" ? { kind: "member", botId: botIds.get(responder.botId)! }
-          : responder.kind === "auto"
-            ? source.memberIds.length > 0
-              ? { kind: "member", botId: botIds.get(responder.fallbackBotId ?? source.memberIds[0])! }
-              : { kind: "mentions" }
-            : responder });
-      const threads = source.tasks.map((task, i) => {
-        if (i === 0) {
-          if (!source.dm) store.renameGroupTask(group.id, group.threadId, task.title);
-          return group.threadId;
-        }
-        return store.createGroupTask(group.id, task.title, false)!.threadId;
-      });
-      source.tasks.forEach((task, i) => restore(task, threads[i]));
-      if (!source.dm) {
-        group.tasks = source.tasks.map((task, i) => ({
-          threadId: threads[i], title: task.title, createdAt: task.createdAt,
-          updatedAt: task.messages.reduce((max, message) => Math.max(max, message.at), task.createdAt),
-          ...(task.pinned === true ? { pinned: true as const } : {}),
-          ...(task.titleFromFirstMessage ? { titleFromFirstMessage: true } : {}),
-          ...(task.turnTimeoutMinutes != null ? { turnTimeoutMinutes: task.turnTimeoutMinutes } : {}),
-        }));
-        group.homeThreadId = roomHomeThreadId(group);
-        store.switchGroupTask(group.id, threads[source.tasks.findIndex((task) => task.key === source.activeTask)]);
-      }
+      store.patchGroup(group.id, { section: sectionFor(source.section) });
     }
     for (const source of backup.routines) {
-      createdRoutines.push(routines.create({ ...source, botId: botIds.get(source.botId)!,
-        groupId: source.target === "room-goal" ? groupIds.get(source.groupId!) : undefined, enabled: false }));
+      createdRoutines.push(routines.create({ ...source, botId: botIds.get(source.botId)!, enabled: false }));
     }
     return { name: backup.name, bots, groups, routines: createdRoutines };
   } catch (error) {

@@ -21,19 +21,6 @@ const COPY = {
   { label: string; tone: string }
 >;
 
-const GOAL_COPY = {
-  completed: COPY.completed,
-  "needs-input": { label: "Needs your input", tone: "text-warning" },
-  blocked: { label: "Blocked", tone: "text-danger" },
-  "limit-reached": { label: "Turn limit reached", tone: "text-warning" },
-  paused: { label: "Paused", tone: "text-warning" },
-  stopped: { label: "Stopped", tone: "text-ink-secondary" },
-  failed: COPY.failed,
-} satisfies Record<
-  NonNullable<RoutineRunCardData["goalStatus"]>,
-  { label: string; tone: string }
->;
-
 function compactDetail(value: string | undefined): string {
   const clean = value?.replace(/\s+/g, " ").trim() ?? "";
   return clean.length > DETAIL_LIMIT ? `${clean.slice(0, DETAIL_LIMIT - 1).trimEnd()}…` : clean;
@@ -65,9 +52,7 @@ export function RoutineRunCard({
     ) : null;
   }
 
-  const copy = run.goalStatus
-    ? GOAL_COPY[run.goalStatus]
-    : run.status === "queued" && run.deferredAt != null
+  const copy = run.status === "queued" && run.deferredAt != null
       ? { label: "Deferred: target busy", tone: "text-warning" }
       : COPY[run.status];
   const detail = compactDetail(
@@ -75,7 +60,7 @@ export function RoutineRunCard({
       ? (run.error ?? run.summary)
       : (run.summary ?? run.error),
   );
-  const actionLabel = run.goalStatus === "needs-input" ? "Review" : "Open run";
+  const actionLabel = "Open run";
 
   return (
     <section
@@ -87,7 +72,7 @@ export function RoutineRunCard({
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <h3 className="truncate text-[14px] font-semibold text-ink">{run.routineName}</h3>
             <span aria-live="polite" className={cn("inline-flex items-center gap-1 text-[11.5px] font-semibold", copy.tone)}>
-              {run.status === "running" && !run.goalStatus && <Loader2 aria-hidden="true" className="size-3 animate-spin" />}
+              {run.status === "running" && <Loader2 aria-hidden="true" className="size-3 animate-spin" />}
               {copy.label}
             </span>
           </div>
@@ -107,9 +92,7 @@ export function RoutineRunCard({
             aria-label={`${actionLabel} for ${run.routineName}`}
             className={cn(
               "flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[12px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-              run.goalStatus === "needs-input"
-                ? "bg-warning/15 text-warning hover:bg-warning/25"
-                : "text-ink-secondary hover:bg-inset hover:text-ink",
+              "text-ink-secondary hover:bg-inset hover:text-ink",
             )}
           >
             {actionLabel}

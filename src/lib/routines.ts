@@ -4,7 +4,6 @@ export type {
   RoutineScheduleInput,
   RoutineRunOn,
   RoutineTarget,
-  RoutineGoalStatus,
   RoutineContextAttachment,
   RoutineRunTrigger,
   RoutineRunStatus,

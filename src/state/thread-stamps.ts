@@ -27,10 +27,7 @@ export function bumpThreadUpdatedAt(state: AppState, threadId: string, at: numbe
       const tasks = advance(bot.tasks);
       return tasks === bot.tasks ? bot : { ...bot, tasks };
     }),
-    groups: state.groups.map((group) => {
-      const tasks = advance(group.tasks);
-      return tasks === group.tasks ? group : { ...group, tasks };
-    }),
+    groups: state.groups,
   };
 }
 
@@ -42,6 +39,6 @@ export function rewindThreadUpdatedAt(state: AppState, threadId: string, message
   return {
     ...state,
     bots: state.bots.map((bot) => bot.tasks?.some((task) => task.threadId === threadId) ? { ...bot, tasks: apply(bot.tasks) } : bot),
-    groups: state.groups.map((group) => group.tasks?.some((task) => task.threadId === threadId) ? { ...group, tasks: apply(group.tasks) } : group),
+    groups: state.groups,
   };
 }

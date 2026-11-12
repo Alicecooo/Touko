@@ -5,7 +5,6 @@ import type { Assignment, EnvelopeNames, Level, Limits, Mode, Origin, Outcome, O
 
 /** One coordinate_bots call, as the internal route hands it to the server. */
 export type CoordinateBotsCall = {
-  groupId?: string;
   botIds: string[];
   message: string;
   reason?: string;

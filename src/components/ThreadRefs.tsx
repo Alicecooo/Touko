@@ -1,7 +1,7 @@
 import { MentionText } from "./MentionText";
 import type { MentionPeer } from "@/lib/mentions";
 import { createContext, Fragment, useContext, useMemo, useRef, type ReactNode } from "react";
-import { botOpensTo, openBot, openThread, useStore, type Action, type AppState, type Bot, type Group, type ThreadTarget } from "@/state/store";
+import { botOpensTo, openBot, openThread, useStore, type Action, type AppState, type Bot, type ThreadTarget } from "@/state/store";
 import { useShowThreads } from "@/lib/thread-preferences";
 import { t } from "@/lib/i18n";
 import { parseBotRefUrl, parseThreadRefUrl, resolveThreadRefAddress, splitThreadRefsForDisplay, type ThreadRefCandidate } from "@/lib/thread-refs";
@@ -19,18 +19,11 @@ export function useThreadRefs(): ThreadRefsValue {
 
 export function collectThreadRefs(
   bots: ReadonlyArray<Pick<Bot, "id" | "name" | "tasks">>,
-  groups: ReadonlyArray<Pick<Group, "id" | "name" | "tasks" | "dm">>,
 ): ThreadRefCandidate[] {
   const refs: ThreadRefCandidate[] = [];
   for (const bot of bots) {
     for (const task of bot.tasks ?? []) {
       refs.push({ botId: bot.id, botName: bot.name, threadId: task.threadId, title: task.title, activeAt: task.createdAt });
-    }
-  }
-  for (const group of groups) {
-    if (group.dm) continue;
-    for (const task of group.tasks ?? []) {
-      refs.push({ botId: group.id, botName: group.name, threadId: task.threadId, title: task.title, activeAt: task.createdAt });
     }
   }
   return refs;
@@ -41,7 +34,7 @@ const signatureOf = (refs: ThreadRefCandidate[]) =>
 
 export function ThreadRefsProvider({ children }: { children: ReactNode }) {
   const { state } = useStore();
-  const next = collectThreadRefs(state.bots, state.groups);
+  const next = collectThreadRefs(state.bots);
   const signature = signatureOf(next);
   const cache = useRef({ signature, threads: next });
   if (cache.current.signature !== signature) cache.current = { signature, threads: next };
@@ -80,9 +73,7 @@ export function openChatLink(dispatch: (action: Action) => void, link: string, s
       openBot(dispatch, bot, threadsShown);
       return { name: bot.name, threadId: botOpensTo(bot, threadsShown) };
     }
-    const room = state.groups.find((group) => group.id === id && !group.dm);
-    if (room) dispatch({ type: "select", id: room.id });
-    return room && { name: room.name, threadId: room.threadId };
+    return undefined;
   };
   const ownerAddress = parseBotRefUrl(link);
   if (ownerAddress) {
@@ -95,7 +86,7 @@ export function openChatLink(dispatch: (action: Action) => void, link: string, s
     return false;
   }
   const address = parseThreadRefUrl(link);
-  const ref = address ? resolveThreadRefAddress(collectThreadRefs(state.bots, state.groups), address) : null;
+  const ref = address ? resolveThreadRefAddress(collectThreadRefs(state.bots), address) : null;
   if (ref) return openThread(dispatch, ref, state, threadsShown);
   const owner = address?.botId ? openOwner(address.botId) : undefined;
   if (owner) {

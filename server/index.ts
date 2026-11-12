@@ -46,10 +46,9 @@ import { messageFileRoots } from "./storage/message-file.ts";
 import { fitsOnOneLine } from "./bots/bot-profile.ts";
 import { routeDirectTurn } from "./agent/turn-route.ts";
 import { groupTurnCwd } from "./teams/room-cwd.ts";
-import { RoomTurnDeadline, RoomTurnStallRegistry, effectiveRoomTurnTimeoutMinutes, parseConversationTurnTimeout, roomTurnTimeoutMessage } from "./teams/room-turn-timeout.ts";
+import { RoomTurnDeadline, RoomTurnStallRegistry, roomTurnTimeoutMessage } from "./teams/room-turn-timeout.ts";
 import { roomTurnEnd, type RoomClaimEnd } from "./teams/room-turn-end.ts";
-import { applyHoldDirective, classifyHoldDirective, heldMemberLine, rememberHeldMessage, stopWordPlacement } from "./teams/room-holds.ts";
-import { roomHomeThreadId } from "./teams/room-home.ts";
+import { heldMemberLine, rememberHeldMessage, stopWordPlacement } from "./teams/room-holds.ts";
 import {
   asOwnVoice, finishedWithoutSummaryLine, isExplicitPass, otherVoices, ROOM_SUMMARY_REASK, roomTurnReply,
   shouldReaskRoomSummary,
@@ -73,11 +72,11 @@ import { createMemoryUpkeep, upkeepEnabled } from "./memory/memory-upkeep.ts";
 import { createCacheKeepWarm, type KeepWarmStatus, type KeepWarmTarget } from "./agent/cache-keepwarm.ts";
 import { createSkillReview, turnToolSteps } from "./skills/skill-review.ts";
 import { createSideJobs, helperSelection } from "./agent/side-jobs.ts";
-import type { CaptureTurn, RoomLine } from "./memory/memory-capture.ts";
+import type { CaptureTurn } from "./memory/memory-capture.ts";
 import { appendAboutMe, commitLearned, planLearned } from "./bots/profile-learned.ts";
-import { canAccessTeam, canReachPeer, coordinatorSupervises, livePeerRoster, livePeerRosterBlock, peerAllowed, peerName, peerRosterSystemPrompt, peerStatus, peerStatusWords, reachablePeers, resolveTeammate, roomPeerRosterSystemPrompt, roomRosterLine } from "./teams/peer-roster.ts";
+import { canAccessTeam, canReachPeer, livePeerRoster, livePeerRosterBlock, peerAllowed, peerName, peerRosterSystemPrompt, peerStatus, peerStatusWords, reachablePeers, resolveTeammate, roomPeerRosterSystemPrompt, roomRosterLine } from "./teams/peer-roster.ts";
 import { attachForTurn, saveBotAttachment } from "./bots/bot-attachment.ts";
-import { cacheUntilConfigChanges, ensureDirs, instanceConfigs, loadConfig, changedInstanceIds, engineLaunches, roomTurnTimeoutMinutes, mcpCallTimeoutMinutes, cacheKeepWarmSettings, threadEventLogMaxBytes, maxConcurrentBotThreads, threadEventLogRetentionDays, saveConfig, showToolCallsEnabled, routinesInConversationEnabled, claudeUserMcpEnabled, skillAuthoringEnabled, skillReviewEnabled, skillReviewSteps, autoRecallEnabled, captureQuietMs, roomMemoryCaptureEnabled, tidyHour, llmThreadTitlesEnabled, stripWorkspaceCredentialEnv, PROVIDER_CREDENTIAL_ENV, persistableInstanceConfigs, type AppConfig, DATA_DIR, customMcpServers, onConfigSaved, CLAUDE_API_INSTANCE } from "./config/config.ts";
+import { cacheUntilConfigChanges, ensureDirs, instanceConfigs, loadConfig, changedInstanceIds, engineLaunches, mcpCallTimeoutMinutes, cacheKeepWarmSettings, threadEventLogMaxBytes, maxConcurrentBotThreads, threadEventLogRetentionDays, saveConfig, showToolCallsEnabled, routinesInConversationEnabled, claudeUserMcpEnabled, skillAuthoringEnabled, skillReviewEnabled, skillReviewSteps, autoRecallEnabled, captureQuietMs, tidyHour, llmThreadTitlesEnabled, stripWorkspaceCredentialEnv, PROVIDER_CREDENTIAL_ENV, persistableInstanceConfigs, type AppConfig, DATA_DIR, customMcpServers, onConfigSaved, CLAUDE_API_INSTANCE } from "./config/config.ts";
 import { sweepThreadEventLogs, type ThreadLogRetentionCandidate } from "./storage/thread-retention.ts";
 import { ComputerControl } from "./computers/computer-control.ts";
 import { augmentedPath, resetPathCache } from "./platform/env-path.ts";
@@ -106,7 +105,7 @@ import type { GroupGoalRunCardData, GroupGoalRunStatus } from "../shared/group-g
 
 import { BUILT_IN_DRIVERS } from "./drivers/builtIn.ts";
 import { openCodeProviderKeysAllowed, setOpenCodeProviderKeyPolicy } from "./drivers/acp/opencode-go.ts";
-import { readMessageText, recallMessages, recentMessages, closeMessageSearch, closeMessageDb, chatFollowups, cancelledChatFollowup, settleChatFollowups, threadsReferencing, logNotification } from "./storage/message-db.ts";
+import { readMessageText, recallMessages, recentMessages, closeMessageDb, chatFollowups, cancelledChatFollowup, settleChatFollowups, threadsReferencing, logNotification } from "./storage/message-db.ts";
 import { briefCrossingLabel, claimRecallCrossings, recallCrossingLabel } from "./observability/recall-disclosure.ts";
 import { parseSince, parseUntil, recentWork, recentWorkPrompt, turnOutcomeLine } from "./observability/recent-work.ts";
 import { chiefEscalationsEnabled, NEEDS_INPUT_GATE, peerApprovalGate, RAISED_GATE } from "./observability/escalations.ts";
@@ -118,7 +117,7 @@ const SESSION_READ_MAX_CHARS = 8_000;
 import { promptWithReply, transcriptText } from "./agent/replies.ts";
 import { admit } from "./agent/admission.ts";
 import { drainSteeredMessages, hasQueuedSteeredMessages, onSteeredQueueChange, queuedSteerSnapshot, queuedSteeredMessage, queuedThreadPosition, queueSteeredMessage, restoreSteeredMessages } from "./teams/steer-queue.ts";
-import { drainChannelMessages, queuedChannelMessage, queueChannelMessage, restoreChannelMessages, type ChannelQueueItem } from "./teams/channel-queue.ts";
+import type { ChannelQueueItem } from "./teams/channel-queue.ts";
 import { acceptedSendMatch, sendFingerprint, SendSequencer } from "./agent/send-idempotency.ts";
 import { EventBus } from "./harness/bus.ts";
 import { ProviderRegistry } from "./harness/registry.ts";
@@ -129,17 +128,16 @@ import { hostedModelPolicy, HOSTED_MODEL_POLICY_HEADER } from "./deployment/host
 import { RESTART_EXIT_CODE } from "./platform/restart.ts";
 import { holdIncludedServices } from "./deployment/included-services.ts";
 import type { ProviderInstance } from "./harness/contracts.ts";
-import { readyToRun, selectDefaultModelSelection, withNewBotEffort, type SelectableInstance } from "./model-catalog/default-model-selection.ts";
+import { readyToRun, selectDefaultModelSelection, type SelectableInstance } from "./model-catalog/default-model-selection.ts";
 import { threadModelFallback, type ThreadEngine } from "./agent/thread-model.ts";
 import { computerEngineMoveText, removedComputerInstanceIds, writeComputerEngineMoveLines } from "./computers/computer-engine-removal.ts";
 import { cancelPeerApprovalsFor, cancelPeerApprovalsForThread, dismissStalePeerCards, peerApprovalFailure, requestPeerApproval, type ApprovalBus } from "./teams/peer-approval.ts";
 import { peerDeliveryReceipt, type PeerDeliveryReceipt } from "./teams/peer-delivery.ts";
 import { createRoomAccess } from "./host/room-access.ts";
-import { createRoomJobs, parallelRoomJobsEnabled, type RoomRoundLine } from "./host/room-jobs.ts";
+import { createRoomJobs, type RoomRoundLine } from "./host/room-jobs.ts";
 import { CONSENT_RULE, escapeNotes, OUTSIDE, peerLineText, peerProvenanceNote, quoteInNote, reportNote, requestWorkOrigin, type WorkOrigin } from "./teams/peer-provenance.ts";
-import { decideRoomPost, emptyRoomPostBudget, type RoomPostAttempt, type RoomPostBudget } from "./teams/room-post-budget.ts";
 import { pageSize, slimMessage } from "./host/message-pages.ts";
-import { mentionedBots, roomResponders, sectionKey, Store, threadTitleFrom, titleFromLlm, type BotRecord, type GroupDefaultResponder, type GroupRecord, type Message, type TaskRecord, toWireTask } from "./storage/store.ts";
+import { mentionedBots, roomResponders, sectionKey, Store, threadTitleFrom, titleFromLlm, type BotRecord, type GroupRecord, type Message, type TaskRecord, toWireTask } from "./storage/store.ts";
 import { turnStartLogLine } from "./agent/turn-log.ts";
 import { TurnStops, outwardActions, stoppedTurnOutcome, turnEvidence } from "./agent/turn-outcome.ts";
 import { buildRecoveryText, buildTurnContext, engineIsFresh, replaysNatively } from "./agent/turn-context.ts";
@@ -164,7 +162,7 @@ import { botSkillTemplateSchema, newBotDefaultsSchema } from "./bots/new-bot-def
 import { expandLearnTurnText, learnSource } from "./skills/skill-learn.ts";
 import { connectedAppsForSetup, expandSetupTurnText, setupModeActive, setupSystemPrompt, type SetupConnectedApps } from "./config/setup-mode.ts";
 import type { SkillRequestCardData } from "../shared/skill-request.ts";
-import { botPersona, buildSystemPrompt, userProfileSystemPrompt, computerPrompt, composioSystemPrompt, customMcpPrompt, CREDENTIAL_PROMPT, longCommandsPrompt, THREADS_PROMPT, WIDGET_PROMPT, LEARN_PROMPT, PROFILE_PROMPT, TEAM_MEMORY_PROMPT, TRIGGER_PROMPT, ROUTINE_EXECUTION_PROMPT, WEBHOOK_PROMPT, resolveComputerPromptKind, teamAvailabilityPart } from "./agent/system-prompt.ts";
+import { botPersona, buildSystemPrompt, userProfileSystemPrompt, computerPrompt, composioSystemPrompt, customMcpPrompt, CREDENTIAL_PROMPT, longCommandsPrompt, THREADS_PROMPT, WIDGET_PROMPT, LEARN_PROMPT, PROFILE_PROMPT, TEAM_MEMORY_PROMPT, TRIGGER_PROMPT, ROUTINE_EXECUTION_PROMPT, resolveComputerPromptKind, teamAvailabilityPart } from "./agent/system-prompt.ts";
 import { shellTimeoutHookResult } from "./agent/shell-timeout-hint.ts";
 import { spillToolResult } from "./agent/tool-result-spill.ts";
 import { readCuaConnection, readCuaUnavailableReason, gatedLocalComputer } from "./computers/local-computer.ts";
@@ -186,7 +184,7 @@ import { savedLoginResumePrompt } from "../shared/logins.ts";
 import { createScreenFrameSource, type ScreenCapture } from "./computers/screen-frame-source.ts";
 import { screenFrameHash, screenSurfaceForTool, screenTouchingTool, settledFrameIsNews } from "./computers/screen-frame-gate.ts";
 import { RoutineRequestService } from "./automation/routine-requests.ts";
-import { listTriggers, parseTriggerRequest, triggerTarget } from "./automation/trigger-tools.ts"; import { WebhookRequestError, WebhookRequestService } from "./automation/webhook-requests.ts";
+import { listTriggers, parseTriggerRequest, triggerTarget } from "./automation/trigger-tools.ts";
 import { appliesNow, directApply, UNDO_STALE, type DirectApply } from "./agent/direct-apply.ts";
 import { createTeamMemoryRequests } from "./teams/team-memory-requests.ts";
 import { createAgentCard } from "./agent/chat-widgets.ts";
@@ -201,10 +199,7 @@ import { OutboundRequestService, outboundCard } from "./usage/outbound-requests.
 import { DEFAULT_OUTBOUND_POLICY, connectorCallsIn, outboundCallsIn } from "../shared/outbound.ts";
 import { connectorAccessDecision, describeConnectorScopes } from "../shared/connector-scopes.ts";
 import { bindThreadLogCapProvider } from "./storage/thread-log-rotation.ts";
-import { listenWebhookIngress, webhookCredential, type WebhookIngress } from "./automation/webhook-ingress.ts";
 import { assertModelVariantSupported, memberTurnSelection } from "./agent/member-turn.ts";
-import { WebhookManager } from "./automation/webhooks.ts";
-import type { WebhookTrigger } from "../shared/webhooks.ts";
 import { AGENTS_PROXY_ENV, agentsProxyLaunch, agentsToolBridgeEnv, applyAgentsBridge, bridgedToolTitle, turnEngine } from "./drivers/agents-bridge-switch.ts";
 import { loadBundledSkills, loadUserSkills, mergeSkills, renderSkillInstructions, selectBundledSkills, skillsLibraryEnabled } from "./skills/skill-library.ts";
 import { runSkillsLibraryBootSweep } from "./skills/skills-library-migration.ts";
@@ -256,9 +251,6 @@ import { createInternalThreadRoutes } from "./routes/internal-threads.ts";
 
 import { createSignInCardRoutes } from "./routes/sign-in-cards.ts";
 import { createInternalEscalateRoutes } from "./routes/internal-escalate.ts";
-import { createRoomHoldRoutes } from "./routes/room-holds.ts";
-import { createGroupRoutes } from "./routes/groups.ts";
-import { createChannelRoutes } from "./routes/channels.ts";
 import { createTaskRoutes } from "./routes/tasks.ts";
 import { createTeamRoutes } from "./routes/teams.ts";
 import { createThreadModelRoutes } from "./routes/thread-models.ts";
@@ -280,8 +272,6 @@ import { createThreadRoutes } from "./routes/threads.ts";
 import { withScopeHint } from "./integrations/connector-scope-hint.ts";
 
 const PORT = Number(process.env.OMB_PORT || process.env.OGB_PORT || 8799);
-const WEBHOOK_PORT = Number(process.env.OMB_WEBHOOK_PORT || PORT + 1);
-const WEBHOOK_PUBLIC_URL = process.env.OMB_WEBHOOK_PUBLIC_URL || undefined;
 const STATIC_DIR = process.env.OMB_STATIC_DIR || null;
 const MIME: Record<string, string> = {
   ".html": "text/html",
@@ -338,7 +328,6 @@ const sessions = new SessionRegistry({
 
 const CLOUD_HOME = null;
 
-const lendingEnabled = () => CLOUD_HOME !== null;
 /** Owner-written routines and owner-started runs: the only routine turns that may use a lent Mac. */
 
 const foreignTurns = new Map<string, { botId: string; threadId: string }>();
@@ -417,7 +406,7 @@ function publicUrl(): string | null { return savedCustomDomain() ?? FALLBACK_PUB
 function customDomainStatus() {
   return {
     customDomain: savedCustomDomain(), publicUrl: publicUrl(), fallbackUrl: FALLBACK_PUBLIC_URL,
-    supported: !DESKTOP_MANAGED, appPort: PORT, webhookPort: WEBHOOK_PORT,
+    supported: !DESKTOP_MANAGED, appPort: PORT,
     serverIpv4: DESKTOP_MANAGED ? null : customDomainIpv4(),
   };
 }
@@ -704,7 +693,7 @@ function recallThreads(from: BotRecord, _capability: Pick<InternalCapability, "b
   return { roomByThread, ownThreads: recallThreadIds(from, roomByThread).filter(() => true) };
 }
 
-/** Other conversations only for a 1:1 turn the person started: another bot, a webhook or a room must not pull a private chat into its reply. */
+/** Other conversations only for a 1:1 turn the person started: another bot or a room must not pull a private chat into its reply. */
 function autoRecallPrompt(bot: BotRecord, threadId: string, message: string, opts: { conversations: boolean; userName: string }): string {
   if (bot.memoryEnabled === false || !autoRecallEnabled(cfg)) return "";
   const roomByThread = opts.conversations ? recallRooms(store.groups, bot, roomFeedsBot) : new Map<string, GroupRecord>();
@@ -757,7 +746,6 @@ function calendarAudienceConflict(body: unknown): string | null {
 function memberFrameContext(visible: VisibleSet): FrameContext {
   return {
     visible,
-    webhookBot: (webhookId) => webhooks.list().find((webhook) => webhook.id === webhookId)?.botId,
     freshBot: (botId) => {
       const bot = store.bot(botId);
       return bot ? publicBot(bot) : undefined;
@@ -795,8 +783,6 @@ interface AuditPlan {
   botId?: string;
   createsBots: boolean;
   deletesBot?: string;
-  createsWebhook: boolean;
-  webhookId?: string;
   sessionId?: string;
   pairing: boolean;
   engineAction?: { id: string; action: string };
@@ -812,14 +798,11 @@ function adminAuditPlan(method: string, path: string): AuditPlan | null {
   const plan: AuditPlan = {
     config: requiredScope(method, path, {  }) === "admin",
     createsBots: method === "POST" && (path === "/api/bots" || path === "/api/teams/import" || path === "/api/org-library/add"),
-    createsWebhook: method === "POST" && path === "/api/webhooks",
     pairing: false,
   };
   let m = /^\/api\/bots\/([\w-]+)(?:\/(always-allow|model))?$/.exec(path);
   if (m && ((!m[2] && method === "PATCH") || (m[2] === "model" && method === "PATCH") || (m[2] === "always-allow" && method === "POST"))) plan.botId = m[1];
   if (m && !m[2] && method === "DELETE") plan.deletesBot = m[1];
-  m = /^\/api\/webhooks\/([\w-]+)(\/rotate)?$/.exec(path);
-  if (m && ((m[2] && method === "POST") || (!m[2] && (method === "PATCH" || method === "DELETE")))) plan.webhookId = m[1];
   m = /^\/api\/auth\/sessions\/([\w-]+)$/.exec(path);
   if (m && method === "DELETE") plan.sessionId = m[1];
   m = /^\/api\/groups\/([\w-]+)$/.exec(path);
@@ -828,14 +811,10 @@ function adminAuditPlan(method: string, path: string): AuditPlan | null {
   if (m && method === "POST") plan.engineAction = { id: m[1]!, action: m[2]!.replace("/", "-") };
   const accountAdd = method === "POST" ? ACCOUNT_ADD_ENGINES.get(path) : undefined;
   if (accountAdd) plan.engineAction = { id: accountAdd, action: "account-add" };
-  return plan.config || plan.botId || plan.createsBots || plan.deletesBot || plan.createsWebhook || plan.webhookId || plan.sessionId || plan.pairing || plan.engineAction || plan.roomId ? plan : null;
+  return plan.config || plan.botId || plan.createsBots || plan.deletesBot || plan.sessionId || plan.pairing || plan.engineAction || plan.roomId ? plan : null;
 }
 
-const WEBHOOK_AUDIT_FIELDS = ["name", "prompt", "botId", "runOn", "enabled", "eventTypes"] as const;
 const auditBot = (id: string | undefined) => (id ? botAuditSnapshot(store.bot(id) as unknown as Record<string, unknown> | null) : null);
-const auditHook = (id: string | undefined) => (id ? webhooks.list().find((hook) => hook.id === id) : undefined);
-const hookFields = (hook: WebhookTrigger, fields: readonly string[] = WEBHOOK_AUDIT_FIELDS) =>
-  Object.fromEntries(fields.map((field) => [field, (hook as unknown as Record<string, unknown>)[field] ?? null]));
 
 function requestedBotFields(req: IncomingMessage, path: string): string[] {
   if (path.endsWith("/always-allow")) return ["alwaysAllow"];
@@ -859,12 +838,11 @@ function beginAdminAudit(req: IncomingMessage, res: ServerResponse, method: stri
   const before = {
     bot: auditBot(plan.botId ?? plan.deletesBot),
     botName: store.bot(plan.botId ?? plan.deletesBot ?? "")?.name,
-    hook: auditHook(plan.webhookId),
     session: plan.sessionId ? sessions.list().find((session) => session.id === plan.sessionId) : undefined,
     roomFloor: plan.roomId ? store.group(plan.roomId)?.audienceFloor ?? "everyone" : undefined,
   };
   let answered: unknown;
-  if (plan.createsBots || plan.createsWebhook || plan.pairing) onJsonBody(res, (body) => (answered = body));
+  if (plan.createsBots || plan.pairing) onJsonBody(res, (body) => (answered = body));
   res.once("finish", () => {
     if (res.statusCode >= 400 || (!sharedAtStart && !adminActivityRecording())) return;
     try {
@@ -879,7 +857,7 @@ function adminAuditRows(
   plan: AuditPlan,
   req: IncomingMessage,
   path: string,
-  before: { bot: Record<string, unknown> | null; botName?: string; hook?: WebhookTrigger; session?: ReturnType<typeof sessions.list>[number]; roomFloor?: unknown },
+  before: { bot: Record<string, unknown> | null; botName?: string; session?: ReturnType<typeof sessions.list>[number]; roomFloor?: unknown },
   answered: unknown,
 ): Array<Omit<AdminActionRow, "at" | "actor">> {
   const rows: Array<Omit<AdminActionRow, "at" | "actor">> = [];
@@ -897,25 +875,6 @@ function adminAuditRows(
   }
   if (plan.deletesBot && before.bot && !store.bot(plan.deletesBot)) {
     rows.push({ category: "bot", action: "bot.delete", target: { kind: "bot", id: plan.deletesBot, ...(before.botName ? { name: before.botName } : {}) }, before: before.bot });
-  }
-  const hookTarget = (hook: WebhookTrigger) => ({ kind: "webhook", id: hook.id, name: hook.name });
-  if (plan.createsWebhook) {
-    const hook = auditHook(idOf(reply.webhook));
-    if (hook) rows.push({ category: "webhook", action: "webhook.create", target: hookTarget(hook), after: hookFields(hook) });
-  }
-  if (plan.webhookId && before.hook) {
-    const after = auditHook(plan.webhookId);
-    if (!after) rows.push({ category: "webhook", action: "webhook.delete", target: hookTarget(before.hook), before: hookFields(before.hook) });
-    else if (path.endsWith("/rotate")) rows.push({ category: "webhook", action: "webhook.rotate-secret", target: hookTarget(after) });
-    else {
-      const body = parsedBodyOf(req);
-      const named = body && typeof body === "object" ? Object.keys(body) : [];
-      const changed = WEBHOOK_AUDIT_FIELDS.filter((field) => named.includes(field) &&
-        JSON.stringify(hookFields(before.hook!, [field])) !== JSON.stringify(hookFields(after, [field])));
-      if (changed.length) {
-        rows.push({ category: "webhook", action: "webhook.update", target: hookTarget(after), changed: [...changed], before: hookFields(before.hook, changed), after: hookFields(after, changed) });
-      }
-    }
   }
   if (before.session && !sessions.list().some((session) => session.id === before.session!.id)) {
     const session = before.session;
@@ -1145,7 +1104,6 @@ type InternalCapability = {
   kind: "agents" | "connectors" | "computer" | "hooks" | "phone" | "highlevel";
   skillAuthoring: boolean;
   createdBots: number;
-  createdRooms?: number;
   openedThreads: number;
   orphanExpiresAt: number;
   teamComputerId?: string;
@@ -1157,12 +1115,10 @@ type InternalCapability = {
   /** attach_file may also deliver files saved outside the conversation's folders. Never on a Cloud home or a hosted workspace. */
   deliversSavedFiles?: boolean;
   turnStartedAt?: number;
-  roomPosts?: number;
   delegatedThisTurn?: Set<string>;
   externalRuntime?: ExternalRuntimeGrant;
 };
 const MAX_ATTACHED_FILES_PER_TURN = 10;
-const MAX_ROOM_POSTS_PER_TURN = 3;
 const MAX_CREATED_BOTS_PER_TURN = 4;
 // Only an orphan backstop: normal terminal paths revoke a capability synchronously.
 const INTERNAL_CAPABILITY_ORPHAN_MS = 30 * 24 * 60 * 60_000;
@@ -2050,8 +2006,7 @@ async function refreshUnsetModelSelections(instances?: readonly SelectableInstan
 
   bootSelection = await defaultSelection(undefined, selectable.filter(instance => readyToRun(instance, selectionContext)));
   if (hostedModels || !bootSelection.instanceId || !bootSelection.model) return;
-  const selection = withNewBotEffort(bootSelection, cfg.newBots?.effort,
-    registry.get(bootSelection.instanceId)?.adapter.capabilities.effortLevels);
+  const selection = bootSelection;
   for (const bot of store.bots) {
     if (!bot.modelSelection.instanceId && !bot.modelSelection.model) store.applyModelDefault(bot.id, selection);
   }
@@ -2304,51 +2259,13 @@ function defaultsPresetFor(body: Record<string, unknown>, includeNotes: boolean)
   return { preset: built.value, skipped: [...skipped, ...built.skipped] };
 }
 
-function checkedGroupResponder(value: unknown, memberIds: string[]): GroupDefaultResponder | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const responder = value as { kind?: unknown; botId?: unknown; fallbackBotId?: unknown };
-  if (responder.kind === "everyone") return { kind: "everyone" };
-  if (responder.kind === "mentions") return { kind: "mentions" };
-  if (responder.kind === "auto") {
-    const fallback = typeof responder.fallbackBotId === "string" && memberIds.includes(responder.fallbackBotId)
-      ? responder.fallbackBotId : memberIds[0];
-    return fallback ? { kind: "member", botId: fallback } : { kind: "mentions" };
-  }
-  if (
-    responder.kind === "member" &&
-    typeof responder.botId === "string" &&
-    memberIds.includes(responder.botId)
-  ) {
-    return { kind: "member", botId: responder.botId };
-  }
-  return null;
-}
-
-function checkedMemberIds(value: unknown): { ok: true; memberIds: string[] } | { ok: false; error: string } {
-  if (!Array.isArray(value)) return { ok: false, error: "memberIds must be a list of bot IDs" };
-  const invalidIndex = value.findIndex(
-    (id) => typeof id !== "string" || !id.trim() || !store.bot(id),
-  );
-  if (invalidIndex !== -1) {
-    return { ok: false, error: `unknown channel member: ${String(value[invalidIndex])}` };
-  }
-  const memberIds = [...new Set(value as string[])];
-  if (!memberIds.length) return { ok: false, error: "a channel needs at least one bot" };
-  if (memberIds.every((id) => store.bot(id)?.hidden)) {
-    return {
-      ok: false,
-      error: "a channel needs at least one active bot — every member given is archived",
-    };
-  }
-  return { ok: true, memberIds };
-}
 let bootSelection = { instanceId: "", model: "" };
 /** Turns wait for this startup read: it is where the server learns each engine's version and flags. */
 let enginesRead: Promise<void> | null = null;
 const presetStore = createPresetStore();
 const store = new Store(
   () => bootSelection,
-  (selection) => withNewBotEffort(selection, cfg.newBots?.effort, registry.get(selection.instanceId)?.adapter.capabilities.effortLevels),
+  (selection) => selection,
   (instanceId) => registry.cliTarget(instanceId)?.driverKind,
   () => cfg.language ?? Intl.DateTimeFormat().resolvedOptions().locale,
 );
@@ -3036,7 +2953,7 @@ function groupThreadIsWorking(groupId: string, threadId: string): boolean {
 }
 
 function activeGroupSpeaker(groupId: string): { botId: string; name: string; color: string } | undefined {
-  const group = store.group(groupId);
+  const group = store.group(groupId)!;
   if (!group) return undefined;
   const activeSpeaker = groupSpeakers.get(group.threadId);
   if (activeSpeaker) return activeSpeaker;
@@ -3112,179 +3029,14 @@ function groupIsWorking(group: GroupRecord): boolean {
   return Boolean(group.busyBotId) || Boolean(groupTurnOperations.get(group.id)?.size);
 }
 
-// Shared by the public and Chief room tools: authorization stays at each ingress.
-function createChannel(value: unknown): GroupRecord {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw Object.assign(new Error("channel must be a JSON object"), { status: 400 });
-  }
-  const body = value as Record<string, unknown>;
-
-  const roster = checkedMemberIds(body.memberIds);
-  if (!roster.ok) throw Object.assign(new Error(roster.error), { status: 400 });
-  const { memberIds } = roster;
-  const audienceConflict = roomAudienceConflict(memberIds);
-  if (audienceConflict) throw Object.assign(new Error(audienceConflict), { status: 400 });
-  if (body.name !== undefined && typeof body.name !== "string") {
-    throw Object.assign(new Error("channel name must be a string"), { status: 400 });
-  }
-  const name = body.name?.trim() || `${store.bot(memberIds[0])!.name} & co.`;
-  if (name.length > 100) throw Object.assign(new Error("channel name must be at most 100 characters"), { status: 400 });
-  let section: string | undefined;
-  if (body.section !== undefined && body.section !== null) {
-    if (typeof body.section !== "string") throw Object.assign(new Error("context must be a string"), { status: 400 });
-    section = body.section.trim() || undefined;
-    if (section && section.length > 60) {
-      throw Object.assign(new Error("context must be at most 60 characters"), { status: 400 });
-    }
-  }
-  let setup:
-    | { bulletin: string; defaultResponder: GroupDefaultResponder; completed: true }
-    | undefined;
-  if (body.setup !== undefined) {
-    if (!body.setup || typeof body.setup !== "object" || Array.isArray(body.setup)) {
-      throw Object.assign(new Error("setup must be an object"), { status: 400 });
-    }
-    const requested = body.setup as { bulletin?: unknown; defaultResponder?: unknown };
-    if (typeof requested.bulletin !== "string") {
-      throw Object.assign(new Error("setup.bulletin must be a string"), { status: 400 });
-    }
-    if (requested.bulletin.length > 12_000) {
-      throw Object.assign(new Error("setup.bulletin must be at most 12000 characters"), { status: 400 });
-    }
-    const responder = checkedGroupResponder(requested.defaultResponder, memberIds);
-    if (!responder) throw Object.assign(new Error("invalid setup.defaultResponder"), { status: 400 });
-    setup = { bulletin: requested.bulletin, defaultResponder: responder, completed: true };
-  }
-  return store.createGroup(name, memberIds, false, section, setup);
-}
-
-function updateChannel(groupId: string, value: unknown): GroupRecord {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw Object.assign(new Error("body must be a JSON object"), { status: 400 });
-  }
-  const body = value as Record<string, unknown>;
-
-  const existing = store.group(groupId);
-  if (!existing) throw Object.assign(new Error("no such room"), { status: 404 });
-
-  if (
-    channelTaskBlocked(existing) &&
-    (body.memberIds !== undefined || body.defaultResponder !== undefined || body.bulletin !== undefined)
-  ) {
-    throw Object.assign(new Error("this channel is working or waiting on you — finish that turn first"), { status: 409 });
-  }
-  const patch: Record<string, unknown> = {};
-  if (body.name !== undefined) {
-    if (typeof body.name !== "string") throw Object.assign(new Error("room name must be a string"), { status: 400 });
-    const name = body.name.trim();
-    if (!name) throw Object.assign(new Error("room name must not be empty"), { status: 400 });
-    if (name.length > 100) throw Object.assign(new Error("room name must be at most 100 characters"), { status: 400 });
-    patch.name = name;
-  }
-  if (body.bulletin !== undefined) {
-    if (typeof body.bulletin !== "string") throw Object.assign(new Error("bulletin must be a string"), { status: 400 });
-    if (body.bulletin.length > 12_000) {
-      throw Object.assign(new Error("bulletin must be at most 12000 characters"), { status: 400 });
-    }
-    patch.bulletin = body.bulletin;
-  }
-  if (body.unread !== undefined) {
-    if (typeof body.unread !== "boolean") throw Object.assign(new Error("unread must be true or false"), { status: 400 });
-    patch.unread = body.unread;
-  }
-  if (body.memberIds !== undefined) {
-    if (existing.dm) throw Object.assign(new Error("direct-message channels cannot change members"), { status: 400 });
-    const roster = checkedMemberIds(body.memberIds);
-    if (!roster.ok) throw Object.assign(new Error(roster.error.replace("channel", "room")), { status: 400 });
-    const audienceConflict = roomAudienceConflict(roster.memberIds, existing.memberIds);
-    if (audienceConflict) throw Object.assign(new Error(audienceConflict), { status: 400 });
-    const removedGoalLead = routines!.listRoutines().some(
-      (routine) =>
-        routine.enabled &&
-        routine.target === "room-goal" &&
-        routine.groupId === existing.id &&
-        !roster.memberIds.includes(routine.botId),
-    ) || routines!.listRuns().some(
-      (run) =>
-        run.target === "room-goal" &&
-        run.groupId === existing.id &&
-        ["queued", "running", "waiting"].includes(run.status) &&
-        !roster.memberIds.includes(run.botId),
-    );
-    if (removedGoalLead) {
-      throw Object.assign(new Error("pause or reassign this room's team-goal routine before removing its lead"), { status: 409 });
-    }
-    patch.memberIds = roster.memberIds;
-  }
-  if (body.defaultResponder !== undefined) {
-    const memberIds = (patch.memberIds as string[] | undefined) ?? existing.memberIds;
-    const responder = checkedGroupResponder(body.defaultResponder, memberIds);
-    if (!responder) throw Object.assign(new Error("invalid default responder"), { status: 400 });
-    patch.defaultResponder = responder;
-  }
-  if (Object.prototype.hasOwnProperty.call(body, "turnTimeoutMinutes")) {
-    if (!existing.dm) {
-      throw Object.assign(new Error("set the turn limit on that conversation"), { status: 400 });
-    }
-    const parsed = parseConversationTurnTimeout(body.turnTimeoutMinutes);
-    if (!parsed.ok) throw Object.assign(new Error(parsed.error), { status: 400 });
-    patch.turnTimeoutMinutes = parsed.minutes;
-  }
-  if (body.cwd !== undefined) {
-    if (existing.dm) throw Object.assign(new Error("direct-message channels cannot have a working folder"), { status: 400 });
-    if (existing.pinnedCwd !== undefined) {
-      throw Object.assign(new Error("the room's working folder is fixed after its first turn"), { status: 409 });
-    }
-    const checked = validateBotCwd(body.cwd);
-    if (!checked.ok) throw Object.assign(new Error(checked.error), { status: 400 });
-    patch.cwd = checked.cwd ?? undefined;
-  }
-  if (body.pinnedMessageId !== undefined) {
-    if (body.pinnedMessageId === null || body.pinnedMessageId === "") patch.pinnedMessageId = undefined;
-    else if (typeof body.pinnedMessageId === "string" && /^[\w-]+$/.test(body.pinnedMessageId)) {
-      patch.pinnedMessageId = body.pinnedMessageId;
-    } else throw Object.assign(new Error("pinnedMessageId must be a message id"), { status: 400 });
-  }
-  if (body.section !== undefined) {
-    if (body.section === null) patch.section = undefined;
-    else if (typeof body.section !== "string") throw Object.assign(new Error("section must be a string"), { status: 400 });
-    else {
-      const trimmed = body.section.trim();
-      if (!trimmed) patch.section = undefined;
-      else if (trimmed.length > 60) throw Object.assign(new Error("section must be at most 60 characters"), { status: 400 });
-      else patch.section = trimmed;
-    }
-  }
-  // Admin-only, and the only way a room's floor widens; a Chief's PATCH never has it.
-  const resetAudience = body.resetAudience !== undefined;
-  if (resetAudience) {
-    if (body.resetAudience !== true) throw Object.assign(new Error("resetAudience must be true"), { status: 400 });
-    patch.audienceFloor = undefined;
-  }
-  const group = store.patchGroup(groupId, patch);
-  if (resetAudience) audienceChanged();
-  if (!group) throw Object.assign(new Error("no such room"), { status: 404 });
-  return group;
-}
-
-const channelTaskBlocked = (group: GroupRecord) =>
-  groupIsWorking(group) ||
-  store.groupTasks(group.id).some((task) =>
-    store.messagesFor(task.threadId).some(
-      (message) =>
-        message.kind === "options" &&
-        message.card?.requestId &&
-        (!isPersistentQuestionCard(message.card) || runningTurnEngines.has(task.threadId)) &&
-        !message.card.answered &&
-        !message.card.dismissed && !message.card.expired,
-    ),
-  );
-
 // Load coordination state before registering store listeners or recovering routines: recovery can emit room changes synchronously.
 const groupQueues = new Map<string, Promise<void>>();
-const { roomRootProblem, roomHandoffProblem, roomSetupPending, laneRoomThread } = createRoomAccess({ store });
-const roomJobs = createRoomJobs({ store, coordinator: { all: () => coordinator.all() }, cfg, laneRoomThread,
-  operations: groupId => groupTurnOperations.get(groupId) ?? [], speakerOf: threadId => groupSpeakers.get(threadId)?.botId });
+const { roomRootProblem, roomHandoffProblem, roomSetupPending } = createRoomAccess({ store });
+const roomJobs = createRoomJobs({
+  coordinator: { all: () => coordinator.all() },
+  operations: groupId => groupTurnOperations.get(groupId) ?? [],
+  speakerOf: threadId => groupSpeakers.get(threadId)?.botId,
+});
 
 // Claude reuses a session's first system prompt across --resume, so assignment bodies and results must travel in the user turn.
 function coordinationSystemInstructions(): string {
@@ -3384,7 +3136,7 @@ function runRoomRootTurn(node: HandoffView, group: GroupRecord, bot: BotRecord, 
   return runRoomNode(node, group, bot, signal, undefined, (operation, result, coordination) =>
     runGroupMemberTurn(group.id, node.threadId, bot.id, 0, new Set(), composed.text, error => { result.stopReason = error; }, () => operation.cancelled,
       () => groupProviderHandshakeStarted(operation), () => groupProviderHandshakeSettled(operation), undefined,
-      { roomHandoffId: node.id, systemInstructions: "", followMentions: true, result, coordination, ...(node.goalRunId ? { goalRunId: node.goalRunId } : {}) }, operation));
+      { roomHandoffId: node.id, systemInstructions: "", result, coordination, ...(node.goalRunId ? { goalRunId: node.goalRunId } : {}) }, operation));
 }
 
 function runRootTurn(node: HandoffView, bot: BotRecord, signal: AbortSignal, composed: ComposedTurn): Promise<HostTurnResult> {
@@ -3540,7 +3292,7 @@ const coordinator: Coordinator = createCoordinator({
         store.appendMessage(node.threadId, { role: "bot", kind: "text",
           roomRequest: { id: request.id, phase: "request" },
           from: sender ? { botId: sender.id, name: sender.name, color: sender.color } : undefined,
-          text: `${request.botIds.map(id => `@${store.bot(id)?.name ?? "Teammate"}`).join(" ")} ${node.text}`,
+          text: `Assigned teammate work for ${request.botIds.map(id => store.bot(id)?.name ?? "Teammate").join(", ")}: ${node.text}`,
         });
       }
       markInternalTurn(node.threadId);
@@ -3592,7 +3344,7 @@ const coordinator: Coordinator = createCoordinator({
         runGroupMemberTurn(group.id, node.threadId, bot.id, MAX_COMMS_DEPTH, new Set(),
           undefined, error => { result.stopReason = error; }, () => operation.cancelled,
           () => groupProviderHandshakeStarted(operation), () => groupProviderHandshakeSettled(operation),
-          { claimed: true }, { roomHandoffId: node.id, resumed, systemInstructions, turnInstructions: brief, turnNote: composed.note, turnRestartNote: composed.restartNote, liveRoster, followMentions: false, result, coordination }, operation));
+          { claimed: true }, { roomHandoffId: node.id, resumed, systemInstructions, turnInstructions: brief, turnNote: composed.note, turnRestartNote: composed.restartNote, liveRoster, result, coordination }, operation));
     },
     names: (node, parent) => {
       const person = cfg.profile?.name?.trim() || undefined;
@@ -3688,7 +3440,6 @@ function publicGroupState(record: GroupRecord): WireGroup {
   return {
     ...group,
     tasks: record.dm ? undefined : tasks,
-    turnTimeoutMinutes: record.turnTimeoutMinutes ?? null,
     usage: usage ?? null,
     memberContext: roomMemberContexts.forThread(group.threadId) ?? null,
     busyBotId: currentSpeaker?.botId ?? (activeWorking ? record.busyBotId : null),
@@ -3759,34 +3510,6 @@ function finishGroupGoalRun(
     startedAt: run.startedAt,
     finishedAt,
   };
-  const routineRun = routines?.finishGoalRun(run.runId, status, safeDetail);
-  // A scheduled team goal that stops to ask must never be filed as a quiet completion.
-  if (routineRun?.status === "waiting") {
-    const coordinator = store.bot(routineRun.botId);
-    if (coordinator) {
-      const notificationBot = routineSourceOwner(routineRun)?.bot ?? coordinator;
-      notify(buildNotification(
-        "question",
-        notificationBot,
-        routineSourceThread(routineRun) ?? routineRun.threadId ?? operation.threadId,
-        safeDetail || `${routineRun.routineName} needs your input`,
-        { avatarUrl: notificationBot.avatarUrl },
-      ));
-    }
-  }
-  if (routineRun?.status === "completed") {
-    const coordinator = store.bot(routineRun.botId);
-    if (coordinator) {
-      const notificationBot = routineSourceOwner(routineRun)?.bot ?? coordinator;
-      notify(buildNotification(
-        "done",
-        notificationBot,
-        routineSourceThread(routineRun) ?? routineRun.threadId ?? operation.threadId,
-        safeDetail || routineRun.routineName,
-        { avatarUrl: notificationBot.avatarUrl },
-      ));
-    }
-  }
   const group = store.group(groupId);
   const ownsThread = group?.dm
     ? group.threadId === operation.threadId
@@ -3901,10 +3624,6 @@ function roomHeld(group: GroupRecord | null | undefined, botId: string): boolean
   return Boolean(group && !group.dm && group.holds?.[botId]);
 }
 
-function roomThreadIds(group: GroupRecord): string[] {
-  return [...new Set([group.threadId, ...(group.dm ? [] : store.groupTasks(group.id).map((task) => task.threadId))])];
-}
-
 function latestRoomTextId(threadId: string): string | undefined {
   return store.activePath(threadId).findLast((message) => message.kind === "text" && Boolean(message.text))?.id;
 }
@@ -3927,44 +3646,6 @@ function noteHeldSkip(groupId: string, threadId: string, bot: BotRecord, message
     from: { botId: bot.id, name: bot.name, color: bot.color },
     tool: { name: heldMemberLine(bot.name), ok: false },
   });
-}
-
-async function interruptHeldMember(groupId: string, botId: string): Promise<void> {
-  const group = store.group(groupId);
-  const bot = store.bot(botId);
-  if (!group || !bot) return;
-  for (const threadId of roomThreadIds(group)) {
-    if (groupSpeakers.get(threadId)?.botId !== botId) continue;
-    heldInterrupts.add(`${threadId}:${botId}`);
-    await runningTurnInstance(bot, threadId)?.adapter.interruptTurn(threadId).catch(() => {});
-    closeOpenApprovals(threadId);
-  }
-}
-
-/** Applied at accept, before the message queues behind a busy room, so a stop reaches a member working now. */
-function applyRoomHoldsFromMessage(groupId: string, text: string): void {
-  const group = store.group(groupId);
-  if (!group || group.dm) return;
-  const members = group.memberIds
-    .map((id) => store.bot(id))
-    .filter((bot): bot is BotRecord => Boolean(bot) && !bot!.hidden);
-  const mentioned = mentionedBots(text, members).map((bot) => bot.id);
-  const change = applyHoldDirective(group.holds, classifyHoldDirective(text, mentioned), members.map((bot) => bot.id), Date.now());
-  if (!change.held.length && !change.released.length) return;
-  store.patchGroup(groupId, { holds: change.holds });
-  for (const botId of change.held) void interruptHeldMember(groupId, botId);
-}
-
-function setRoomHold(groupId: string, botId: string, held: boolean): GroupRecord | null {
-  const group = store.group(groupId);
-  if (!group || group.dm || !group.memberIds.includes(botId)) return null;
-  const directive = held
-    ? { hold: [botId], holdAll: false, release: [], releaseAll: false }
-    : { hold: [], holdAll: false, release: [botId], releaseAll: false };
-  const change = applyHoldDirective(group.holds, directive, group.memberIds, Date.now());
-  if (change.held.length || change.released.length) store.patchGroup(groupId, { holds: change.holds });
-  if (held) void interruptHeldMember(groupId, botId);
-  return store.group(groupId) ?? null;
 }
 
 function heldReplayFor(groupId: string, threadId: string, botId: string, userName: string, roomContext: string): { block: string; messageIds: string[] } {
@@ -4282,17 +3963,8 @@ interface SseClient {
 }
 const sseClients = new Set<SseClient>();
 const upgrades = createUpgrades();
-
 let audienceChangedAt = 0;
-function audienceChanged(): void {
-  audienceChangedAt = lastSeq;
 
-  for (const client of sseClients) {
-    if (client.viewer.kind !== "member") continue;
-    sseClients.delete(client);
-    try { client.res.end(); } catch {}
-  }
-}
 function closeSessionStreams(sessionId: string): void {
 
   for (const client of sseClients) {
@@ -4648,13 +4320,11 @@ const memoryUpkeep = createMemoryUpkeep({
   },
   sourceLabel: (botId, threadId) => memorySourceLabel({ room: store.groupByThread(threadId), task: store.taskByThread(botId, threadId), threadId }),
   mayCapture: (botId, threadId) => {
-    const room = store.groupByThread(threadId);
-    return !room || roomCaptureAllowed(room, store.bot(botId));
+    return !store.groupByThread(threadId) && store.botByThread(threadId)?.id === botId;
   },
   restoreTurn: (botId, threadId, turnId) => {
     if (routines?.runForThread(threadId)) return null;
-    const room = store.groupByThread(threadId);
-    if (room) return roomCaptureAllowed(room, store.bot(botId)) ? captureRoomTurnFor(threadId, botId, turnId) : null;
+    if (store.groupByThread(threadId)) return null;
     if (store.botByThread(threadId)?.id !== botId) return null;
 
     return captureTurnFor(threadId, turnId);
@@ -4772,56 +4442,11 @@ bus.subscribe((event: RuntimeEvent) => {
   }
 });
 
-const ROOM_CAPTURE_LINES = 12;
-
-/** A bot's memory reaches every chat it has, so a room fewer people can see never feeds it. */
-function roomCaptureAllowed(room: GroupRecord, bot: BotRecord | null | undefined): bot is BotRecord {
-  if (!bot || !roomMemoryCaptureEnabled(cfg) || CLOUD_HOME || room.dm) return false;
-  return room.memberIds.includes(bot.id) && upkeepEnabled(bot) && roomFeedsBot(room, bot);
-}
-
-function captureRoomTurnFor(threadId: string, botId: string, turnId: string): CaptureTurn | null {
-  const path = store.activePath(threadId);
-  const replyAt = path.findLastIndex((message) => message.role === "bot" && message.kind === "text" && message.turnId === turnId && message.from?.botId === botId);
-  if (replyAt < 0) return null;
-  const lastSpoke = path.slice(0, replyAt).findLastIndex((message) => message.role === "bot" && message.kind === "text" && message.from?.botId === botId);
-  const lines: RoomLine[] = [];
-  for (const message of path.slice(lastSpoke + 1, replyAt)) {
-    if (message.kind !== "text" || !message.text?.trim()) continue;
-    if (message.role === "user") {
-      if (message.peerAsk || message.aside) continue;
-      const text = extractTurnImages(message.text).text;
-      lines.push(message.sender ? { by: "other", name: message.sender.name, text } : { by: "person", name: "Person", text });
-    } else if (message.role === "bot" && message.from && message.from.botId !== botId && !message.webhookPost) {
-      lines.push({ by: "peer", name: message.from.name, text: message.text });
-    }
-  }
-  const read = lines.slice(-ROOM_CAPTURE_LINES);
-  if (!read.some((line) => line.by !== "peer")) return null;
-  return {
-    person: read.filter((line) => line.by === "person").map((line) => line.text).join("\n"),
-    bot: path[replyAt]!.text ?? "",
-    owner: !read.some((line) => line.by === "other"),
-    turnId,
-    room: read,
-  };
-}
-
 bus.subscribe((event: RuntimeEvent) => {
   if (shouldIgnoreProviderEvent(event)) return;
   if (event.type !== "turn.completed" || !event.turnId || !event.ok) return;
   try {
-    const room = store.groupByThread(event.threadId);
-    if (room) {
-      if (!roomMemoryCaptureEnabled(cfg) || isInternalTurn(event.threadId) || routines?.runForThread(event.threadId)
-        || groupGoalCoordinatorTurns.get(event.threadId)?.size) return;
-      const reply = store.activePath(event.threadId).findLast((message) => message.role === "bot" && message.kind === "text" && message.turnId === event.turnId);
-      const member = reply?.from ? store.bot(reply.from.botId) : undefined;
-      if (!roomCaptureAllowed(room, member) || isUnattended(member.id, event.threadId)) return;
-      const turn = captureRoomTurnFor(event.threadId, member.id, event.turnId);
-      if (turn) memoryUpkeep.noteTurn(member.id, event.threadId, turn);
-      return;
-    }
+    if (store.groupByThread(event.threadId)) return;
     const bot = store.botByThread(event.threadId);
     if (!bot || !upkeepEnabled(bot) || isInternalTurn(event.threadId)
       || isUnattended(bot.id, event.threadId) || routines?.runForThread(event.threadId)) return;
@@ -5978,9 +5603,7 @@ function handoffOpener(capability: Pick<InternalCapability, "botId" | "threadId"
   if (run) {
     return {
       requester: { kind: "routine_run", runId: run.id, botId: run.botId, threadId },
-      origin: run.triggerSource === "webhook"
-        ? { kind: "outside", source: "webhook", ref: run.routineId }
-        : { kind: "routine", source: "routine", ref: run.routineId },
+      origin: { kind: "routine", source: "routine", ref: run.routineId },
     };
   }
 
@@ -6394,43 +6017,28 @@ async function deliverLateQuestionAnswer(
   owner: BotRecord,
 ): Promise<{ queued: boolean }> {
   const group = store.groupByThread(threadId);
-  const roomTarget = group
-    ? group.dm
-      ? group.threadId === threadId
-      : Boolean(store.groupTaskByThread(group.id, threadId))
-    : false;
-  if (group && (!roomTarget || !group.memberIds.includes(owner.id))) {
-    throw Object.assign(new Error("the bot that asked this question is no longer in this conversation"), { status: 409 });
+  if (group) {
+    throw Object.assign(new Error("groups are management containers and do not own conversations"), { status: 409 });
   }
-  if (!group && !store.taskByThread(owner.id, threadId)) {
+  if (!store.taskByThread(owner.id, threadId)) {
     throw Object.assign(new Error("the question's conversation no longer exists"), { status: 409 });
   }
 
-  const text = group ? `@${owner.name}: ${answer}` : answer;
+  const text = answer;
   const sendId = `late-question-${createHash("sha256").update(`${threadId}:${requestId}`).digest("hex").slice(0, 32)}`;
-  const key = group
-    ? `group:${group.id}:${threadId}:${sendId}`
-    : `bot:${owner.id}:${threadId}:${sendId}`;
-  const receipt = await sendSequencer.run(key, sendFingerprint(text, cardMessage.id, group ? "chat" : undefined), async () => {
-    const accepted = acceptedSendMatch(store.messagesFor(threadId), sendId, text, cardMessage.id, group ? "chat" : undefined);
+  const key = `bot:${owner.id}:${threadId}:${sendId}`;
+  const receipt = await sendSequencer.run(key, sendFingerprint(text, cardMessage.id), async () => {
+    const accepted = acceptedSendMatch(store.messagesFor(threadId), sendId, text, cardMessage.id);
     if (accepted.kind === "conflict") throw Object.assign(new Error("this question already has a different recorded answer"), { status: 409 });
     if (accepted.kind === "match") return { queued: false };
 
-    const queuedDirect = group ? null : queuedSteeredMessage(owner.id, threadId, sendId);
+    const queuedDirect = queuedSteeredMessage(owner.id, threadId, sendId);
     if (queuedDirect) {
       if (queuedDirect.text !== text || queuedDirect.replyToId !== cardMessage.id) {
         throw Object.assign(new Error("this question already has a different queued answer"), { status: 409 });
       }
       return { queued: true };
     }
-    const queuedRoom = group ? queuedChannelMessage(group.id, threadId, sendId) : null;
-    if (queuedRoom) {
-      if (queuedRoom.text !== text || queuedRoom.replyToId !== cardMessage.id || queuedRoom.mode !== "chat") {
-        throw Object.assign(new Error("this question already has a different queued answer"), { status: 409 });
-      }
-      return { queued: true };
-    }
-
     const latestCard = store.messagesFor(threadId).find((message) => message.id === cardMessage.id)?.card;
     if (!latestCard || latestCard.answered || latestCard.dismissed) {
       throw Object.assign(new Error("this question has already been answered"), { status: 409 });
@@ -6438,22 +6046,6 @@ async function deliverLateQuestionAnswer(
     assertWithinBudget(cfg, DATA_DIR);
     const sender = messageSender(auth);
     const trigger = usageTriggerFor(auth);
-    if (group) {
-      const current = store.group(group.id);
-      if (!current || !roomTarget) throw Object.assign(new Error("the room switched tasks before it could receive the answer"), { status: 409 });
-      if (groupThreadIsWorking(current.id, threadId)) {
-        const queued = queueChannelMessage(current.id, threadId, text, {
-          replyToId: cardMessage.id,
-          sendId,
-          mode: "chat",
-          sender,
-          trigger,
-        });
-        return { queued: true, queueId: queued.id };
-      }
-      startGroupTurn(current.id, text, cardMessage, sendId, "chat", undefined, { threadId, sender, trigger });
-      return { queued: false };
-    }
     const direct = await startOrQueueDirectMessage(owner.id, threadId, text, cardMessage, sendId, sender, trigger);
     return { queued: "queued" in direct && Boolean(direct.queued) };
   });
@@ -6719,7 +6311,7 @@ async function startTurn(
   }
   // Revoke what a previous turn left behind before minting this turn's integrations.
   revokeEarlierTurnCapabilities(threadId);
-  if (opts?.automationSource === "webhook" || opts?.unattended) markUnattended(bot.id, threadId);
+  if (opts?.unattended) markUnattended(bot.id, threadId);
   else if (opts?.automationSource === undefined && !opts?.commsDepth && !opts?.cardContinuation) clearUnattended(threadId);
   const task = store.taskByThread(bot.id, threadId);
   if (!task) throw Object.assign(new Error("no such task"), { status: 404 });
@@ -6837,7 +6429,7 @@ async function startTurn(
     ? previousRequest.generations : new Set<string>();
   if (requestGenerations.size >= 500) { requestGenerations.clear(); requestMessageId = undefined; }
   requestGenerations.add(dispatchClaimId);
-  // A continuation keeps its request's origin and never re-reads a stored line, which cannot say a routine or webhook wrote it.
+  // A continuation keeps its request's origin and never re-reads a stored line.
   const continuation = Boolean(opts?.cardContinuation || opts?.computerSelectionContinuation);
   const continued = previousRequest && !previousRequest.stopped &&
     (requestMessageId ? previousRequest.messageId === requestMessageId : opts?.cardContinuation) ? previousRequest.origin : undefined;
@@ -7235,13 +6827,12 @@ async function startTurn(
         { id: "skills", label: "Skills index", text: privateWorkspace ? skillsHost.skillsIndex(store.bot(bot.id) ?? bot, threadId, instance) : "" },
         { id: "skill-instructions", label: "Skill instructions", text: skillInstructions },
         { id: "playbooks", label: "Playbooks", text: packagePlaybooks },
-        { id: "webhook", label: "Webhook provenance", text: opts?.automationSource === "webhook" ? WEBHOOK_PROMPT : "" },
         { id: "mentions", label: "Mentions", text: tagged.length ? `The user named these existing teammates: ${tagged.map(b => `${peerName(b.name)} (${b.id})`).join(", ")}. Use coordinate_bots when their contribution is needed; do not substitute native helper agents for these bots.` : "" },
       ], integrations.agents);
       turnPromptBytes.set(threadId, { stable: Buffer.byteLength(prompt.stable), volatile: Buffer.byteLength(prompt.volatile) });
       // Recall rides in front of this turn's message, never the system prompt, whose volatile half is re-sent whole on any change.
       const recalled = autoRecallPrompt(bot, threadId, resolvedImages.text, {
-        // A routine run starts fresh, and a webhook is untrusted: neither pulls earlier conversations in.
+        // A routine run starts fresh and does not pull earlier conversations in.
         conversations: commsDepth === 0 && !coordinationNode && !opts?.automationSource && !opts?.unattended,
         userName: cfg.profile?.name?.trim() || "User",
       });
@@ -7484,7 +7075,6 @@ function routineRunCard(run: RoutineRun): NonNullable<Message["routineRun"]> {
     scheduledFor: run.scheduledFor,
     status: run.status,
   };
-  if (run.goalStatus) card.goalStatus = run.goalStatus;
   if (run.deferredAt != null && run.status === "queued") card.deferredAt = run.deferredAt;
   if (run.threadId) card.executionThreadId = run.threadId;
   if (summary) card.summary = summary;
@@ -7493,18 +7083,7 @@ function routineRunCard(run: RoutineRun): NonNullable<Message["routineRun"]> {
 }
 
 function routineRunFallbackText(card: NonNullable<Message["routineRun"]>): string {
-  const goalState = card.goalStatus === "needs-input"
-    ? "needs your input"
-    : card.goalStatus === "blocked"
-      ? "was blocked"
-      : card.goalStatus === "limit-reached"
-        ? "reached its limit"
-        : card.goalStatus === "stopped"
-          ? "was stopped"
-          : card.goalStatus === "failed"
-            ? "failed"
-            : undefined;
-  const state = goalState ?? (
+  const state = (
     card.status === "waiting"
       ? "needs your attention"
       : card.status === "completed"
@@ -7560,7 +7139,7 @@ function syncRoutineRunToSource(run: RoutineRun): string | null {
   }
 
   // Mark only the fresh execution: after its first running card persisted, before dispatch adds any transcript.
-  if (run.target === "bot" && run.triggerSource !== "webhook" && run.threadId && run.threadId !== sourceThreadId) {
+  if (run.target === "bot" && run.threadId && run.threadId !== sourceThreadId) {
     const execution = store.taskByThread(run.botId, run.threadId);
     const freshExecution = execution && run.status === "running" && !execution.routineRunId &&
       store.messagesFor(run.threadId).length === 0;
@@ -7576,21 +7155,6 @@ function syncRoutineRunToSource(run: RoutineRun): string | null {
     else store.patchTask(source.bot.id, sourceThreadId, { unread: true });
   }
   return sourceThreadId;
-}
-
-async function interruptRoutineGroupGoal(
-  groupId: string,
-  threadId: string,
-  outcome?: { status: "stopped" | "limit-reached"; detail: string },
-): Promise<void> {
-  const speaker = groupSpeakers.get(threadId);
-  const bot = speaker ? store.bot(speaker.botId) : undefined;
-  cancelGroupTurnOperations(groupId, threadId, outcome);
-  revokeInternalCapabilitiesForThread(threadId);
-  await (bot ? runningTurnInstance(bot, threadId) : null)
-    ?.adapter.interruptTurn(threadId)
-    .catch(() => {});
-  closeOpenApprovals(threadId);
 }
 
 /** Cancellation flags flip synchronously; the awaited work only drains capabilities and interrupts started processes. */
@@ -7637,25 +7201,8 @@ routines = new RoutineManager({
     ? process.env.OMB_DESKTOP_LAUNCH_ID : undefined,
   hasPendingDelegations: runtimeWorkPending, handedOffWorkLive: (threadId) => coordinator.outstandingFor(threadId).length > 0,
   botState: unattendedDispatchState,
-  goalState: (groupId, coordinatorBotId) => {
-    const group = store.group(groupId);
-    const coordinator = store.bot(coordinatorBotId);
-    if (
-      !group ||
-      group.dm ||
-      roomSetupPending(group) ||
-      !coordinator ||
-      coordinator.hidden ||
-      !group.memberIds.includes(coordinator.id)
-    ) {
-      return "missing";
-    }
-    return groupIsWorking(group) || coordinator.busy ? "busy" : "ready";
-  },
   createTask: (botId, title, activate = false) => {
     const task = store.createTask(botId, title, activate);
-    // On a Cloud home the routine's writer opens a run's conversation; a webhook run is the owner's, but its payload never reaches the lent Mac.
-
     return task;
   },
   joinConversation: (run) => {
@@ -7664,7 +7211,6 @@ routines = new RoutineManager({
     if (!source || source.group || source.bot.id !== run.botId) return null;
     return source.threadId;
   },
-  createGoalTask: (groupId, title) => store.createGroupTask(groupId, title, false),
   isResultsThread: (botId, threadId) => {
     const bot = store.bot(botId);
     const task = store.taskByThread(botId, threadId);
@@ -7692,13 +7238,6 @@ return undefined;
   startTurn: async (botId, threadId, prompt, runOn, triggerSource, onDispatchError) => {
     await startTurn(botId, prompt, { threadId, runOn, automationSource: triggerSource, onDispatchError });
   },
-  startGoal: async (groupId, threadId, prompt, coordinatorBotId, runId, _onDispatchError) => {
-    startGroupTurn(groupId, prompt, undefined, undefined, "goal", undefined, {
-      threadId,
-      goalCoordinatorBotId: coordinatorBotId,
-      goalRunId: runId,
-    });
-  },
   interruptTurn: async (botId, threadId) => {
     const bot = botForThread(botId, threadId);
     cancelDirectTurnDispatch(botId, threadId);
@@ -7711,9 +7250,8 @@ return undefined;
       closeOpenApprovals(threadId);
     }
   },
-  interruptGoal: interruptRoutineGroupGoal,
   onRunChanged: (run) => {  syncRoutineRunToSource(run); },
-  onRunCut: (run) => run.groupId ? coordinator.cancelRoom(run.groupId, run.threadId!, ROUTINE_RESTARTED) : coordinator.cancelDirect(run.threadId!, ROUTINE_RESTARTED),
+  onRunCut: (run) => run.threadId && coordinator.cancelDirect(run.threadId, ROUTINE_RESTARTED),
   onRunFailed: (run, alert) => {
 
     const bot = store.bot(run.botId);
@@ -7749,30 +7287,6 @@ orgLibrary = new OrgLibrary({
   if (early) orgLibrary.applyRelay(early.library);
   pendingOrgLibraryRelay = null;
 }
-// Separate durable stores: after a crash between the two writes, the correlated RoutineRun's terminal state wins.
-const recoveredRoutineGoalRuns = new Map(
-  routines.listRuns().filter((run) => run.target === "room-goal").map((run) => [run.id, run]),
-);
-const groupGoalRecoveryAt = Date.now();
-store.reconcileInterruptedGroupGoals((runId, threadId) => {
-  const run = recoveredRoutineGoalRuns.get(runId);
-  if (!run || run.threadId !== threadId) return null;
-  const status = run.goalStatus ?? (
-    run.status === "completed"
-      ? "completed"
-      : run.status === "cancelled"
-        ? "stopped"
-        : "failed"
-  );
-  const detail = run.output ?? run.error ?? (
-    status === "completed"
-      ? "The scheduled team goal completed before OpenMausBot restarted."
-      : status === "stopped"
-        ? "The scheduled team goal was stopped."
-        : "OpenMausBot restarted before this scheduled team goal finished."
-  );
-  return { status, detail, finishedAt: run.finishedAt ?? groupGoalRecoveryAt };
-});
 calendarCalls = new CalendarCallManager({
   botExists: (botId) => Boolean(store.bot(botId)),
   onDue: deliverCalendarCall,
@@ -7855,7 +7369,6 @@ async function deleteBotWithLifecycle(botId: string, revalidate: () => void = ()
   skillReview.dropBot(bot.id);
   memoryUpkeep.forgetBot(bot.id);
   routines!.disableForBot(bot.id);
-  webhooks.disableForBot(bot.id);
   calendarCalls!.removeBot(bot.id);
 
   cacheKeepWarm.cancelBot(bot.id);
@@ -8142,8 +7655,6 @@ async function undoAppliedChange(res: ServerResponse, threadId: string, requestI
     const undone = routineRequests.undo({ botId, threadId, requestId });
 
     result = undone;
-  } else if (card.webhookRequest) {
-    result = webhookRequests.undo({ botId, threadId, requestId });
   } else if (card.profileRequest) {
     const undone = profileRequests.undo({ botId, threadId, requestId });
     if (undone.claimed && undone.state === "undone") {
@@ -8178,46 +7689,6 @@ async function undoAppliedChange(res: ServerResponse, threadId: string, requestI
   json(res, 200, { ok: true, undone: true, ...(result.state === "already_undone" ? { alreadyUndone: true } : {}) });
 }
 
-const webhooks = new WebhookManager({
-  emit: broadcast,
-  botState: unattendedDispatchState,
-  enqueue: (input) => routines!.enqueueWebhook(input),
-  findRun: (webhookId, deliveryId) => routines!.webhookRunReceipt(webhookId, deliveryId),
-  cancelQueued: (webhookId, message) => routines!.cancelQueuedWebhook(webhookId, message),
-  pendingRuns: (webhookId) => routines!.activeWebhookRunCount(webhookId),
-  // delivery:"post" lands in a dedicated "Updates" task, never bot.threadId, the bot's live selection.
-  post: (botId, threadId, text) => {
-    if (!store.bot(botId)) return;
-    store.appendMessage(threadId, { role: "bot", kind: "text", text, webhookPost: true });
-    store.patchTask(botId, threadId, { unread: true });
-  },
-  resolvePostThread: (trigger, forceNew) => {
-    if (!forceNew && trigger.resultsThreadId) return trigger.resultsThreadId;
-    return store.createTask(trigger.botId, "Updates", false)?.threadId;
-  },
-});
-const webhookRequests = new WebhookRequestService({ store, webhooks, botName: (botId) => store.bot(botId)?.name ?? "the bot" });
-
-let webhookIngress: WebhookIngress | null = null;
-let webhookIngressError: string | null = null;
-try {
-  webhookIngress = await listenWebhookIngress(webhooks, {
-    port: WEBHOOK_PORT, publicBaseUrl: WEBHOOK_PUBLIC_URL,
-    claimRequest: () => workspaceMaintenance.request(),
-  });
-  const advertised = WEBHOOK_PUBLIC_URL ? ` (advertised as ${webhookIngress.baseUrl})` : "";
-  console.log(`openmausbot webhook receiver on http://${webhookIngress.host}:${webhookIngress.port}${advertised}`);
-} catch (error) {
-  webhookIngressError = error instanceof Error ? error.message : String(error);
-  console.error(`openmausbot webhook receiver unavailable: ${webhookIngressError}`);
-}
-
-const webhookIngressStatus = () => ({
-  available: Boolean(webhookIngress),
-  baseUrl: webhookIngress?.baseUrl ?? `http://127.0.0.1:${WEBHOOK_PORT}`,
-  ...(webhookIngressError ? { error: webhookIngressError } : {}),
-});
-
 const RUNTIME_KEEP_MS = 30 * 24 * 60 * 60_000;
 let runtimePrunedAt = 0;
 const roomHandoffTimer = setInterval(() => {
@@ -8245,8 +7716,6 @@ roomHandoffTimer.unref();
 function reconcileParkedRoots(): void {
   for (const node of coordinator.active()) reconcileParkedNode(node);
 }
-const MAX_GROUP_HOPS = 1;
-
 type GroupMemberTurnOutcome =
   | "settled"
   | "provider_failed"
@@ -8266,7 +7735,6 @@ type GroupTurnOrchestration = {
   liveRoster?: string;
   turnNote?: string;
   turnRestartNote?: string;
-  followMentions: boolean;
   result: { replyText?: string; outcome?: GroupMemberTurnOutcome; stopReason?: string | null };
   onClaimed?: () => void;
   onTurnStarted?: (turnId: string) => void;
@@ -8285,8 +7753,6 @@ function teammateReportContext(requestId: string, readerBotId?: string): string 
 
 const roomTranscript = createRoomTranscript({ store, teammateReportContext });
 
-const roomPostBudgets = new Map<string, RoomPostBudget>();
-const ROOM_POST_MAX_CHARS = 4_000;
 
 const approvalBus: ApprovalBus = { store, broadcast, notify, autoApply: fullAccessForSource,
   onPeerApprovalPending: (from, target, action, sourceThreadId, message) => void reportEscalation({
@@ -8681,13 +8147,13 @@ async function runClaimedGroupMemberTurn(
     `Room members: ${roster}, and ${userName} (the human).`,
     readyGroup.bulletin.trim() && `Room bulletin (shared instructions for everyone):\n${readyGroup.bulletin.trim()}`,
     readyGroup.dm
-      ? `This is a bot-to-bot channel with its own conversation, separate from ${userName}'s private chats and from named group rooms. Speak only as ${bot.name}. Never write ${userName}'s lines, another bot's lines, or a script of the conversation. @Name invites that member into this channel. Do not copy this channel into a private chat.`
+      ? `This is a bot-to-bot channel with its own conversation, separate from ${userName}'s private chats and from named group rooms. Speak only as ${bot.name}. Never write ${userName}'s lines, another bot's lines, or a script of the conversation. Keep ordinary replies as natural messages; do not use visible @mentions to address or summon another bot. Use coordinate_bots for structured teammate communication. Do not copy this channel into a private chat.`
       : orchestration
-        ? `This named room is its own conversation, separate from each member's private chat with ${userName} and from bot-to-bot channels. Speak only as ${bot.name}. Never write ${userName}'s lines, another participant's lines, or a script of the conversation. This turn is yours because you were addressed or assigned: answer it yourself. To bring a teammate in, mention them like @Name. Do not file this room into a private chat.`
-        : `This named room is its own conversation, separate from each member's private chat with ${userName} and from bot-to-bot channels. Speak only as ${bot.name}. Never write ${userName}'s lines, another participant's lines, or a script of the conversation. Reply when you were @mentioned, when the room was asked with @everyone, or when you have something new to add. Otherwise reply with exactly (pass) and nothing else. Staying silent is a complete answer. Mention a teammate like @Name to bring them in, or @everyone to ask the room. To get ${userName}'s attention or ask them something blocking, write @you. Do not file this room into a private chat.`,
+        ? `This named room is its own conversation, separate from each member's private chat with ${userName} and from bot-to-bot channels. Speak only as ${bot.name}. Never write ${userName}'s lines, another participant's lines, or a script of the conversation. This turn is yours because you were addressed or assigned: answer it yourself. Keep the reply natural and do not emit visible @mentions; use coordinate_bots for structured teammate communication. Do not file this room into a private chat.`
+        : `This named room is its own conversation, separate from each member's private chat with ${userName} and from bot-to-bot channels. Speak only as ${bot.name}. Reply when the user addressed you or the room, or when you have something new to add. Otherwise reply with exactly (pass) and nothing else. Staying silent is a complete answer. Keep ordinary replies natural and do not emit visible @mentions; user-authored mentions are routing input, while bot-to-bot communication uses coordinate_bots. Do not file this room into a private chat.`,
     outsideRoom.length > 0 && roomPeerRosterSystemPrompt(outsideRoom),
     integrations.agents && (CREDENTIAL_PROMPT + (orchestration && !orchestration.roomHandoffId ? THREADS_PROMPT : "")).trim(),
-    integrations.agents && (!orchestration || orchestration.roomHandoffId) && "For actual OpenMausBot teamwork, discover IDs with list_room_targets and use coordinate_bots for advice or work in this or another room. Do not substitute native coding helpers for these named bots. Consult only when needed to make a decision; no discussion step is mandatory. Give concrete responsibilities, exact accessible paths and acceptance checks. End your turn after assigning; busy teammates queue and results automatically resume you. When they return, finish the requested verification and give the user one final answer. Native helper names are not evidence that an OpenMausBot teammate participated. Plain @mentions are only for conversational replies in this room." + requesterRule,
+    integrations.agents && (!orchestration || orchestration.roomHandoffId) && "For actual OpenMausBot teamwork, use list_bots to discover teammates and coordinate_bots for advice or work. Do not substitute native coding helpers for these named bots. Consult only when needed to make a decision; no discussion step is mandatory. Give concrete responsibilities, exact accessible paths and acceptance checks. End your turn after assigning; busy teammates queue and results automatically resume you. When they return, finish the requested verification and give the user one final answer. Native helper names are not evidence that an OpenMausBot teammate participated. Keep coordination structured through coordinate_bots; do not put @Name or @everyone commands in ordinary room text." + requesterRule,
     integrations.agents && TRIGGER_PROMPT.trim(),
     integrations.agents && PROFILE_PROMPT.trim(),
     skillAuthoring && LEARN_PROMPT.trim(),
@@ -8806,13 +8272,7 @@ async function runClaimedGroupMemberTurn(
     if (providerTurnId) retireProviderTurn(providerTurnId);
     else markCancelledProviderHandshake(threadId, retirementOwner);
   };
-  const liveGroup = store.group(groupId) ?? group;
-  const timeoutMinutes = effectiveRoomTurnTimeoutMinutes(
-    roomTurnTimeoutMinutes(cfg),
-    liveGroup.dm
-      ? liveGroup.turnTimeoutMinutes
-      : store.groupTaskByThread(liveGroup.id, threadId)?.turnTimeoutMinutes,
-  );
+  const timeoutMinutes = 5;
   const outcome = await new Promise<GroupMemberTurnOutcome>((resolve) => {
     let done = false;
     let unsub = () => {};
@@ -9072,64 +8532,6 @@ async function runClaimedGroupMemberTurn(
     }
   }
 
-  const roomRootId = orchestration?.coordination?.id ?? internalGeneration;
-  const roomRoot = coordinator.node(roomRootId);
-  const handedOut = roomRoot !== undefined && coordinator.children(roomRootId).some((child) => child.createdAt >= (roomRoot.startedAt ?? 0));
-  if (
-    (orchestration?.followMentions ?? true) &&
-    roomRoot !== undefined && roomRoot.parentId === undefined &&
-    !handedOut &&
-    !isCancelled?.() &&
-    hop < MAX_GROUP_HOPS &&
-    replyText.trim()
-  ) {
-    const members = group.memberIds
-      .map((id) => store.bot(id))
-      .filter((b): b is NonNullable<typeof b> => Boolean(b) && b!.id !== bot.id);
-    const missed = mentionedBots(
-      replyText,
-      reachablePeers(store.bots, bot).filter((peer) => !group.memberIds.includes(peer.id)),
-    );
-    for (const peer of missed) {
-      store.appendMessage(threadId, {
-        role: "bot",
-        kind: "activity",
-        tool: {
-          name: `${peer.name} isn't in this room, so that mention didn't reach them — add them to the room to bring them in.`,
-          ok: false,
-        },
-      });
-    }
-    for (const next of roomResponders(replyText, members, { kind: "mentions" })) {
-      if (isCancelled?.()) return false;
-      if (spoken.has(next.id)) continue;
-      if (operation) {
-        const verdict = await waitForChatRoomMember(operation, threadId, next);
-        if (verdict === "stop") return false;
-        if (verdict === "skip") {
-          spoken.add(next.id);
-          continue;
-        }
-      }
-      if (!(await runGroupMemberTurn(
-        groupId,
-        threadId,
-        next.id,
-        hop + 1,
-        spoken,
-        undefined,
-        undefined,
-        isCancelled,
-        onProviderHandshakeStarted,
-        onProviderHandshakeSettled,
-        skillAuthoringClaim,
-        undefined,
-        operation,
-      ))) {
-        return false;
-      }
-    }
-  }
   return true;
   } catch (error) {
     if (providerDispatched) throw error;
@@ -9231,7 +8633,6 @@ async function runGroupGoalStep(args: {
         args.skillAuthoringClaim,
         {
           systemInstructions: args.instructions,
-          followMentions: false,
           result,
           goalRunId: run.runId,
           onClaimed: () => {
@@ -9536,7 +8937,7 @@ function startGroupTurn(
     throw Object.assign(new Error("the selected goal coordinator is not an active room member"), { status: 409 });
   }
   // Read the room before this message is appended just below.
-  const queuedGroup = options.queuedGroup;
+  const queuedGroup = options.queuedGroup ?? [];
   const message = queuedGroup && queuedGroup.length > 0
     ? (() => {
         for (const item of queuedGroup.slice(0, -1)) {
@@ -9601,7 +9002,7 @@ function startGroupTurn(
   const explicitlyMentionedLead = roomResponders(text, routableMembers, { kind: "mentions" })[0];
   const goalCoordinator = channelMode === "goal"
     ? requestedGoalCoordinator ?? explicitlyMentionedLead ?? selectGroupGoalCoordinator(routableMembers, group.defaultResponder)
-    : null;
+    : undefined;
   if (!responders.length && group.dm) {
     const lastSpeakerId = [...store.messagesFor(threadId)]
       .reverse()
@@ -9656,7 +9057,7 @@ function startGroupTurn(
     const detail = `${goalCoordinator.name} is coordinating this goal.`;
     const card = store.appendMessage(threadId, {
       role: "bot",
-      kind: "goal.run",
+      kind: "activity",
       text: `Goal in progress: ${detail}`,
       from: { botId: goalCoordinator.id, name: goalCoordinator.name, color: goalCoordinator.color },
       goalRun: {
@@ -9753,85 +9154,24 @@ function drainQueuedChannelSends(): void {
     if (queuedChannelSendsDrainOwed) { queuedChannelSendsDrainOwed = false; drainQueuedChannelSends(); }
   }
 }
+void startGroupTurn;
 function drainQueuedChannelSendsNow(): void {
-  drainChannelMessages(
-    (groupId, threadId) => groupThreadIsWorking(groupId, threadId),
-    ({ groupId, threadId, items }) => {
-      const group = store.group(groupId);
-      const ownsThread = group?.dm
-        ? group.threadId === threadId
-        : Boolean(group && store.groupTaskByThread(group.id, threadId));
-      if (!group || !ownsThread) return;
-      const head = items[0]!;
-      const last = items[items.length - 1]!;
-      const joined = items.map((item) => item.text).join("\n\n");
-      try {
-        startGroupTurn(groupId, joined, resolveReplyTarget(threadId, last.replyToId), last.sendId, last.mode, last.id, {
-          threadId,
-          sender: head.sender,
-          trigger: queuedTurnTrigger({ trigger: head.trigger, sender: head.sender }),
-          queuedGroup: items,
-        });
-      } catch (error) {
-        for (const item of items) {
-          if (!store.messagesFor(threadId).some((message) => message.queueId === item.id && message.role === "user")) {
-            store.appendMessage(threadId, { role: "user", kind: "text", text: item.text, replyToId: item.replyToId, sendId: item.sendId, channelMode: item.mode, queueId: item.id, via: item.via, sender: item.sender });
-          }
-        }
-        store.appendMessage(threadId, {
-          role: "bot",
-          kind: "activity",
-          tool: failedTurnTool(`queued channel message could not start — ${error instanceof Error ? error.message : String(error)}`),
-        });
-      }
-      queueMicrotask(drainQueuedChannelSends);
-      return groupQueues.get(threadId);
-    },
-  );
-}
-
-function sameCalendarRoster(group: GroupRecord, botIds: readonly string[]): boolean {
-  if (group.dm || group.memberIds.length !== botIds.length) return false;
-  const wanted = new Set(botIds);
-  return group.memberIds.every((id) => wanted.has(id));
-}
-
-function ensureCalendarCallRoom(call: CalendarCall): GroupRecord {
-  const linked = call.roomId ? store.group(call.roomId) : undefined;
-  let group = linked && sameCalendarRoster(linked, call.botIds) && !roomSetupPending(linked)
-    ? linked
-    : undefined;
-  const conflict = group ? null : roomAudienceConflict(call.botIds);
-  if (conflict) throw Object.assign(new Error(conflict), { status: 400 });
-  group ??= store.createGroup(call.name, call.botIds, false, undefined, {
-    bulletin: "",
-    defaultResponder: { kind: "everyone" },
-    completed: true,
-  });
-  if (call.roomId !== group.id) calendarCalls!.linkRoom(call.id, group.id);
-  return group;
 }
 
 function deliverCalendarCall(call: CalendarCall, scheduledFor: number): void {
-  if (call.botIds.length < 2) return;
-  let group: GroupRecord;
-  try {
-    group = ensureCalendarCallRoom(call);
-  } catch (error) {
-    console.warn(`calendar call "${call.name}" did not start: ${error instanceof Error ? error.message : String(error)}`);
-    return;
-  }
+  if (call.botIds.length !== 1) return;
+  const bot = store.bot(call.botIds[0]!);
+  if (!bot || bot.hidden) return;
   const text = [
-    `@everyone ${call.description.trim() || call.name}`,
+    call.description.trim() || call.name,
     ...call.attachments.map((attachment) =>
       `<${attachment.kind === "image" ? "attached-image" : "attached-file"} path="${escapeAttribute(attachment.path)}" name="${escapeAttribute(attachment.name)}" />`
     ),
   ].join("\n\n");
   const sendId = `calendar_${call.id}_${scheduledFor}`;
-  const threadIds = new Set([group.threadId, ...(group.tasks ?? []).map((task) => task.threadId)]);
-  const messages = [...threadIds].flatMap((threadId) => store.messagesFor(threadId));
+  const messages = store.messagesFor(bot.threadId);
   if (messages.some((message) => message.sendId === sendId)) return;
-  startGroupTurn(group.id, text, undefined, sendId, "chat", undefined, { threadId: roomHomeThreadId(group) });
+  void startTurn(bot.id, text, { threadId: bot.threadId, sendId, unattended: true, automationSource: "schedule" });
 }
 
 function resolveReplyTarget(threadId: string, value: unknown): Message | undefined {
@@ -9877,53 +9217,6 @@ function connectorThread(botId: string, threadId: string) {
   const group = store.groupByThread(threadId);
   if (group?.memberIds.includes(botId)) return { bot, group };
   return null;
-}
-
-/** Read fresh every time; a line stamped via the HTTP API does not count, so a bot cannot re-arm the ceiling it just spent. */
-function lastHumanRoomMessageAt(group: GroupRecord): number | undefined {
-  let newest: number | undefined;
-  for (const threadId of roomThreadIds(group)) {
-    const messages = store.messagesFor(threadId);
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      const message = messages[i];
-      if (message.role !== "user" || message.kind !== "text" || message.via || message.at === undefined) continue;
-      if (newest === undefined || message.at > newest) newest = message.at;
-      break;
-    }
-  }
-  return newest;
-}
-
-/** Refuses cross-section rooms outright, so a tool is never the way one section speaks to another; membership comes from the record, never a tool argument. */
-function roomPostEligibility(
-  bot: BotRecord,
-  group: GroupRecord,
-): { ok: true } | { ok: false; status: number; error: string } {
-  if (group.dm) {
-    return {
-      ok: false,
-      status: 400,
-      error: "that is a one-to-one bot channel, not a room — use coordinate_bots to reach a single bot",
-    };
-  }
-  if (!group.memberIds.includes(bot.id)) {
-    return { ok: false, status: 403, error: "you are not a member of that room" };
-  }
-  const outsider = group.memberIds
-    .map((id) => store.bot(id))
-    .find((member) => member && !canAccessTeam(bot, member.section) && !coordinatorSupervises(member, bot));
-  if (outsider) {
-    return {
-      ok: false,
-      status: 403,
-      error: `that room includes @${outsider.name}, who is outside your section — tell the user what you wanted to post there instead`,
-    };
-  }
-  // A bot must never settle whether a room's unfinished setup still counts as pending.
-  if (roomSetupPending(group)) {
-    return { ok: false, status: 409, error: "that room is still being set up — it cannot receive messages yet" };
-  }
-  return { ok: true };
 }
 
 function proposalPersistence(botId: string, threadId: string, opensCard = true) {
@@ -10476,11 +9769,9 @@ function configStatus() {
     managedPolicy: managedPolicy.summary(),
     ...({}),
     language: cfg.language ?? "",
-    rooms: { turnTimeoutMinutes: roomTurnTimeoutMinutes(cfg) },
     mcp: { callTimeoutMinutes: mcpCallTimeoutMinutes(cfg) },
     automaticRecovery: cfg.automaticRecovery ?? { enabled: false },
     cacheKeepWarm: cacheKeepWarmSettings(cfg),
-    newBots: cfg.newBots?.effort ? { effort: cfg.newBots.effort } : {},
     threads: {
       maxConcurrentPerBot: maxConcurrentBotThreads(cfg),
       ...(eventLogMaxBytes !== null ? { eventLogMaxBytes } : {}),
@@ -10498,8 +9789,6 @@ function configStatus() {
       claudeUserMcp: claudeUserMcpEnabled(cfg),
       claudeUserSkills: claudeUserSkillsEnabled(cfg),
       autoRecall: autoRecallEnabled(cfg),
-      roomMemoryCapture: roomMemoryCaptureEnabled(cfg),
-      parallelRoomJobs: parallelRoomJobsEnabled(cfg),
       llmThreadTitles: llmThreadTitlesEnabled(cfg),
     },
     onboarding: {
@@ -10799,7 +10088,6 @@ const workspaceBackupAccess = {
     flush: async () => {
       await Promise.all([flushAllMemoryJournals(), flushUsageLedger(DATA_DIR), flushDecisionLog(DATA_DIR), flushAdminActivity(DATA_DIR)]);
       // Writers gated and work idle: release the WAL connection for a consistent snapshot; Store reopens it lazily.
-      await closeMessageSearch();
       closeMessageDb();
     },
   }, keepLocked),
@@ -10828,12 +10116,7 @@ ROUTES.push(createBotMessageRoutes({
 }));
 // `let` slots are read per request.
 ROUTES.push(createThreadRoutes({
-  store, cfg, sessions, groupUsageReader, lendingEnabled,
-  hostedWorkspace: HOSTED_WORKSPACE, sessionCookie: SESSION_COOKIE, loopback: LOOPBACK, defaultPage: DEFAULT_PAGE,
-  workspaceAccess: () => workspaceAccess,
-  desktopMutationToken: () => desktopMutationToken,
-
-  cliOwnerToken: () => cliOwnerToken,
+  store, cfg, sessions, groupUsageReader, defaultPage: DEFAULT_PAGE,
   pageSize, messagePage, messageWindow, publicBotQueuedMessages, publicGroupState, wireBot, wireTask,
   botComputerControlSnapshot, messageFileRootsForThread, viewerFor, visibleTo, coordinator, groupThreadIsWorking,
 }));
@@ -10883,62 +10166,9 @@ ROUTES.push(createBotMemoryRoutes({
 }));
 ROUTES.push(createNotificationRoutes());
 ROUTES.push(createSignInCardRoutes({ settle: settleSignIn, threadVisible: (auth, threadId) => visibleTo(viewerFor(auth)).thread(threadId) }));
-ROUTES.push(createRoomHoldRoutes({
-  group: (id) => store.group(id),
-  setHold: (groupId, botId, held) => {
-    const updated = setRoomHold(groupId, botId, held);
-    return updated ? publicGroupState(updated) : null;
-  },
-}));
+// Group chat routes were removed. Groups are maintained as Bot membership containers;
+// Bot-to-Bot work uses coordinate_bots in each Bot's own conversation.
 // `routines` and `orgLibrary` are assigned at boot, after this line: read them per request.
-ROUTES.push(createGroupRoutes({
-  store,
-  cloudHome: Boolean(CLOUD_HOME),
-  visibleFor: (auth) => visibleTo(viewerFor(auth)),
-  actorKey,
-  threadStarters,
-  createChannel,
-  publicGroupState,
-  checkedGroupResponder,
-}));
-ROUTES.push(createChannelRoutes({
-  store,
-  cfg,
-  desktopManaged: DESKTOP_MANAGED,
-  routines: () => routines,
-  broadcast,
-  actorKey,
-  threadStarters,
-
-  sendSequencer,
-  roomMemberContexts,
-  skillReview,
-  groupSpeakers,
-  groupTurnOperations,
-  lastReply,
-
-  messageSender,
-  usageTriggerFor,
-  publicGroupState,
-  groupWithThread,
-  updateChannel,
-  groupIsWorking,
-  groupThreadIsWorking,
-  readCursor,
-  pageSize,
-  messagePage,
-  resolveReplyTarget,
-  runningTurnInstance,
-  startGroupTurn, engineSteersImages,
-  applyRoomHoldsFromMessage,
-  cancelGroupTurnOperations,
-  drainQueuedChannelSends,
-  clearTurnDigestState,
-  closeOpenApprovals,
-  revokeInternalCapabilitiesForThread,
-  stagedSkillCleanupsForThread,
-  rejectDeletedThreadSkillStages,
-}));
 ROUTES.push(createTaskRoutes({
   store,
   cloudHome: Boolean(CLOUD_HOME),
@@ -11599,38 +10829,12 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           return json(res, status, { error: message });
         }
       }
-      if (method === "GET" && path === "/api/internal/rooms") {
-        const from = internalSender;
-        const fromThreadId = internalCapability.threadId;
-        if (!connectorThread(from.id, fromThreadId)) {
-          return json(res, 403, { error: "source conversation does not belong to sender" });
-        }
-        const rooms: Array<{ id: string; name: string; members: string[] }> = [];
-        const unpostable: Array<{ name: string; reason: string }> = [];
-        for (const group of store.groups) {
-          if (group.dm || !group.memberIds.includes(from.id)) continue;
-          const eligibility = roomPostEligibility(from, group);
-          if (!eligibility.ok) {
-            unpostable.push({ name: group.name, reason: eligibility.error });
-            continue;
-          }
-          rooms.push({
-            id: group.id,
-            name: group.name,
-            members: group.memberIds
-              .map((id) => store.bot(id))
-              .filter((member): member is BotRecord => Boolean(member))
-              .map((member) => member.name),
-          });
-        }
-        return json(res, 200, { rooms: rooms.slice(0, 50), unpostable: unpostable.slice(0, 50) });
-      }
       if (method === "GET" && path === "/api/internal/triggers") {
         if (!connectorThread(internalSender.id, internalCapability.threadId)) return json(res, 403, { error: "source conversation does not belong to sender" });
         const target = triggerTarget(internalSender, url.searchParams.get("forBotId") ?? undefined, (id) => store.bot(id));
         if ("error" in target) return json(res, target.status, { error: target.error });
         return json(res, 200, listTriggers({ botId: target.forBot?.botId ?? internalSender.id, triggerId: url.searchParams.get("triggerId") ?? undefined,
-          routines: routines!.listRoutines(), webhooks: webhooks.list(), runs: routines!.listRuns(), timeZone: routineTimeZone(), now: Date.now() }));
+          routines: routines!.listRoutines(), runs: routines!.listRuns(), timeZone: routineTimeZone(), now: Date.now() }));
       }
       if (method === "POST" && path === "/api/internal/trigger-requests") {
         const from = internalSender;
@@ -11647,19 +10851,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           return json(res, persistence.status, { error: persistence.error });
         }
         const sender = owner.group ? { botId: from.id, name: from.name, color: from.color } : undefined;
-        if (request.kind === "webhook") {
-          // Its calls start the owner's bot: a turn the Cloud's owner did not drive cannot add or change one.
-
-          let applied: ReturnType<WebhookRequestService["submit"]>;
-          try {
-            applied = webhookRequests.submit({ botId: from.id, threadId: fromThreadId, operation: { ...request.operation, forBot }, from: sender, canCommit: () => internalCapabilityIsActive(internalCapability) });
-          } catch (error) {
-            return json(res, error instanceof WebhookRequestError ? error.status : (error as { status?: number }).status ?? 400, { error: error instanceof Error ? error.message : String(error) });
-          }
-          appendDecision(DATA_DIR, { threadId: fromThreadId, requestId: applied.requestId, botId: from.id, botName: from.name,
-            tool: applied.action === "create" ? "create_trigger" : "manage_trigger", summary: applied.summary, decision: "auto-approved", source: "routine" });
-          return json(res, 201, applied);
-        }
         const proposedInput = { ...request.proposal, forBot };
 
         const proposed = await routineRequests.submit({
@@ -11991,18 +11182,11 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       const EXTERNAL = internalCapability.generation === EXTERNAL_RUNTIME_GENERATION;
       const coordinateBots = async (call: CoordinateBotsCall): Promise<{ status: number; body: Record<string, unknown> }> => {
         const refuse = (status: number, error: string, more: Record<string, unknown> = {}) => ({ status, body: { error, ...more } });
-        const source = store.groupByThread(internalCapability.threadId);
-        if (source && (source.dm || !source.memberIds.includes(internalSender.id))) {
-          return refuse(403, "Coordination needs a room you are a member of, or your own conversation.");
-        }
-        const address = { groupId: source?.id, threadId: internalCapability.threadId, botId: internalSender.id };
-        const problem = roomHandoffProblem(address);
-        if (problem) return refuse(403, problem);
+         const source = store.groupByThread(internalCapability.threadId);
+         if (source) return refuse(403, "Bot coordination is available from a bot's one-to-one conversation; groups are containers, not chat rooms.");
+         const address = { threadId: internalCapability.threadId, botId: internalSender.id };
         if (call.consult && call.reply === "none") return refuse(400, "consult asks a question whose answer comes back to you; leave reply out");
-        const groupId = call.groupId ?? source?.id;
-        const destination = groupId ? store.group(groupId) : undefined;
-        if (groupId && !destination) return refuse(404, "No such room; use list_room_targets.");
-        const fresh = !destination && call.thread === "new";
+         const fresh = call.thread === "new";
         const folder = inMyFolderCwd(call.inMyFolder, fresh, store.taskByThread(internalSender.id, address.threadId)?.cwd, DATA_DIR);
         if (folder.error) return refuse(400, folder.error);
         if (fresh && !EXTERNAL && internalCapability.openedThreads >= MAX_THREADS_OPENED_PER_TURN) {
@@ -12015,17 +11199,15 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           botIds.push(resolved.id);
         }
         if (new Set(botIds).size !== botIds.length) return refuse(400, "bot_ids name the same teammate twice — send each teammate once");
-        const targets = botIds.map(botId => ({ groupId: destination?.id,
-          threadId: destination ? destination.id === source?.id ? address.threadId : roomHomeThreadId(destination) : store.bot(botId)?.threadId ?? "", botId,
-        }));
+         const targets = botIds.map(botId => ({ threadId: store.bot(botId)?.threadId ?? "", botId }));
         for (const target of targets) {
             // Echo only the id the caller sent, never a bot's name.
           const addressed = store.bot(target.botId);
           const eligibility =
             target.botId === internalSender.id ? "Choose a teammate, not yourself"
-            : !addressed ? `No bot with id "${target.botId}" — call list_bots and copy the exact id from the result`
+             : !addressed ? `No bot with id "${target.botId}" — call list_bots and copy the exact id from the result`
             : addressed.hidden ? `The bot with id "${target.botId}" is no longer available — call list_bots for the ones you can reach`
-            : roomHandoffProblem(target, address);
+             : undefined;
           if (eligibility) return refuse(403, eligibility);
         }
         let approvalGranted = false;
@@ -12042,7 +11224,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             { approvals: blocked });
           approvalGranted = true;
         }
-        const requestBatchKey = destination ? randomUUID() : undefined;
         const generation = EXTERNAL ? randomUUID() : internalCapability.generation;
         if (EXTERNAL) {
           const opener = handoffOpener(internalCapability, address.threadId);
@@ -12052,7 +11233,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         const mode: NonNullable<HandoffOptions["mode"]> = call.consult ? "consult" : call.reply === "none" ? "notify" : "work";
         const reply: NonNullable<HandoffOptions["reply"]> = call.reply === "none" ? "none" : EXTERNAL ? "poll" : "resume";
         const returns = reply === "none" ? "nothing comes back from it" : reply === "poll" ? "read its result with assignment_status" : "its result will resume you";
-        const lanes = Boolean(destination) && roomJobs.useLanes(destination!, targets[0]!.threadId, targets.length, mode);
         const receipts: PeerDeliveryReceipt[] = [];
         const refused: string[] = [];
         for (const target of targets) {
@@ -12061,23 +11241,17 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             requireActiveInternalCapability();
             const recipient = store.bot(target.botId);
             if (!recipient) throw new Error("The recipient no longer exists");
-            const continued = destination || fresh ? undefined : store.workThread(target.botId, internalSender.id, address.threadId);
-            const lane = destination && lanes ? roomJobs.openLane(destination, target.threadId, target.botId, internalSender, call.message) : undefined;
-            if (lane?.created) createdThread = lane.threadId;
-            if (lane) applyDelegatedLevel(internalSender, internalCapability.threadId, recipient, lane.threadId);
-            if (!destination) {
-              const opened = { botId: internalSender.id, name: internalSender.name, threadId: address.threadId, at: Date.now() };
-              const task = continued ?? (fresh
-                ? store.createTask(target.botId, call.title ?? (call.message.replace(/\s+/g, " ").trim().slice(0, 60) || `From ${internalSender.name}`), false, call.projectId, opened, undefined, undefined, folder.cwd)
-                : store.createTask(target.botId, `@${internalSender.name} · work`, false, undefined, { ...opened, kind: "work" }));
-              if (!task) throw new Error("The recipient no longer exists");
-              target.threadId = task.threadId;
-              if (!continued) createdThread = task.threadId;
-              applyDelegatedLevel(internalSender, internalCapability.threadId, recipient, target.threadId);
-            }
-            const routed = lane ? { botId: target.botId, threadId: lane.threadId } : target;
-            const { node, duplicate } = coordinator.enqueue(address, generation, internalCapability.roomHandoffId, routed, call.message, {
-              mode, reply, thread: lane ? "new" : call.thread, approvalGranted, rework: call.rework, ...(lane ? {} : { requestBatchKey }),
+             const continued = fresh ? undefined : store.workThread(target.botId, internalSender.id, address.threadId);
+             const opened = { botId: internalSender.id, name: internalSender.name, threadId: address.threadId, at: Date.now() };
+             const task = continued ?? (fresh
+               ? store.createTask(target.botId, call.title ?? (call.message.replace(/\s+/g, " ").trim().slice(0, 60) || `From ${internalSender.name}`), false, call.projectId, opened, undefined, undefined, folder.cwd)
+               : store.createTask(target.botId, `@${internalSender.name} · work`, false, undefined, { ...opened, kind: "work" }));
+             if (!task) throw new Error("The recipient no longer exists");
+             target.threadId = task.threadId;
+             if (!continued) createdThread = task.threadId;
+             applyDelegatedLevel(internalSender, internalCapability.threadId, recipient, target.threadId);
+             const { node, duplicate } = coordinator.enqueue(address, generation, internalCapability.roomHandoffId, target, call.message, {
+               mode, reply, thread: call.thread, approvalGranted, rework: call.rework,
               ...(call.doneWhen ? { doneWhen: call.doneWhen } : {}),
             });
             if (duplicate && createdThread) store.deleteTask(target.botId, createdThread);
@@ -12086,7 +11260,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
               if (fresh && !EXTERNAL) internalCapability.openedThreads += 1;
             }
             createdThread = undefined;
-            const title = destination && !lane ? undefined : store.taskByThread(node.botId, node.threadId)?.title;
+             const title = store.taskByThread(node.botId, node.threadId)?.title;
             const finished: Partial<Record<HandoffView["status"], string>> = {
               completed: "it already finished and its result stands; send it with rework=true to run it again",
               failed: "it failed; send it with rework=true to retry", cancelled: "it was cancelled; send it with rework=true to retry",
@@ -12099,22 +11273,19 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
               outcome: notSent ? "failed" : !duplicate || node.status === "queued" ? "queued" : "injected",
               detail: notSent ?? (duplicate
                 ? `already sent: it is ${node.status === "queued" ? "queued" : "under way"} and ${returns}`
-                : lane
-                  ? `runs in its own thread "${lane.title}", in parallel with the other room jobs; its result posts in this room and ${returns}`
-                  : title
+                 : title
                     ? `sent to "${title}"; it runs after anything still running there`
                     : "handed to the coordinator; the teammate's turn has not started yet"),
               requestId: node.id,
-              ...(destination && !lane ? {} : { threadId: node.threadId }),
+               threadId: node.threadId,
             }));
             if (!duplicate) {
               if (!EXTERNAL) delegatedThisTurn(node.id);
               store.appendMessage(address.threadId, { role: "bot", kind: "activity",
                 from: { botId: internalSender.id, name: internalSender.name, color: internalSender.color },
-                tool: { name: "Sent to " + recipient.name + (destination && destination.id !== source?.id ? " · " + destination.name : ""), ok: true,
+                 tool: { name: "Sent to " + recipient.name, ok: true,
                   ...(call.reason ? { output: call.reason } : {}) },
-                ...(destination && !lane ? { comm: { groupId: destination.id, threadId: node.threadId, withBotId: recipient.id, withName: recipient.name, withColor: recipient.color } }
-                  : { threadRef: { botId: recipient.id, threadId: node.threadId, title: store.taskByThread(recipient.id, node.threadId)?.title ?? "Teammate work" } }),
+                 threadRef: { botId: recipient.id, threadId: node.threadId, title: store.taskByThread(recipient.id, node.threadId)?.title ?? "Teammate work" },
               });
             }
           } catch (error) {
@@ -12127,15 +11298,13 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           }
         }
         const sent = refused.length < receipts.length;
-        const lead = destination && sent ? roomJobs.describeRoomJobs(destination, targets[0]!.threadId, receipts,
-          { senderId: internalSender.id, returns, lanes, awaited: reply !== "none" }) : "";
         if (EXTERNAL) coordinator.endTurn(generation, { ok: sent, text: sent ? "" : refused.join("; ") });
         const message = reply === "none"
           ? "Sent one way. Nothing comes back and nothing resumes you; continue your turn."
           : reply === "poll"
             ? "Handed to the coordinator. Read each result with assignment_status (id: a receipt's requestId, or rootId for the whole call), long-polling with wait_ms."
             : "End your turn after sending all work. These actual teammates will reply and resume you automatically. Do not poll or wait.";
-        return { status: sent ? 200 : 409, body: { receipts, ...(sent ? { message: lead ? `${lead} ${message}` : message } : { error: refused.join("; ") }),
+         return { status: sent ? 200 : 409, body: { receipts, ...(sent ? { message } : { error: refused.join("; ") }),
           ...(EXTERNAL && sent ? { rootId: generation } : {}) } };
       };
       if (method === "GET" && path === "/api/internal/assignment-status") {
@@ -12189,7 +11358,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       }
       if (method === "POST" && path === "/api/internal/coordinate-bots") {
         const parsed = z.object({
-          groupId: z.string().min(1).max(128).optional(),
           botIds: z.array(z.string().min(1).max(128)).min(1).max(4).refine(ids => new Set(ids).size === ids.length),
           message: z.string().trim().min(1).max(4000),
           reason: z.string().trim().max(200).optional(),
@@ -12201,27 +11369,9 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           done_when: z.string().trim().max(1000).optional(),
         }).safeParse(await readInternalBody());
         if (!parsed.success) return json(res, 400, { error: "Provide 1-4 distinct botIds and a message of 1-4000 characters; thread is standing or new, reply is resume or none, consult is a boolean, done_when at most 1000 characters." });
-        const { groupId, botIds, message, reason, rework, thread, reply, consult, inMyFolder, done_when: doneWhen } = parsed.data;
-        const result = await coordinateBots({ groupId, botIds, message, reason: reason || undefined, rework, thread, reply, consult, inMyFolder, doneWhen: doneWhen || undefined });
+        const { botIds, message, reason, rework, thread, reply, consult, inMyFolder, done_when: doneWhen } = parsed.data;
+        const result = await coordinateBots({ botIds, message, reason: reason || undefined, rework, thread, reply, consult, inMyFolder, doneWhen: doneWhen || undefined });
         return json(res, result.status, result.body);
-      }
-      if (method === "GET" && path === "/api/internal/room-targets") {
-        const source = store.groupByThread(internalCapability.threadId);
-        if (source && (source.dm || !source.memberIds.includes(internalSender.id))) {
-          return json(res, 403, { error: "Coordination needs a room you are a member of, or your own conversation." });
-        }
-        const address = { groupId: source?.id, threadId: internalCapability.threadId, botId: internalSender.id };
-        const problem = roomHandoffProblem(address);
-        if (problem) return json(res, 403, { error: problem });
-        const rooms = store.groups.filter(g => !g.dm).map(g => ({
-          id: g.id, name: g.name, workingFolder: g.cwd || null,
-          members: g.memberIds.map(id => store.bot(id)).filter(b => b && b.id !== internalSender.id &&
-            !roomHandoffProblem({ groupId: g.id, threadId: g.id === source?.id ? address.threadId : g.threadId, botId: b.id }, address))
-            .map(b => ({ id: b!.id, name: b!.name, title: b!.title, busy: b!.busy })),
-        })).filter(g => g.members.length);
-        return json(res, 200, { currentRoom: source ? { id: source.id, name: source.name, workingFolder: source.cwd || null } : null,
-          bots: reachablePeers(store.bots, internalSender).map(bot => ({ id: bot.id, name: bot.name, title: bot.title, section: bot.section, busy: bot.busy })),
-          rooms, note: "Each bot uses its own environment and permissions. Files are not transferred: pass absolute paths only when accessible to the recipient, otherwise pass the content." });
       }
       if (method === "POST" && path === "/api/internal/retry-thread") {
         const body = await readInternalBody();
@@ -12267,98 +11417,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         readBody: readInternalBody, requireActive: requireActiveInternalCapability,
         report: (reason) => reportEscalation({ kind: "raised", bot: internalSender, threadId: internalCapability.threadId, gate: RAISED_GATE, reason, alreadyNotified: false }),
       })], { req, res, url, path, method, auth, json, readBody })) return;
-      // post_to_room appends role "bot", never "user" (which would start a round of real turns), starts no turn, and takes membership from the record.
-      if (method === "POST" && path === "/api/internal/post-to-room") {
-        const body = await readInternalBody();
-        const from = internalSender;
-        const fromThreadId = internalCapability.threadId;
-        const owner = connectorThread(from.id, fromThreadId);
-        if (!owner) return json(res, 403, { error: "source conversation does not belong to sender" });
-        const groupId = String(body.groupId ?? "").trim();
-        const message = String(body.message ?? "").trim();
-        if (!groupId || !message) {
-          return json(res, 400, { error: "post_to_room needs group_id (from list_rooms) and message" });
-        }
-        if ((internalCapability.roomPosts ?? 0) >= MAX_ROOM_POSTS_PER_TURN) {
-          return json(res, 429, { error: `You have already posted ${MAX_ROOM_POSTS_PER_TURN} times this turn, which is the limit. Do not retry — finish your turn and say anything further to the user directly.` });
-        }
-        if (message.length > ROOM_POST_MAX_CHARS) {
-          return json(res, 400, {
-            error: `a room post is at most ${ROOM_POST_MAX_CHARS} characters — post the short version and keep the detail in your own reply`,
-          });
-        }
-        let room = store.group(groupId);
-        if (!room) return json(res, 404, { error: "no such room — call list_rooms and copy the exact id from the result" });
-        if (room.id === owner.group?.id) {
-          return json(res, 409, { error: "you are already speaking in that room — say it in your reply instead" });
-        }
-        const eligibility = roomPostEligibility(from, room);
-        if (!eligibility.ok) return json(res, eligibility.status, { error: eligibility.error });
-        // The budget is read BEFORE any approval card and CHARGED only on the path that actually appends.
-        const askBudget = (bot: BotRecord, group: GroupRecord) => {
-          const attempt: RoomPostAttempt = {
-            botId: bot.id,
-            botName: bot.name,
-            text: message,
-            now: Date.now(),
-          };
-          const askedAt = owner.group ? undefined : personAskAt.get(fromThreadId);
-          const spokeAt = Math.max(lastHumanRoomMessageAt(group) ?? -Infinity, askedAt ?? -Infinity);
-          if (Number.isFinite(spokeAt)) attempt.lastHumanAt = spokeAt;
-          return decideRoomPost(roomPostBudgets.get(group.id) ?? emptyRoomPostBudget(), attempt);
-        };
-        // A refusal is stored, an allowance is not: losing a refusal would let a ring re-form one call later.
-        const preflight = askBudget(from, room);
-        if (!preflight.allowed) {
-          roomPostBudgets.set(room.id, preflight.budget);
-          return json(res, 429, { error: preflight.message });
-        }
-        let poster = from;
-        if (peerReviewRequired(from, fromThreadId)) {
-          // A bot the user asked to be consulted about is consulted here too, or this would be the one way round it.
-          const verdict = await requestPeerApproval(
-            approvalBus,
-            from,
-            { id: room.id, name: room.name },
-            message,
-            "post_to_room",
-            fromThreadId,
-          );
-          requireActiveInternalCapability();
-          if (verdict !== "allow") return json(res, 200, peerApprovalFailure(verdict));
-          // Re-read both records, so nothing is posted through on a stale decision.
-          const freshFrom = store.bot(internalSender.id);
-          const freshRoom = store.group(groupId);
-          if (!freshFrom || !freshRoom) return json(res, 404, { error: "that bot or room no longer exists" });
-          const stillEligible = roomPostEligibility(freshFrom, freshRoom);
-          if (!stillEligible.ok) return json(res, stillEligible.status, { error: stillEligible.error });
-          poster = freshFrom;
-          room = freshRoom;
-        }
-        const decision = askBudget(poster, room);
-        roomPostBudgets.set(room.id, decision.budget);
-        if (!decision.allowed) return json(res, 429, { error: decision.message });
-        // Reading the mark keeps its window alive through a turn that only posts; an aged-out mark would hand the next hop to auto-approve.
-        const unattended = isUnattended(poster.id, internalCapability.threadId);
-        const posted = store.appendMessage(roomHomeThreadId(room), {
-          role: "bot",
-          kind: "text",
-          text: message,
-          from: { botId: poster.id, name: poster.name, color: poster.color },
-          peerPost: unattended ? { unattended: true } : {},
-        });
-        internalCapability.roomPosts = (internalCapability.roomPosts ?? 0) + 1;
-        store.patchGroup(room.id, { unread: true });
-        const chip: Omit<Message, "id" | "at"> = {
-          role: "bot",
-          kind: "activity",
-          tool: { name: `Posted in ${room.name}`, ok: true },
-          comm: { groupId: room.id, withBotId: poster.id, withName: room.name, withColor: poster.color },
-        };
-        if (owner.group) chip.from = { botId: poster.id, name: poster.name, color: poster.color };
-        store.appendMessage(fromThreadId, chip);
-        return json(res, 201, { ok: true, messageId: posted.id, roomName: room.name });
-      }
       // start_thread never activates: a bot must not move what the person is looking at.
       if (method === "POST" && path === "/api/internal/threads") {
         const body = await readInternalBody();
@@ -12532,79 +11590,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           model: created.modelSelection.model,
           modelSelection: created.modelSelection,
         });
-      }
-      if (method === "POST" && (path === "/api/internal/create-room" || path === "/api/internal/manage-room")) {
-        const body = await readInternalBody();
-        const chief = store.bot(internalCapability.botId)!;
-        if (chief.hidden || !chief.chiefOfStaff || !connectorThread(chief.id, internalCapability.threadId)) {
-          return json(res, 403, { error: "only an active section Chief of Staff can manage rooms" });
-        }
-        if (!body || typeof body !== "object" || Array.isArray(body)) {
-          return json(res, 400, { error: "room request must be a JSON object" });
-        }
-        if (peerReviewRequired(chief, internalCapability.threadId)) {
-          return json(res, 403, { error: "peer approval is required; ask the user to make this room change" });
-        }
-        // Section labels are a permission boundary: a Chief may not recruit excluded peers or acquire a foreign transcript.
-        const allowedIds = new Set([chief.id, ...reachablePeers(store.bots, chief).map((bot) => bot.id)]);
-        const allowedRoster = (ids: string[]) => ids.includes(chief.id) && ids.every((id) => allowedIds.has(id));
-        if (body.section !== undefined && (typeof body.section !== "string" || sectionKey(body.section) !== sectionKey(chief.section))) {
-          return json(res, 403, { error: "rooms must stay in your own section; ask the user to move them" });
-        }
-        if (path === "/api/internal/create-room") {
-          if ((internalCapability.createdRooms ?? 0) >= 4) {
-            return json(res, 429, { error: "you can create at most 4 rooms in one turn" });
-          }
-          const parsed = z.object({
-            fromBotId: z.string().optional(), fromThreadId: z.string().optional(),
-            name: z.string().trim().min(1).max(100), memberIds: z.array(z.string()).min(1).max(100),
-            section: z.string().optional(), bulletin: z.string().max(12_000).optional(),
-          }).strict().safeParse(body);
-          if (!parsed.success) return json(res, 400, { error: "provide a room name, memberIds, and optional bulletin (at most 12000 characters)" });
-          const memberIds = [...new Set([chief.id, ...parsed.data.memberIds])];
-          if (!allowedRoster(memberIds)) {
-            return json(res, 403, { error: "include yourself and only active, allowed peers from your section" });
-          }
-          const group = createChannel({
-            name: redactSecretsInText(parsed.data.name), memberIds, section: chief.section,
-            setup: {
-              bulletin: redactSecretsInText(parsed.data.bulletin ?? ""),
-              defaultResponder: { kind: "member", botId: chief.id },
-            },
-          });
-          internalCapability.createdRooms = (internalCapability.createdRooms ?? 0) + 1;
-          return json(res, 201, { id: group.id, name: group.name, section: group.section || "General", memberIds: group.memberIds, memberCount: group.memberIds.length });
-        }
-        const parsed = z.object({
-          fromBotId: z.string().optional(), fromThreadId: z.string().optional(),
-          roomId: z.string(), action: z.enum(["add_members", "remove_members", "set_members", "rename", "set_bulletin"]),
-          memberIds: z.array(z.string()).min(1).max(100).optional(),
-          name: z.string().trim().min(1).max(100).optional(), bulletin: z.string().max(12_000).optional(),
-        }).strict().safeParse(body);
-        if (!parsed.success) return json(res, 400, { error: "provide roomId and a supported room action; section moves are user-only" });
-        const room = store.group(parsed.data.roomId);
-        if (!room || room.dm || sectionKey(room.section) !== sectionKey(chief.section) || !allowedRoster(room.memberIds)) {
-          return json(res, 403, { error: "you can only manage rooms you belong to with allowed peers in your own section" });
-        }
-        const { action, memberIds, name, bulletin } = parsed.data;
-        const patch: Record<string, unknown> = {};
-        if (action === "rename") {
-          if (name === undefined) return json(res, 400, { error: "rename requires a name" });
-          patch.name = redactSecretsInText(name);
-        } else if (action === "set_bulletin") {
-          if (bulletin === undefined) return json(res, 400, { error: "set_bulletin requires bulletin text; use an empty string to clear it" });
-          patch.bulletin = redactSecretsInText(bulletin);
-        } else {
-          if (!memberIds || memberIds.some((id) => !allowedIds.has(id))) {
-            return json(res, 403, { error: "memberIds must name only yourself or active, allowed peers in your section" });
-          }
-          const next = action === "add_members" ? [...new Set([...room.memberIds, ...memberIds])]
-            : action === "remove_members" ? room.memberIds.filter((id) => !memberIds.includes(id)) : memberIds;
-          if (!allowedRoster(next)) return json(res, 403, { error: "keep yourself in the room; only the user can remove its managing Chief" });
-          patch.memberIds = next;
-        }
-        const updated = updateChannel(room.id, patch);
-        return json(res, 200, { ok: true, memberIds: updated.memberIds, memberCount: updated.memberIds.length, message: `Updated room “${updated.name}”.` });
       }
       if (method === "POST" && path === "/api/internal/mcp-servers") {
         // Single-flight with the MCP servers route: two writers must not interleave a read of cfg.mcpServers with a save.
@@ -13074,16 +12059,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         throw Object.assign(error instanceof Error ? error : new Error(String(error)), { status: 400 });
       }
     }
-    const calendarCallRoomMatch = path.match(/^\/api\/calendar-calls\/([\w-]+)\/room$/);
-    if (calendarCallRoomMatch && method === "POST") {
-      const call = calendarCalls!.get(calendarCallRoomMatch[1]);
-      if (!call) return json(res, 404, { error: "no such scheduled call" });
-      if (call.botIds.length < 2) {
-        return json(res, 400, { error: "single-bot events open that bot's chat directly" });
-      }
-      const group = ensureCalendarCallRoom(call);
-      return json(res, 200, { group: { ...publicGroupState(group), messages: store.messagesFor(group.threadId) } });
-    }
     const calendarCallMatch = path.match(/^\/api\/calendar-calls\/([\w-]+)$/);
     if (calendarCallMatch && method === "PATCH") {
       if (!calendarCalls!.get(calendarCallMatch[1])) return json(res, 404, { error: "no such scheduled call" });
@@ -13100,47 +12075,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       return calendarCalls!.remove(calendarCallMatch[1])
         ? json(res, 200, { ok: true })
         : json(res, 404, { error: "no such scheduled call" });
-    }
-
-    // Deliveries land on a separate webhook-only loopback listener, so a relay never exposes the rest of the control surface.
-    if (path === "/api/webhooks" && method === "GET") {
-      const shownHooks = webhooks.list().filter((webhook) => visible.bot(webhook.botId));
-      const shownIds = new Set(shownHooks.map((webhook) => webhook.id));
-      return json(res, 200, { webhooks: shownHooks, attempts: webhooks.listAttempts().filter((attempt) => visible.everything || shownIds.has(attempt.webhookId)), ingress: webhookIngressStatus() });
-    }
-    if (path === "/api/webhooks" && method === "POST") {
-      const created = webhooks.create(await readBody(req));
-      const ingress = webhookIngressStatus();
-      return json(res, 201, {
-        webhook: created.webhook,
-        ingress,
-        credential: webhookCredential(ingress.baseUrl, created.webhook.endpointId, created.secret),
-      });
-    }
-    let webhookMatch = path.match(/^\/api\/webhooks\/([\w-]+)\/(rotate|test)$/);
-    if (webhookMatch && method === "POST") {
-      if (webhookMatch[2] === "test") {
-        const result = webhooks.test(webhookMatch[1], await readBody(req));
-        return result ? json(res, 202, result) : json(res, 404, { error: "no such webhook" });
-      }
-      const rotated = webhooks.rotateSecret(webhookMatch[1]);
-      if (!rotated) return json(res, 404, { error: "no such webhook" });
-      const ingress = webhookIngressStatus();
-      return json(res, 200, {
-        webhook: rotated.webhook,
-        ingress,
-        credential: webhookCredential(ingress.baseUrl, rotated.webhook.endpointId, rotated.secret),
-      });
-    }
-    webhookMatch = path.match(/^\/api\/webhooks\/([\w-]+)$/);
-    if (webhookMatch && method === "PATCH") {
-      const webhook = webhooks.update(webhookMatch[1], await readBody(req));
-      return webhook ? json(res, 200, { webhook }) : json(res, 404, { error: "no such webhook" });
-    }
-    if (webhookMatch && method === "DELETE") {
-      return webhooks.remove(webhookMatch[1])
-        ? json(res, 200, { ok: true })
-        : json(res, 404, { error: "no such webhook" });
     }
 
     if (method === "GET" && path === "/api/events") {
@@ -13683,7 +12617,6 @@ for (const row of chatFollowups()) {
   settleChatFollowups([row.id], null);
 }
 restoreSteeredMessages();
-restoreChannelMessages();
 
 {
   let movedAutoPins = 0;
@@ -13765,7 +12698,6 @@ const gracefulShutdown = createGracefulShutdown({
       memoryUpkeep.stop();
       cacheKeepWarm.dispose();
       skillReview.stop();
-      webhookIngress?.server.close();
       tunnelListener?.close(); 
     },
     async () => { await managedDesktop.close(); await registry.disposeAll(); },
@@ -13775,7 +12707,6 @@ const gracefulShutdown = createGracefulShutdown({
     () => flushDecisionLog(DATA_DIR),
     () => flushAdminActivity(DATA_DIR),
     () => bus.flush(),
-    () => closeMessageSearch(),
   ],
   // Release only after the concurrent cleanup jobs settle, right before exit, so no new server overlaps a still-mutating old one.
   exit: (code) => {

@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 import { api, useStore, type Bot } from "@/state/store";
 import { BotPickerList } from "./BotPickerList";
-import { NewBotDialog } from "./lazy-screens";
 import { t } from "@/lib/i18n";
 
 export function TeamDialog({ section, rename = false, onClose, onRenamed }: {
@@ -17,7 +16,6 @@ export function TeamDialog({ section, rename = false, onClose, onRenamed }: {
   const managing = Boolean(section) && !rename;
   const initialMembers = useRef(new Set(managing ? state.bots.filter(bot => !bot.hidden && (bot.section?.trim() ?? "") === section).map(bot => bot.id) : []));
   const [picked, setPicked] = useState<Set<string>>(() => new Set(initialMembers.current));
-  const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const dialog = useRef<HTMLDivElement>(null);
@@ -28,18 +26,15 @@ export function TeamDialog({ section, rename = false, onClose, onRenamed }: {
     (dialog.current?.querySelector<HTMLElement>("input") ?? dialog.current?.querySelector<HTMLElement>("button"))?.focus();
     return () => { if (opener?.isConnected) opener.focus(); };
   }, []);
-  useEffect(() => {
-    if (!creating) (dialog.current?.querySelector<HTMLElement>("input") ?? dialog.current?.querySelector<HTMLElement>("button"))?.focus();
-  }, [creating]);
   const moving = section !== undefined && !rename;
-  const title = rename ? t("team.rename") : managing ? t(initialMembers.current.size ? "team.manageBots" : "team.addBots") : moving ? t("team.moveTo", { name: section || "General" }) : t("team.create");
+  const title = rename ? t("team.rename") : managing ? t("team.manageBots") : moving ? t("team.moveTo", { name: section || "General" }) : t("team.create");
   const candidates = state.bots.filter((bot) => !bot.hidden && (managing || !moving || (bot.section?.trim() ?? "") !== section));
   const addBotIds = [...picked].filter(id => !initialMembers.current.has(id));
   const removeBotIds = [...initialMembers.current].filter(id => !picked.has(id));
   const unchanged = managing ? !addBotIds.length && !removeBotIds.length : moving && !picked.size;
   const save = async () => {
     if (saving || (!moving && !name.trim()) || unchanged) return;
-    if (section === undefined && [...(state.sections ?? []), ...state.bots.map((bot) => bot.section), ...state.groups.map((group) => group.section)].includes(name.trim())) {
+    if (section === undefined && [...(state.sections ?? []), ...state.bots.map((bot) => bot.section)].includes(name.trim())) {
       setError(t("team.duplicate"));
       return;
     }
@@ -59,10 +54,6 @@ export function TeamDialog({ section, rename = false, onClose, onRenamed }: {
       setSaving(false);
     }
   };
-  if (creating) return createPortal(<NewBotDialog section={section} preserveSelection onClose={() => setCreating(false)} onCreated={(bot) => {
-    initialMembers.current.add(bot.id);
-    setPicked(previous => new Set([...previous, bot.id]));
-  }} />, document.body);
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !saving) onClose();
@@ -89,13 +80,6 @@ export function TeamDialog({ section, rename = false, onClose, onRenamed }: {
             className="mt-1 w-full rounded-lg border border-hairline/50 bg-inset px-3 py-2 text-[14px] text-ink" />
         </label>}
         {!rename && <>
-          <p className="mb-3 text-[13px] leading-relaxed text-ink-secondary">
-            {managing ? t("team.manageIntro") : moving ? t("team.moveIntro") : t("team.createIntro")} {t("team.moveWarning")}
-          </p>
-          {managing && <button disabled={saving || state.botCreationPending} onClick={() => setCreating(true)}
-            className="mb-3 flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] text-accent hover:bg-raised disabled:opacity-40">
-            <Plus size={14} />{t("sidebar.newBot")}
-          </button>}
           <fieldset disabled={saving}>
             <legend className="mb-1 text-[12px] font-medium text-ink-secondary">{t("team.existingBots")}</legend>
             <BotPickerList bots={candidates} picked={picked} emptyHint={t("team.noBots")} onToggle={(id) => setPicked((previous) => {

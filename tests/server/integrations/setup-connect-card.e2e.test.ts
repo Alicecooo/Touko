@@ -80,7 +80,7 @@ describe("/setup connects an app through a Connect card, against the real server
         HOME: home, USERPROFILE: home, OMB_DATA_DIR: data,
         APPDATA: join(home, "appdata"), LOCALAPPDATA: join(home, "localappdata"),
         TEMP: home, TMP: home, TMPDIR: home, OMB_TEST_SEALED_PATH: "1",
-        OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1), OMB_USER_DATA: join(home, "user-data"),
+        OMB_PORT: String(port), OMB_USER_DATA: join(home, "user-data"),
         OMB_COMPOSIO_BROKER_URL: brokerUrl, OMB_COMPOSIO_BROKER_TOKEN: "c".repeat(64),
       }, stdio: ["ignore", "pipe", "pipe"],
     });

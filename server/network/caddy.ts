@@ -96,7 +96,7 @@ export async function ensureCaddy(options: {
 }
 
 /** Certificates and state live under the data dir, so they survive restarts and upgrades. */
-export function caddyfileFor(input: { domain: string; appPort: number; webhookPort: number }): string {
+export function caddyfileFor(input: { domain: string; appPort: number }): string {
   return [
     "# Written by openmausbot serve --domain. Edit the command, not this file.",
     "{",
@@ -108,11 +108,6 @@ export function caddyfileFor(input: { domain: string; appPort: number; webhookPo
     "",
     `${input.domain} {`,
     "\tencode zstd gzip",
-    "",
-    "\t# Webhook ingress has its own per-hook secrets and is meant for third parties.",
-    "\thandle /hooks/* {",
-    `\t\treverse_proxy 127.0.0.1:${input.webhookPort}`,
-    "\t}",
     "",
     "\thandle {",
     `\t\treverse_proxy 127.0.0.1:${input.appPort} {`,
@@ -147,7 +142,6 @@ export async function startCaddy(options: {
   dataDir: string;
   domain: string;
   appPort: number;
-  webhookPort: number;
   env?: NodeJS.ProcessEnv;
   log?: (line: string) => void;
   settleMs?: number;

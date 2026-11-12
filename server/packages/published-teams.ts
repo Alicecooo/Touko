@@ -12,7 +12,7 @@ const keyMap = z.record(z.string(), z.string());
 const publishedTeamSchema = z.object({
   packageId: z.string().min(1),
   lastRelease: z.string().min(1),
-  keys: z.object({ bots: keyMap, rooms: keyMap, routines: keyMap }).default({ bots: {}, rooms: {}, routines: {} }),
+  keys: z.object({ bots: keyMap, routines: keyMap }).default({ bots: {}, routines: {} }),
 });
 const fileSchema = z.object({ version: z.literal(1), teams: z.record(z.string(), z.unknown()) });
 

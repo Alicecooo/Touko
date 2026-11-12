@@ -33,7 +33,6 @@ async function restartFixture(fixture: VerificationServer): Promise<ChildProcess
     XDG_CACHE_HOME: join(home, ".cache"), XDG_DATA_HOME: join(home, ".local", "share"),
     TEMP: temp, TMP: temp, TMPDIR: temp, HERMES_HOME: join(home, ".hermes"),
     OMB_DATA_DIR: dataDir, OMB_PORT: new URL(fixture.info.url).port,
-    OMB_WEBHOOK_PORT: String(Number(new URL(fixture.info.url).port) + 1),
     FAKE_CLAUDE_MODE: "happy", FAKE_CLAUDE_DUMP: fixture.fixtureDumpPath,
     PATH: dirname(process.execPath),
   });
@@ -140,7 +139,7 @@ export async function verifyWorkspaceBackup(report: (event: unknown) => void = (
     const original = before.bots.find((candidate: { id: string }) => candidate.id === bot.id);
     assert.ok(original.messages.some((message: { text?: string }) => message.text?.includes("hello from fake claude")));
     const oldBytes = readFileSync(join(destination.info.dataDir, "bots.json"));
-    const clientState = { "omb-skin": "default", "omb-drafts": JSON.stringify({ [bot.threadId]: "Keep draft" }), "omb-webhook-credentials": "private-source-webhook-url", "unrelated-auth-token": "must-not-transfer" };
+    const clientState = { "omb-skin": "default", "omb-drafts": JSON.stringify({ [bot.threadId]: "Keep draft" }), "unrelated-auth-token": "must-not-transfer" };
     const exported = await api(source, "POST", "/api/workspace-backup/export", { password: PASSWORD, clientState });
     assert.equal(exported.status, 200, JSON.stringify(exported.body));
     assert.equal(exported.body.summary.bots, before.bots.length);
@@ -169,7 +168,6 @@ export async function verifyWorkspaceBackup(report: (event: unknown) => void = (
     assert.equal(Object.hasOwn(stagedConfig, "instances"), false);
     const manifest = JSON.parse(readFileSync(join(staged, "manifest.json"), "utf8"));
     assert.equal(Object.hasOwn(manifest, "credentials"), false);
-    assert.equal(JSON.stringify(manifest).includes("private-source-webhook-url"), false);
     assert.equal((await api(destination, "POST", "/api/workspace-backup/restore", { id: preview.body.id, confirmation: "replace" })).status, 400);
     assert.deepEqual(readFileSync(join(destination.info.dataDir, "bots.json")), oldBytes);
     const committed = await api(destination, "POST", "/api/workspace-backup/restore", { id: preview.body.id, confirmation: "REPLACE" });

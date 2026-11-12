@@ -28,7 +28,6 @@ function fenceCarriedReport(output: string): string {
 
 /** A bare instruction ("check the inbox") reads like something to acknowledge; the header says to do it now. */
 function routineHeader(name: string, trigger: RoutineRunTrigger): string {
-  if (trigger === "webhook") return "";
   const label = JSON.stringify(name.replace(/[[\]\s]+/g, " ").trim());
   return `[${trigger === "schedule" ? "Scheduled routine" : "Routine"} ${label} — do this now:]\n`;
 }

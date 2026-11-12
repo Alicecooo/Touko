@@ -105,7 +105,7 @@ export function renderRecall(passages: readonly RecallPassage[], maxChars = RECA
 export interface RecallInput {
   botId: string;
   message: string;
-  /** Empty when conversations must not be searched (rooms, peer or webhook turns). */
+  /** Empty when conversations must not be searched (rooms or peer turns). */
   threadIds: readonly string[];
   label: (threadId: string) => string;
   author: (hit: RecallHit) => string;

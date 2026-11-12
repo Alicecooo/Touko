@@ -3,14 +3,12 @@ import { createHash } from "node:crypto";
 
 import { canonicalJson, decodeBase64 } from "../../shared/package-format.ts";
 
-import type { PackageAgent, PackageConnection, PackagePlaybook, PackageRoom, PackageRoutine } from "../../shared/package-format.ts";
+import type { PackageAgent, PackageConnection, PackagePlaybook, PackageRoutine } from "../../shared/package-format.ts";
 
 export interface PartPair { r: string; w: string }
 
 export const AGENT_PARTS = ["name", "title", "description", "look", "playbooks", "skills", "connections", "approval"] as const;
 export type AgentPart = typeof AGENT_PARTS[number];
-export const ROOM_PARTS = ["name", "bulletin", "members", "defaultResponder"] as const;
-export type RoomPart = typeof ROOM_PARTS[number];
 export const ROUTINE_PARTS = ["name", "prompt", "schedule", "target"] as const;
 export type RoutinePart = typeof ROUTINE_PARTS[number];
 export const TEAM_PARTS = ["name", "brief", "leader"] as const;
@@ -61,17 +59,6 @@ export function agentReleaseValues(agent: PackageAgent, playbooks: ReadonlyMap<s
   };
 }
 
-export const roomReleaseValues = (room: PackageRoom): Record<RoomPart, unknown> => ({
-  name: room.name,
-  bulletin: room.bulletin ?? "",
-  members: [...room.members].sort(),
-  defaultResponder: room.defaultResponder.kind === "agent"
-    ? { kind: "agent", agent: room.defaultResponder.agent }
-    : room.defaultResponder.kind === "auto" && room.defaultResponder.agent
-      ? { kind: "auto", agent: room.defaultResponder.agent }
-      : { kind: room.defaultResponder.kind },
-});
-
 /** Run on startup appears only when set, so installs from before it keep their hash. */
 export function scheduleValue(routine: {
   runOn: string;
@@ -97,7 +84,7 @@ export const routineReleaseValues = (routine: PackageRoutine): Record<RoutinePar
   name: routine.name,
   prompt: routine.prompt,
   schedule: scheduleValue(routine),
-  target: { agent: routine.agent, room: routine.room ?? null },
+  target: { agent: routine.agent },
 });
 
 export const connectionReleaseValue = (connection: PackageConnection) => ({

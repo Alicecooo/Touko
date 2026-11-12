@@ -5,7 +5,6 @@ import { routinesInConversationEnabled, showToolCallsEnabled, skillsLibraryEnabl
 import { localeChoices, type LocaleKey } from "@/locales";
 import { t } from "@/lib/i18n";
 import { AppConnectionSettings, ModelApiSettings } from "./ConnectionSettings";
-import { AnalyticsRow } from "./AnalyticsRow";
 import { EnginesSettings } from "./EnginesSettings";
 import { ActivitySection } from "./ActivitySection";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
@@ -15,8 +14,6 @@ import { LoginsSettings } from "./LoginsSettings";
 import { ConnectedWorkspacesSettings } from "./ConnectedWorkspacesSettings";
 import { OrganizationSettings } from "./OrganizationSettings";
 import { Card, SettingRow, Switch } from "./SettingsPrimitives";
-import { effortLabel } from "./ModelPicker";
-import { EFFORT_LEVELS, isEffortLevel } from "../../shared/wire";
 import { shortcutLabel } from "./ShortcutHint";
 import { UsageSection } from "./UsageSection";
 import { SkillsSection } from "./SkillsSection";
@@ -25,18 +22,15 @@ import { WorkspacesSection, workspacesAvailable } from "./WorkspacesSection";
 import { SkinPicker } from "./SkinPicker";
 import { ChatWidthRow, FontRow } from "./AppearanceSelectRows";
 import { setColorUserBubbles, useColorUserBubbles } from "@/lib/user-bubble-preference";
-import { RoomTurnTimeoutSettings } from "./RoomTurnTimeoutSettings";
 import { McpCallTimeoutSettings } from "./McpCallTimeoutSettings";
 import { ThreadConcurrencySettings } from "./ThreadConcurrencySettings";
 import { AutomaticRecoverySettings } from "./AutomaticRecoverySettings";
 import { ThreadCleanupSettings } from "./ThreadCleanupSettings";
-import { DefaultBotSettings } from "./NewBotDialog";
 import { WorkspaceBackupSettings } from "./WorkspaceBackupSettings";
 import { CompanyBackupSettings } from "./CompanyBackupSettings";
 import { cn } from "@/lib/cn";
 import { glassPopupFrameStyle } from "@/lib/glass-popup";
 import { NotificationRows } from "./NotificationSettingsRows";
-import { setShowThreads, useShowThreadsChoice } from "@/lib/thread-preferences";
 import { parseSidebarDensity, setPinnedCircles, setSidebarDensity, setUniversalPins, SIDEBAR_DENSITIES, usePinnedCircles, useSidebarDensity, useUniversalPins, type SidebarDensity } from "@/lib/sidebar-preferences";
 import { setShowRunCard, useShowRunCard } from "@/lib/run-card-preferences";
 import { parseSendKey, SEND_KEYS, sendKeyLabel, setSendKey, useSendKey } from "@/lib/send-key";
@@ -122,52 +116,6 @@ function ProfileFields() {
   );
 }
 
-function NewBotEffortRow() {
-  const { state, dispatch } = useStore();
-  const current = state.config?.newBots?.effort ?? "";
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const save = async (value: string) => {
-    if (saving) return;
-    setSaving(true);
-    setError("");
-    try {
-      const config: ConfigStatus = await api("/api/config", {
-        method: "PATCH",
-        body: JSON.stringify({ newBots: { effort: isEffortLevel(value) ? value : null } }),
-      });
-      dispatch({ type: "configStatus", config });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("settings.newBotEffort.error"));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <SettingRow
-      title={t("settings.newBotEffort.title")}
-      subtitle={t("settings.newBotEffort.subtitle")}
-      message={error ? <p role="alert" className="text-danger">{error}</p> : null}
-    >
-      <Select size="sm" className="w-full max-w-[240px]"
-        value={current}
-        disabled={saving}
-        aria-label={t("settings.newBotEffort.aria")}
-        onChange={(event) => void save(event.target.value)}
-      >
-        <option value="">{t("settings.newBotEffort.default")}</option>
-        {EFFORT_LEVELS.map((level) => (
-          <option key={level} value={level}>
-            {effortLabel(level)}
-          </option>
-        ))}
-      </Select>
-    </SettingRow>
-  );
-}
-
 function LanguageRow() {
   const { state } = useStore();
   const current = effectiveLanguage(useLanguageChoice(), state.config?.language);
@@ -218,19 +166,6 @@ function ColorUserBubblesRow() {
         checked={enabled}
         aria-label={t("settings.userBubbles.aria")}
         onClick={() => setColorUserBubbles(!enabled)}
-      />
-    </SettingRow>
-  );
-}
-
-function ShowThreadsRow() {
-  const enabled = useShowThreadsChoice();
-  return (
-    <SettingRow title={t("settings.threadDisplay.title")} subtitle={t("settings.threadDisplay.subtitle")}>
-      <Switch
-        checked={enabled}
-        aria-label={t("settings.threadDisplay.show")}
-        onClick={() => setShowThreads(!enabled)}
       />
     </SettingRow>
   );
@@ -473,22 +408,11 @@ export function SettingsModal() {
       case "general":
         return (
           <>
-            
-
-            <></>
             <Card title={t("settings.profile.title")} subtitle={t("settings.profile.subtitle")}>
               <ProfileFields />
             </Card>
 
             <LanguageRow />
-            <NewBotEffortRow />
-            <AnalyticsRow />
-            <DefaultBotSettings />
-
-            <Card title={t("settings.roomTurns.title")} subtitle={t("settings.roomTurns.subtitle")}>
-              <RoomTurnTimeoutSettings />
-            </Card>
-
             <Card title={t("settings.mcpCalls.title")} subtitle={t("settings.mcpCalls.subtitle")}>
               <McpCallTimeoutSettings />
             </Card>
@@ -512,7 +436,6 @@ export function SettingsModal() {
             <ColorUserBubblesRow />
             <SendKeyRow />
             <SidebarDensityRow />
-            {<ShowThreadsRow />}
             <PinnedCirclesRow />
             <UniversalPinsRow />
             <NotificationRows />

@@ -1,13 +1,11 @@
-// Automations as a person reads them: one plain sentence, one status word, "last ran" and "next". Built from the
-// store's schedules (routines), webhooks and runs, so the Automations page, its panel and the chat card never disagree.
+// Automations as a person reads them: one plain sentence, one status word, "last ran" and "next".
 import { cronScheduleLabel } from "../../shared/cron-label";
 import { activeLocale, t } from "@/lib/i18n";
 import type { LocaleKey } from "@/locales";
 import type { Routine, RoutineRun, RoutineSchedule } from "@/lib/routines";
-import type { WebhookTrigger } from "@/lib/webhooks";
 import type { OptionCardData } from "@/state/store";
 
-export type AutomationKind = "schedule" | "webhook";
+export type AutomationKind = "schedule";
 
 export interface Automation {
   kind: AutomationKind;
@@ -17,7 +15,6 @@ export interface Automation {
   instructions: string;
   enabled: boolean;
   schedule?: RoutineSchedule;
-  eventTypes?: string[];
   nextRunAt: number | null;
   /** This automation's runs, newest first. */
   runs: RoutineRun[];
@@ -26,24 +23,19 @@ export interface Automation {
 const runTime = (run: RoutineRun) => run.startedAt ?? run.scheduledFor ?? run.createdAt;
 const newestFirst = (left: RoutineRun, right: RoutineRun) => runTime(right) - runTime(left);
 
-export function automationsFrom(sources: { routines: readonly Routine[]; webhooks: readonly WebhookTrigger[]; runs: readonly RoutineRun[] }): Automation[] {
+export function automationsFrom(sources: { routines: readonly Routine[]; runs: readonly RoutineRun[] }): Automation[] {
   const runsOf = (id: string) => sources.runs.filter((run) => run.routineId === id).sort(newestFirst);
   return [
     ...sources.routines.map((routine): Automation => ({
       kind: "schedule", id: routine.id, name: routine.name, botId: routine.botId, instructions: routine.prompt, enabled: routine.enabled,
       schedule: routine.schedule, nextRunAt: routine.enabled ? routine.nextRunAt : null, runs: runsOf(routine.id),
     })),
-    ...sources.webhooks.map((webhook): Automation => ({
-      kind: "webhook", id: webhook.id, name: webhook.name, botId: webhook.botId, instructions: webhook.prompt, enabled: webhook.enabled,
-      eventTypes: webhook.eventTypes, nextRunAt: null, runs: runsOf(webhook.id),
-    })),
   ];
 }
 
 export function automationFor(ref: { kind: AutomationKind; id: string }, sources: Parameters<typeof automationsFrom>[0]): Automation | null {
   return automationsFrom({
-    routines: ref.kind === "schedule" ? sources.routines.filter((routine) => routine.id === ref.id) : [],
-    webhooks: ref.kind === "webhook" ? sources.webhooks.filter((webhook) => webhook.id === ref.id) : [],
+    routines: sources.routines.filter((routine) => routine.id === ref.id),
     runs: sources.runs,
   })[0] ?? null;
 }
@@ -53,8 +45,6 @@ export function cardAutomation(card: OptionCardData): { kind: AutomationKind; id
   if (!card.autoApplied || card.answered !== "allow" || card.held) return null;
   const routine = card.routineRequest;
   if (routine?.operation.action === "create" && routine.resultId) return { kind: "schedule", id: routine.resultId };
-  const webhook = card.webhookRequest;
-  if (webhook?.operation.action === "create" && webhook.resultId) return { kind: "webhook", id: webhook.resultId };
   return null;
 }
 
@@ -158,7 +148,7 @@ export function doesPhrase(instructions: string, english = activeLocale().starts
   return `${cut.slice(0, cut.lastIndexOf(" ") > 20 ? cut.lastIndexOf(" ") : PHRASE_CHARS).trimEnd()}…`;
 }
 
-const GENERIC = new Set(["lead", "leads", "trigger", "triggers", "webhook", "webhooks", "hook", "hooks", "event", "events", "call", "calls", "request", "requests", "message", "messages", "notification", "notifications", "update", "updates"]);
+const GENERIC = new Set(["lead", "leads", "trigger", "triggers", "event", "events", "call", "calls", "request", "requests", "message", "messages", "notification", "notifications", "update", "updates"]);
 
 const SOURCE_WORD = /\b(form|forms|app|site|website|store|shop|crm|inbox|sheet|zapier|typeform|tally|jotform|stripe|github|gitlab|shopify|hubspot|salesforce|slack|gmail|calendar|notion|airtable|webflow|wordpress|n8n|ifttt|make)\b/i;
 
@@ -198,7 +188,7 @@ const OUT_OF_CREDIT = /credit|quota|billing|payment|insufficient|out of tokens|u
 const OUT_OF_TIME = /run limit|time limit|timed out|minute limit/i;
 
 function ownerFix(run: RoutineRun): { reason: string; fix: AutomationFix } | null {
-  const error = `${run.error ?? ""} ${run.goalStatus === "limit-reached" ? "run limit" : ""}`;
+  const error = run.error ?? "";
   if (SIGNED_OUT.test(error)) return { reason: t("automations.reason.signIn"), fix: "sign-in" };
   if (OUT_OF_TIME.test(error)) return { reason: t("automations.reason.timeLimit"), fix: "edit" };
   if (OUT_OF_CREDIT.test(error)) return { reason: t("automations.reason.usage"), fix: "usage" };

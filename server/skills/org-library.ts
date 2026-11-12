@@ -49,7 +49,7 @@ const entrySchema = z.object({
   }).nullable(),
   withdrawnReleases: z.array(z.object({ version: z.string().regex(SEMVER), sha256: z.string().regex(HEX64) })).max(50),
   contents: z.object({
-    bots: count, skills: count, presets: count, rooms: count, routines: count, connections: count,
+    bots: count, skills: count, presets: count, routines: count, connections: count,
     botNames: z.array(safeText(100)).max(12),
   }),
   scanFindings: count,
@@ -143,7 +143,6 @@ const installSchema = z.object({
   section: z.string().max(60),
   team: z.object({ parts: z.object({ name: partPair.optional(), brief: partPair.optional(), leader: partPair.optional() }) }),
   bots: z.record(z.string(), z.string()),
-  rooms: z.record(z.string(), z.string()),
   routines: z.record(z.string(), z.string()),
   connections: z.record(z.string(), z.object({ name: z.string(), r: z.string().regex(HEX64), w: z.string().regex(HEX64) })),
   presets: z.record(z.string(), z.object({ presetId: z.string(), r: z.string().regex(HEX64) })),
@@ -163,7 +162,7 @@ const addingSchema = z.object({
   release: z.string().regex(SEMVER),
   sha256: z.string().regex(HEX64),
   startedAt: count,
-  expect: z.object({ bots: partKeys, rooms: partKeys, routines: partKeys, leader: z.string().min(1).max(64).nullable() }),
+  expect: z.object({ bots: partKeys, routines: partKeys, leader: z.string().min(1).max(64).nullable() }),
 });
 export type OrgPendingAdd = z.output<typeof addingSchema>;
 
@@ -189,7 +188,6 @@ function emptyState(): OrgLibraryStateFile {
 
 interface LiveRecords {
   bots: Record<string, string>;
-  rooms: Record<string, string>;
   routines: Record<string, string>;
   skills: number;
   sections: string[];
@@ -197,15 +195,14 @@ interface LiveRecords {
 }
 
 function teamAlive(live: LiveRecords | undefined): boolean {
-  return Boolean(live && (Object.keys(live.bots).length || Object.keys(live.rooms).length || Object.keys(live.routines).length));
+  return Boolean(live && (Object.keys(live.bots).length || Object.keys(live.routines).length));
 }
 
-function noteRemovedParts(install: OrgInstall, next: Pick<LiveRecords, "bots" | "rooms" | "routines">): boolean {
+function noteRemovedParts(install: OrgInstall, next: Pick<LiveRecords, "bots" | "routines">): boolean {
   const removed = new Set(install.removedLocally);
   const present = new Set<string>();
   for (const [kind, was, now] of [
     ["agent", install.bots, next.bots],
-    ["room", install.rooms, next.rooms],
     ["routine", install.routines, next.routines],
   ] as const) {
     for (const key of Object.keys(was)) if (!Object.hasOwn(now, key)) removed.add(`${kind}:${key}`);
@@ -377,7 +374,7 @@ export class OrgLibrary {
     const entry = (installId: string) => {
       let value = found.get(installId);
       if (!value) {
-        value = { bots: {}, rooms: {}, routines: {}, skills: 0, sections: [] };
+        value = { bots: {}, routines: {}, skills: 0, sections: [] };
         found.set(installId, value);
       }
       return value;
@@ -392,9 +389,6 @@ export class OrgLibrary {
       }
       if (stamp?.presetKey) continue;
       for (const skill of this.deps.skills.stamps(bot.id)) entry(skill.stamp.installId).skills += 1;
-    }
-    for (const group of store.groups) {
-      if (group.installedPackage) entry(group.installedPackage.installId).rooms[group.installedPackage.key] = group.id;
     }
     for (const routine of this.deps.routines.packageStamps()) {
       if (store.bot(routine.botId)) entry(routine.stamp.installId).routines[routine.stamp.key] = routine.routineId;
@@ -424,10 +418,9 @@ export class OrgLibrary {
       const live = records.get(installId);
       if (!teamAlive(live)) {
         if (install.kind === "team" && install.status !== "removed") {
-          noteRemovedParts(install, { bots: {}, rooms: {}, routines: {} });
+          noteRemovedParts(install, { bots: {}, routines: {} });
           install.status = "removed";
           install.bots = {};
-          install.rooms = {};
           install.routines = {};
           install.updatedAt = now;
           changed = true;
@@ -436,14 +429,13 @@ export class OrgLibrary {
       }
       const next = {
         bots: live!.bots,
-        rooms: live!.rooms,
         routines: live!.routines,
         section: mostCommon(live!.sections) ?? install.section,
         status: install.status === "removed" ? "installed" as const : install.status,
       };
       const noted = noteRemovedParts(install, next);
-      if (noted || JSON.stringify([install.bots, install.rooms, install.routines, install.section, install.status]) !==
-          JSON.stringify([next.bots, next.rooms, next.routines, next.section, next.status])) {
+      if (noted || JSON.stringify([install.bots, install.routines, install.section, install.status]) !==
+        JSON.stringify([next.bots, next.routines, next.section, next.status])) {
         Object.assign(install, next, { updatedAt: now });
         changed = true;
       }
@@ -467,7 +459,6 @@ export class OrgLibrary {
         section: mostCommon(live.sections) ?? "",
         team: { parts: {} },
         bots: live.bots,
-        rooms: live.rooms,
         routines: live.routines,
         connections: {},
         presets: {},
@@ -499,7 +490,7 @@ export class OrgLibrary {
           release: row.release,
           sha256: row.sha256 ?? entry.release?.sha256,
           status: "installed", kind: "library", name: entry.name, section: "", team: { parts: {} },
-          bots: {}, rooms: {}, routines: {}, connections: {}, presets: {}, removedLocally: [], addedAt: now, updatedAt: now,
+          bots: {}, routines: {}, connections: {}, presets: {}, removedLocally: [], addedAt: now, updatedAt: now,
         });
         if (!adopted.success) continue;
         install = this.state.installs[installId] = adopted.data;
@@ -524,7 +515,7 @@ export class OrgLibrary {
         this.state.installs[installId] = {
           packageId: add.packageId, ref: add.ref, publisher: { ...add.publisher }, release: add.release, sha256: add.sha256,
           status: "installed", kind: "team", name: add.name, section: mostCommon(live.sections) ?? "",
-          team: { parts: {} }, bots: live.bots, rooms: live.rooms, routines: live.routines, connections: {}, presets: {},
+          team: { parts: {} }, bots: live.bots, routines: live.routines, connections: {}, presets: {},
           removedLocally: [], addedAt: previous?.addedAt ?? add.startedAt, updatedAt: now,
         };
       } else {
@@ -539,7 +530,6 @@ export class OrgLibrary {
   private finished(add: OrgPendingAdd, live: LiveRecords): boolean {
     const { store } = this.deps;
     return add.expect.bots.every((key) => Boolean(live.bots[key] && store.bot(live.bots[key]!)?.packageBase)) &&
-      add.expect.rooms.every((key) => Boolean(live.rooms[key])) &&
       add.expect.routines.every((key) => Boolean(live.routines[key])) &&
       (add.expect.leader === null || store.bot(live.bots[add.expect.leader] ?? "")?.chiefOfStaff === true);
   }
@@ -694,7 +684,7 @@ export class OrgLibrary {
         adding,
       };
     } catch {
-      console.warn("[org-library] state.json could not be read; rebuilding it from your bots, rooms and routines");
+      console.warn("[org-library] state.json could not be read; rebuilding it from your bots and routines");
       return emptyState();
     }
   }
@@ -845,7 +835,6 @@ export class OrgLibrary {
         startedAt: this.deps.now?.() ?? Date.now(),
         expect: {
           bots: pkg.agents.map((agent) => agent.key),
-          rooms: (pkg.rooms ?? []).map((room) => room.key),
           routines: (pkg.routines ?? []).map((routine) => routine.key),
           leader: pkg.team?.leader ?? null,
         },
@@ -897,7 +886,6 @@ export class OrgLibrary {
       section: index.section,
       team: { parts: index.team.parts as Partial<Record<TeamPart, PartPair>> },
       bots: index.bots,
-      rooms: index.rooms,
       routines: index.routines,
       connections: index.connections,
       presets: Object.fromEntries((result.presets ?? []).flatMap((preset) => {

@@ -42,7 +42,7 @@ export function teamImportPreview(manifest: unknown): PendingTeamImport {
       members: backup.bots.map((bot) => ({ name: bot.name, title: bot.title })),
       rooms: backup.groups.length, playbooks: backup.bots.reduce((total, bot) => total + bot.playbooks.length, 0),
       routines: backup.routines.length, apps: [],
-      conversations: [...backup.bots, ...backup.groups].reduce((total, owner) => total + owner.tasks.length, 0),
+      conversations: backup.bots.reduce((total, owner) => total + owner.tasks.length, 0),
       archivedBots: backup.bots.filter((bot) => bot.hidden).length,
       warnings: backup.warnings,
     };
@@ -118,7 +118,7 @@ function sharedTeamPreview(document: PackageDocument, manifest: unknown): Pendin
     pictures: pkg.agents.map((agent) => agent.appearance.avatar
       ? `data:${agent.appearance.avatar.mime};base64,${agent.appearance.avatar.data}`
       : null),
-    rooms: pkg.rooms?.length ?? 0,
+    rooms: 0,
     playbooks: pkg.playbooks?.length ?? 0,
     routines: pkg.routines?.length ?? 0,
     apps: pkg.requirements.apps.map((app) => ({ label: app.label, optional: app.optional === true })),
@@ -197,7 +197,7 @@ function packagePreview(root: Record<string, unknown>, manifest: unknown): Pendi
     description: typeof pkg.summary === "string" ? pkg.summary.trim() : "",
     members,
     ...(typeof chief === "string" ? { chiefOfStaff: chief } : {}),
-    rooms: Array.isArray(pkg.rooms) ? pkg.rooms.length : 0,
+    rooms: 0,
     playbooks: Array.isArray(pkg.playbooks) ? pkg.playbooks.length : 0,
     routines: Array.isArray(pkg.routines) ? pkg.routines.length : 0,
     apps,

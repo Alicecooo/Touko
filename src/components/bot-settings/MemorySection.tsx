@@ -5,8 +5,7 @@ import { cn } from "@/lib/cn";
 import { MEMORY_INDEX, capacityStatus, deleteMemoryDoc, fetchMemoryDoc, fetchMemoryJournal, fetchMemoryOverview, formatBytes, localizedRelativeTime, journalSource, journalSourceKey, fileLabel, openMemoryLocation, revertMemoryChange, saveMemoryDoc, fetchUpkeepStatus, tidyMemoryNow, tidySummary, noticedCount, topicFileName, type UpkeepStatus, type MemoryCapacity, type MemoryFileInfo, type MemoryJournalRow, type MemoryOverview, type LendingReview, markMemoryReviewed } from "@/lib/memory";
 import { shortPath } from "@/lib/short-path";
 import { activeLocale, t } from "@/lib/i18n";
-import { roomMemoryCaptureEnabled } from "@/lib/feature-flags";
-import { api, ApiError, useStore, type Bot, type ConfigStatus } from "@/state/store";
+import { ApiError, useStore, type Bot } from "@/state/store";
 import { Switch } from "../SettingsPrimitives";
 import { useDesktopCapabilities } from "../DesktopCapabilities";
 import { inputCls } from "./field";
@@ -93,10 +92,7 @@ export function MemorySection({ bot, active = true, onToggle }: { bot: Bot; acti
   const [lendingReview, setLendingReview] = useState<LendingReview | null>(null);
   const [lendingReviewStale, setLendingReviewStale] = useState(false);
   const [reviewing, setReviewing] = useState(false);
-  const { state, dispatch } = useStore();
-  const learnFromRooms = roomMemoryCaptureEnabled(state.config);
-  const [roomsSaving, setRoomsSaving] = useState(false);
-  const [roomsError, setRoomsError] = useState("");
+  const { dispatch } = useStore();
 
   const refresh = async (openPath?: string) => {
     const [nextOverview, nextJournal, nextUpkeep] = await Promise.all([
@@ -225,23 +221,6 @@ export function MemorySection({ bot, active = true, onToggle }: { bot: Bot; acti
     setUpkeep((current) => (current ? { ...current, enabled } : current));
   };
 
-  const toggleRooms = async () => {
-    if (roomsSaving) return;
-    setRoomsSaving(true);
-    setRoomsError("");
-    try {
-      const config: ConfigStatus = await api("/api/config", {
-        method: "PATCH",
-        body: JSON.stringify({ features: { roomMemoryCapture: !learnFromRooms } }),
-      });
-      dispatch({ type: "configStatus", config });
-    } catch (cause) {
-      setRoomsError(cause instanceof Error ? cause.message : t("memory.learnFromRooms.error"));
-    } finally {
-      setRoomsSaving(false);
-    }
-  };
-
   const tidyNow = async () => {
     setTidying(true);
     setError(null);
@@ -270,13 +249,6 @@ export function MemorySection({ bot, active = true, onToggle }: { bot: Bot; acti
           <input type="checkbox" checked={bot.memoryEnabled !== false} disabled={bot.busy} onChange={(event) => onToggle(event.target.checked)} />
           {t("memory.enable")}
         </label>
-        <p className="mt-1 text-[12.5px] text-ink-secondary">
-          {t("memory.enableHelp")}
-          {bot.busy ? ` ${t("memory.busyHelp")}` : ""}
-        </p>
-        <p className="mt-1 text-[13px] leading-relaxed text-ink-secondary">
-          {t("memory.notesHelp")}
-        </p>
         {overview && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink-secondary" title={overview.workspacePath}>
@@ -322,7 +294,6 @@ export function MemorySection({ bot, active = true, onToggle }: { bot: Bot; acti
         tidying={tidying}
         onToggle={toggleUpkeep}
         onTidy={() => void tidyNow()}
-        rooms={{ enabled: learnFromRooms, saving: roomsSaving, error: roomsError, onToggle: () => void toggleRooms() }}
       />}
 
       {editing && (
@@ -387,7 +358,6 @@ export function MemorySection({ bot, active = true, onToggle }: { bot: Bot; acti
         <div className="rounded-xl bg-card p-4">
           <MemoryFileRows
             title={t("memory.topicFiles")}
-            hint={t("memory.topicFilesHint")}
             files={overview.topics}
             selected={editing?.path}
             onOpen={(file) => void open(file.path)}
@@ -412,7 +382,6 @@ export function MemorySection({ bot, active = true, onToggle }: { bot: Bot; acti
             <div className="mt-4">
               <MemoryFileRows
                 title={t("memory.dailyLogs")}
-                hint={t("memory.dailyLogsHint")}
                 files={overview.logs}
                 selected={editing?.path}
                 onOpen={(file) => void open(file.path)}
@@ -425,9 +394,6 @@ export function MemorySection({ bot, active = true, onToggle }: { bot: Bot; acti
 
       <div className="rounded-xl bg-card p-4">
         <div className="text-[15px] font-medium text-ink">{t("memory.changes")}</div>
-        <p className="mt-1 text-[13px] leading-relaxed text-ink-secondary">
-          {t("memory.changesHelp")}
-        </p>
         <div className="mt-3">
           <MemoryJournalList rows={journal} botName={bot.name} reverting={reverting} onRevert={(row) => void revert(row)} />
         </div>
@@ -451,43 +417,21 @@ export function MemoryUpkeepCard({
   tidying,
   onToggle,
   onTidy,
-  rooms,
 }: {
   enabled: boolean;
   status: UpkeepStatus | null;
   tidying: boolean;
   onToggle: () => void;
   onTidy: () => void;
-  rooms?: { enabled: boolean; saving: boolean; error: string; onToggle: () => void };
 }) {
   return (
     <div className="rounded-xl bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[15px] font-medium text-ink">{t("memory.upkeep.title")}</div>
-          <p className="mt-1 text-[13px] leading-relaxed text-ink-secondary">{t("memory.upkeep.help")}</p>
         </div>
         <Switch checked={enabled} aria-label={t("memory.upkeep.title")} onClick={onToggle} />
       </div>
-      {enabled && rooms && (
-        <div className="mt-3 flex items-start justify-between gap-3 border-t border-hairline/40 pt-3">
-          <div className="min-w-0">
-            <div className="text-[13px] font-medium text-ink">{t("memory.learnFromRooms.title")}</div>
-            <p className="mt-0.5 text-[12.5px] leading-relaxed text-ink-secondary">{t("memory.learnFromRooms.subtitle")}</p>
-            {status && !status.modelSteps && (
-              <p className="mt-1 text-[12.5px] leading-relaxed text-ink-secondary">{t("memory.learnFromRooms.noModelSteps")}</p>
-            )}
-            {rooms.error && <p role="alert" className="mt-1 text-[12.5px] text-danger">{rooms.error}</p>}
-          </div>
-          <Switch
-            checked={rooms.enabled}
-            aria-label={t("memory.learnFromRooms.title")}
-            disabled={rooms.saving}
-            onClick={rooms.onToggle}
-            className="disabled:cursor-wait disabled:opacity-50"
-          />
-        </div>
-      )}
       {enabled && status && !status.modelSteps && (
         <p className="mt-2 text-[12.5px] text-ink-secondary">{t("memory.upkeep.noModelSteps")}</p>
       )}
@@ -522,7 +466,6 @@ export function MemoryGauge({ index }: { index: MemoryCapacity }) {
       <p className={cn("mt-2 text-[12.5px] leading-relaxed", status.level === "over" ? "text-danger" : "text-ink-secondary")}>
           {status.warning ?? t("memory.capacity.sentence", { lines: index.lines, maxLines: index.maxLines, bytes: formatBytes(index.bytes), maxBytes: formatBytes(index.maxBytes), maxLoaded: index.maxLines })}
       </p>
-      {status.warning && <p className="mt-1 text-[12px] text-ink-secondary">{t("memory.capacity.sentence", { lines: index.lines, maxLines: index.maxLines, bytes: formatBytes(index.bytes), maxBytes: formatBytes(index.maxBytes), maxLoaded: index.maxLines })}</p>}
     </div>
   );
 }
@@ -584,7 +527,7 @@ export function MemoryFileRows({
   onDelete,
 }: {
   title: string;
-  hint: string;
+  hint?: string;
   files: MemoryFileInfo[];
   selected?: string;
   onOpen: (file: MemoryFileInfo) => void;
@@ -593,7 +536,7 @@ export function MemoryFileRows({
   return (
     <div>
       <div className="text-[12px] font-medium uppercase tracking-[0.08em] text-ink-secondary">{title}</div>
-      <div className="mt-0.5 text-[12px] text-ink-secondary">{hint}</div>
+      {hint && <div className="mt-0.5 text-[12px] text-ink-secondary">{hint}</div>}
       {files.length === 0 ? (
         <div className="mt-2 text-[12.5px] text-ink-secondary">{t("memory.noneYet")}</div>
       ) : (

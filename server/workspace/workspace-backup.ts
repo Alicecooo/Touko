@@ -42,7 +42,7 @@ const EXCLUSION_NOTES = [
   "External project folders, CLI login homes, browser session homes, OS keychains, companion devices and other servers.",
   "VM/container disk layers and remote cloud data; durable files inside this workspace are included.",
 ];
-const RESTORE_WARNING = "Restoring pauses routines, webhooks and calendar calls, and does not resume pending delegations, queued chat messages or queued runs. Definitions and historical receipts are retained; review before enabling them again.";
+const RESTORE_WARNING = "Restoring pauses routines and calendar calls, and does not resume pending delegations, queued chat messages or queued runs. Definitions and historical receipts are retained; review before enabling them again.";
 
 type Entry = { path: string; type: "file" | "directory"; size: number; mode: number; sha256?: string };
 interface Manifest extends WorkspaceBackupPrivateMetadata {
@@ -79,7 +79,7 @@ function excluded(name: string): boolean {
 function forbiddenArchivePath(path: string): boolean {
   const folded = path.toLowerCase();
   return excluded(folded.split("/")[0]) || excludedWorkspaceAuthPath(folded) ||
-    (path !== folded && ["config.json", "webhooks.json"].includes(folded));
+    (path !== folded && ["config.json"].includes(folded));
 }
 function preserved(name: string): boolean {
   // An existing WAL/SHM belongs to the old database: it must never accompany a different restored main database.
@@ -357,14 +357,9 @@ export async function createWorkspaceBackupSnapshot(dataDir: string, options: Cr
           walk(source, path);
         } else if (stat.isFile()) {
           let copied: { size: number; mode: number; sha256: string };
-          if (path === "config.json" || path === "webhooks.json") {
+          if (path === "config.json") {
             const value = privateJson(source);
-            if (path === "config.json") writeJson(destination, portableWorkspaceConfig(value));
-            else {
-              if (!record(value)) throw new Error("Invalid webhook definitions in workspace backup.");
-              if (Array.isArray(value.webhooks)) for (const webhook of value.webhooks) if (record(webhook)) delete webhook.secretHash;
-              writeJson(destination, value);
-            }
+            writeJson(destination, portableWorkspaceConfig(value));
             copied = { size: lstatSync(destination).size, mode: 0o600, sha256: hashFile(destination) };
           } else copied = copyRegular(SNAPSHOT_DATABASES[path] ? join(snapshot, SNAPSHOT_DATABASES[path]) : source, destination);
           bytes += copied.size;
@@ -545,10 +540,6 @@ function validateStaged(directory: string, expected?: Map<string, { type: string
     const config = privateJson(join(data, "config.json"));
     if (JSON.stringify(config) !== JSON.stringify(portableWorkspaceConfig(config))) throw new Error("Workspace backup contains non-portable connection settings.");
   }
-  if (existsSync(join(data, "webhooks.json"))) {
-    const value = privateJson(join(data, "webhooks.json"));
-    if (!record(value) || Array.isArray(value.webhooks) && value.webhooks.some((webhook) => record(webhook) && Object.hasOwn(webhook, "secretHash"))) throw new Error("Workspace backup contains webhook credentials.");
-  }
   const counts = databaseCounts(join(data, "messages.db"));
   if (counts.messages !== manifest.summary.messages || counts.threads !== manifest.summary.threads) throw new Error("The message database does not match the backup summary.");
   return manifest;
@@ -722,20 +713,7 @@ function prepareRestore(dataDir: string, id: string, manifest: Manifest): string
         run.status = "failed";
         run.error = "This queued or active run was not resumed after workspace restore.";
         run.finishedAt = Date.now();
-        if (run.target === "room-goal") run.goalStatus = "failed";
       }
-    }
-  });
-  changeJson("webhooks.json", (value) => {
-    if (!record(value)) throw new Error("Invalid webhook definitions in workspace backup.");
-    const destination = existsSync(join(dataDir, "webhooks.json")) ? privateJson(join(dataDir, "webhooks.json")) : {};
-    const oldHooks = record(destination) && Array.isArray(destination.webhooks) ? destination.webhooks : [];
-    if (Array.isArray(value.webhooks)) for (const webhook of value.webhooks) if (record(webhook)) {
-      webhook.enabled = false;
-      webhook.verificationPending = false;
-      const previous = oldHooks.find((old) => record(old) && old.id === webhook.id && old.endpointId === webhook.endpointId);
-      // A migrated hook needs a secret rotation: an unknown hash cannot authenticate a caller.
-      webhook.secretHash = record(previous) && typeof previous.secretHash === "string" && /^[a-f0-9]{64}$/.test(previous.secretHash) ? previous.secretHash : randomBytes(32).toString("hex");
     }
   });
   changeJson("calendar-calls.json", (value) => {

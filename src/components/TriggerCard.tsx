@@ -4,13 +4,11 @@ import { Undo2, Zap } from "lucide-react";
 import { automationFor, automationSentence, automationStatus, cardAutomation, lastWhen, nextWhen, runLine } from "@/lib/automations";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
-import { saveWebhookCredential, webhookCredentialStore } from "@/lib/webhook-credentials";
 import { api, ApiError, useStore, type OptionCardData } from "@/state/store";
 import { useAutomationActions } from "./automations/actions";
 
 // The editors live with the Automations page; a chat only loads one when Edit is pressed.
 const RoutineEditor = lazy(async () => ({ default: (await import("./RoutinesPage")).RoutineEditor }));
-const WebhookEditor = lazy(async () => ({ default: (await import("./WebhookTrigger")).WebhookEditor }));
 
 const ACTION = "rounded-md px-1.5 py-0.5 font-medium hover:bg-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50";
 
@@ -23,8 +21,8 @@ export function TriggerCard({ card, threadId }: { card: OptionCardData; threadId
   const [error, setError] = useState<string>();
   const ref = cardAutomation(card);
   if (!ref) return null;
-  const automation = automationFor(ref, { routines: state.routines, webhooks: state.webhooks, runs: state.routineRuns });
-  const fallbackName = card.routineRequest?.undo?.name ?? card.webhookRequest?.undo?.name ?? card.title;
+  const automation = automationFor(ref, { routines: state.routines, runs: state.routineRuns });
+  const fallbackName = card.routineRequest?.undo?.name ?? card.title;
 
   if (card.undone || !automation) {
     if (!card.undone && ref.kind === "schedule" && state.routinesLoadState === "loading") return null;
@@ -75,16 +73,13 @@ export function TriggerCard({ card, threadId }: { card: OptionCardData; threadId
           <button type="button" onClick={() => actions.toggle(automation)} className={ACTION}>{automation.enabled ? t("automations.pause") : t("automations.resume")}</button>
           <span aria-hidden="true">·</span>
           <button type="button" onClick={() => setEditing(true)} className={ACTION}>{t("automations.edit")}</button>
-          {automation.kind === "webhook" && <><span aria-hidden="true">·</span><button type="button" disabled={Boolean(actions.busy)} onClick={() => void actions.copyAddress(automation.id)} className={ACTION}>{actions.copied === automation.id ? t("automations.address.copied") : t("automations.address.copy")}</button></>}
           {threadId && card.requestId && <><span aria-hidden="true">·</span><button type="button" onClick={undo} disabled={undoing} className={cn(ACTION, "text-accent")}>{undoing ? t("automations.card.undoing") : t("automations.card.undo")}</button></>}
         </span>
       </div>
       {(error || actions.error) && <div role="alert" className="mt-1 pl-[22px] text-[12px] text-warning">{error ?? actions.error}</div>}
       {editing && (
         <Suspense fallback={null}>
-          {automation.kind === "schedule"
-            ? <RoutineEditor routine={state.routines.find((routine) => routine.id === automation.id)} bots={visibleBots} plain onClose={() => setEditing(false)} />
-            : <WebhookEditor webhook={state.webhooks.find((webhook) => webhook.id === automation.id)} bots={visibleBots} onClose={() => setEditing(false)} onCredential={(credential, id) => saveWebhookCredential(webhookCredentialStore(), id, credential)} />}
+          <RoutineEditor routine={state.routines.find((routine) => routine.id === automation.id)} bots={visibleBots} plain onClose={() => setEditing(false)} />
         </Suspense>
       )}
     </section>

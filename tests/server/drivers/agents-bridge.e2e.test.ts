@@ -148,7 +148,7 @@ it("keeps a turn on the whole catalog until the switch is on, then mounts the br
       // exactly what the bridge makes of this turn's own unbridged list
       expect(JSON.stringify(list.result!.tools)).toBe(JSON.stringify(createToolBridge(whole).listed));
       expect(namesOf(list).slice(-2)).toEqual(["find_tool", "use_tool"]);
-      expect(namesOf(list)).toEqual(expect.arrayContaining(["coordinate_bots", "post_to_room", "memory_update", "request_sign_in"]));
+       expect(namesOf(list)).toEqual(expect.arrayContaining(["coordinate_bots", "memory_update", "request_sign_in"]));
       expect(namesOf(list)).not.toEqual(expect.arrayContaining(["create_trigger"]));
       expect(JSON.stringify(list.result!.tools).length).toBeLessThan(JSON.stringify(whole).length / 2);
 
@@ -170,7 +170,6 @@ it("keeps a turn on the whole catalog until the switch is on, then mounts the br
       // arguments the tool will not take are refused by the tool, in the words a direct call gets
       const misfit = await use(ask, "session_read", { thread_id: 7 });
       expect(refusalOf(misfit)).toBe(textOf(await call(ask, "session_read", { thread_id: 7 })));
-      expect(refusalOf(await use(ask, "post_to_room", { group_id: "room-1", message: "Shipped." }))).toContain("post_to_room is in your tool list: call it directly");
 
       // A parameter only a Chief may pass. The bridged list leaves it out of
       // this bot's schema and use_tool checks no schema, so it is the harness
@@ -199,14 +198,6 @@ it("keeps a turn on the whole catalog until the switch is on, then mounts the br
     await control(["interrupt", "--bot", bot.id]);
     await control(["wait", "--bot", bot.id, "--timeout", "30"]);
 
-    // A room turn is built by its own code path; it gets the same.
-    const { channel } = await control(["new-channel", "--name", "Bridge room", "--members", bot.id]);
-    await control(["send-channel", "--channel", channel.id, "--text", "Stay active in this room."]);
-    const room = await launched();
-    expect(room.mcpConfig.mcpServers.agents!.env.OMB_AGENTS_TOOL_BRIDGE).toBe("1");
-    expect(room.systemPrompt).toContain(AGENTS_TOOL_BRIDGE_PROMPT);
-    await control(["interrupt", "--channel", channel.id]);
-    await control(["wait", "--channel", channel.id, "--timeout", "30"]);
   });
 }, hostTimeout(90_000));
 
@@ -230,7 +221,7 @@ it("leaves every gate and limit where it was: a tool selection, a Chief-only too
     await withServer(gate, async (ask) => {
       const list = await ask("tools/list");
       // the whole catalog but the one tool the selection leaves out, and no way round it
-      expect(namesOf(list)).toEqual(expect.arrayContaining(["coordinate_bots", "create_trigger", "list_rooms", "post_to_room"]));
+       expect(namesOf(list)).toEqual(expect.arrayContaining(["coordinate_bots", "create_trigger"]));
       for (const name of ["vm_exec", "find_tool", "use_tool"]) expect(namesOf(list), name).not.toContain(name);
       expect((await call(ask, "vm_exec", { command: "true" })).error).toEqual({ code: -32602, message: "Tool selection excludes this tool. Check the bot's Access settings." });
       expect((await use(ask, "vm_exec", { command: "true" })).error).toEqual({ code: -32602, message: "Tool selection excludes this tool. Check the bot's Access settings." });
@@ -279,11 +270,9 @@ it("leaves every gate and limit where it was: a tool selection, a Chief-only too
 
 it("knows a bridged call by the tool it ran, in the activity row, the work summary and the restart policy's evidence, and leaves an unbridged turn's rows alone", async () => {
   // What an engine reports for a turn that used the bridge: every call but
-  // the last two is named use_tool. The post is one the proxy would have
-  // refused; it is scripted as done to show what the restart policy would see.
+  // the last two is named use_tool.
   const calls = [
     { name: "mcp__agents__use_tool", input: { name: "list_triggers", arguments: {} }, output: "This bot has no triggers.", ok: true },
-    { name: "mcp__agents__use_tool", input: { name: "post_to_room", arguments: { group_id: "room-1", message: "Shipped." } }, output: "Posted.", ok: true },
     { name: "mcp__agents__use_tool", input: { name: "schedule_task", arguments: {} }, output: "Unknown tool: schedule_task", ok: false },
     { name: "mcp__agents__use_tool", input: { arguments: { name: "vm_exec" } }, output: "use_tool needs a name", ok: false },
     { name: "mcp__agents__find_tool", input: { query: "what routines do I have" }, output: "{}", ok: true },
@@ -319,23 +308,20 @@ it("knows a bridged call by the tool it ran, in the activity row, the work summa
     const bridged = await turn("Use your tools again.");
     expect(bridged.rows.map((row) => row.tool!.name)).toEqual([
       "mcp__agents__list_triggers",
-      "mcp__agents__post_to_room",
       "mcp__agents__use_tool",
       "mcp__agents__use_tool",
       "mcp__agents__find_tool",
       "mcp__agents__list_bots",
     ]);
-    expect(bridged.rows.map((row) => row.tool!.ok)).toEqual([true, true, false, false, true, true]);
+    expect(bridged.rows.map((row) => row.tool!.ok)).toEqual([true, false, false, true, true]);
     // the work summary counts them the same way
     expect(Object.fromEntries(bridged.digest.tools.map((tool) => [tool.name, [tool.count, tool.failed]]))).toEqual({
       "mcp__agents__list_triggers": [1, 0],
-      "mcp__agents__post_to_room": [1, 0],
       "mcp__agents__use_tool": [2, 2],
       "mcp__agents__find_tool": [1, 0],
       "mcp__agents__list_bots": [1, 0],
     });
-    // and the restart policy sees that something was posted, which it could not under the name use_tool
-    expect(turnEvidence(bridged.rows as never)).toMatchObject({ toolCalls: 6, okToolCalls: 4, outward: ["mcp__agents__post_to_room"] });
+    expect(turnEvidence(bridged.rows as never)).toMatchObject({ toolCalls: 5, okToolCalls: 3 });
 
     // The bot's Activity log is read back from the event log, which keeps the
     // call as the engine reported it. It names each of those calls by the
@@ -344,7 +330,6 @@ it("knows a bridged call by the tool it ran, in the activity row, the work summa
     const { rows } = (await api("GET", `/api/bots/${bot.id}/activity`)).body as { rows: Array<{ tool: string; app: string | null; label: string; outcome: string }> };
     const logged = (tool: string) => rows.filter((row) => row.tool === tool).map(({ app, label, outcome }) => ({ app, label, outcome }));
     expect(logged("mcp__agents__list_triggers")).toEqual([{ app: "Team", label: "List triggers", outcome: "ran" }, { app: "Team", label: "List triggers", outcome: "ran" }]);
-    expect(logged("mcp__agents__post_to_room")).toHaveLength(2);
     // what named no tool of the catalog is still a use_tool call, there as here
     expect(logged("mcp__agents__use_tool")).toEqual(Array.from({ length: 4 }, () => ({ app: "Team", label: "Use tool", outcome: "failed" })));
   }, { FAKE_CLAUDE_TOOL_CALLS: JSON.stringify(calls) });

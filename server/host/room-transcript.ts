@@ -1,6 +1,6 @@
 import { DRAIN_COALESCE_MAX_ITEMS } from "../agent/admission.ts";
 import { digestPromptLine } from "../observability/digest.ts";
-import { escapeNotes, peerProvenanceNote } from "../teams/peer-provenance.ts";
+import { escapeNotes } from "../teams/peer-provenance.ts";
 import { peerName } from "../teams/peer-roster.ts";
 import { transcriptText } from "../agent/replies.ts";
 import { roomTurnNarrationIds } from "../teams/room-reply.ts";
@@ -58,8 +58,7 @@ export function createRoomTranscript({ store, teammateReportContext }: RoomTrans
           ? m.via === "api" ? `${person} (sent through the local API, not typed)` : person
           : m.from ? peerName(m.from.name) : "Bot";
         const line = `${speaker}: ${escapeNotes(transcriptText(rendered, messagesById, userName))}`;
-        if (!m.peerPost || !m.from || m.from.botId === readerBotId) return line;
-        return `${peerProvenanceNote({ botName: m.from.name, delivery: "post_to_room", unattended: m.peerPost.unattended })}\n${line}`;
+        return line;
       });
     return {
       text: texts.join("\n"),

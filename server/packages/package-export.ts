@@ -4,7 +4,7 @@ import type { PublishedTeam } from "./published-teams.ts";
 import { nextPatchRelease } from "./published-teams.ts";
 import type { Routine } from "../automation/routines.ts";
 import type { BotRecord, GroupRecord, InstalledPlaybook } from "../storage/store.ts";
-import { AGENT_MAX_SKILLS, AVATAR_MAX_BYTES, decodeBase64, PACKAGE_FORMAT, PACKAGE_MAX_SKILLS, PACKAGE_VERSION, PackageFormatError, parsePackageDocument, pictureMatchesMime, RELEASE_NOTES_MAX, redactPackageSecrets, SEED_FILE_MAX_BYTES, SEED_MAX_BYTES, SEED_MAX_FILES, utf8Bytes, type PackageAgent, type PackageConnection, type PackageDefinition, type PackageDocument, type PackagePreset, type PackageRoom, type PackageRoutine, type PackageRoutineSchedule } from "../../shared/package-format.ts";
+import { AGENT_MAX_SKILLS, AVATAR_MAX_BYTES, decodeBase64, PACKAGE_FORMAT, PACKAGE_MAX_SKILLS, PACKAGE_VERSION, PackageFormatError, parsePackageDocument, pictureMatchesMime, RELEASE_NOTES_MAX, redactPackageSecrets, SEED_FILE_MAX_BYTES, SEED_MAX_BYTES, SEED_MAX_FILES, utf8Bytes, type PackageAgent, type PackageConnection, type PackageDefinition, type PackageDocument, type PackagePreset, type PackageRoutine, type PackageRoutineSchedule } from "../../shared/package-format.ts";
 
 function portableKey(value: string, fallback: string, used: Set<string>): string {
   const stem = value
@@ -18,16 +18,6 @@ function portableKey(value: string, fallback: string, used: Set<string>): string
   for (let suffix = 2; used.has(key); suffix++) key = `${stem}-${suffix}`;
   used.add(key);
   return key;
-}
-
-/** An Auto room is written as its lead: older apps refuse a package with an `auto` kind. */
-function packageRoomResponder(
-  responder: GroupRecord["defaultResponder"],
-  keys: ReadonlyMap<string, string>,
-): { kind: "agent"; agent: string } | { kind: "everyone" } | { kind: "mentions" } {
-  if (responder.kind === "member" && keys.has(responder.botId)) return { kind: "agent", agent: keys.get(responder.botId)! };
-  if (responder.kind === "everyone") return { kind: "everyone" };
-  return { kind: "mentions" };
 }
 
 function samePlaybook(a: InstalledPlaybook, b: BotPackagePlaybook): boolean {
@@ -139,24 +129,8 @@ export function createBotPackageExport(input: {
   const { packageSkills, agentSkills } = assignSkills(bots, input.skillsByBot);
   const requirements = requiredApps(bots);
 
-  const roomKeys = new Set<string>();
-  const rooms: NonNullable<BotPackageDefinition["rooms"]> = [];
-  for (const [index, group] of input.groups.filter((group) => !group.dm).entries()) {
-    const members = group.memberIds.flatMap((id) => idToKey.has(id) ? [idToKey.get(id)!] : []);
-    if (!members.length) continue;
-    const defaultResponder = packageRoomResponder(group.defaultResponder, idToKey);
-    rooms.push({
-      key: portableKey(group.name, `room-${index + 1}`, roomKeys),
-      name: group.name,
-      members,
-      bulletin: group.bulletin,
-      defaultResponder,
-    });
-  }
-
   const routineKeys = new Set<string>();
   const routines: NonNullable<BotPackageDefinition["routines"]> = input.routines.flatMap((routine, index) => {
-    if (routine.target === "room-goal") return [];
     const agent = idToKey.get(routine.botId);
     if (!agent) return [];
     return [{
@@ -195,7 +169,7 @@ export function createBotPackageExport(input: {
     release: "1.0.0",
     name: input.name,
     tagline: `A portable OpenMausBot setup with ${bots.length} ${bots.length === 1 ? "bot" : "bots"}.`,
-    summary: "Exported from OpenMausBot. Review the roles, rooms, playbooks, connector requirements, and paused routines before sharing or publishing.",
+    summary: "Exported from OpenMausBot. Review the roles, playbooks, connector requirements, and paused routines before sharing or publishing.",
     category: "Community",
     author: { name: input.authorName?.trim() || "OpenMausBot user" },
     license: "Unspecified",
@@ -206,7 +180,6 @@ export function createBotPackageExport(input: {
   };
   const chief = bots.find((bot) => bot.chiefOfStaff);
   if (chief) definition.chiefOfStaff = idToKey.get(chief.id)!;
-  if (rooms.length) definition.rooms = rooms;
   if (routines.length) definition.routines = routines;
   if (playbooks.length) definition.playbooks = playbooks;
   if (packageSkills.size) {
@@ -571,43 +544,23 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
     return agent;
   });
 
-  const groups = input.groups.filter((group) => !group.dm && teamOf(group.section) === team);
-  const roomKeys = stableKeys(groups, recorded?.rooms, () => undefined, "group-chat");
-  const rooms: PackageRoom[] = [];
-  const roomMembers = new Map<string, Set<string>>();
-  for (const group of groups) {
-    const members = group.memberIds.flatMap((id) => botKeys.has(id) ? [botKeys.get(id)!] : []);
-    if (!members.length) continue;
-    const defaultResponder = packageRoomResponder(group.defaultResponder, botKeys);
-    const key = roomKeys.get(group.id)!;
-    rooms.push({ key, name: group.name, members, ...(group.bulletin ? { bulletin: group.bulletin } : {}), defaultResponder });
-    roomMembers.set(group.id, new Set(members));
-  }
-
-  const owned = input.routines.filter((routine) => botKeys.has(routine.botId) &&
-    (routine.target !== "room-goal" || (routine.groupId !== undefined && roomMembers.has(routine.groupId))));
+  const owned = input.routines.filter((routine) => botKeys.has(routine.botId));
   const routineKeys = stableKeys(owned, recorded?.routines, () => undefined, "routine");
   const routines: PackageRoutine[] = owned.flatMap((routine) => {
     const key = routineKeys.get(routine.id)!;
     const agent = botKeys.get(routine.botId)!;
-    const goal = routine.target === "room-goal";
-    if (goal && !roomMembers.get(routine.groupId!)!.has(agent)) {
-      skipped.push({ part: `routines[${key}]`, reason: "lead_not_in_group_chat" });
-      return [];
-    }
     if (routine.attachments?.length) skipped.push({ part: `routines[${key}].attachments`, reason: "files_not_shared" });
     return [{
       key,
       name: routine.name,
       agent,
-      ...(goal ? { room: roomKeys.get(routine.groupId!)! } : {}),
       prompt: routine.prompt,
-      runOn: goal ? "maus" as const : routine.runOn,
+      runOn: routine.runOn,
       schedule: portableSchedule(routine.schedule),
       durationMinutes: routine.durationMinutes,
       ...(routine.timeoutMinutes === undefined ? {} : { timeoutMinutes: routine.timeoutMinutes }),
       ...(routine.overlap === "queue" ? { overlap: "queue" as const } : {}),
-      ...(!goal && routine.continuity ? { continuity: true } : {}),
+      ...(routine.continuity ? { continuity: true } : {}),
       ...(routine.runOnStartup ? { runOnStartup: true } : {}),
       enabledAfterInstall: routine.enabled,
     }];
@@ -621,7 +574,7 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
     name: displayName,
     tagline: input.tagline?.trim() || `A portable OpenMausBot team with ${bots.length} ${bots.length === 1 ? "bot" : "bots"}.`,
     summary: input.summary?.trim() ||
-      "Shared from OpenMausBot. Bots, skills, group chats and routines arrive as new copies; routines start paused and chat history never travels.",
+      "Shared from OpenMausBot. Bots, skills and routines arrive as new copies; routines start paused and chat history never travels.",
     ...(notes ? { notes } : {}),
     category: "Community",
     author: { name: input.authorName?.trim() || "OpenMausBot user" },
@@ -636,7 +589,6 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
     },
     agents,
   };
-  if (rooms.length) definition.rooms = rooms;
   if (routines.length) definition.routines = routines;
   if (playbooks.length) definition.playbooks = playbooks;
   if (input.preset) definition.presets = [withPresetSkills(input.preset, packageSkills, skipped)];
@@ -655,7 +607,6 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
   }
   const toRecord = (keys: ReadonlyMap<string, string>, include: (id: string) => boolean) =>
     Object.fromEntries([...keys].filter(([id]) => include(id)));
-  const exportedRooms = new Set(rooms.map((room) => room.key));
   const exportedRoutines = new Set(routines.map((routine) => routine.key));
   return {
     document,
@@ -667,7 +618,6 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
       lastRelease: release,
       keys: {
         bots: { ...recorded?.bots, ...toRecord(botKeys, () => true) },
-        rooms: { ...recorded?.rooms, ...toRecord(roomKeys, (id) => exportedRooms.has(roomKeys.get(id)!)) },
         routines: { ...recorded?.routines, ...toRecord(routineKeys, (id) => exportedRoutines.has(routineKeys.get(id)!)) },
       },
     },

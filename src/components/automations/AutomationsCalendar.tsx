@@ -12,11 +12,10 @@ import { CalendarGrid, EventDetails, EventEditor, projectCalls, QuickComposer, t
 
 /** The schedules (and scheduled calls) on a week or day grid. An automation opens the same panel as the list; a call
  * keeps its own details. */
-export function AutomationsCalendar({ botFilter, selectedAutomationId, onOpenAutomation, onOpenRoom }: {
+export function AutomationsCalendar({ botFilter, selectedAutomationId, onOpenAutomation }: {
   botFilter: string;
   selectedAutomationId?: string | null;
   onOpenAutomation: (id: string) => void;
-  onOpenRoom: (id: string) => void;
 }) {
   const { state, dispatch } = useStore();
   const routinesOnly = window.ogb?.remoteClient?.active === true;
@@ -113,14 +112,14 @@ export function AutomationsCalendar({ botFilter, selectedAutomationId, onOpenAut
       </div>
       <div className="relative flex min-h-0 flex-1">
         {!liveSelected && <div className="hidden shrink-0 @min-[1040px]/routines:block"><CalendarSidebar bots={visibleBots} anchor={anchor} onSelectDate={(at) => setAnchor(startOfDay(at))} /></div>}
-        <CalendarGrid anchor={rangeStart} days={days} items={items} bots={state.bots} groups={state.groups} selectedId={selectedId}
+        <CalendarGrid anchor={rangeStart} days={days} items={items} bots={state.bots} selectedId={selectedId}
           onOpen={openItem}
           onCreate={(seed) => { setSelected(null); setQuick(seed); }}
           onMove={(item, at) => void moveEvent(item, at)} onResize={(item, duration) => void resizeEvent(item, duration)} />
         {liveSelected && (
           <div className="absolute inset-y-0 right-0 z-30 flex shadow-2xl @min-[760px]/routines:static @min-[760px]/routines:shadow-none">
             <EventDetails key={`${liveSelected.kind}:${liveSelected.id}`} item={liveSelected} bots={state.bots} onClose={() => setSelected(null)} onEdit={editSelected} onOpenRun={openRun}
-              onCallChanged={(id) => { if (id) setCalls((current) => current.filter((call) => call.id !== id)); else void loadCalls(); }} onOpenRoom={onOpenRoom} />
+              onCallChanged={(id) => { if (id) setCalls((current) => current.filter((call) => call.id !== id)); else void loadCalls(); }} />
           </div>
         )}
       </div>

@@ -16,7 +16,6 @@ function raw(url: string, path: string, headers: Record<string, string>, method 
       res.on("data", (chunk) => { text += chunk; });
       res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: text }));
     });
-    call.on("upgrade", (res, socket) => { socket.destroy(); resolve({ status: res.statusCode ?? 0, headers: res.headers, body: "" }); });
     call.on("error", reject);
     call.end(body);
   });
@@ -38,10 +37,6 @@ describe("a browser on a self-hosted server's own machine", () => {
           expect(JSON.parse(refused.body).error).toBe(BROWSER_SIGN_IN);
         }
       }
-      const socket = await raw(url, "/api/desktop-viewer/local/shared/websockify", {
-        origin: url, upgrade: "websocket", connection: "Upgrade", "sec-websocket-version": "13", "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==",
-      });
-      expect(socket.status).toBe(401);
       // Public routes still answer a stranger: the sign-in page needs them.
       expect(await raw(url, "/api/health", fromPage(url)).then((answer) => JSON.parse(answer.body))).toEqual({ app: "openmausbot" });
 

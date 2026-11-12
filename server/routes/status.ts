@@ -142,7 +142,7 @@ export function createStatusRoutes(deps: StatusRouteDeps): RouteHandler {
       const range = parseUsageRange(fromParam, url.searchParams.get("to"));
       if (!range) return json(res, 400, { error: "from and to must be dates (YYYY-MM-DD), from no later than to, at most a year apart" });
       const what = parseActivityWhat(url.searchParams.get("what"));
-      if (!what) return json(res, 400, { error: "what must be all, approvals, decisions, config, people, session, webhook, mcp, engine, bot, budget or visibility" });
+      if (!what) return json(res, 400, { error: "what must be all, approvals, decisions, config, people, session, mcp, engine, bot, budget or visibility" });
       const entries = activityEntries(readDecisionRange(DATA_DIR, range), readAdminActivityRange(DATA_DIR, range), {
         what,
         who: (url.searchParams.get("who") ?? "").slice(0, 200),

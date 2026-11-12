@@ -16,7 +16,6 @@ const LEVEL_LABEL: Record<Level, string> = { ask: "Ask", edits: "Edits", auto: "
 const OUTSIDE_SOURCE: Record<OriginSource, string> = {
   chat: "a chat line nothing proves the user wrote",
   routine: "a routine",
-  webhook: "a webhook",
   relay: "a relayed message",
   external_runtime: "an external runtime",
   guest: "a Cloud guest",

@@ -113,10 +113,6 @@ export function ActivityPanel({ bot }: { bot: Bot }) {
         </span>
       </div>
 
-      <p className="border-b border-hairline/40 px-4 pb-3 text-[12px] text-ink-secondary">
-        {t("activity.panel.subtitle", { name: bot.name })}
-      </p>
-
       <div className="min-h-0 flex-1 overflow-y-auto">
         {error && <div className="px-4 py-3 text-[13px] text-danger">{t("activity.panel.error", { message: error })}</div>}
         {rows && rows.length === 0 && !error && (

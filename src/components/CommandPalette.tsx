@@ -1,17 +1,13 @@
 import { t } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "react";
-import { Bot as BotIcon, MessageSquare, Search, Users } from "lucide-react";
-import { api, openBot, useStore, type Bot, type Group } from "@/state/store";
+import { Bot as BotIcon, Search } from "lucide-react";
+import { openBot, useStore, type Bot } from "@/state/store";
 import { rankByName } from "@/lib/palette-rank";
 import { useShowThreads } from "@/lib/thread-preferences";
 import { cn } from "@/lib/cn";
-import type { SearchHit } from "@/lib/search-hit";
-import { landOnSearchHit } from "@/lib/focus-message";
 
 type PaletteEntry =
-  | { kind: "bot"; bot: Bot }
-  | { kind: "room"; group: Group }
-  | { kind: "message"; hit: SearchHit };
+  { kind: "bot"; bot: Bot };
 
 const OPEN_EVENT = "omb:open-command-palette";
 
@@ -24,7 +20,6 @@ export function CommandPalette({ onOpenChange }: { onOpenChange?: (open: boolean
   const showThreads = useShowThreads();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [messageHits, setMessageHits] = useState<SearchHit[]>([]);
   const [cursor, setCursor] = useState(0);
   const selectedRef = useRef<HTMLButtonElement>(null);
 
@@ -47,7 +42,6 @@ export function CommandPalette({ onOpenChange }: { onOpenChange?: (open: boolean
   useEffect(() => {
     if (!open) return;
     setQuery("");
-    setMessageHits([]);
     setCursor(0);
   }, [open]);
 
@@ -57,54 +51,20 @@ export function CommandPalette({ onOpenChange }: { onOpenChange?: (open: boolean
 
   const q = query.trim().toLowerCase();
 
-  useEffect(() => {
-    if (!open || !q) {
-      setMessageHits([]);
-      return;
-    }
-    setMessageHits([]);
-    let alive = true;
-    const timer = setTimeout(() => {
-      api(`/api/search?q=${encodeURIComponent(q)}&limit=12`)
-        .then((result: { hits?: SearchHit[] }) => alive && setMessageHits(result.hits ?? []))
-        .catch(() => alive && setMessageHits([]));
-    }, 150);
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
-  }, [open, q]);
-
   useEffect(() => setCursor(0), [q]);
 
   useEffect(() => {
     selectedRef.current?.scrollIntoView({ block: "nearest" });
-  }, [cursor, messageHits]);
+  }, [cursor]);
 
   if (!open) return null;
 
   const bots = rankByName(state.bots.filter((b) => !b.hidden), q);
-  const rooms = rankByName(state.groups, q);
-  const entries: PaletteEntry[] = [
-    ...bots.map((bot): PaletteEntry => ({ kind: "bot", bot })),
-    ...rooms.map((group): PaletteEntry => ({ kind: "room", group })),
-    ...(q ? messageHits.map((hit): PaletteEntry => ({ kind: "message", hit })) : []),
-  ];
+  const entries: PaletteEntry[] = bots.map((bot): PaletteEntry => ({ kind: "bot", bot }));
   const selected = entries.length ? Math.min(cursor, entries.length - 1) : 0;
 
   const activate = async (entry: PaletteEntry) => {
-    if (entry.kind === "message") {
-      const hit = entry.hit;
-      try {
-        await landOnSearchHit(hit, state, dispatch, showThreads);
-      } catch (error) {
-        dispatch({ type: "error", message: error instanceof Error ? error.message : String(error) });
-      }
-    } else if (entry.kind === "bot") {
-      openBot(dispatch, entry.bot, showThreads);
-    } else {
-      dispatch({ type: "select", id: entry.group.id });
-    }
+    openBot(dispatch, entry.bot, showThreads);
     setOpen(false);
   };
 
@@ -125,9 +85,6 @@ export function CommandPalette({ onOpenChange }: { onOpenChange?: (open: boolean
       if (entry) void activate(entry);
     }
   };
-
-  const roomOffset = bots.length;
-  const messageOffset = bots.length + rooms.length;
 
   const row = (key: string, index: number, onPick: () => void, children: React.ReactNode, twoLine = false) => (
     <button
@@ -164,7 +121,7 @@ export function CommandPalette({ onOpenChange }: { onOpenChange?: (open: boolean
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("ui.label.searchBotsChannelsMessages")}
+            placeholder={t("routines.sidebar.searchBots")}
             className="w-full bg-transparent text-[14px] text-ink placeholder:text-ink-secondary focus:outline-none"
           />
           <kbd className="shrink-0 rounded-md border border-hairline/40 px-1.5 py-0.5 text-[11px] text-ink-secondary">
@@ -195,47 +152,6 @@ export function CommandPalette({ onOpenChange }: { onOpenChange?: (open: boolean
               </>,
             ),
           )}
-          {rooms.length > 0 && (
-            <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-secondary">
-              {t("backup.groups")}</div>
-          )}
-          {rooms.map((group, i) =>
-            row(
-              `room:${group.id}`,
-              roomOffset + i,
-              () => void activate({ kind: "room", group }),
-              <>
-                <Users size={16} className="shrink-0 text-ink-secondary" />
-                <span className="truncate text-[14px] text-ink">{group.name}</span>
-              </>,
-            ),
-          )}
-          {q && messageHits.length > 0 && (
-            <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-secondary">
-              {t("backup.messages")}</div>
-          )}
-          {q &&
-            messageHits.map((hit, i) => {
-              const before = hit.snippet.slice(0, hit.matchStart);
-              const match = hit.snippet.slice(hit.matchStart, hit.matchStart + hit.matchLength);
-              const after = hit.snippet.slice(hit.matchStart + hit.matchLength);
-              return row(
-                `msg:${hit.threadId}:${hit.messageId}`,
-                messageOffset + i,
-                () => void activate({ kind: "message", hit }),
-                <>
-                  <span className="flex items-center gap-2 truncate text-[13px] font-medium text-ink">
-                    <MessageSquare size={13} className="shrink-0 text-ink-secondary" />
-                    {hit.name}
-                    {hit.task ? <span className="font-normal text-ink-secondary"> · {hit.task}</span> : null}
-                  </span>
-                  <span className="line-clamp-2 text-[12.5px] text-ink-secondary">
-                    {before}<mark className="rounded-sm bg-accent/25 px-0.5 text-ink">{match}</mark>{after}
-                  </span>
-                </>,
-                true,
-              );
-            })}
         </div>
       </div>
     </div>

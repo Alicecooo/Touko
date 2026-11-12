@@ -1,12 +1,12 @@
-import { directMessageSent, roomMessageSent } from "@/lib/product-events";
+import { directMessageSent } from "@/lib/product-events";
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { ArrowUp, BookOpen, Clock, Paperclip, Sparkles, Square, Target, Users, X } from "lucide-react";
-import { useStore, visibleMessages, currentTaskBot, type Bot, type Group, type Message } from "@/state/store";
+import { useStore, visibleMessages, currentTaskBot, type Bot, type Message } from "@/state/store";
 import { cn } from "@/lib/cn";
 import { useMenuMotion } from "./MenuMotion";
 import { activeLocale, t } from "@/lib/i18n";
 import { imeComposing, sendKeyLabel, sendsMessage, useSendKey } from "@/lib/send-key";
-import { draftRevision, appendDraftAttachments, changeDraftAttachmentPending, forgetFailedComposerSend, markDraftEdited, prependComposerDraft, recoverFailedComposerSend, rememberFailedComposerSend, replaceDraftAttachment, restoredSendId, restoredRequestText, useComposerDraft, useComposerChannelMode, useDraftAttachmentPending, useFailedComposerSends, type ComposerSendSnapshot, type FailedComposerSend } from "@/lib/drafts";
+import { draftRevision, appendDraftAttachments, changeDraftAttachmentPending, forgetFailedComposerSend, markDraftEdited, prependComposerDraft, recoverFailedComposerSend, rememberFailedComposerSend, replaceDraftAttachment, restoredSendId, restoredRequestText, useComposerDraft, useDraftAttachmentPending, useFailedComposerSends, type ComposerSendSnapshot, type FailedComposerSend } from "@/lib/drafts";
 import { BotAvatar } from "./Avatar";
 import { ComposerMenuRow } from "./ComposerMenuRow";
 import { MentionTextarea } from "./MentionTextarea";
@@ -17,18 +17,16 @@ import { ApprovalModeSelector } from "./ApprovalModeSelector";
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
 import { appendPastedText, handoffAttachmentImagePreview, clipboardHasImages, clipboardImageFiles, composeMessage, composerShouldRefocus, composerTakesFocusOnOpen, imageAttachmentFromFile, replyTargetTakesFocus, intakeFiles, isLongPaste, optimisticImageAttachment, pasteAttachment, releaseAttachmentImagePreview, type Attachment, type PasteAttachment } from "@/lib/composer-attachments";
 
-import { goalCoordinatorForComposer, groupComposerHint, openTaskWorking, roomRespondersForComposer } from "@/lib/group-routing";
 import { PendingApprovalActions, PendingApprovalPanel, pendingApprovals } from "./PendingApproval";
-import { GoalToggle } from "./GoalToggle";
 import { useDesktopCapabilities } from "./DesktopCapabilities";
 import { ComposerReplyStrip } from "./ReplyQuote";
 import { escapeCancelsReply } from "@/lib/replies";
 import { useThreadRefs } from "./ThreadRefs";
 import { QueuedComposerMessages, composerCanSteerQueuedMessages, doubleEnterSteerWindowExpiresAt, doubleEnterSteersQueue } from "./ComposerQueuedMessages";
 import { skillAuthoringEnabled } from "@/lib/feature-flags";
-import { mentionChoicesForQuery, mentionQueryAt, mentionRowDescription } from "@/lib/mentions";
+import { mentionChoicesForQuery, mentionQueryAt } from "@/lib/mentions";
 import { serializeThreadRefs, threadTokenFromPaste, threadTokenSpacing } from "@/lib/thread-refs";
-import { composerSlashTrigger, goalTextFromComposer, replaceComposerSlashTrigger, skillSlashCommands, slashCommandMatches, type ComposerSlashCommand } from "@/lib/composer-commands";
+import { composerSlashTrigger, replaceComposerSlashTrigger, skillSlashCommands, slashCommandMatches, type ComposerSlashCommand } from "@/lib/composer-commands";
 import { useSlashSkills } from "@/lib/use-slash-skills";
 
 type MentionChoice = { id: string; name: string; bot?: Bot };
@@ -39,8 +37,6 @@ interface ComposerDraftSnapshot extends ComposerSendSnapshot {
 
 export function Composer({
   bot: profile,
-  group,
-  members,
   onEditLast,
   replyTo,
   onClearReply,
@@ -49,8 +45,6 @@ export function Composer({
   locked: setupLocked = false,
 }: {
   bot?: Bot;
-  group?: Group;
-  members?: Bot[];
   onEditLast?: () => void;
   replyTo?: Message | null;
   onClearReply?: () => void;
@@ -66,37 +60,23 @@ export function Composer({
   const sendKey = useSendKey();
   const sendLabel = sendKeyLabel(sendKey);
   const remoteClient = window.ogb?.remoteClient?.active === true;
-  const threadId = group?.threadId ?? bot?.threadId ?? "";
-  const currentGroupTask = group?.tasks?.find((task) => task.threadId === threadId);
-  const groupBusyBotId = currentGroupTask?.busyBotId ?? (currentGroupTask?.working ? group?.busyBotId : (group?.threadId === threadId ? group?.busyBotId : null));
-  const groupWorking = group ? openTaskWorking(group) : false;
-  const busy = group ? Boolean(groupWorking || groupBusyBotId) : Boolean(bot?.busy);
-  const steerInstanceId = group
-    ? members?.find((member) => member.id === groupBusyBotId)?.modelSelection.instanceId
-    : bot?.modelSelection.instanceId;
+  const threadId = bot?.threadId ?? "";
+  const busy = Boolean(bot?.busy);
+  const steerInstanceId = bot?.modelSelection.instanceId;
   const canSteer =
     state.instances.find((i) => i.instanceId === steerInstanceId)?.capabilities?.queueing === true;
   // Visible branch only: an approval left on an abandoned branch must not block the composer.
-  const approvals = pendingApprovals(group ? group.messages : bot ? visibleMessages(bot) : []);
+  const approvals = pendingApprovals(bot ? visibleMessages(bot) : []);
   const approval = approvals[0];
-  const approvalBot = group
-    ? members?.find((member) => member.id === approval?.message.from?.botId) ??
-      members?.find((member) => member.id === groupBusyBotId)
-    : bot;
-  const busyName = group
-    ? (members?.find((b) => b.id === groupBusyBotId)?.name ??
-      (groupWorking ? t("composer.busy.team") : t("composer.busy.aBot")))
-    : (bot?.name ?? t("composer.busy.theBot"));
-  const draftId = group
-    ? `group:${group.id}:${group.threadId}`
-    : `bot:${bot?.id ?? ""}:${bot?.threadId ?? ""}`;
+  const approvalBot = bot;
+  const busyName = bot?.name ?? t("composer.busy.theBot");
+  const draftId = `bot:${bot?.id ?? ""}:${bot?.threadId ?? ""}`;
   const [text, setText, attachments, setAttachments] = useComposerDraft(
     draftId,
-    !group && bot ? `bot:${bot.id}` : undefined,
+    bot ? `bot:${bot.id}` : undefined,
   );
   const attachmentPending = useDraftAttachmentPending(draftId);
   const failedSends = useFailedComposerSends(draftId);
-  const [channelMode, setChannelMode] = useComposerChannelMode(draftId);
   const editText = useCallback(
     (next: string) => {
       markDraftEdited(draftId);
@@ -199,22 +179,13 @@ export function Composer({
       candidate &&
         state.instances.find((i) => i.instanceId === candidate.modelSelection.instanceId)?.capabilities?.images,
     );
-  const imageTargetsSupport = (message: string, mode: "chat" | "goal") => {
-    if (!group) return botSupportsImages(bot);
-    if (mode === "goal") {
-      return botSupportsImages(goalCoordinatorForComposer(message, members ?? [], group) ?? undefined);
-    }
-    const responders = roomRespondersForComposer(message, members ?? [], group);
-    return responders.length > 0 && responders.every(botSupportsImages);
-  };
-  const typedGoalText = group && !group.dm ? goalTextFromComposer(text) : null;
-  const effectiveText = typedGoalText ?? text;
-  const effectiveChannelMode = typedGoalText !== null ? "goal" : channelMode;
-  const engineSupportsImages = imageTargetsSupport(effectiveText, effectiveChannelMode);
+  const imageTargetsSupport = (_message: string, _mode: "chat" | "goal") => botSupportsImages(bot);
+  const effectiveText = text;
+  const engineSupportsImages = imageTargetsSupport(effectiveText, "chat");
 
   const slash = composerSlashTrigger(text, caret);
   const locale = activeLocale();
-  const slashSkills = useSlashSkills(group ? undefined : bot?.id, Boolean(slash) && slash?.start !== dismissedSlashAt);
+  const slashSkills = useSlashSkills(bot?.id, Boolean(slash) && slash?.start !== dismissedSlashAt);
   const commandCandidates = useMemo(() => {
     if (!slash || slash.start === dismissedSlashAt) return [];
     const supportsAgents = (candidate?: Bot) =>
@@ -225,15 +196,9 @@ export function Composer({
           )?.capabilities?.agentsMcp,
       );
     const available: ComposerSlashCommand[] = [];
-    if (group && !group.dm) available.push({
-      kind: "command",
-      id: "goal",
-      label: "/goal",
-      description: t("composer.command.goalDesc"),
-    });
     if (
       skillAuthoringEnabled(state.config) &&
-      (group ? (members ?? []).some(supportsAgents) : supportsAgents(bot))
+      supportsAgents(bot)
     ) {
       available.push({
         kind: "command",
@@ -242,7 +207,7 @@ export function Composer({
         description: t("composer.command.learnDesc"),
       });
     }
-    if (!group && supportsAgents(bot)) available.push({
+    if (supportsAgents(bot)) available.push({
       kind: "command",
       id: "setup",
       label: "/setup",
@@ -250,23 +215,17 @@ export function Composer({
     });
     available.push(...skillSlashCommands(slashSkills));
     return available.filter((command) => slashCommandMatches(command, slash.query));
-  }, [slash, dismissedSlashAt, group, members, bot, state.config, state.instances, locale, slashSkills]);
+  }, [slash, dismissedSlashAt, bot, state.config, state.instances, locale, slashSkills]);
   const commandPickerOpen = commandCandidates.length > 0;
 
   const mention = mentionQueryAt(text, caret);
   const candidates = useMemo(() => {
     if (!mention || mention.start === dismissedAt) return [];
-    const pool: MentionChoice[] = group
-      ? [
-          ...(!group.dm ? [{ id: "__everyone__", name: "everyone" }] : []),
-          ...(members ?? []).map((member) => ({ id: member.id, name: member.name, bot: member })),
-        ]
-      : state.bots
-          .filter((member) => member.id !== bot?.id && !member.hidden)
-          .map((member) => ({ id: member.id, name: member.name, bot: member }));
+    const pool: MentionChoice[] = state.bots
+      .filter((member) => member.id !== bot?.id && !member.hidden)
+      .map((member) => ({ id: member.id, name: member.name, bot: member }));
     return mentionChoicesForQuery(pool, mention.query);
-  }, [mention, dismissedAt, state.bots, bot?.id, group, members]);
-  const mentionEveryoneCount = (members ?? []).filter((member) => !member.hidden).length;
+  }, [mention, dismissedAt, state.bots, bot?.id]);
   const mentionPickerOpen = candidates.length > 0;
   const commandMotion = useMenuMotion(commandPickerOpen);
   const mentionMotion = useMenuMotion(mentionPickerOpen);
@@ -317,7 +276,6 @@ export function Composer({
     editText(next.text);
     setCaret(next.caret);
     setDismissedSlashAt(slash.start);
-    setChannelMode(command.kind === "command" && command.id === "goal" ? "goal" : "chat");
     requestAnimationFrame(() => {
       inputRef.current?.focus();
       inputRef.current?.setSelectionRange(next.caret, next.caret);
@@ -334,19 +292,14 @@ export function Composer({
   );
   const [steering, setSteering] = useState(false);
   const interruptTurn = () => {
-    if (group) dispatch({ type: "interruptGroup", groupId: group.id, threadId });
-    else if (bot) dispatch({ type: "interrupt", botId: bot.id, threadId });
+    if (bot) dispatch({ type: "interrupt", botId: bot.id, threadId });
   };
   const queueHeadId = queuedMessages[0]?.queueId;
   const steerQueued = () => {
     if (!queueHeadId) return;
     setSteering(true);
     const settle = () => setSteering(false);
-    if (group && canSteer) {
-      dispatch({ type: "steerGroupQueued", groupId: group.id, threadId, queueId: queueHeadId, onError: settle, onSettled: settle });
-    } else if (group) {
-      dispatch({ type: "interruptGroup", groupId: group.id, threadId, onError: settle });
-    } else if (bot && canSteer) {
+    if (bot && canSteer) {
       dispatch({ type: "steerQueued", botId: bot.id, threadId, queueId: queueHeadId, onError: settle, onSettled: settle });
     } else if (bot) {
       dispatch({ type: "interrupt", botId: bot.id, threadId, onError: settle });
@@ -370,8 +323,7 @@ export function Composer({
         input.setSelectionRange(cited.display.length, cited.display.length);
       });
     };
-    if (group) dispatch({ type: "cancelGroupQueued", groupId: group.id, threadId, queueId, onCancelled });
-    else if (bot) dispatch({ type: "cancelQueued", botId: bot.id, threadId, queueId, onCancelled });
+    if (bot) dispatch({ type: "cancelQueued", botId: bot.id, threadId, queueId, onCancelled });
   };
   const steerAgainUntilRef = useRef(0);
   const prevPendingCountRef = useRef(pendingCount);
@@ -401,7 +353,7 @@ export function Composer({
     threadId: string;
   } | null>(null);
   const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
-  const modeBot = group ? undefined : bot;
+  const modeBot = bot;
   const approvalEngine = modeBot
     ? state.instances.find((instance) => instance.instanceId === modeBot.modelSelection.instanceId)
     : undefined;
@@ -456,8 +408,7 @@ export function Composer({
 
   const hasContent = Boolean(effectiveText.trim()) || attachments.length > 0;
   const retryFailedSend = (failed: FailedComposerSend) => {
-    const failedMode = failed.channelMode ?? "chat";
-    if (failed.requestText.includes("<attached-image ") && !imageTargetsSupport(failed.requestText, failedMode)) {
+    if (failed.requestText.includes("<attached-image ") && !imageTargetsSupport(failed.requestText, "chat")) {
       dispatch({ type: "error", message: t("composer.error.noImages") });
       return;
     }
@@ -478,9 +429,7 @@ export function Composer({
         });
       },
     };
-    if (group) {
-      dispatch({ type: "sendGroup", groupId: group.id, mode: failedMode, ...retry });
-    } else if (bot) {
+    if (bot) {
       dispatch({ type: "send", botId: bot.id, ...retry });
     }
   };
@@ -488,7 +437,7 @@ export function Composer({
     if (locked || attachmentPending) return;
     if (
       attachments.some((attachment) => attachment.kind === "image") &&
-      !imageTargetsSupport(effectiveText, effectiveChannelMode)
+      !imageTargetsSupport(effectiveText, "chat")
     ) {
       dispatch({ type: "error", message: t("composer.error.noImages") });
       return;
@@ -506,21 +455,9 @@ export function Composer({
       reply: replyTo ?? null,
       replyToId: replyTo?.id,
       threadId,
-      channelMode: group ? effectiveChannelMode : undefined,
+      channelMode: undefined,
     };
-    if (group) {
-      dispatch({
-        type: "sendGroup",
-        groupId: group.id,
-        text: body,
-        sendId: sentDraft.sendId,
-        replyToId: replyTo?.id,
-        threadId,
-        mode: effectiveChannelMode,
-        onError: () => restoreDraft(sentDraft),
-      });
-      roomMessageSent(effectiveChannelMode, busy);
-    } else if (bot) {
+    if (bot) {
       dispatch({
         type: "send",
         botId: bot.id,
@@ -535,7 +472,6 @@ export function Composer({
     setText("");
     setAttachments([]);
     onConsumeReply?.();
-    if (group) setChannelMode("chat");
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -601,22 +537,6 @@ export function Composer({
     editAttachments((prev) => [...prev, pasteAttachment(pasted)]);
   };
 
-  const toggleGoal = () => {
-    markDraftEdited(draftId);
-    if (typedGoalText !== null) {
-      const nextCaret = Math.max(0, caret - (text.length - typedGoalText.length));
-      editText(typedGoalText);
-      setCaret(nextCaret);
-      setChannelMode("chat");
-      requestAnimationFrame(() => {
-        inputRef.current?.focus();
-        inputRef.current?.setSelectionRange(nextCaret, nextCaret);
-      });
-      return;
-    }
-    setChannelMode((current) => current === "goal" ? "chat" : "goal");
-  };
-  const goal = group && !group.dm ? { on: effectiveChannelMode === "goal", onToggle: toggleGoal } : undefined;
   const approvalChoice = modeBot && approvalEngine && !remoteClient ? {
     approvalMode: modeBot.approvalMode,
     autoApprove: modeBot.autoApprove,
@@ -716,9 +636,7 @@ export function Composer({
             className={cn("absolute bottom-full start-2 z-20 mb-2 max-h-72 w-72 overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-hairline/40 bg-raised shadow-lg", mentionMotion.className)} {...mentionMotion.exitProps}
           >
             {candidates.map((peer, i) => {
-              const description = mentionRowDescription(peer.bot
-                ? { kind: "bot", title: peer.bot.title }
-                : { kind: "everyone", count: mentionEveryoneCount });
+              const description = peer.bot?.title?.trim() ?? "";
               return (
                 <ComposerMenuRow
                   key={peer.id}
@@ -777,11 +695,10 @@ export function Composer({
           items={queuedMessages}
           onSteer={canSteerQueued ? steerQueued : undefined}
           steerInterrupts={!canSteer}
-          steerMode={group ? "next" : "all"}
+          steerMode="all"
           steering={steering}
           onCancel={(queueId) => {
-            if (group) dispatch({ type: "cancelGroupQueued", groupId: group.id, threadId, queueId });
-            else if (bot) dispatch({ type: "cancelQueued", botId: bot.id, threadId, queueId });
+            if (bot) dispatch({ type: "cancelQueued", botId: bot.id, threadId, queueId });
           }}
           onEdit={locked ? undefined : editQueued}
         />
@@ -817,15 +734,14 @@ export function Composer({
               >
                 <Paperclip size={17} />
               </button>}
-              {goal && <GoalToggle on={goal.on} onToggle={goal.onToggle} />}
               {(approvalChoice) && <ApprovalModeSelector {...approvalChoice} />}
             </div>
           )}
           <MentionTextarea
           wrapperClassName="@max-[30rem]/composer:order-first @max-[30rem]/composer:basis-full"
           inputRef={inputRef}
-          peers={group ? members ?? [] : state.bots.filter((member) => member.id !== bot?.id)}
-          everyone={Boolean(group && !group.dm)}
+          peers={state.bots.filter((member) => member.id !== bot?.id)}
+          everyone={false}
           dir="auto"
           rows={1}
           value={text}
@@ -919,19 +835,10 @@ export function Composer({
                   ? t("composer.placeholder.steerQueued", { name: busyName, key: sendLabel })
                   : t("composer.placeholder.steer", { name: busyName, key: sendLabel })
               : busy
-                ? group
-                  ? t("composer.placeholder.queueGroup", { name: busyName, key: sendLabel })
-                  : t("composer.placeholder.queue", { name: busyName })
-                : group
-                  ? channelMode === "goal"
-                    ? t("composer.placeholder.goal", { name: group.name })
-                    : t("composer.placeholder.group", {
-                        name: group.name,
-                        hint: groupComposerHint(group, members ?? []),
-                      })
-                  : t("composer.placeholder.bot", { name: bot?.name ?? "" })
+                ? t("composer.placeholder.queue", { name: busyName })
+                : t("composer.placeholder.bot", { name: bot?.name ?? "" })
           }
-          aria-label={t("composer.placeholder.bot", { name: group ? group.name : (bot?.name ?? "") })}
+          aria-label={t("composer.placeholder.bot", { name: bot?.name ?? "" })}
             className="block max-h-[9rem] min-h-6 w-full resize-none overflow-y-auto bg-transparent px-1 py-1 text-[15px] leading-6 placeholder:text-ink-secondary focus:outline-none"
           />
           <div data-composer-actions className="flex items-center gap-1 @max-[30rem]/composer:ml-auto">

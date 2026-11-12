@@ -203,7 +203,7 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
         const receipt = await acceptDirectSend({
           botId: bot.id, threadId, text, sendId, replyTo, sender, trigger,
           // The bot's own shell reaches this route on a headless server (loopback is the owner), so only a
-          // paired session or the desktop capability proves a person and lifts the webhook block.
+          // paired session or the desktop capability proves a person and lifts the automated-source block.
           personPresent: auth.kind === "session" || DESKTOP_MANAGED,
         }, guardedStart);
         press?.settle("queueId" in receipt ? receipt.queueId : undefined);

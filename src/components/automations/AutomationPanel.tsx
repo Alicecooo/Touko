@@ -1,10 +1,8 @@
-import { Check, Copy, Pause, Pencil, Play, RotateCw, Trash2, X } from "lucide-react";
+import { Pause, Pencil, Play, Trash2, X } from "lucide-react";
 
 import { automationStatus, runLine, type Automation } from "@/lib/automations";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
-import { loadWebhookCredentials, webhookCredentialStore } from "@/lib/webhook-credentials";
-import { useStore } from "@/state/store";
 import { useAutomationActions } from "./actions";
 import { FixButton, StatusMark } from "./parts";
 
@@ -19,12 +17,8 @@ export function AutomationPanel({ automation, sentence, onClose, onEdit, onDelet
   onEdit: () => void;
   onDeleted: () => void;
 }) {
-  const { state } = useStore();
   const actions = useAutomationActions();
   const status = automationStatus(automation);
-  const webhook = automation.kind === "webhook" ? state.webhooks.find((candidate) => candidate.id === automation.id) : undefined;
-  const credential = webhook ? loadWebhookCredentials(webhookCredentialStore())[webhook.id] : undefined;
-  const receiving = state.webhookIngress?.available !== false;
   const statusWord = t(status.state === "paused" ? "automations.status.paused" : status.state === "needs-you" ? "automations.status.needsYou" : "automations.status.working");
 
   return (
@@ -42,26 +36,6 @@ export function AutomationPanel({ automation, sentence, onClose, onEdit, onDelet
           <FixButton automation={automation} status={status} actions={actions} onEdit={onEdit} />
         </div>
 
-        {webhook && (
-          <section className="rounded-xl border border-hairline/45 bg-inset/50 p-3.5">
-            <h3 className="text-[13px] font-medium text-ink">{t("automations.address.title")}</h3>
-            <button type="button" disabled={Boolean(actions.busy) || !receiving} onClick={() => void actions.copyAddress(webhook.id)} className={cn(BUTTON, "mt-2.5 bg-accent text-accent-ink hover:brightness-110")}>
-              {actions.copied === webhook.id ? <Check size={14} /> : <Copy size={14} />}
-              {actions.copied === webhook.id ? t("automations.address.copied") : t("automations.address.copy")}
-            </button>
-            <p className="mt-2 text-[11.5px] leading-relaxed text-ink-secondary">{receiving ? t("automations.address.keepOpen") : t("automations.address.unavailable")}</p>
-            <details className="mt-2.5 text-[11.5px] text-ink-secondary">
-              <summary className="cursor-pointer select-none font-medium text-ink-secondary hover:text-ink">{t("automations.more")}</summary>
-              <div className="mt-2 space-y-2 leading-relaxed">
-                <p className="font-medium text-ink">{t("automations.address.showSecret")}</p>
-                <p className="break-all font-mono text-[11px]">{credential ? t("automations.address.secret", { secret: credential.secret }) : t("automations.address.secretUnknown")}</p>
-                <p>{t("automations.address.header")}</p>
-                {webhook.eventTypes?.length ? <p>{t("automations.address.events", { events: webhook.eventTypes.join(", ") })}</p> : null}
-                <button type="button" disabled={Boolean(actions.busy)} onClick={() => { if (window.confirm(t("automations.address.replaceConfirm"))) void actions.copyAddress(webhook.id, true); }} className="flex items-center gap-1.5 rounded-lg border border-hairline/50 px-2.5 py-1.5 text-ink hover:bg-raised"><RotateCw size={12} />{t("automations.address.replace")}</button>
-              </div>
-            </details>
-          </section>
-        )}
 
         <section>
           <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wider text-ink-tertiary">{t("automations.panel.recent")}</h3>

@@ -152,7 +152,7 @@ export function createQuotaSwitch(deps: QuotaSwitchDeps): QuotaSwitch {
       if (classifyError({ text: deps.turnStops.failureCause(event) ?? "" }).reason !== "quota") return null;
       const currentId = bot.modelSelection.instanceId;
       limited.add(currentId);
-      // Only the person's own request: never a routine's, a webhook's, a relayed or a guest's.
+      // Only the person's own request: never a routine's, a relayed or a guest's.
       const own = !internal && request && !request.stopped && request.origin?.kind === "user"
         && (!request.turnId || !event.turnId || request.turnId === event.turnId);
       if (!own || !enabled() || openCard(threadId)) return null;

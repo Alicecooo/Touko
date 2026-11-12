@@ -226,8 +226,6 @@ const storedOperationSchema = z.discriminatedUnion("action", [
 ]);
 const storedSnapshotSchema = storedDefinitionSchema.extend({
   enabled: z.boolean(),
-  target: z.literal("room-goal").optional(),
-  groupId: z.string().min(1).max(128).optional(),
   resultsThreadId: z.string().min(1).max(128).optional(),
 }).strict();
 const storedUndoSchema = z.object({
@@ -1093,8 +1091,6 @@ function routineSnapshot(routine: Routine): RoutineRequestSnapshot | undefined {
     ...(routine.overlap === "queue" ? { overlap: "queue" as const } : {}),
     ...(routine.runOnStartup ? { runOnStartup: true } : {}),
     enabled: routine.enabled,
-    ...(routine.target === "room-goal" ? { target: "room-goal" as const } : {}),
-    ...(routine.groupId ? { groupId: routine.groupId } : {}),
     ...(routine.resultsThreadId ? { resultsThreadId: routine.resultsThreadId } : {}),
   };
   return storedSnapshotSchema.safeParse(snapshot).success ? snapshot : undefined;
@@ -1335,7 +1331,6 @@ export class RoutineRequestService {
             name: before.name,
             prompt: before.instructions,
             botId: owner,
-            ...(before.target ? { target: before.target, groupId: before.groupId } : {}),
             runOn: before.runOn,
             enabled: before.enabled,
             schedule: asSchedule(before.schedule, now),

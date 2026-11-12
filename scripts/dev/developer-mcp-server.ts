@@ -243,100 +243,12 @@ export const TOOLS: McpToolDefinition[] = [
     annotations: MUTATING,
   },
   {
-    name: "list_channels",
-    description: "List multi-agent channels, their members, active task, and available tasks without loading transcripts.",
-    inputSchema: {
-      type: "object",
-      properties: {},
-      additionalProperties: false,
-    },
-    annotations: READ_ONLY,
-  },
-  {
-    name: "get_channel_messages",
-    description: "Retrieve a bounded page of recent messages from one channel task. Images are never returned inline.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        channel_id: { type: "string", description: "The ID of the channel." },
-        task_id: { type: "string", description: "Optional task/thread ID. Defaults to the channel's active task." },
-        limit: { type: "integer", minimum: 1, maximum: 200, description: "Messages to retrieve (default: 30, max: 200)." },
-      },
-      required: ["channel_id"],
-      additionalProperties: false,
-    },
-    annotations: READ_ONLY,
-  },
-  {
-    name: "send_channel_message",
-    description: "Send an instruction to a channel's active task. Optionally name the expected task to prevent cross-task races. This may cause one or more bots to use external tools.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        channel_id: { type: "string", description: "The ID of the channel." },
-        task_id: { type: "string", description: "Optional expected active task/thread ID." },
-        text: { type: "string", description: "The message content to post." },
-        send_id: SEND_ID_SCHEMA,
-      },
-      required: ["channel_id", "text"],
-      additionalProperties: false,
-    },
-    annotations: AGENT_ACTION,
-  },
-  {
-    name: "create_channel",
-    description: "Create a multi-agent channel from existing bots.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "Channel name." },
-        member_ids: { type: "array", items: { type: "string" }, minItems: 1, uniqueItems: true },
-        section: { type: "string", description: "Optional sidebar section." },
-        bulletin: { type: "string", description: "Optional shared instructions for channel members." },
-        default_responder: {
-          oneOf: [
-            { type: "object", properties: { kind: { const: "everyone" } }, required: ["kind"], additionalProperties: false },
-            { type: "object", properties: { kind: { const: "mentions" } }, required: ["kind"], additionalProperties: false },
-            { type: "object", properties: { kind: { const: "member" }, bot_id: { type: "string" } }, required: ["kind", "bot_id"], additionalProperties: false },
-          ],
-        },
-      },
-      required: ["name", "member_ids"],
-      additionalProperties: false,
-    },
-    annotations: ADDITIVE,
-  },
-  {
-    name: "update_channel",
-    description: "Update a channel's name, members, section, bulletin, or default responder.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        channel_id: { type: "string", description: "The ID of the channel." },
-        name: { type: "string" },
-        member_ids: { type: "array", items: { type: "string" }, minItems: 1, uniqueItems: true },
-        section: { type: ["string", "null"], description: "Null clears the section." },
-        bulletin: { type: "string" },
-        default_responder: {
-          oneOf: [
-            { type: "object", properties: { kind: { const: "everyone" } }, required: ["kind"], additionalProperties: false },
-            { type: "object", properties: { kind: { const: "mentions" } }, required: ["kind"], additionalProperties: false },
-            { type: "object", properties: { kind: { const: "member" }, bot_id: { type: "string" } }, required: ["kind", "bot_id"], additionalProperties: false },
-          ],
-        },
-      },
-      required: ["channel_id"],
-      additionalProperties: false,
-    },
-    annotations: MUTATING,
-  },
-  {
     name: "create_task",
-    description: "Create and activate a fresh conversation task for a bot or user-created channel.",
+    description: "Create and activate a fresh conversation task for a bot.",
     inputSchema: {
       type: "object",
       properties: {
-        target_type: { type: "string", enum: ["bot", "channel"] },
+        target_type: { const: "bot" },
         target_id: { type: "string" },
         title: { type: "string", description: "Optional task title." },
       },
@@ -347,11 +259,11 @@ export const TOOLS: McpToolDefinition[] = [
   },
   {
     name: "switch_task",
-    description: "Select an existing bot or channel task. Bot tasks keep running independently; busy channels cannot switch.",
+    description: "Select an existing bot task.",
     inputSchema: {
       type: "object",
       properties: {
-        target_type: { type: "string", enum: ["bot", "channel"] },
+        target_type: { const: "bot" },
         target_id: { type: "string" },
         task_id: { type: "string" },
       },
@@ -362,11 +274,11 @@ export const TOOLS: McpToolDefinition[] = [
   },
   {
     name: "rename_task",
-    description: "Rename an existing bot or channel task.",
+    description: "Rename an existing bot task.",
     inputSchema: {
       type: "object",
       properties: {
-        target_type: { type: "string", enum: ["bot", "channel"] },
+        target_type: { const: "bot" },
         target_id: { type: "string" },
         task_id: { type: "string" },
         title: { type: "string" },
@@ -377,27 +289,12 @@ export const TOOLS: McpToolDefinition[] = [
     annotations: MUTATING,
   },
   {
-    name: "search_messages",
-    description: "Search local transcripts, optionally within one task/thread. Returns at most 100 compact hits.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: { type: "string" },
-        task_id: { type: "string", description: "Optional task/thread ID." },
-        limit: { type: "integer", minimum: 1, maximum: 100, description: "Maximum hits (default: 40)." },
-      },
-      required: ["query"],
-      additionalProperties: false,
-    },
-    annotations: READ_ONLY,
-  },
-  {
     name: "wait_for_conversation",
-    description: "Wait for a bot or channel task, and every teammate it is waiting on, to finish, stall, fail, or require user input. The result carries the job tree.",
+    description: "Wait for a bot task, and every teammate it is waiting on, to finish, stall, fail, or require user input. The result carries the job tree.",
     inputSchema: {
       type: "object",
       properties: {
-        target_type: { type: "string", enum: ["bot", "channel"] },
+        target_type: { const: "bot" },
         target_id: { type: "string" },
         task_id: { type: "string", description: "Optional task/thread ID. Defaults to the active task." },
         timeout_seconds: { type: "integer", minimum: 1, maximum: 120, description: "Maximum wait (default: 30 seconds)." },
@@ -459,11 +356,11 @@ export const TOOLS: McpToolDefinition[] = [
   },
   {
     name: "interrupt_conversation",
-    description: "Interrupt one bot or channel task's turn without stopping other bot tasks.",
+    description: "Interrupt one bot task's turn.",
     inputSchema: {
       type: "object",
       properties: {
-        target_type: { type: "string", enum: ["bot", "channel"] },
+        target_type: { const: "bot" },
         target_id: { type: "string" },
         task_id: { type: "string", description: "Optional task/thread ID. Defaults to the selected task." },
       },
@@ -572,14 +469,6 @@ function idArg(args: Record<string, unknown>, key: string): string {
   return value;
 }
 
-function stringArrayArg(args: Record<string, unknown>, key: string): string[] {
-  const value = args[key];
-  if (!Array.isArray(value) || value.length === 0 || value.some((item) => typeof item !== "string" || !item.trim())) {
-    throw new ToolInputError(`${key} must be a non-empty list of IDs`);
-  }
-  return [...new Set(value.map((item) => item.trim()))];
-}
-
 function records(value: unknown): Array<Record<string, any>> {
   return Array.isArray(value) ? value.filter(isRecord) : [];
 }
@@ -598,12 +487,6 @@ function projectTask(task: Record<string, any>, activeThreadId: unknown) {
     ...(typeof activeThreadId === "string" ? { active: task.threadId === activeThreadId } : {}),
     ...(task.usage ? { usage: task.usage } : {}),
   };
-}
-
-/** The channel a bot is speaking in, whichever of its threads that is. */
-function channelBusyWith(groups: unknown, botId: string) {
-  return records(groups).find((channel) =>
-    channel.busyBotId === botId || records(channel.tasks).some((task) => task.busyBotId === botId));
 }
 
 function botTaskState(bot: Record<string, any>, taskId: string) {
@@ -628,22 +511,6 @@ function projectBot(bot: Record<string, any>) {
     unread: Boolean(bot.unread),
     activeTaskId: bot.threadId,
     tasks: records(bot.tasks).map((task) => projectTask(task, bot.threadId)),
-  };
-}
-
-function projectChannel(channel: Record<string, any>) {
-  return {
-    id: channel.id,
-    name: channel.name,
-    memberIds: channel.memberIds,
-    bulletin: channel.bulletin,
-    defaultResponder: channel.defaultResponder,
-    section: channel.section ?? null,
-    directMessage: Boolean(channel.dm),
-    working: Boolean(channel.working),
-    busyBotId: channel.busyBotId ?? null,
-    activeTaskId: channel.threadId,
-    tasks: records(channel.tasks).map((task) => projectTask(task, channel.threadId)),
   };
 }
 
@@ -769,16 +636,6 @@ async function conversationTail(
   };
 }
 
-function normalizeResponder(value: unknown): Record<string, string> | undefined {
-  if (value === undefined) return undefined;
-  if (!isRecord(value)) throw new ToolInputError("default_responder must be an object");
-  if (value.kind === "everyone" || value.kind === "mentions") return { kind: value.kind };
-  if (value.kind === "member" && typeof value.bot_id === "string" && value.bot_id.trim()) {
-    return { kind: "member", botId: value.bot_id.trim() };
-  }
-  throw new ToolInputError("default_responder is invalid");
-}
-
 async function checkedModelSelection(
   args: Record<string, unknown>,
   fetcher: (path: string, options?: RequestInit) => Promise<any>,
@@ -804,8 +661,7 @@ async function checkedModelSelection(
 
 function taskRoute(targetType: unknown, targetId: string): string {
   if (targetType === "bot") return `/api/bots/${encodeURIComponent(targetId)}/tasks`;
-  if (targetType === "channel") return `/api/groups/${encodeURIComponent(targetId)}/tasks`;
-  throw new ToolInputError("target_type must be bot or channel");
+  throw new ToolInputError("target_type must be bot");
 }
 
 /** The optional client send id, checked as the server checks it. */
@@ -919,10 +775,6 @@ export async function handleToolCall(
       if (!bot) throw new Error(`Bot not found: ${botId}`);
       const taskId = args.task_id === undefined ? String(bot.threadId) : idArg(args, "task_id");
       if (!taskBelongsTo(bot, taskId)) throw new Error(`Task '${taskId}' does not belong to bot '${botId}'`);
-      const busyChannel = channelBusyWith(state.groups, botId);
-      if (busyChannel) {
-        throw new Error(`Bot '${botId}' is working in channel '${busyChannel.id}'; send to or interrupt that channel instead`);
-      }
       const receipt = await fetcher(`/api/bots/${encodeURIComponent(botId)}/messages`, {
         method: "POST",
         body: JSON.stringify({ text, threadId: taskId, ...sendIdArg(args) }),
@@ -974,99 +826,6 @@ export async function handleToolCall(
       return { success: true, bot: projectBot(result.bot) };
     }
 
-    case "list_channels": {
-      const res = await fleet(fetcher);
-      return { channels: records(res.groups).map(projectChannel) };
-    }
-
-    case "get_channel_messages": {
-      const channelId = idArg(args, "channel_id");
-      const res = await fleet(fetcher);
-      const channel = records(res.groups).find((candidate) => candidate.id === channelId);
-      if (!channel) throw new Error(`Channel not found: ${channelId}`);
-      const taskId = args.task_id === undefined ? String(channel.threadId) : idArg(args, "task_id");
-      if (!taskBelongsTo(channel, taskId)) throw new Error(`Task '${taskId}' does not belong to channel '${channelId}'`);
-      const limit = parsePositiveLimit(args.limit, 30, 200);
-      const page = await fetcher(`/api/threads/${encodeURIComponent(taskId)}/messages?limit=${limit}`);
-      return {
-        channel: projectChannel(channel),
-        taskId,
-        messages: records(page.messages).map(projectMessage),
-        hasMore: Boolean(page.hasMore),
-      };
-    }
-
-    case "send_channel_message": {
-      const channelId = idArg(args, "channel_id");
-      const text = stringArg(args, "text", { trim: true, max: 100_000 });
-      const state = await fleet(fetcher);
-      const channel = records(state.groups).find((candidate) => candidate.id === channelId);
-      if (!channel) throw new Error(`Channel not found: ${channelId}`);
-      const taskId = args.task_id === undefined ? String(channel.threadId) : idArg(args, "task_id");
-      if (!taskBelongsTo(channel, taskId)) {
-        throw new Error(`Task '${taskId}' does not belong to channel '${channelId}'`);
-      }
-      // A server that reports each thread's own state runs them in parallel
-      // and takes a message for any of them; an older one only the active.
-      if (channel.threadId !== taskId && !records(channel.tasks).some((task) => typeof task.working === "boolean")) {
-        throw new Error(`Task '${taskId}' is not active for channel '${channelId}'; switch to it before sending`);
-      }
-      const receipt = await fetcher(`/api/groups/${encodeURIComponent(channelId)}/messages`, {
-        method: "POST",
-        body: JSON.stringify({ text, threadId: taskId, ...sendIdArg(args) }),
-      });
-      return { success: true, channelId, taskId, ...sendReceipt(receipt) };
-    }
-
-    case "create_channel": {
-      const name = stringArg(args, "name", { max: 100 });
-      const memberIds = stringArrayArg(args, "member_ids");
-      const section = optionalStringArg(args, "section", { max: 60 });
-      const bulletin = optionalStringArg(args, "bulletin", { trim: false, allowEmpty: true, max: 12_000 }) ?? "";
-      const requestedResponder = normalizeResponder(args.default_responder);
-      if (requestedResponder?.kind === "member" && !memberIds.includes(requestedResponder.botId)) {
-        throw new ToolInputError("default_responder bot must be a channel member");
-      }
-      const responder = requestedResponder ?? { kind: "member", botId: memberIds[0] };
-      const created = await fetcher("/api/groups", {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          memberIds,
-          ...(section ? { section } : {}),
-          setup: { bulletin, defaultResponder: responder },
-        }),
-      });
-      if (!isRecord(created?.group) || typeof created.group.id !== "string") {
-        throw new Error("OpenMausBot did not return the created channel");
-      }
-      return { success: true, channel: projectChannel(created.group) };
-    }
-
-    case "update_channel": {
-      const channelId = idArg(args, "channel_id");
-      const patch: Record<string, unknown> = {};
-      if (args.name !== undefined) patch.name = stringArg(args, "name", { max: 100 });
-      if (args.member_ids !== undefined) patch.memberIds = stringArrayArg(args, "member_ids");
-      if (args.section !== undefined) patch.section = args.section === null ? null : stringArg(args, "section", { max: 60 });
-      if (args.bulletin !== undefined) patch.bulletin = stringArg(args, "bulletin", { trim: false, allowEmpty: true, max: 12_000 });
-      if (args.default_responder !== undefined) patch.defaultResponder = normalizeResponder(args.default_responder);
-      if (Object.keys(patch).length === 0) throw new ToolInputError("provide at least one channel field to update");
-      const memberIds = patch.memberIds as string[] | undefined;
-      const responder = patch.defaultResponder as Record<string, string> | undefined;
-      if (memberIds && responder?.kind === "member" && !memberIds.includes(responder.botId)) {
-        throw new ToolInputError("default_responder bot must be a channel member");
-      }
-      const result = await fetcher(`/api/groups/${encodeURIComponent(channelId)}`, {
-        method: "PATCH",
-        body: JSON.stringify(patch),
-      });
-      if (!isRecord(result?.group)) {
-        throw new Error("OpenMausBot did not return the updated channel");
-      }
-      return { success: true, channel: projectChannel(result.group) };
-    }
-
     case "create_task": {
       const targetId = idArg(args, "target_id");
       const title = optionalStringArg(args, "title", { max: 80 });
@@ -1075,7 +834,7 @@ export async function handleToolCall(
       if (!isRecord(result?.task) || typeof result.task.threadId !== "string") {
         throw new Error("OpenMausBot did not return the created task");
       }
-      const activeTaskId = result.bot?.threadId ?? result.group?.threadId ?? result.task?.threadId;
+      const activeTaskId = result.bot?.threadId ?? result.task?.threadId;
       return {
         success: true,
         targetType: args.target_type,
@@ -1089,15 +848,13 @@ export async function handleToolCall(
       const taskId = idArg(args, "task_id");
       const route = taskRoute(args.target_type, targetId);
       const result = await fetcher(`${route}/${encodeURIComponent(taskId)}?messages=0`, { method: "POST", body: "{}" });
-      const target = args.target_type === "bot" ? result.bot : result.group;
+      const target = result.bot;
       return {
         success: true,
         targetType: args.target_type,
         targetId,
         taskId,
-        ...(isRecord(target)
-          ? { target: args.target_type === "bot" ? projectBot(target) : projectChannel(target) }
-          : {}),
+        ...(isRecord(target) ? { target: projectBot(target) } : {}),
       };
     }
 
@@ -1121,32 +878,16 @@ export async function handleToolCall(
       };
     }
 
-    case "search_messages": {
-      const query = stringArg(args, "query", { max: 500 });
-      const limit = parsePositiveLimit(args.limit, 40, 100);
-      const params = new URLSearchParams({ q: query, limit: String(limit) });
-      if (args.task_id !== undefined) params.set("threadId", idArg(args, "task_id"));
-      const result = await fetcher(`/api/search?${params.toString()}`);
-      return { hits: records(result.hits) };
-    }
-
     case "wait_for_conversation": {
-      const targetType = args.target_type;
-      if (targetType !== "bot" && targetType !== "channel") {
-        throw new ToolInputError("target_type must be bot or channel");
-      }
+      const targetType = "bot";
       const targetId = idArg(args, "target_id");
       const timeoutSeconds = parsePositiveLimit(args.timeout_seconds, 30, 120);
-      const label = targetType === "bot" ? "Bot" : "Channel";
-      const find = (state: any) => (targetType === "bot" ? records(state.bots) : records(state.groups)).find((candidate) => candidate.id === targetId);
+      const find = (state: any) => records(state.bots).find((candidate) => candidate.id === targetId);
       const state = await fleet(fetcher);
       const target = find(state);
-      if (!target) throw new Error(`${label} not found: ${targetId}`);
+      if (!target) throw new Error(`Bot not found: ${targetId}`);
       const taskId = args.task_id === undefined ? String(target.threadId) : idArg(args, "task_id");
       if (!taskBelongsTo(target, taskId)) throw new Error(`Task '${taskId}' does not belong to ${targetType} '${targetId}'`);
-      // An older server runs a bot's room turns on its selected task.
-      const busyChannel = targetType === "bot" && botTaskState(target, taskId) === target && channelBusyWith(state.groups, targetId);
-      if (busyChannel) throw new Error(`Bot '${targetId}' is working in channel '${busyChannel.id}'; wait on that channel instead`);
       const { job, timedOut } = await waitForJob(fetcher, taskId, {
         scope: args.scope === "turn" ? "turn" : "job", timeoutMs: timeoutSeconds * 1_000, signal, onProgress: hooks.onProgress,
         ...(typeof args.since_ms === "number" ? { since: args.since_ms } : {}),
@@ -1165,7 +906,7 @@ export async function handleToolCall(
         : status !== "settled" && (job.state === "completed" || job.state === "idle") ? status : job.state;
       return {
         status, state: jobState, targetType, targetId, taskId,
-        target: targetType === "bot" ? projectBot(latest) : projectChannel(latest),
+        target: projectBot(latest),
         messages: tail.messages, hasMore: tail.hasMore, job,
       };
     }
@@ -1237,25 +978,14 @@ export async function handleToolCall(
     }
 
     case "interrupt_conversation": {
-      const targetType = args.target_type;
-      if (targetType !== "bot" && targetType !== "channel") {
-        throw new ToolInputError("target_type must be bot or channel");
-      }
+      const targetType = "bot";
       const targetId = idArg(args, "target_id");
       const current = await fleet(fetcher);
-      const target = (targetType === "bot" ? records(current.bots) : records(current.groups))
-        .find((candidate) => candidate.id === targetId);
-      if (!target) throw new Error(`${targetType === "bot" ? "Bot" : "Channel"} not found: ${targetId}`);
+      const target = records(current.bots).find((candidate) => candidate.id === targetId);
+      if (!target) throw new Error(`Bot not found: ${targetId}`);
       const taskId = args.task_id === undefined ? String(target.threadId) : idArg(args, "task_id");
       if (!taskBelongsTo(target, taskId)) throw new Error(`Task '${taskId}' does not belong to ${targetType} '${targetId}'`);
-      if (targetType === "bot") {
-        const busyChannel = botTaskState(target, taskId) === target && channelBusyWith(current.groups, targetId);
-        if (busyChannel) {
-          throw new Error(`Bot '${targetId}' is working in channel '${busyChannel.id}'; interrupt that channel instead`);
-        }
-      }
-      const route = targetType === "bot" ? "bots" : "groups";
-      await fetcher(`/api/${route}/${encodeURIComponent(targetId)}/interrupt`, {
+      await fetcher(`/api/bots/${encodeURIComponent(targetId)}/interrupt`, {
         method: "POST",
         body: JSON.stringify({ threadId: taskId }),
       });

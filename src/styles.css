@@ -124,7 +124,7 @@
   --animate-spot-in: spot-in 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
   /* onboarding: a surface reacting once to an event (a routine firing) */
   --animate-ripple: ripple 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
-  /* onboarding: a bolt travelling from a webhook address to the bot */
+  /* onboarding motion */
   --animate-bolt: bolt 0.9s cubic-bezier(0.77, 0, 0.175, 1) infinite;
 
   /* Defaults = Midnight. Kept here so the app is never unstyled. */
@@ -788,7 +788,7 @@
   vertical-align: middle;
 }
 
-/* Plain-text message bodies (user turns, webhook tasks, error fallbacks) are
+/* Plain-text message bodies (user turns and error fallbacks) are
    written in whatever language the person used, which is independent of the
    UI language. `plaintext` resolves direction per line from its own first
    strong character, so a pasted block that mixes an Arabic sentence with an
@@ -1220,7 +1220,7 @@ body {
    Unlayered, so it wins over the resting `border-hairline/40` every field
    carries as well as over a faint per-file `focus:border-*`. --color-focus
    clears 3:1 on every field surface (pnpm check:contrast). A borderless
-   field, such as the composer or a find bar, has no border to paint and is
+   field, such as the composer, has no border to paint and is
    left as it was; its rounded wrapper takes `focus-within:border-focus`.
    A field reporting an error (aria-invalid) keeps its danger border, so the
    red does not vanish while the user is fixing it. */

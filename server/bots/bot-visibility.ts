@@ -271,7 +271,6 @@ export interface StreamSeen {
 
 export interface FrameContext {
   visible: VisibleSet;
-  webhookBot: (webhookId: string) => string | undefined;
   freshBot: (botId: string) => Record<string, unknown> | undefined;
   freshGroup: (groupId: string) => Record<string, unknown> | undefined;
 }
@@ -376,12 +375,6 @@ export function frameForMember(payload: Record<string, unknown>, ctx: FrameConte
       const run = field("run");
       return routineVisible(run, visible) ? payload : undefined;
     }
-    case "webhook":
-      return visible.bot(str(field("webhook").botId)) ? payload : undefined;
-    case "webhook.attempt": {
-      const botId = ctx.webhookBot(str(field("attempt").webhookId));
-      return botId && visible.bot(botId) ? payload : undefined;
-    }
     case "runtime":
       return visible.thread(str(field("event").threadId)) ? payload : undefined;
     case "screen":
@@ -391,7 +384,6 @@ export function frameForMember(payload: Record<string, unknown>, ctx: FrameConte
       return visible.bot(str(payload.botId)) ? payload : undefined;
     case "config":
     case "routine.deleted":
-    case "webhook.deleted":
       return payload;
     default:
       // A frame kind added later is sent only when it names nothing hidden.

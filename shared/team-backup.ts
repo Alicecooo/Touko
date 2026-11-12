@@ -4,8 +4,8 @@ import { CONNECTOR_SLUG_PATTERN, CONNECTOR_TOOL_NAME_PATTERN } from "./wire.ts";
 import { parseToolScope, type ToolScope } from "./tool-scope.ts";
 
 export const MAX_TEAM_BACKUP_BYTES = 50 * 1024 * 1024;
-export const TEAM_BACKUP_CONTENTS = "Bot profiles, instructions, sections, rooms, playbooks, routines, each bot's memory (MEMORY.md, topic notes and daily logs) and conversation text (all tasks and branches).";
-export const TEAM_BACKUP_EXCLUSIONS = "Files, images, custom avatars, account connections, model settings and permissions are not included. Action cards are saved as text. Memory is saved with secrets removed. Imported routines start paused.";
+export const TEAM_BACKUP_CONTENTS = "Bot profiles, instructions, sections, groups, playbooks, routines, each bot's memory (MEMORY.md, topic notes and daily logs) and each bot's conversation text.";
+export const TEAM_BACKUP_EXCLUSIONS = "Group conversations and group runtime settings are not included. Files, images, custom avatars, account connections, model settings and permissions are not included. Action cards are saved as text. Memory is saved with secrets removed. Imported routines start paused.";
 
 const key = z.string().min(1).max(200);
 const name = z.string().trim().min(1).max(200);
@@ -19,7 +19,6 @@ const message = z.object({
   parentId: key.nullable(),
   replyToId: key.optional(),
   from: z.object({ botId: key, name, color: z.string().max(40) }).optional(),
-  peerPost: z.object({ unattended: z.boolean().optional() }).optional(),
 });
 const task = z.object({
   key,
@@ -32,8 +31,6 @@ const task = z.object({
   closedBy: z.object({ botId: key, name, at: timestamp }).optional(),
   /** Only true travels; absence is unpinned. */
   pinned: z.literal(true).optional(),
-  /** A conversation's own turn ceiling. Absence keeps the group default. */
-  turnTimeoutMinutes: z.number().int().min(1).max(1_440).optional(),
   activeLeafId: key.nullable(),
   messages: z.array(message).max(100_000),
 });
@@ -74,19 +71,6 @@ const connectorTools = z.record(
   z.object({ tools: z.union([z.literal("*"), z.array(z.string().regex(CONNECTOR_TOOL_NAME_PATTERN)).min(1).max(500)]) }),
 );
 
-/** A responder kind from a newer release restores as the room's first
- * member as lead (what a room without one does) instead of refusing the
- * whole backup. Malformed values still fail the schema. */
-function knownRoomResponder(value: unknown): unknown {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-  const group = value as { memberIds?: unknown; defaultResponder?: unknown };
-  const kind = group.defaultResponder && typeof group.defaultResponder === "object"
-    ? (group.defaultResponder as { kind?: unknown }).kind : undefined;
-  if (typeof kind !== "string" || ["member", "everyone", "mentions", "auto"].includes(kind)) return value;
-  const first = Array.isArray(group.memberIds) && typeof group.memberIds[0] === "string" ? group.memberIds[0] : undefined;
-  return { ...group, defaultResponder: first ? { kind: "member", botId: first } : { kind: "mentions" } };
-}
-
 const backupSchema = z.object({
   format: z.literal("openmaus.backup"),
   version: z.literal(1),
@@ -110,21 +94,15 @@ const backupSchema = z.object({
     helperModel: z.boolean().optional(),
     memory: memory.optional(),
   })).min(1).max(200),
-  groups: z.array(z.preprocess(knownRoomResponder, z.object({
-    ...owner,
+  groups: z.array(z.object({
+    key,
+    name,
+    section: z.string().max(200).optional(),
     memberIds: z.array(key).max(200),
-    dm: z.boolean(),
-    bulletin: z.string().max(200_000),
-    defaultResponder: z.discriminatedUnion("kind", [
-      z.object({ kind: z.literal("member"), botId: key }),
-      z.object({ kind: z.literal("everyone") }),
-      z.object({ kind: z.literal("mentions") }),
-      z.object({ kind: z.literal("auto"), fallbackBotId: key.optional() }),
-    ]),
-  }))).max(2_000),
+  })).max(2_000),
   routines: z.array(z.object({
     name, prompt: z.string().trim().min(1).max(200_000),
-    target: z.enum(["bot", "room-goal"]), botId: key, groupId: key.optional(),
+    target: z.literal("bot"), botId: key,
     runOn: z.enum(["maus", "cloud"]), schedule,
     durationMinutes: z.number().finite().positive(),
     timeoutMinutes: z.number().int().min(5).max(240).optional(),
@@ -149,7 +127,7 @@ export function parseTeamBackup(input: unknown): TeamBackup {
     return set;
   };
   const bots = unique(backup.bots.map((bot) => bot.key), "bot key");
-  const groups = unique(backup.groups.map((group) => group.key), "room key");
+  unique(backup.groups.map((group) => group.key), "group key");
   const chiefs = new Set<string>();
   for (const bot of backup.bots) {
     if (!bot.chiefOfStaff) continue;
@@ -161,24 +139,11 @@ export function parseTeamBackup(input: unknown): TeamBackup {
   for (const group of backup.groups) {
     if (group.memberIds.some((id) => !bots.has(id))) throw new Error("Invalid backup: unknown room member");
     unique(group.memberIds, "room member");
-    const lead = group.defaultResponder.kind === "member" ? group.defaultResponder.botId
-      : group.defaultResponder.kind === "auto" ? group.defaultResponder.fallbackBotId : undefined;
-    if (lead !== undefined && !group.memberIds.includes(lead)) {
-      throw new Error("Invalid backup: room responder is not a member");
-    }
-    if (group.dm && (group.memberIds.length !== 2 || group.tasks.length !== 1)) throw new Error("Invalid backup: invalid direct-message room");
   }
   for (const routine of backup.routines) {
     if (!bots.has(routine.botId)) throw new Error("Invalid backup: unknown routine bot");
-    if (routine.target === "room-goal") {
-      if (routine.runOn !== "maus") throw new Error("Invalid backup: room goals must run on this computer");
-      const group = backup.groups.find((candidate) => candidate.key === routine.groupId);
-      if (!groups.has(routine.groupId ?? "") || !group || group.dm || !group.memberIds.includes(routine.botId)) {
-        throw new Error("Invalid backup: unknown routine room or coordinator");
-      }
-    }
   }
-  for (const entry of [...backup.bots, ...backup.groups]) {
+  for (const entry of backup.bots) {
     const tasks = unique(entry.tasks.map((task) => task.key), "task key");
     if (!tasks.has(entry.activeTask)) throw new Error("Invalid backup: unknown active task");
     for (const task of entry.tasks) {

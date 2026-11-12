@@ -269,7 +269,7 @@ export async function exportVerb(ctx: VerbContext): Promise<VerbOutcome> {
   let threadId = target.taskId;
   if (!threadId) {
     const fleet = await client.json<Rec>("/api/bots?messages=0");
-    threadId = (target.type === "bot" ? fleet.bots : fleet.groups)?.find((record: Rec) => record.id === target.id)?.threadId;
+    threadId = fleet.bots?.find((record: Rec) => record.id === target.id)?.threadId;
     if (!threadId) throw new HeadlessError(`no conversation found for ${target.name ?? target.id}`, EXIT.usage);
   }
   const manifest = await exportJob(client, { ...options, threadId }, ctx.output);

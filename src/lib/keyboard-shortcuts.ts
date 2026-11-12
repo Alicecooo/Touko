@@ -40,12 +40,6 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
         macKeys: ["⌘", "⇧", "[ / ]"],
         winKeys: ["Ctrl", "Shift", "[ / ]"],
       },
-      {
-        id: "find-conversation",
-        description: "Find in conversation",
-        macKeys: ["⌘", "F"],
-        winKeys: ["Ctrl", "F"],
-      },
     ],
   },
   {
@@ -71,7 +65,7 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       },
       {
         id: "close-panel",
-        description: "Close active drawer, modal, or find bar",
+        description: "Close active drawer or modal",
         macKeys: ["Esc"],
         winKeys: ["Esc"],
       },
@@ -86,12 +80,6 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
   {
     category: "Management & Groups",
     items: [
-      {
-        id: "save-bulletin",
-        description: "Save group instruction changes",
-        macKeys: ["⌘", "Return"],
-        winKeys: ["Ctrl", "Enter"],
-      },
       {
         id: "reorder-section",
         description: "Reorder sidebar sections (focus a section heading)",

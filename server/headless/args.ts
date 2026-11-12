@@ -36,7 +36,6 @@ const GLOBAL = {
 
 const TARGET = {
   bot: { type: "string" },
-  channel: { type: "string" },
   thread: { type: "string" },
   task: { type: "string" },
 } satisfies ParseArgsOptionsConfig;
@@ -56,11 +55,9 @@ const WAITING = {
 const VERBS: Record<string, { options: ParseArgsOptionsConfig; positionals: number }> = {
   doctor: { options: { wait: { type: "string" } }, positionals: 0 },
   bots: { options: {}, positionals: 0 },
-  channels: { options: {}, positionals: 0 },
   models: { options: {}, positionals: 0 },
   messages: { options: { ...TARGET, limit: { type: "string" } }, positionals: 1 },
   send: { options: { ...TARGET, ...TEXT, "send-id": { type: "string" }, "dry-run": { type: "boolean" } }, positionals: 2 },
-  "send-channel": { options: { ...TARGET, ...TEXT, "send-id": { type: "string" }, "dry-run": { type: "boolean" } }, positionals: 2 },
   run: {
     options: { ...TARGET, ...TEXT, ...WAITING, title: { type: "string" }, wait: { type: "string" }, export: { type: "string" }, force: { type: "boolean" },
       "send-id": { type: "string" } },
@@ -73,7 +70,6 @@ const VERBS: Record<string, { options: ParseArgsOptionsConfig; positionals: numb
       model: { type: "string" }, instance: { type: "string" }, effort: { type: "string" } },
     positionals: 1,
   },
-  "new-channel": { options: { name: { type: "string" }, members: { type: "string" }, team: { type: "string" }, section: { type: "string" } }, positionals: 1 },
   "set-model": { options: { ...TARGET, model: { type: "string" }, instance: { type: "string" }, effort: { type: "string" }, "dry-run": { type: "boolean" } }, positionals: 1 },
   edit: { options: { ...TARGET, ...TEXT, message: { type: "string" }, "dry-run": { type: "boolean" } }, positionals: 2 },
   export: {
@@ -111,7 +107,7 @@ export const HEADLESS_VERBS: ReadonlySet<string> = new Set(Object.keys(VERBS).ma
 
 /** Verbs that change something; control-omb refuses them on a discovered server. */
 export const MUTATING_VERBS: ReadonlySet<string> = new Set([
-  "send", "send-channel", "run", "interrupt", "new-bot", "new-channel", "set-model", "edit", "team apply", "engine set",
+  "send", "run", "interrupt", "new-bot", "set-model", "edit", "team apply", "engine set",
 ]);
 
 export type Flags = Record<string, string | boolean | string[] | undefined>;

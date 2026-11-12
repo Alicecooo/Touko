@@ -53,23 +53,17 @@ export const HELP = `control-omb — the openmausbot headless verbs (docs/headle
 read-only (every verb also takes --url URL):
   doctor
   bots
-  channels
   models
   messages --bot ID [--task ID] [--limit 30]
-  messages --channel ID [--task ID] [--limit 30]
   wait --bot ID [--task ID] [--timeout 30] [--for job|turn]
-  wait --channel ID [--task ID] [--timeout 30]
   export --thread ID --out DIR
   events --job THREAD_ID --until-settled
 
 mutating (an explicit --url or OPENMAUSBOT_URL/OMB_PORT is required):
   new-bot --name NAME [--section TEAM]
-  new-channel --name NAME --members ID,ID
   send --bot ID --text TEXT [--task ID] [--dry-run]
-  send-channel --channel ID --text TEXT [--task ID] [--dry-run]
   run --bot ID --text TEXT [--wait job|turn|none] [--timeout 5m] [--export DIR]
   interrupt --bot ID [--task ID] [--tree] [--dry-run]
-  interrupt --channel ID [--task ID] [--dry-run]
   edit --bot ID --message ID --text TEXT [--task ID] [--dry-run]
   set-model --bot ID --instance ID --model ID [--task ID] [--effort LEVEL] [--dry-run]
   team apply FILE [--dry-run | --check]
@@ -153,7 +147,6 @@ export function verificationServerEnvironment(parentEnv: NodeJS.ProcessEnv, data
     HERMES_HOME: join(dataDir, ".hermes"),
     OMB_DATA_DIR: dataDir,
     OMB_PORT: String(port),
-    OMB_WEBHOOK_PORT: String(port + 1),
     // A caller's FAKE_CLAUDE_MODE overrides this below to drive failure paths.
     FAKE_CLAUDE_MODE: parentEnv.FAKE_CLAUDE_MODE || "happy",
     FAKE_CLAUDE_DUMP: join(dataDir, "fake-claude-dump.json"),
@@ -213,7 +206,8 @@ export async function launchVerificationServer(
   /** A stand-in enterprise layer (the folder shape core loads) and the key
    * it should accept, so a recipe can prove entitled behaviour offline. */
   enterprise?: { dir: string; licenseKey: string },
-  room?: { scripted: boolean },
+  /** Legacy fixture slot retained for callers; group conversations are no longer provisioned. */
+  _room?: { scripted: boolean },
   /** Optional repository-owned fake providers for multi-engine setup checks. */
   extraProviders: Array<"codex" | "cline"> = [],
   /** Programmatic tests only: an owned loopback Boat provider, never a live account. */
@@ -266,7 +260,6 @@ export async function launchVerificationServer(
         driver: "claudeAgent",
         displayName: "Verification fixture",
         config: { cli: FAKE_CLI },
-        ...(room?.scripted ? { environment: { FAKE_CLAUDE_ROOM_PLAN: join(dataDir, "room-plan.json") } } : {}),
       },
     },
   }, null, 2));

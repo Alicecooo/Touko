@@ -1,10 +1,8 @@
 
-
 export interface FeatureFlagConfig {
-  features?: { skillAuthoring?: boolean; showToolCalls?: boolean; sharedComputers?: boolean; claudeUserMcp?: boolean; claudeUserSkills?: boolean; routinesInConversation?: boolean; llmThreadTitles?: boolean; skillsLibrary?: boolean; shareLearnedSkills?: "off" | "ask" | "auto"; roomMemoryCapture?: boolean };
+  features?: { skillAuthoring?: boolean; showToolCalls?: boolean; sharedComputers?: boolean; claudeUserMcp?: boolean; claudeUserSkills?: boolean; routinesInConversation?: boolean; llmThreadTitles?: boolean; skillsLibrary?: boolean; shareLearnedSkills?: "off" | "ask" | "auto" };
 
 }
-
 export function skillAuthoringEnabled(config: FeatureFlagConfig | null | undefined): boolean {
   return config?.features?.skillAuthoring !== false;
 }
@@ -42,6 +40,3 @@ export function shareLearnedSkillsMode(config: FeatureFlagConfig | null | undefi
   return config?.features?.shareLearnedSkills ?? "ask";
 }
 
-export function roomMemoryCaptureEnabled(config: FeatureFlagConfig | null | undefined): boolean {
-  return config?.features?.roomMemoryCapture === true;
-}

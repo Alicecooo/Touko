@@ -11,16 +11,15 @@ export function latestRoutineRun(routineId: string, runs: readonly RoutineRun[])
 }
 
 export function routineRunLabel(run: RoutineRun): string {
-  if (run.goalStatus) return t(`routines.goal.${run.goalStatus}`);
   const status = t(`routines.status.${run.status}`);
   return run.retried && run.status !== "queued" ? t(`routines.retried.${run.retried}`, { status }) : status;
 }
 
 export function routineRunTone(run: RoutineRun): string {
-  if (run.status === "waiting" || ["needs-input", "limit-reached", "paused"].includes(run.goalStatus ?? "")) return "text-warning";
-  if (["failed", "missed"].includes(run.status) || ["failed", "blocked"].includes(run.goalStatus ?? "")) return "text-danger";
+  if (run.status === "waiting") return "text-warning";
+  if (["failed", "missed"].includes(run.status)) return "text-danger";
   if (run.status === "running") return "text-accent";
-  if (run.status === "completed" && (!run.goalStatus || run.goalStatus === "completed")) return "text-success";
+  if (run.status === "completed") return "text-success";
   return "text-ink-secondary";
 }
 
@@ -42,11 +41,10 @@ export function routineNextLabel(routine: Routine): string {
   return routine.nextRunAt == null ? t("routines.noNextRun") : t("routines.nextRun", { time: routineDateTime(routine.nextRunAt) });
 }
 
-export function routineRunsOn({ roomGoal, runOn, computer, cloudHome }: {
-  roomGoal: boolean; runOn?: string; computer?: string | null; cloudHome: boolean;
+export function routineRunsOn({ runOn, computer, cloudHome }: {
+  runOn?: string; computer?: string | null; cloudHome: boolean;
 }): { label: string; hint: string } {
   const hint = t(cloudHome ? "routines.runsOn.cloudHomeHint" : "routines.runsOn.localHint");
-  if (roomGoal) return { label: t(cloudHome ? "routines.runsOn.teamCloudHome" : "routines.runsOn.team"), hint };
   if (runOn === "cloud") return { label: t("routines.runsOn.boat"), hint: t(cloudHome ? "routines.runsOn.boatHintCloudHome" : "routines.runsOn.boatHint") };
   if (computer === "cloud") return { label: t("routines.runsOn.botCloud"), hint };
   if (computer === "vm" && !cloudHome) return { label: t("routines.runsOn.botVm"), hint };

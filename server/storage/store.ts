@@ -28,7 +28,7 @@ import type { GroupGoalRunCardData } from "../../shared/group-goal-run.ts";
 import { isMentionBoundary, isMentionNameContinuation } from "../../shared/mention-boundary.ts";
 import { roomHomeThreadId } from "../teams/room-home.ts";
 import type { HandedState } from "../agent/delta-context.ts";
-import type { AgentPart, PartPair, RoomPart } from "../packages/package-parts.ts";
+import type { AgentPart, PartPair } from "../packages/package-parts.ts";
 import type { BotActivity, GroupDefaultResponder, GroupTask as GroupTaskRecord, MausColor, OptionCardData, TaskClosedBy, TaskOpenedBy, TaskUsage, WireBot, WireGroup, WireMessage, WireTask, BotProject as BotProjectRecord } from "../../shared/wire.ts";
 import { movesThreadToTop } from "../../shared/wire.ts";
 import { parseConnectorTools } from "../integrations/connector-tools.ts";
@@ -47,7 +47,7 @@ export interface GroupPackageStamp {
   installId: string;
   key: string;
   memberKeys: string[];
-  parts: Record<RoomPart, PartPair>;
+  parts: Record<string, PartPair>;
 }
 
 export type GroupRecord = Omit<WireGroup, "working" | "usage"> & {
@@ -75,7 +75,7 @@ export interface TaskRecord extends Omit<WireTask, TaskWireDerivedKeys> {
   lastContextModel?: string;
   /** Absent (legacy) may be a person's choice: only an "auto" pin yields to a Works on change. */
   surfaceSource?: "user" | "auto";
-  /** Epoch ms a person last wrote here: never a teammate, routine, webhook, the bot itself or a Slack relay. */
+  /** Epoch ms a person last wrote here: never a teammate, routine, the bot itself or a Slack relay. */
   askedAt?: number;
 }
 
@@ -1012,7 +1012,7 @@ export class Store {
     );
   }
 
-  patchGroup(id: string, patch: Partial<Pick<GroupRecord, "name" | "memberIds" | "defaultResponder" | "bulletin" | "unread" | "lastReadMessageId" | "busyBotId" | "cwd" | "pinnedMessageId" | "section" | "setupCompletedAt" | "setupSkippedAt" | "audienceFloor" | "installedPackage" | "turnTimeoutMinutes" | "holds" | "heldMessages">>): GroupRecord | null {
+  patchGroup(id: string, patch: Partial<Pick<GroupRecord, "name" | "memberIds" | "defaultResponder" | "bulletin" | "unread" | "lastReadMessageId" | "busyBotId" | "cwd" | "pinnedMessageId" | "section" | "setupCompletedAt" | "setupSkippedAt" | "audienceFloor" | "installedPackage" | "holds" | "heldMessages">>): GroupRecord | null {
     const group = this.group(id);
     if (!group) return null;
     if (Object.prototype.hasOwnProperty.call(patch, "section")) {
@@ -1023,9 +1023,6 @@ export class Store {
     if (Object.prototype.hasOwnProperty.call(patch, "busyBotId")) {
       if (patch.busyBotId && patch.busyBotId !== previousBusyBotId) group.turnStartedAt = Date.now();
       else if (!patch.busyBotId) delete group.turnStartedAt;
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "turnTimeoutMinutes") && patch.turnTimeoutMinutes == null) {
-      delete group.turnTimeoutMinutes;
     }
     if (!group.dm && Object.prototype.hasOwnProperty.call(patch, "pinnedMessageId")) {
       const active = this.activeGroupTask(group.id);
@@ -1170,16 +1167,6 @@ export class Store {
     if (!task) return null;
     if (pinned) task.pinned = true;
     else delete task.pinned;
-    this.saveGroups();
-    this.emit({ type: "group", groupId });
-    return task;
-  }
-
-  setGroupTaskTurnTimeout(groupId: string, threadId: string, minutes: number | null): GroupTaskRecord | null {
-    const task = this.groupTaskByThread(groupId, threadId);
-    if (!task) return null;
-    if (minutes == null) delete task.turnTimeoutMinutes;
-    else task.turnTimeoutMinutes = minutes;
     this.saveGroups();
     this.emit({ type: "group", groupId });
     return task;
@@ -1488,7 +1475,8 @@ export class Store {
       description: profile.description ?? "",
       notifications: true,
       color: profile.color ?? COLORS[this.bots.length % COLORS.length],
-      ...(profile.mascotExpression ? { mascotExpression: profile.mascotExpression } : {}),      // Restricted from its first frame: no one else is ever told it exists.
+      ...(profile.mascotExpression ? { mascotExpression: profile.mascotExpression } : {}),
+      // Restricted from its first frame: no one else is ever told it exists.
       ...(profile.visibility && profile.visibility !== "everyone" ? { visibility: structuredClone(profile.visibility) } : {}),
       ...(toolScope.scope ? { toolScope: toolScope.scope } : {}),
       unread: false,

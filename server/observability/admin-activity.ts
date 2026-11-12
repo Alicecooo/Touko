@@ -9,7 +9,7 @@ import { actorLabel, boundRetentionDays, pruneMonthFiles, type DecisionActor, ty
 import { redactSecrets } from "../security/redact.ts";
 import { csvCell, monthKey } from "../usage/usage-ledger.ts";
 
-export const ADMIN_ACTIVITY_CATEGORIES = ["config", "people", "session", "webhook", "mcp", "engine", "bot", "budget", "visibility"] as const;
+export const ADMIN_ACTIVITY_CATEGORIES = ["config", "people", "session", "mcp", "engine", "bot", "budget", "visibility"] as const;
 export type AdminActivityCategory = typeof ADMIN_ACTIVITY_CATEGORIES[number];
 
 export type AdminActor = DecisionActor | { kind: "cli" };
@@ -18,7 +18,7 @@ export interface AdminActionRow {
   at: string;
   category: AdminActivityCategory;
   /** `<thing>.<verb>`: config.update, people.update, bot.create, bot.update,
-   * bot.delete, visibility.update, webhook.create, session.revoke, … */
+   * bot.delete, visibility.update, session.revoke, … */
   action: string;
   target?: { kind: string; id?: string; name?: string };
   /** The setting paths or fields that changed. Never their secret values. */

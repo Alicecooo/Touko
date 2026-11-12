@@ -34,7 +34,7 @@ async function freePorts(count) {
 
 const staging = mkdtempSync(join(tmpdir(), "omb-smoke-"));
 const home = mkdtempSync(join(tmpdir(), "omb-smoke-home-"));
-const [port, webhookPort] = await freePorts(2);
+const [port] = await freePorts(1);
 
 // OMB_SMOKE_DIST lets the release workflow aim this at a packaged app's
 // Resources/server tree instead of the repo build.
@@ -60,7 +60,6 @@ const fixtureEnv = {
   XDG_DATA_HOME: join(home, ".local", "share"),
   OMB_DATA_DIR: join(home, ".openmausbot"),
   OMB_PORT: String(port),
-  OMB_WEBHOOK_PORT: String(webhookPort),
   // Not a genuine key: enough to make the server look for its enterprise layer.
   OMB_LICENSE_KEY: "omb1.not.real",
 };
@@ -100,14 +99,6 @@ while (Date.now() < deadline) {
   } catch {
   }
   await new Promise((resolve) => setTimeout(resolve, 300));
-}
-
-let searchReport = null;
-if (listening) {
-  try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/search?q=packaged-worker-probe`, { signal: AbortSignal.timeout(10_000) });
-    searchReport = { status: response.status, body: await response.json() };
-  } catch (error) { searchReport = { error: String(error) }; }
 }
 
 // Bundling relocates import.meta.url, so a proxy's sibling paths can resolve one
@@ -247,10 +238,10 @@ if (listening) {
 let launcherReport = null;
 if (listening && process.platform !== "win32") {
   const launcherHome = mkdtempSync(join(tmpdir(), "omb-smoke-launcher-"));
-  const [launcherPort, launcherWebhookPort] = await freePorts(2);
+  const [launcherPort] = await freePorts(1);
   const launcher = spawn(process.execPath, [join(staging, "server", "server-launcher.js")], {
     cwd: staging,
-    env: { ...fixtureEnv, HOME: launcherHome, USERPROFILE: launcherHome, OMB_DATA_DIR: join(launcherHome, ".openmausbot"), OMB_PORT: String(launcherPort), OMB_WEBHOOK_PORT: String(launcherWebhookPort) },
+    env: { ...fixtureEnv, HOME: launcherHome, USERPROFILE: launcherHome, OMB_DATA_DIR: join(launcherHome, ".openmausbot"), OMB_PORT: String(launcherPort) },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let launcherOutput = "";
@@ -298,11 +289,11 @@ if (listening) {
   desktopEntryReport = { starts: [] };
   try {
     for (let round = 0; round < 2; round++) {
-      const [entryPort, entryWebhookPort] = await freePorts(2);
+      const [entryPort] = await freePorts(1);
       const entry = spawn(process.execPath, [join(staging, "server", "desktop-entry.mjs")], {
         cwd: staging,
         env: { ...fixtureEnv, HOME: entryHome, USERPROFILE: entryHome, OMB_DATA_DIR: join(entryHome, ".openmausbot"),
-          OMB_PORT: String(entryPort), OMB_WEBHOOK_PORT: String(entryWebhookPort), OMB_SERVER_COMPILE_CACHE: cacheDir },
+          OMB_PORT: String(entryPort), OMB_SERVER_COMPILE_CACHE: cacheDir },
         stdio: ["ignore", "pipe", "pipe"],
       });
       let entryOutput = "";
@@ -355,11 +346,6 @@ if (!listening) {
   console.error(`the packaged server never served /api/health on port ${port}.`);
   console.error(`exit code: ${child.exitCode}`);
   console.error(output.trim() || "(no output)");
-  process.exit(1);
-}
-
-if (searchReport?.status !== 200 || !Array.isArray(searchReport.body?.hits)) {
-  console.error("The packaged read-only search worker did not respond:", searchReport);
   process.exit(1);
 }
 

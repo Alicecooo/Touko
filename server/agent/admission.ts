@@ -6,7 +6,7 @@ export type AdmissionSurface =
   | "room" // room send while the channel works: always queue
   | "room-steer" // manual steer of a queued room message: head only
   | "guarded" // guarded external send: refuse when anything is busy
-  | "unattended" // routines/webhooks: busy means a missed run
+  | "unattended" // routines: busy means a missed run
   | "peer" // delegations and resume drains: slot-aware admission
   | "opened-thread" // a bot's self-opened thread: queue behind a slot
   | "incident"; // a report to the Chief's incidents thread: never refused

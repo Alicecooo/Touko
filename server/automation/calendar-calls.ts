@@ -30,7 +30,6 @@ export interface CalendarCall {
   schedule: CalendarCallSchedule;
   durationMinutes: number;
   attachments: CalendarCallAttachment[];
-  roomId?: string;
   nextRunAt: number | null;
   createdAt: number;
   updatedAt: number;
@@ -59,7 +58,7 @@ interface CalendarCallFile {
   calls: CalendarCall[];
 }
 
-const MAX_BOTS = 100;
+const MAX_BOTS = 1;
 const MAX_ATTACHMENTS = 50;
 
 const scheduleSchema = z.discriminatedUnion("type", [
@@ -85,7 +84,6 @@ const callSchema = z.object({
   schedule: scheduleSchema,
   durationMinutes: z.number().int().min(5).max(240),
   attachments: z.array(attachmentSchema).max(MAX_ATTACHMENTS),
-  roomId: z.string().min(1).optional(),
   nextRunAt: z.number().finite().nonnegative().nullable().optional(),
   createdAt: z.number().finite().nonnegative(),
   updatedAt: z.number().finite().nonnegative(),
@@ -99,12 +97,6 @@ function cloneSchedule(schedule: CalendarCallSchedule): CalendarCallSchedule {
   return schedule.type === "once"
     ? { type: "once", at: schedule.at }
     : { type: "daily", time: schedule.time, weekdays: [...schedule.weekdays] };
-}
-
-function sameRoster(left: readonly string[], right: readonly string[]): boolean {
-  if (left.length !== right.length) return false;
-  const wanted = new Set(left);
-  return right.every((id) => wanted.has(id));
 }
 
 function cloneCall(call: CalendarCall): CalendarCall {
@@ -145,7 +137,7 @@ function cleanAttachments(value: CalendarCallAttachment[] | undefined): Calendar
 function cleanInput(
   input: CalendarCallInput,
   botExists: CalendarCallManagerOptions["botExists"],
-): Omit<CalendarCall, "id" | "roomId" | "nextRunAt" | "createdAt" | "updatedAt"> {
+): Omit<CalendarCall, "id" | "nextRunAt" | "createdAt" | "updatedAt"> {
   const name = String(input.name ?? "").trim().slice(0, 120);
   const description = String(input.description ?? "").trim().slice(0, 20_000);
   if (!name) throw new Error("Give the call a title");
@@ -196,7 +188,7 @@ export class CalendarCallManager {
             const nextRunAt = call.data.nextRunAt === undefined
               ? this.loadedOccurrence(call.data.schedule)
               : call.data.nextRunAt;
-            return [cloneCall({ ...call.data, nextRunAt })];
+            return [cloneCall({ ...call.data, botIds: call.data.botIds.slice(0, 1), nextRunAt })];
           })
         : [];
     } catch {
@@ -250,7 +242,6 @@ export class CalendarCallManager {
     const updated: CalendarCall = {
       id: previous.id,
       ...clean,
-      roomId: patch.botIds && !sameRoster(clean.botIds, previous.botIds) ? undefined : previous.roomId,
       nextRunAt: this.initialOccurrence(clean.schedule, this.now()),
       createdAt: previous.createdAt,
       updatedAt: this.now(),
@@ -260,16 +251,6 @@ export class CalendarCallManager {
     });
     if (this.timer) queueMicrotask(() => void this.tick());
     return cloneCall(updated);
-  }
-
-  linkRoom(id: string, roomId: string): CalendarCall {
-    const call = this.calls.find((candidate) => candidate.id === id);
-    if (!call) throw new Error("Call not found");
-    if (call.roomId === roomId) return cloneCall(call);
-    this.commit(() => {
-      call.roomId = roomId;
-    });
-    return cloneCall(call);
   }
 
   remove(id: string): boolean {

@@ -1,16 +1,14 @@
 import type { WireBot, WireGroup, WireTask } from "../../shared/wire.ts";
 import { ATTACHMENTS_DIR, extensionForMime, FILE_MAX_BYTES, IMAGE_MAX_BYTES, parseAudioRange, readAttachment, saveFile, saveImageUpload, validateAttachmentUploadId, type SavedAttachment } from "../workspace/attachments.ts";
 import { deliveredCopy } from "../bots/bot-attachment.ts";
-import { memberBot, memberGroup, type Viewer, type VisibleSet } from "../bots/bot-visibility.ts";
+import { memberBot, type Viewer, type VisibleSet } from "../bots/bot-visibility.ts";
 import type { ComputerControl } from "../computers/computer-control.ts";
 import type { AppConfig } from "../config/config.ts";
 import type { Coordinator } from "../teams/coordinator.ts";
 import type { ModelSelection } from "../harness/contracts.ts";
-import type { WorkspaceAccess } from "../deployment/enterprise.ts";
 import type { GroupUsageReader } from "../teams/group-thread-usage.ts";
-import { searchMessagesAsync } from "../storage/message-db.ts";
 import { listMessageFolder, messageAttachmentName, messageFileDisposition, messageFileDownloadName, messageFolderEntryName, messageImageTargetAt, messageReferencesFile, openMessageFile, openMessageFolderEntry, referencedFileName } from "../storage/message-file.ts";
-import { resolveRequestAuth, type RequestAuth, type ResolveOptions } from "../auth/request-auth.ts";
+import type { RequestAuth, ResolveOptions } from "../auth/request-auth.ts";
 import type { queuedSteerSnapshot } from "../teams/steer-queue.ts";
 import type { BotRecord, GroupRecord, Message, Store, TaskRecord } from "../storage/store.ts";
 import { createJobRoutes } from "./jobs.ts";
@@ -27,14 +25,6 @@ export interface ThreadRouteDeps {
   cfg: Pick<AppConfig, "profile">;
   sessions: ResolveOptions["sessions"];
   groupUsageReader: Pick<GroupUsageReader, "refresh">;
-  hostedWorkspace: boolean;
-  sessionCookie: string;
-  loopback: { trust: ResolveOptions["loopbackTrust"]; localBrowsers: boolean };
-  lendingEnabled(): boolean;
-  workspaceAccess(): WorkspaceAccess | null;
-  desktopMutationToken(): string | undefined;
-  
-  cliOwnerToken(): string | undefined;
   defaultPage: number;
   pageSize(raw: string | null): number | null | undefined;
   messagePage(threadId: string, limit: number | undefined, before?: string | null): MessagePage;
@@ -50,15 +40,11 @@ export interface ThreadRouteDeps {
 }
 
 export function createThreadRoutes(deps: ThreadRouteDeps): RouteHandler {
-  const {store, cfg, sessions, groupUsageReader, lendingEnabled, hostedWorkspace: HOSTED_WORKSPACE, sessionCookie: SESSION_COOKIE, loopback: LOOPBACK, defaultPage: DEFAULT_PAGE, pageSize, messagePage, messageWindow, publicBotQueuedMessages, publicGroupState, wireBot, wireTask, botComputerControlSnapshot, messageFileRootsForThread, viewerFor, visibleTo} = deps;
+  const {store, cfg, sessions, groupUsageReader, defaultPage: DEFAULT_PAGE, pageSize, messagePage, messageWindow, publicBotQueuedMessages, wireBot, wireTask, botComputerControlSnapshot, messageFileRootsForThread, viewerFor, visibleTo} = deps;
   const jobs = createJobRoutes({ store, coordinator: deps.coordinator, groupThreadIsWorking: deps.groupThreadIsWorking, viewerFor, visibleTo, sessions });
   const handle = async ({ req, res, url, path, method, auth, json, readBody }: RouteContext): Promise<unknown> => {
     let m: RegExpMatchArray | null = null;
     const visible = visibleTo(viewerFor(auth));
-    const workspaceAccess = deps.workspaceAccess();
-    const desktopMutationToken = deps.desktopMutationToken();
-    
-    const cliOwnerToken = deps.cliOwnerToken();
     if (method === "GET" && path === "/api/bots") {
       try { groupUsageReader.refresh(); } catch { }
       const limit = pageSize(url.searchParams.get("messages"));
@@ -74,10 +60,7 @@ export function createThreadRoutes(deps: ThreadRouteDeps): RouteHandler {
         }, visible)),
         botQueuedMessages: visible.everything ? queued : Object.fromEntries(Object.entries(queued).filter(([threadId]) => visible.thread(threadId))),
         sections: visible.sections(store.sections),
-        groups: store.groups.filter((g) => visible.group(g.id)).map((g) => {
-          const room = { ...publicGroupState(g), ...messagePage(g.threadId, limit) };
-          return visible.everything ? room : memberGroup(room);
-        }),
+        groups: [],
         computerControl: Object.fromEntries(
           shownBots.map((bot) => {
             const snapshot = botComputerControlSnapshot(bot.id);
@@ -370,57 +353,6 @@ export function createThreadRoutes(deps: ThreadRouteDeps): RouteHandler {
       }
       res.writeHead(200, { ...headers, "content-length": String(size) });
       return res.end(attachment.bytes);
-    }
-
-    if (method === "GET" && path === "/api/search") {
-      const q = url.searchParams.get("q") ?? "";
-      const rawLimit = url.searchParams.get("limit");
-      const limit = rawLimit ? Math.min(Math.max(Number(rawLimit) || 0, 1), 100) : 40;
-      const threadId = url.searchParams.get("threadId")?.trim() || undefined;
-      if (threadId && ((!store.botByThread(threadId) && !store.groupByThread(threadId)) || !visible.thread(threadId))) {
-        return json(res, 404, { error: "no such conversation" });
-      }
-      const activePaths = new Map<string, Set<string>>();
-      const onActivePath = (threadId: string, messageId: string) => {
-        let ids = activePaths.get(threadId);
-        if (!ids) activePaths.set(threadId, (ids = new Set(store.activePath(threadId).map((m) => m.id))));
-        return ids.has(messageId);
-      };
-      const found = await searchMessagesAsync(q, visible.everything ? limit : Math.min(limit * 10, 1_000), threadId);
-      // A scan may outlive a revocation or audience edit: authorize again after the await.
-      if (HOSTED_WORKSPACE && auth.kind === "session") {
-        const failure = workspaceAccess ? await workspaceAccess.authorize(req, auth)
-          : { status: 503, error: "Workspace sign-in is unavailable." };
-        if (failure) return json(res, failure.status, { error: failure.error });
-      }
-      const current = resolveRequestAuth(req, {
-        sessions, cookieName: SESSION_COOKIE, streamPath: "/api/events", url,
-        loopbackMutationToken: desktopMutationToken, 
-        features: { sharedComputers: lendingEnabled() }, loopbackTrust: LOOPBACK.trust, cliOwnerToken, trustLocalBrowser: LOOPBACK.localBrowsers,
-      });
-      if (!current.auth) return json(res, current.status, { error: current.error });
-      const currentVisible = visibleTo(viewerFor(current.auth));
-      if (threadId && !currentVisible.thread(threadId)) return json(res, 404, { error: "no such conversation" });
-      const hits = found
-        .filter((hit) => currentVisible.thread(hit.threadId))
-        .slice(0, limit)
-        .map((hit) => {
-          const bot = store.botByThread(hit.threadId);
-          const group = bot ? undefined : store.groupByThread(hit.threadId);
-          if (!bot && !group) return null;
-          const active = onActivePath(hit.threadId, hit.messageId);
-          if (bot) {
-            const task = store.taskByThread(bot.id, hit.threadId);
-            return { ...hit, botId: bot.id, name: bot.name, task: task?.title, onActivePath: active };
-          }
-          if (group) {
-            const task = store.groupTaskByThread(group.id, hit.threadId);
-            return { ...hit, groupId: group.id, name: group.name, task: task?.title, onActivePath: active };
-          }
-          return null;
-        })
-        .filter((hit): hit is NonNullable<typeof hit> => hit !== null);
-      return json(res, 200, { hits });
     }
 
     m = path.match(/^\/api\/threads\/([\w-]+)\/export$/);

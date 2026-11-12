@@ -185,17 +185,11 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
       ? `Read more with tool_result_read id "${args.id}" and offset ${r.nextOffset}.`
       : `End of retained result.${r.truncated ? " The original tail exceeded the storage limit and was omitted." : ""}`}]` };
   }
-  if (name === "list_room_targets") {
-    const r = await api("/api/internal/room-targets");
-    return { text: JSON.stringify(r), ...(r.error ? { isError: true } : {}) };
-  }
   if (name === "coordinate_bots") {
     const canonical: Json = { ...args };
     delete canonical.botIds;
-    delete canonical.groupId;
     delete canonical.doneWhen;
     if (canonical.bot_ids === undefined) canonical.bot_ids = args.botIds;
-    if (canonical.group_id === undefined) canonical.group_id = args.groupId;
     if (canonical.done_when === undefined) canonical.done_when = args.doneWhen;
     const ids = canonical.bot_ids;
     const optional = (key: string, type: "boolean" | "string") => canonical[key] === undefined || typeof canonical[key] === type;
@@ -207,12 +201,12 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
       && optional("done_when", "string") && optional("reason", "string");
     if (!usable) {
       return {
-        text: `coordinate_bots takes snake_case arguments: bot_ids (an array of 1-4 teammate ids) and message are required; group_id, reason, rework, thread ("standing" or "new"), reply ("resume" or "none"), consult (true or false), in_my_folder (true or false) and done_when are optional. Received: ${Object.keys(args).join(", ") || "none"}.`,
+       text: `coordinate_bots takes snake_case arguments: bot_ids (an array of 1-4 teammate ids) and message are required; reason, rework, thread ("standing" or "new"), reply ("resume" or "none"), consult (true or false), in_my_folder (true or false) and done_when are optional. Received: ${Object.keys(args).join(", ") || "none"}.`,
         isError: true,
       };
     }
     const r = await api("/api/internal/coordinate-bots", { method: "POST", body: JSON.stringify({
-      groupId: canonical.group_id, botIds: ids, message: canonical.message,
+       botIds: ids, message: canonical.message,
       reason: typeof canonical.reason === "string" && canonical.reason.trim() ? canonical.reason.trim() : undefined,
       rework: canonical.rework,
       thread: canonical.thread, reply: canonical.reply, consult: canonical.consult, inMyFolder: canonical.in_my_folder,
@@ -261,42 +255,6 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
     });
     return {
       text: `Reachable teammates:\n${lines.join("\n")}\n\nUse coordinate_bots for concrete work or, with consult: true, for advice, then end your turn. Busy teammates queue and results resume you automatically.`,
-    };
-  }
-  if (name === "list_rooms") {
-    const query = new URLSearchParams({ fromBotId: BOT_ID, fromThreadId: THREAD_ID });
-    const r = await api(`/api/internal/rooms?${query.toString()}`);
-    const rooms = Array.isArray(r.rooms) ? r.rooms.filter(jsonRecord) : [];
-    const unpostable = Array.isArray(r.unpostable) ? r.unpostable.filter(jsonRecord) : [];
-    const blocked = unpostable.length
-      ? `\n\nRooms you are in but cannot post into (no id — there is nothing to retry; give the user the reason instead):\n${
-        unpostable.map((room) => `- ${String(room.name)}: ${String(room.reason)}`).join("\n")
-      }`
-      : "";
-    if (!rooms.length) {
-      return { text: `You are not in any room you can post into. Tell the user what you wanted to share and let them decide where it goes.${blocked}` };
-    }
-    const lines = rooms.map((room) => {
-      const members = Array.isArray(room.members) ? room.members.map(String).join(", ") : "";
-      return `- ${String(room.name)} [id: ${String(room.id)}]${members ? ` — members: ${members}` : ""}`;
-    });
-    return {
-      text: `Rooms you can post into:\n${lines.join("\n")}\n\nUse post_to_room with one of these ids. A post adds one message to the room; it does not start anyone's turn, so nobody replies to it automatically.${blocked}`,
-    };
-  }
-  if (name === "post_to_room") {
-    const groupId = String(args.group_id ?? "").trim();
-    const message = String(args.message ?? "").trim();
-    if (!groupId || !message) {
-      return { text: "post_to_room needs group_id (from list_rooms) and message.", isError: true };
-    }
-    const r = await api("/api/internal/post-to-room", {
-      method: "POST",
-      body: JSON.stringify( { fromBotId: BOT_ID, fromThreadId: THREAD_ID, groupId, message}),
-    });
-    if (r.error) return { text: String(r.error), isError: true };
-    return {
-      text: `Posted in ${r.roomName ?? "the room"}. Nobody's turn was started, so expect no reply — tell the user it is posted.`,
     };
   }
   if (name === "select_computer") {
@@ -413,62 +371,6 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
     return {
       text: `Created @${r.name ?? botName} in ${r.section ?? "General"} [id: ${r.id}].${r.modelSelection ? ` Model: ${JSON.stringify(r.modelSelection)}.` : ""} Assign work with coordinate_bots.`,
     };
-  }
-  if (name === "create_room") {
-    if (args.section !== undefined) return { text: "Room sections are fixed to your own section; ask the user to move rooms.", isError: true };
-    const roomName = String(args.name ?? "").trim();
-    const memberIds = Array.isArray(args.member_bot_ids)
-      ? args.member_bot_ids.map((id) => String(id).trim()).filter(Boolean)
-      : [];
-    const bulletin = typeof args.bulletin === "string" ? args.bulletin.trim() : undefined;
-    if (!roomName) {
-      return { text: "create_room needs a room name.", isError: true };
-    }
-    if (!memberIds.length) {
-      return { text: "create_room needs at least one bot ID in member_bot_ids.", isError: true };
-    }
-    const r = await api(`/api/internal/create-room`, {
-      method: "POST",
-      body: JSON.stringify({
-        fromBotId: BOT_ID,
-        fromThreadId: THREAD_ID,
-        name: roomName,
-        memberIds,
-        bulletin,
-      }),
-    });
-    if (r.error) return { text: `Couldn't create room: ${r.error}`, isError: true };
-    return {
-      text: `Created room “${r.name ?? roomName}” in section “${r.section ?? "General"}” [id: ${r.id}] with ${r.memberCount ?? memberIds.length} members.`,
-    };
-  }
-  if (name === "manage_room") {
-    if (args.section !== undefined || args.action === "set_section") return { text: "Moving rooms between sections is user-only.", isError: true };
-    const roomId = String(args.room_id ?? "").trim();
-    const action = String(args.action ?? "").trim();
-    if (!roomId || !action) {
-      return { text: "manage_room needs room_id and action.", isError: true };
-    }
-    const memberIds = Array.isArray(args.member_bot_ids)
-      ? args.member_bot_ids.map((id) => String(id).trim()).filter(Boolean)
-      : undefined;
-    const roomName = typeof args.name === "string" ? args.name.trim() : undefined;
-    const bulletin = typeof args.bulletin === "string" ? args.bulletin.trim() : undefined;
-    const r = await api(`/api/internal/manage-room`, {
-      method: "POST",
-      body: JSON.stringify({
-        fromBotId: BOT_ID,
-        fromThreadId: THREAD_ID,
-        roomId,
-        action,
-        memberIds,
-        name: roomName,
-        bulletin,
-      }),
-    });
-    if (r.error) return { text: `Couldn't manage room: ${r.error}`, isError: true };
-    const message = typeof r.message === "string" ? r.message : `Updated room ${roomId}.`;
-    return { text: message };
   }
   if (name === "request_credential") {
     const credentialId = args.credential_id;

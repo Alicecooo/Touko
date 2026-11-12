@@ -1,48 +1,7 @@
-// Rows are `display: contents` wrappers with no box, so their last child is what gets scrolled and highlighted.
 import { useEffect } from "react";
-import { api, useStore, type Action, type AppState } from "@/state/store";
-import type { SearchHit } from "@/lib/search-hit";
+import { useStore } from "@/state/store";
 
 const FLASH_CLASSES = ["ring-2", "ring-accent/70", "rounded-2xl", "transition-shadow"];
-
-export async function landOnSearchHit(
-  hit: SearchHit,
-  state: Pick<AppState, "bots" | "groups">,
-  dispatch: React.Dispatch<Action>,
-  threadsShown: boolean,
-): Promise<void> {
-  const ownerId = hit.botId ?? hit.groupId;
-  const bot = hit.botId ? state.bots.find((candidate) => candidate.id === hit.botId) : undefined;
-  const group = hit.groupId ? state.groups.find((candidate) => candidate.id === hit.groupId) : undefined;
-  if (!ownerId || (!bot && !group)) throw new Error("That conversation is no longer available.");
-
-  const switchAlone = bot && bot.threadId !== hit.threadId && !threadsShown ? bot : undefined;
-  if (!switchAlone) dispatch({ type: "select", id: ownerId });
-  if (bot && bot.threadId !== hit.threadId && !switchAlone) {
-    const result = await api(`/api/bots/${bot.id}/tasks/${hit.threadId}`, { method: "POST" });
-    if (result?.bot) dispatch({ type: "taskSwitched", bot: result.bot });
-  }
-  if (group && group.threadId !== hit.threadId) {
-    const result = await api(`/api/groups/${group.id}/tasks/${hit.threadId}`, { method: "POST" });
-    if (result?.group) dispatch({ type: "groupPatched", group: result.group });
-  }
-  if (bot && !hit.onActivePath) {
-    const branch = await api(`/api/bots/${bot.id}/active-branch`, {
-      method: "POST",
-      body: JSON.stringify({ messageId: hit.messageId, threadId: hit.threadId }),
-    });
-    if (branch?.activeLeafId) {
-      dispatch({ type: "threadActive", threadId: hit.threadId, activeLeafId: branch.activeLeafId });
-    }
-  }
-  if (switchAlone) dispatch({ type: "switchTask", botId: switchAlone.id, threadId: hit.threadId, whole: true });
-  dispatch({
-    type: "focusMessage",
-    threadId: hit.threadId,
-    messageId: hit.messageId,
-    matchText: hit.snippet.slice(hit.matchStart, hit.matchStart + hit.matchLength),
-  });
-}
 
 function matchRange(root: HTMLElement, text: string): Range | null {
   const needle = text.trim();
@@ -55,7 +14,10 @@ function matchRange(root: HTMLElement, text: string): Range | null {
     nodes.push(node);
     rendered += node.data;
   }
-  const pattern = needle.split(/\s+/).map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+");
+  const pattern = needle
+    .split(/\s+/)
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("\\s+");
   const match = new RegExp(pattern, "iu").exec(rendered);
   if (!match) return null;
   const range = document.createRange();
@@ -110,7 +72,6 @@ export function useFocusMessage(threadId: string, ready: boolean) {
           scroller.scrollTop += match.top + match.height / 2 - viewport.top - viewport.height / 2;
         });
       }
-      // `consumed` is deliberately not a dependency, so this flash survives the bookkeeping update.
       dispatch({ type: "focusMessageConsumed", nonce: focus.nonce });
       flashTimer = setTimeout(() => target?.classList.remove(...FLASH_CLASSES), 1800);
     };

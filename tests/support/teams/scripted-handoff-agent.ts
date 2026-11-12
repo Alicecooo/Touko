@@ -184,9 +184,8 @@ export async function runRoomHandoffAgent(argv: string[], planPath: string, prom
   let screen: Array<{ ms: number; state: unknown }> | undefined;
   try {
     return await Promise.race([failed, (async () => {
-      await call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "room-fixture", version: "1" } });
+      await call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "team-fixture", version: "1" } });
       evidence.push(await call("tools/list"));
-      evidence.push(await call("tools/call", { name: "list_room_targets", arguments: {} }));
       for (const step of steps) {
         const browser = step.server === "browser" ? (launch ? undefined : JSON.parse(readAtLaunch(arg("--mcp-config"))).mcpServers?.browser as AgentsIntegration | undefined) : undefined;
         if (step.server === "browser" && !browser) throw new Error("A scripted browser step needs the turn's browser tools");

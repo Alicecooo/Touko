@@ -78,7 +78,6 @@ describe("full backup Settings in the real renderer", () => {
       };
       localStorage.setItem('omb-drafts', JSON.stringify({fixture: 'private fixture draft'}));
       localStorage.setItem('fixture-auth-token', 'must not export');
-      localStorage.setItem('omb-webhook-credentials', 'fixture private URL must not export');
       return true;
     })()`);
     await expect.poll(snapshot, { timeout: 10_000 }).toContain('button "You"');
@@ -100,7 +99,6 @@ describe("full backup Settings in the real renderer", () => {
     await click("Export full backup");
     await expect.poll(() => evaluate("window.backupFixture.download"), { timeout: 10_000 }).toEqual({ href: "/api/workspace-backup/download/download-stage", filename: "fixture.ombbackup" });
     expect(await evaluate("window.backupFixture.calls.find(call => call.path.endsWith('/export')).body.clientState['fixture-auth-token'] ?? null")).toBeNull();
-    expect(await evaluate("window.backupFixture.calls.find(call => call.path.endsWith('/export')).body.clientState['omb-webhook-credentials'] ?? null")).toBeNull();
     expect(await evaluate("Object.values(localStorage).some(value => value.includes('fixture password 123'))")).toBe(false);
 
     // A File is delivered through the native input's change event. This

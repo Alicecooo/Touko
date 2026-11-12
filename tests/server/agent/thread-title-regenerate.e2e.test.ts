@@ -66,7 +66,6 @@ beforeAll(async () => {
       HOME: home,
       USERPROFILE: home,
       OMB_PORT: String(port),
-      OMB_WEBHOOK_PORT: String(port + 1),
       OMB_STATIC_DIR: staticDir,
     },
     stdio: ["ignore", "pipe", "pipe"],

@@ -2,7 +2,7 @@ export { HEADLESS_VERBS as HEADLESS_VERB_NAMES } from "../headless/args.ts";
 
 export const HEADLESS_USAGE = `Drive a running workspace (scripts, CI, other agents):
   openmausbot doctor                    check the server answers and an engine is ready
-  openmausbot bots | channels | models  your bots, your rooms, the engines and their models
+  openmausbot bots | models             your bots, the engines and their models
   openmausbot run BOT "do this"         give a bot one job and wait until it and every teammate it asked are done
   openmausbot send BOT "text"           send one message and return at once
   openmausbot wait BOT                  wait on work already running
@@ -13,7 +13,7 @@ export const HEADLESS_USAGE = `Drive a running workspace (scripts, CI, other age
   openmausbot team apply FILE           make the workspace match a team file (team export writes one)
   openmausbot engine set claude --key-env ANTHROPIC_API_KEY   give it an engine without a screen
   openmausbot connect URL --code CODE --out FILE              get a token for a workspace elsewhere
-  openmausbot new-bot | new-channel | set-model | edit | mcp
+  openmausbot new-bot | set-model | edit | mcp
 
   Server: --url URL (or OPENMAUSBOT_URL), --port N (or OMB_PORT), else this computer's.
   Token: OPENMAUSBOT_TOKEN or --token-file FILE. --json prints one JSON document;

@@ -87,12 +87,10 @@ export type RoutineRequestOperation =
   | { action: "delete"; routineId: string; expectedUpdatedAt: number; forBot?: RoutineRequestTargetBot };
 
 /** A routine as it stood before a change applied without a person, so Undo
- * can put it back. Room goals keep their room; attachments are not kept, so
- * a routine that has any is not offered an Undo for its update or delete. */
+ * can put it back. Attachments are not kept, so a routine that has any is not
+ * offered an Undo for its update or delete. */
 export interface RoutineRequestSnapshot extends RoutineRequestDefinition {
   enabled: boolean;
-  target?: "room-goal";
-  groupId?: string;
   resultsThreadId?: string;
 }
 

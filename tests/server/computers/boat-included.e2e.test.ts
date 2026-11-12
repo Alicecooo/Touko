@@ -85,7 +85,7 @@ beforeAll(async () => {
       PATH: process.env.PATH,
       ...(process.env.PATHEXT ? { PATHEXT: process.env.PATHEXT } : {}),
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-      HOME: home, USERPROFILE: home, OMB_DATA_DIR: dataDir, OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1),
+      HOME: home, USERPROFILE: home, OMB_DATA_DIR: dataDir, OMB_PORT: String(port),
       OMB_BOAT_API: `${stubBase}/boat/api/v1`,
       OMB_CLOUD_BOAT_URL: `${stubBase}/relay/api/box/v1`,
       OMB_CLOUD_BOAT_TOKEN: INCLUDED,

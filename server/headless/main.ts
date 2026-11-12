@@ -1,7 +1,7 @@
 import { HEADLESS_USAGE } from "../cli/cli-usage.ts";
 import { EXIT, HeadlessError, MUTATING_VERBS, parseCommand } from "./args.ts";
 import { explain, loadMcp, openClient, type ClientDeps, type HeadlessClient } from "./client.ts";
-import { doctor, edit, interrupt, list, messages, newBot, newChannel, send, setModel } from "./commands.ts";
+import { doctor, edit, interrupt, list, messages, newBot, send, setModel } from "./commands.ts";
 import { connectVerb } from "./connect.ts";
 import type { VerbContext, VerbOutcome } from "./context.ts";
 import { engineVerb } from "./engine.ts";
@@ -11,7 +11,7 @@ import { Output, processIo, type HeadlessIo } from "./output.ts";
 import { runVerb, waitVerb } from "./run.ts";
 import { teamApplyVerb, teamExportVerb } from "./team-apply.ts";
 
-const T = "TARGET is a bot or room by name or id, or --bot ID, --channel ID, --thread ID; --task ID picks one of its conversations.";
+const T = "TARGET is a bot by name or id, or --bot ID, --thread ID; --task ID picks one of its conversations.";
 
 /** Each verb's help, in plain words. `openmausbot help VERB` or `VERB --help`. */
 export const VERB_HELP: Record<string, string> = {
@@ -19,18 +19,16 @@ export const VERB_HELP: Record<string, string> = {
   Check the server answers, is new enough, says who you are to it, and has an engine ready.
   --wait 2m keeps checking until it is ready. Exit 0 ready, 1 no engine, 5 unreachable or too old.`,
   bots: "openmausbot bots\n  Your bots and what each is doing.",
-  channels: "openmausbot channels\n  Your rooms (group chats) and who is in them.",
   models: "openmausbot models\n  The engines and the models each offers (use them as INSTANCE/MODEL).",
   messages: `openmausbot messages TARGET [--limit 30]\n  The latest messages of a conversation (at most 200).
   ${T}`,
   send: `openmausbot send TARGET (TEXT | --text TEXT | --message-file FILE | -) [--send-id ID] [--dry-run]
   Send one message and return at once. The same --send-id never sends twice.
   ${T}`,
-  "send-channel": "openmausbot send-channel --channel ID (TEXT | --text TEXT) [--task ID] [--dry-run]\n  The same as send, for a room named by id.",
   run: `openmausbot run TARGET (TEXT | --message-file FILE | -) [--task new|current|ID] [--title T]
                 [--wait job|turn|none] [--timeout 30m] [--on-input exit|wait|stop] [--on-timeout leave|stop]
                 [--strict] [--export DIR [--force]]
-  Give a bot or room one job and wait until it, and every teammate it asked, is done.
+  Give a bot one job and wait until it, and every teammate it asked, is done.
   It starts a new conversation unless --task says otherwise, prints progress to stderr,
   then the final reply and the files it links. --export writes the job to DIR once it ends
   (a new or empty folder, checked before anything is sent; --force writes into a used one).
@@ -46,7 +44,6 @@ export const VERB_HELP: Record<string, string> = {
   interrupt: `openmausbot interrupt TARGET [--tree] [--dry-run]\n  Press Stop on a conversation. --tree also stops every teammate still working on its job.
   ${T}`,
   "new-bot": "openmausbot new-bot NAME [--title T] [--team T] [--model INSTANCE/MODEL] [--effort E]\n  Make a bot.",
-  "new-channel": "openmausbot new-channel NAME --members A,B [--team T]\n  Make a room from bots, by name or id.",
   "set-model": "openmausbot set-model BOT --model INSTANCE/MODEL [--effort E] [--task ID] [--dry-run]\n  Change an idle bot's model (or one idle conversation's, with --task).",
   edit: "openmausbot edit BOT --message ID (TEXT | --text TEXT) [--task ID] [--dry-run]\n  Rewrite an earlier message of yours and have the bot answer again from there.",
   export: `openmausbot export TARGET --out DIR [--root ID] [--since MS] [--max-files 200] [--max-screens 100] [--max-bytes 500MB] [--force]
@@ -54,15 +51,15 @@ export const VERB_HELP: Record<string, string> = {
   the files its replies link to, and screen captures. --root keeps one job.
   ${T}`,
   events: `openmausbot events [--thread ID]… [--job THREAD_ID [--until-settled]] [--kind K,…] [--since CURSOR] [--screens] [--jsonl]
-  The server's live events, one JSON line each: messages, threads, bots and rooms, or the kinds --kind names
+  The server's live events, one JSON line each: messages, threads and bots, or the kinds --kind names
   (--kind message,runtime adds token-level events to messages).
   --job follows the threads of one conversation's job; --until-settled ends with it.`,
   team: "openmausbot team apply FILE | team export --out FILE   (see help team apply, help team export)",
   "team apply": `openmausbot team apply FILE [--dry-run | --check] [--prune] [--rotate-secrets] [--wait-idle 2m]
-  Make the workspace match a team file (YAML or JSON): teams and briefs, bots, skills, Chiefs,
-  rooms and engines. Prints the plan, then applies it; a second apply prints "No changes.".
+  Make the workspace match a team file (YAML or JSON): teams and briefs, bots, skills, Chiefs and engines.
+  Prints the plan, then applies it; a second apply prints "No changes.".
   --dry-run only prints the plan; --check exits 6 if anything would change. --prune deletes bots
-  and rooms the file leaves out, in teams marked prune: true. Keys come from { env } or { file },
+  and bots the file leaves out, in teams marked prune: true. Keys come from { env } or { file },
   and a key already set is kept unless --rotate-secrets. docs/headless-cli.md has the format.`,
   "team export": "openmausbot team export [--team NAME]… --out FILE\n  Write the workspace (or some teams) as a team file; skills go beside it, keys as placeholders,\n  and a key written into a brief or skill is taken out.",
   engine: "openmausbot engine set KIND … | engine list   (see help engine set)",
@@ -91,8 +88,8 @@ export interface HeadlessOptions {
 }
 
 const VERBS: Record<string, (ctx: VerbContext) => Promise<VerbOutcome>> = {
-  doctor, bots: list, channels: list, models: list, messages, send, "send-channel": send, run: runVerb, wait: waitVerb,
-  interrupt, "new-bot": newBot, "new-channel": newChannel, "set-model": setModel, edit, export: exportVerb, events: eventsVerb,
+  doctor, bots: list, models: list, messages, send, run: runVerb, wait: waitVerb,
+  interrupt, "new-bot": newBot, "set-model": setModel, edit, export: exportVerb, events: eventsVerb,
   "team apply": teamApplyVerb, "team export": teamExportVerb, "engine set": engineVerb, "engine list": engineVerb, connect: connectVerb,
 };
 

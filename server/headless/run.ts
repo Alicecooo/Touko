@@ -18,7 +18,7 @@ export async function stopTeammates(client: HeadlessClient, threadId: string, no
   for (const node of nodes) {
     if (!STOPPABLE.has(node.status) || node.threadId === threadId || done.has(node.threadId)) continue;
     done.add(node.threadId);
-    const route = node.groupId ? `/api/groups/${enc(node.groupId)}/interrupt` : `/api/bots/${enc(node.botId)}/interrupt`;
+    const route = `/api/bots/${enc(node.botId)}/interrupt`;
     try {
       await client.json(route, { method: "POST", body: JSON.stringify({ threadId: node.threadId }) });
       stopped.push({ id: node.id, botId: node.botId, botName: node.botName, threadId: node.threadId });
@@ -33,7 +33,7 @@ export async function stopConversation(client: HeadlessClient, target: Target, t
   let threadId = target.taskId;
   if (tree && !threadId) {
     const fleet = await client.json<Rec>("/api/bots?messages=0");
-    threadId = (target.type === "bot" ? fleet.bots : fleet.groups)?.find((record: Rec) => record.id === target.id)?.threadId;
+    threadId = fleet.bots?.find((record: Rec) => record.id === target.id)?.threadId;
   }
   const before = tree && threadId ? await readJob(client, threadId) : undefined;
   const result = await client.tool("interrupt_conversation", { target_type: target.type, target_id: target.id, ...(threadId ? { task_id: threadId } : {}) });
@@ -151,7 +151,7 @@ const interrupted = (watching: Watching): HeadlessError =>
     watching.threadId ? `wait again: ${waitAgain(watching)}` : "openmausbot wait TARGET picks it up again");
 
 export async function runVerb(ctx: VerbContext): Promise<VerbOutcome> {
-  const named = Boolean(flag(ctx.flags, "bot") ?? flag(ctx.flags, "channel") ?? flag(ctx.flags, "thread"));
+  const named = Boolean(flag(ctx.flags, "bot") ?? flag(ctx.flags, "thread"));
   const [first, second] = ctx.positionals;
   const text = await readMessage(ctx, named ? first : second);
   const mode = oneOf(flag(ctx.flags, "wait"), "--wait", ["job", "turn", "none"] as const, "job");
@@ -168,14 +168,14 @@ export async function runVerb(ctx: VerbContext): Promise<VerbOutcome> {
     threadId = (await client.tool("create_task", { target_type: target.type, target_id: target.id, title })).task.taskId;
   } else if (task === "current") {
     const fleet = await client.json<Rec>("/api/bots?messages=0");
-    const owner = (target.type === "bot" ? fleet.bots : fleet.groups)?.find((record: Rec) => record.id === target.id);
-    if (!owner) throw usageError(`no ${target.type === "bot" ? "bot" : "room"} with id ${target.id}`);
+    const owner = fleet.bots?.find((record: Rec) => record.id === target.id);
+    if (!owner) throw usageError(`no bot with id ${target.id}`);
     threadId = owner.threadId;
   } else threadId = task!;
   const since = Number((await readJob(client, threadId)).now);
   const sendId = flag(ctx.flags, "send-id") ?? newSendId();
-  const tool = target.type === "bot" ? "send_bot_message" : "send_channel_message";
-  const args = { [`${target.type}_id`]: target.id, task_id: threadId, text, send_id: sendId };
+  const tool = "send_bot_message";
+  const args = { bot_id: target.id, task_id: threadId, text, send_id: sendId };
   let sent: Rec | undefined;
   for (let attempt = 1; !sent; attempt++) {
     try {
@@ -204,7 +204,7 @@ export async function runVerb(ctx: VerbContext): Promise<VerbOutcome> {
     throw error;
   }
   if (waited.result.state === "idle") {
-    waited = { ...waited, exitCode: EXIT.failed, reason: "no turn ran for the message: nobody took it up (a room set to answer mentions answers only the bots a message names)" };
+    waited = { ...waited, exitCode: EXIT.failed, reason: "no turn ran for the message" };
   }
   let exported: Rec | undefined;
   if (out) {

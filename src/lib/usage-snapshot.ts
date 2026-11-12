@@ -21,15 +21,12 @@ export interface UsageInput {
   sections?: readonly string[];
   /** null while the routine list is not loaded. */
   routines: ReadonlyArray<Pick<Routine, "enabled" | "runOn" | "target" | "schedule">> | null;
-  /** null while webhooks are not loaded. */
-  webhooks: number | null;
   apps: { services: Record<string, ConnectorStatus>; authoritative: boolean } | null;
   sessions: { sessions: ReadonlyArray<{ id?: unknown; email?: unknown }>; current: unknown } | null;
   platform: "desktop" | "browser";
   remoteClient: boolean;
 }
 
-const count = (value: unknown): number | undefined => Number.isInteger(value) && (value as number) >= 0 ? value as number : undefined;
 const tally = <T,>(items: readonly T[], test: (item: T) => boolean) => items.filter(test).length;
 
 function keyProviders(config: ConfigStatus): KeyProvider[] {
@@ -54,7 +51,6 @@ function routineCounts(routines: UsageInput["routines"]): Record<string, number>
     routines: routines.length,
     routines_enabled: tally(routines, (routine) => routine.enabled === true),
     routines_cloud: tally(routines, (routine) => routine.runOn === "cloud"),
-    routines_room_goal: tally(routines, (routine) => routine.target === "room-goal"),
     routines_once: tally(routines, (routine) => routine.schedule.type === "once"),
     routines_daily: tally(routines, (routine) => routine.schedule.type === "daily"),
     routines_interval: tally(routines, (routine) => routine.schedule.type === "interval"),
@@ -94,7 +90,6 @@ export function buildUsageSnapshot(input: UsageInput): EventProps {
     bot_channels: tally(groups, (group) => group.dm === true),
     teams: input.sections?.length ?? 0,
     ...routineCounts(input.routines),
-    webhooks: count(input.webhooks),
     engines: [...new Set(ready.map((instance) => engineForDriver(instance.driverKind)))].sort(),
     engine_count: ready.length,
     custom_endpoints: addedServers(instances).length,
@@ -113,11 +108,10 @@ export function buildUsageSnapshot(input: UsageInput): EventProps {
 }
 
 export function snapshotReady(
-  state: Pick<AppState, "connected" | "hydrated" | "config" | "routinesLoadState" | "instances" | "webhookIngress">,
-  loadsWebhooks: boolean,
+  state: Pick<AppState, "connected" | "hydrated" | "config" | "routinesLoadState" | "instances">,
 ): boolean {
   return state.connected && state.hydrated === true && state.config !== null && state.routinesLoadState !== "loading"
-    && state.instances.length > 0 && (!loadsWebhooks || state.webhookIngress !== null);
+    && state.instances.length > 0;
 }
 
 export interface UsageSources {
@@ -128,7 +122,7 @@ export interface UsageSources {
   remoteClient: boolean;
 }
 
-export type SnapshotState = Pick<AppState, "config" | "instances" | "bots" | "groups" | "sections" | "routines" | "routinesLoadState" | "webhooks" | "webhookIngress">;
+export type SnapshotState = Pick<AppState, "config" | "instances" | "bots" | "groups" | "sections" | "routines" | "routinesLoadState">;
 
 /** Null when the source fails or does not answer in time. */
 function settle<T>(work: () => Promise<T>): Promise<T | null> {
@@ -171,10 +165,9 @@ export async function sendDailySnapshot(state: SnapshotState, sources: UsageSour
       config,
       instances: state.instances,
       bots: state.bots,
-      groups: state.groups,
+      groups: [],
       sections: state.sections,
       routines: state.routinesLoadState === "ready" ? state.routines : null,
-      webhooks: state.webhookIngress ? state.webhooks.length : null,
       apps,
       sessions: Array.isArray(sessions?.sessions)
         ? { sessions: sessions.sessions.filter((session) => session !== null && typeof session === "object"), current: sessions.current }

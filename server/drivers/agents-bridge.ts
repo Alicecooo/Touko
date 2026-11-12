@@ -34,13 +34,10 @@ export type BridgeRoute = { name: string; arguments: Json } | { answer: BridgeAn
 export const BRIDGE_HOT_TOOL_NAMES: ReadonlySet<string> = new Set([
   "create_options_card",
   "tool_result_read",
-  "list_room_targets",
   "coordinate_bots",
   "list_bots",
-  "list_rooms",
   "select_computer",
   "attach_file",
-  "post_to_room",
   "request_credential",
   "request_sign_in",
   "memory_update",

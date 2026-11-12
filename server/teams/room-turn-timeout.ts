@@ -1,40 +1,5 @@
-import { MAX_ROOM_TURN_TIMEOUT_MINUTES, MIN_ROOM_TURN_TIMEOUT_MINUTES } from "../config/config.ts";
-
 export function roomTurnTimeoutMs(minutes: number): number {
   return minutes * 60_000;
-}
-
-export function parseConversationTurnTimeout(
-  value: unknown,
-): { ok: true; minutes: number | null } | { ok: false; error: string } {
-  if (value === null) return { ok: true, minutes: null };
-  if (
-    typeof value !== "number" ||
-    !Number.isInteger(value) ||
-    value < MIN_ROOM_TURN_TIMEOUT_MINUTES ||
-    value > MAX_ROOM_TURN_TIMEOUT_MINUTES
-  ) {
-    return {
-      ok: false,
-      error: "Turn limit must be a whole number from 1 to 1,440, or null to use the group default.",
-    };
-  }
-  return { ok: true, minutes: value };
-}
-
-export function effectiveRoomTurnTimeoutMinutes(
-  globalMinutes: number,
-  override: number | null | undefined,
-): number {
-  if (
-    typeof override === "number" &&
-    Number.isInteger(override) &&
-    override >= MIN_ROOM_TURN_TIMEOUT_MINUTES &&
-    override <= MAX_ROOM_TURN_TIMEOUT_MINUTES
-  ) {
-    return override;
-  }
-  return globalMinutes;
 }
 
 /** Counts work, not wall time: the clock holds while the turn waits on a card, and stray resolves clamp the count at zero. */

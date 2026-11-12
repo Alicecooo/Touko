@@ -4,12 +4,12 @@ import type { ApprovalMode } from "../../shared/approval-mode.ts";
 /** Where the work ultimately started. Immutable down the whole tree. */
 export type OriginKind = "person" | "routine" | "outside";
 /** The concrete source behind an outside origin. */
-export type OriginSource = "chat" | "routine" | "webhook" | "relay" | "external_runtime" | "guest" | "peer" | "api";
+export type OriginSource = "chat" | "routine" | "relay" | "external_runtime" | "guest" | "peer" | "api";
 
 export interface Origin {
   kind: OriginKind;
   source: OriginSource;
-  /** The thread, routine or webhook the work came from, when known. */
+  /** The thread or routine the work came from, when known. */
   ref?: string;
   /** The person's own request, harness-quoted (at most 400 characters), when kind is "person". Never model text. */
   quote?: string;

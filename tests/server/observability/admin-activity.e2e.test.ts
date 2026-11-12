@@ -46,7 +46,7 @@ async function start() {
     env: {
       ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-      HOME: home, USERPROFILE: home, OMB_PORT: String(PORT), OMB_WEBHOOK_PORT: String(PORT + 1),
+      HOME: home, USERPROFILE: home, OMB_PORT: String(PORT),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -152,7 +152,7 @@ posixOnly("admin activity log", () => {
     }
   });
 
-  it("records MCP servers, webhooks, bots, a bot's audience and sessions", async () => {
+  it("records MCP servers, bots, a bot's audience and sessions", async () => {
     const mcp = await api("POST", "/api/mcp/servers", { name: "fixture", command: process.execPath, args: ["--version", "--api-key", ARG_SECRET], env: { FIXTURE_TOKEN: MCP_SECRET } }, BOSS);
     expect(mcp.status, JSON.stringify(mcp.body)).toBe(201);
     const bot = await api("POST", "/api/bots", { name: "Audit Owl" }, BOSS);
@@ -164,16 +164,13 @@ posixOnly("admin activity log", () => {
     expect((await api("PATCH", `/api/bots/${botId}`, { visibility: { people: ["nope"] } }, BOSS)).status).toBe(400);
     const signOut = await api("POST", "/api/instances/no-such-engine/auth/sign-out", {}, BOSS);
     expect(signOut.status, JSON.stringify(signOut.body)).toBeGreaterThanOrEqual(400);
-    const hook = await api("POST", "/api/webhooks", { name: "Audit feed", botId, prompt: "Read it.", enabled: false }, BOSS);
-    expect(hook.status).toBe(201);
-    expect((await api("DELETE", `/api/webhooks/${hook.body.webhook.id}`, undefined, BOSS)).status).toBe(200);
     expect((await api("DELETE", `/api/auth/sessions/${oldPhone}`, undefined, BOSS)).status).toBe(200);
     expect((await api("POST", "/api/auth/pairing", { label: "Reception iPad", scopes: ["client"] }, BOSS)).status).toBe(200);
     expect((await api("DELETE", `/api/bots/${botId}`, undefined, BOSS)).status).toBe(200);
 
     const rows = (await activity("?what=all")).filter((entry) => entry.type === "admin");
     const actions = rows.map((entry) => entry.action);
-    for (const action of ["mcp.update", "bot.create", "visibility.update", "bot.update", "webhook.create", "webhook.delete", "session.revoke", "pairing.create", "bot.delete"]) {
+    for (const action of ["mcp.update", "bot.create", "visibility.update", "bot.update", "session.revoke", "pairing.create", "bot.delete"]) {
       expect(actions, action).toContain(action);
     }
     expect(actions.filter((action) => action === "bot.update")).toHaveLength(1);

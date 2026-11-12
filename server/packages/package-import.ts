@@ -2,7 +2,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { mcpServerNameError, MAX_MCP_SERVERS, parseStoredMcpServer } from "../mcp/mcp-registry.ts";
-import { AGENT_PARTS, agentReleaseValues, connectionLocalValue, connectionReleaseValue, pair, pairs, playbookValues, ROOM_PARTS, roomReleaseValues, ROUTINE_PARTS, routineReleaseValues, scheduleValue, sha256Hex, TEAM_PARTS, type AgentPart, type PartPair, type TeamPart } from "./package-parts.ts";
+import { AGENT_PARTS, agentReleaseValues, connectionLocalValue, connectionReleaseValue, pair, pairs, playbookValues, ROUTINE_PARTS, routineReleaseValues, scheduleValue, sha256Hex, TEAM_PARTS, type AgentPart, type PartPair, type TeamPart } from "./package-parts.ts";
 import type { PresetRegistry } from "./presets.ts";
 import type { Routine, RoutineInput, RoutineManager } from "../automation/routines.ts";
 import type { SkillListing, SkillPackageStamp } from "../skills/skills.ts";
@@ -85,7 +85,6 @@ export interface OrgInstallIndex {
   section: string;
   team: { parts: Partial<Record<TeamPart, PartPair>> };
   bots: Record<string, string>;
-  rooms: Record<string, string>;
   routines: Record<string, string>;
   connections: Record<string, { name: string; r: string; w: string }>;
 }
@@ -122,7 +121,8 @@ export function memberFromAgent(agent: PackageAgent): TeamManifestMember {
     description: agent.description ?? "",
     appearance: {
       color: agent.appearance.color,
-      ...(agent.appearance.mascotExpression ? { mascotExpression: agent.appearance.mascotExpression } : {}),    },
+      ...(agent.appearance.mascotExpression ? { mascotExpression: agent.appearance.mascotExpression } : {}),
+    },
   };
 }
 
@@ -176,7 +176,7 @@ export function importPackageDocument(
         skipped: registered?.skipped ?? (pkg.presets ?? []).map((preset) => ({ part: `presets[${preset.key}]`, reason: "presets_not_supported_yet" as const })),
         brief: false, notes: 0,
         ...(registered ? { presets: [...registered.added, ...registered.existing] } : {}),
-        org: { kind: "library", section: "", team: { parts: {} }, bots: {}, rooms: {}, routines: {}, connections: {} },
+        org: { kind: "library", section: "", team: { parts: {} }, bots: {}, routines: {}, connections: {} },
       };
     }
   }
@@ -221,7 +221,7 @@ function runImport(source: ImportSource, options: PackageImportOptions, deps: Pa
   const createdServers: string[] = [];
   const createdPresets: string[] = [];
   const skipped: ImportSkip[] = [];
-  const orgIndex: OrgInstallIndex = { kind: "team", section: "", team: { parts: {} }, bots: {}, rooms: {}, routines: {}, connections: {} };
+  const orgIndex: OrgInstallIndex = { kind: "team", section: "", team: { parts: {} }, bots: {}, routines: {}, connections: {} };
   const takenNames = new Set(store.bots.map((bot) => bot.name.trim().toLowerCase()));
   const botIds = new Map<string, string>();
   let group: GroupRecord | undefined;
@@ -367,37 +367,6 @@ function runImport(source: ImportSource, options: PackageImportOptions, deps: Pa
     const brief = Boolean(pkg?.team?.brief?.trim());
     if (brief) deps.sections.writeBrief(section, pkg!.team!.brief!);
 
-    const groupIds = new Map<string, string>();
-    for (const room of pkg?.rooms ?? []) {
-      const ids = room.members.map((key) => botIds.get(key)!);
-      let created = store.createGroup(room.name, ids, false, section);
-      createdGroups.push(created);
-      const responder = room.defaultResponder;
-      const defaultResponder = responder.kind === "agent"
-        ? { kind: "member" as const, botId: botIds.get(responder.agent)! }
-        : responder.kind === "auto"
-          ? { kind: "member" as const, botId: botIds.get(responder.agent ?? room.members[0])! }
-          : { kind: responder.kind };
-      created = store.patchGroup(created.id, {
-        bulletin: room.bulletin ?? "",
-        defaultResponder,
-        setupCompletedAt: Date.now(),
-      }) ?? created;
-      groupIds.set(room.key, created.id);
-      if (org) {
-        const local = {
-          name: created.name,
-          bulletin: created.bulletin ?? "",
-          members: [...created.memberIds].sort(),
-          defaultResponder: created.defaultResponder,
-        };
-        created = store.patchGroup(created.id, {
-          installedPackage: { installId: org.installId, key: room.key, memberKeys: [...room.members].sort(), parts: pairs(ROOM_PARTS, roomReleaseValues(room), local) },
-        }) ?? created;
-        orgIndex.rooms[room.key] = created.id;
-      }
-    }
-
     for (const routine of pkg?.routines ?? []) {
       // Routines always arrive paused.
       let timeoutMinutes = routine.timeoutMinutes;
@@ -409,14 +378,14 @@ function runImport(source: ImportSource, options: PackageImportOptions, deps: Pa
         name: routine.name,
         prompt: routine.prompt,
         botId: botIds.get(routine.agent)!,
-        ...(routine.room !== undefined ? { target: "room-goal" as const, groupId: groupIds.get(routine.room)! } : {}),
+        target: "bot" as const,
         runOn: routine.runOn,
         enabled: false,
         schedule: routine.schedule,
         durationMinutes: routine.durationMinutes,
         ...(timeoutMinutes === undefined ? {} : { timeoutMinutes }),
         ...(routine.overlap ? { overlap: routine.overlap } : {}),
-        ...(routine.continuity && routine.room === undefined ? { continuity: true } : {}),
+        ...(routine.continuity ? { continuity: true } : {}),
         ...(routine.runOnStartup ? { runOnStartup: true } : {}),
       };
       const created = deps.routines.create(input);
@@ -426,7 +395,7 @@ function runImport(source: ImportSource, options: PackageImportOptions, deps: Pa
           name: created.name,
           prompt: created.prompt,
           schedule: scheduleValue(created),
-          target: { botId: created.botId, groupId: created.groupId ?? null },
+          target: { botId: created.botId },
         };
         deps.routines.stampInstalledPackage!(created.id, { installId: org.installId, key: routine.key, parts: pairs(ROUTINE_PARTS, routineReleaseValues(routine), local) });
         orgIndex.routines[routine.key] = created.id;

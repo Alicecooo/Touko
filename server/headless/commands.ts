@@ -81,12 +81,10 @@ export async function doctor(ctx: VerbContext): Promise<VerbOutcome> {
 }
 
 export async function list(ctx: VerbContext): Promise<VerbOutcome> {
-  const tool = ctx.verb === "bots" ? "list_bots" : ctx.verb === "channels" ? "list_channels" : "list_available_models";
+  const tool = ctx.verb === "bots" ? "list_bots" : "list_available_models";
   const result = await (await ctx.client()).tool(tool, {});
   const human = ctx.verb === "bots"
     ? (result.bots as Rec[]).map((bot) => `${bot.name}${bot.title ? ` — ${bot.title}` : ""} · ${bot.section ? `team ${bot.section}` : "no team"}${bot.chiefOfStaff ? " · Chief of Staff" : ""} · ${bot.activity === "waiting-on-you" ? "waiting on you" : bot.busy ? "working" : bot.waitingForTeammates ? "waiting on teammates" : "idle"} · id ${bot.id}`)
-    : ctx.verb === "channels"
-      ? (result.channels as Rec[]).map((room) => `${room.name} · ${room.memberIds?.length ?? 0} members · ${room.working ? "working" : "idle"} · id ${room.id}`)
       : (result.instances as Rec[]).map((instance) => `${instance.instanceId} · ${instance.snapshot?.state ?? "unknown"}${instance.models?.default ? ` · default ${instance.models.default}` : ""}${Array.isArray(instance.models?.options) ? ` · ${instance.models.options.length} models` : ""}`);
   return { result, exitCode: EXIT.done, human: human.length ? human : [`No ${ctx.verb === "models" ? "engines" : ctx.verb} yet.`] };
 }
@@ -94,7 +92,7 @@ export async function list(ctx: VerbContext): Promise<VerbOutcome> {
 export async function messages(ctx: VerbContext): Promise<VerbOutcome> {
   const target = await resolveTarget(ctx, ctx.positionals[0]);
   const limit = parseCount(flag(ctx.flags, "limit"), "--limit", 30, 200);
-  const result = await (await ctx.client()).tool(target.type === "bot" ? "get_bot_messages" : "get_channel_messages", { ...targetArgs(target), limit });
+  const result = await (await ctx.client()).tool("get_bot_messages", { ...targetArgs(target), limit });
   const human = (result.messages as Rec[] ?? []).map((message) => {
     const who = message.role === "user" ? "you" : message.from?.name ?? target.name ?? "bot";
     const what = message.kind === "text" ? oneLine(message.text ?? "", 400)
@@ -106,12 +104,11 @@ export async function messages(ctx: VerbContext): Promise<VerbOutcome> {
 }
 
 export async function send(ctx: VerbContext): Promise<VerbOutcome> {
-  const channelOnly = ctx.verb === "send-channel";
-  const named = Boolean(flag(ctx.flags, "bot") ?? flag(ctx.flags, "channel") ?? flag(ctx.flags, "thread"));
+  const named = Boolean(flag(ctx.flags, "bot") ?? flag(ctx.flags, "thread"));
   const [first, second] = ctx.positionals;
   const text = await readMessage(ctx, named ? first : second);
-  const target = await resolveTarget(ctx, named ? undefined : first, channelOnly ? "channel" : "any");
-  const tool = target.type === "bot" ? "send_bot_message" : "send_channel_message";
+  const target = await resolveTarget(ctx, named ? undefined : first);
+  const tool = "send_bot_message";
   const args = { ...targetArgs(target), text, send_id: flag(ctx.flags, "send-id") ?? newSendId() };
   const preview = dryRun(ctx, tool, args);
   if (preview) return preview;
@@ -167,29 +164,11 @@ export async function newBot(ctx: VerbContext): Promise<VerbOutcome> {
   return { result, exitCode: EXIT.done, human: [`Created ${result.bot.name}${team ? ` in team ${team}` : ""} (id ${result.bot.id}).`] };
 }
 
-export async function newChannel(ctx: VerbContext): Promise<VerbOutcome> {
-  const name = (flag(ctx.flags, "name") ?? ctx.positionals[0])?.trim();
-  if (!name) throw usageError("--name is required (the new room's name)");
-  const wanted = requiredFlag(ctx.flags, "members").split(",").map((member) => member.trim()).filter(Boolean);
-  if (!wanted.length || new Set(wanted).size !== wanted.length) throw usageError("--members must contain unique comma-separated bot names or ids");
-  const client = await ctx.client();
-  const bots: Rec[] = (await client.json<Rec>("/api/bots?messages=0")).bots ?? [];
-  const memberIds = wanted.map((member) => {
-    const found = bots.filter((bot) => bot.id === member);
-    const byName = found.length ? found : bots.filter((bot) => String(bot.name).trim().toLowerCase() === member.toLowerCase());
-    if (byName.length !== 1) throw usageError(byName.length ? `"${member}" names ${byName.length} bots: use their ids` : `no bot named "${member}"`, "openmausbot bots lists them");
-    return byName[0]!.id as string;
-  });
-  const team = (flag(ctx.flags, "team") ?? flag(ctx.flags, "section"))?.trim();
-  const result = await client.tool("create_channel", { name, member_ids: memberIds, ...(team ? { section: team } : {}) });
-  return { result, exitCode: EXIT.done, human: [`Created room ${result.channel.name} with ${memberIds.length} members (id ${result.channel.id}).`] };
-}
-
 export async function setModel(ctx: VerbContext): Promise<VerbOutcome> {
   const selection = modelArgs(ctx, true);
   const explicit = flag(ctx.flags, "bot")?.trim();
   const target = explicit ? { type: "bot" as const, id: explicit, ...(flag(ctx.flags, "task") ? { taskId: flag(ctx.flags, "task")!.trim() } : {}) }
-    : await resolveTarget(ctx, ctx.positionals[0], "bot");
+    : await resolveTarget(ctx, ctx.positionals[0]);
   const args = { bot_id: target.id, ...(target.taskId ? { task_id: target.taskId } : {}), ...selection };
   const preview = dryRun(ctx, "set_bot_model", args);
   if (preview) return preview;
@@ -204,7 +183,7 @@ export async function edit(ctx: VerbContext): Promise<VerbOutcome> {
   if (!target && !first) throw usageError("a bot is required", "openmausbot edit BOT --message ID TEXT, or --bot ID");
   const messageId = requiredFlag(ctx.flags, "message");
   const text = await readMessage(ctx, target ? first : second);
-  const resolved = target ?? await resolveTarget(ctx, first, "bot");
+  const resolved = target ?? await resolveTarget(ctx, first);
   const args = { bot_id: resolved.id, message_id: messageId, text, ...(resolved.taskId ? { task_id: resolved.taskId } : {}) };
   const preview = dryRun(ctx, "edit_bot_message", args);
   if (preview) return preview;

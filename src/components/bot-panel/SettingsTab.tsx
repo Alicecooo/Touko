@@ -22,19 +22,18 @@ export function SettingsTab({ bot, derived, slackUrl, onOpen }: {
   const none = t("botPanel.none");
   const name = bot.name;
 
-  const page = (key: PageId, icon: Parameters<typeof NavRow>[0]["icon"], hint?: string, value?: ReactNode): ReactNode => {
+  const page = (key: PageId, icon: Parameters<typeof NavRow>[0]["icon"], value?: ReactNode): ReactNode => {
     const title = t(PAGES[key].title, { name });
-    return <NavRow key={key} data-panel-page={key} icon={icon} title={title} hint={hint} value={value} onClick={() => onOpen(key)} />;
+    return <NavRow key={key} data-panel-page={key} icon={icon} title={title} value={value} onClick={() => onOpen(key)} />;
   };
 
   const cards: Array<{ label: string | null; anchor: string; rows: ReactNode[] }> = [
     { label: t("botPanel.card.profile"), anchor: "profile", rows: [
-      page("folder", FolderOpen, t("botAccess.folder.title")),
+      page("folder", FolderOpen),
       <SwitchRow
         key="notify"
         data-panel-row="notify"
         title={t("notifications.title")}
-        hint={t("botPanel.notificationsHint")}
         color={bot.color}
         checked={bot.notifications}
         onChange={() => {
@@ -45,16 +44,16 @@ export function SettingsTab({ bot, derived, slackUrl, onOpen }: {
       />,
     ] },
     { label: t("botPanel.card.tools"), anchor: "tools", rows: [
-      page("mcp", Puzzle, t("botPanel.mcpHint"), bot.mcpServers == null ? t("botPanel.all") : bot.mcpServers.length),
-      page("tools", SlidersHorizontal, t("botPanel.toolsHint")),
-      page("always", Check, t("botPanel.alwaysHint"), alwaysAllowed || none),
+      page("mcp", Puzzle, bot.mcpServers == null ? t("botPanel.all") : bot.mcpServers.length),
+      page("tools", SlidersHorizontal),
+      page("always", Check, alwaysAllowed || none),
     ] },
     ...(slackUrl ? [{ label: t("botPanel.card.sharing"), anchor: "sharing", rows: [
-      page("slack", Slack, t("botPanel.slackHint")),
+      page("slack", Slack),
     ] }] : []),
     { label: t("botPanel.card.activity"), anchor: "activity", rows: [
       <ColRow key="usage" data-panel-row="usage"><UsageSection bot={bot} bare /></ColRow>,
-      page("prompt", FileCode2, t("botPanel.promptHint")),
+      page("prompt", FileCode2),
     ] },
   ];
 

@@ -11,7 +11,6 @@ import { parseToolScope, type ToolScope } from "../../shared/tool-scope.ts";
 import { usageError } from "./args.ts";
 
 export const TEAM_BRIEF_MAX_BYTES = 24_000;
-export const ROOM_BRIEF_MAX_CHARS = 12_000;
 export const SKILL_MAX_BYTES = 262_144;
 
 const secret = z.union([
@@ -66,13 +65,6 @@ const teamFileSchema = z.object({
     manages: z.array(z.string().trim().min(1).max(60)).optional(),
     ...botFields,
   }).strict()).min(1, "list at least one bot"),
-  rooms: z.array(z.object({
-    name: z.string().trim().min(1).max(100),
-    team: z.string().trim().min(1).max(60).optional(),
-    members: z.array(z.string().trim().min(1)).min(1),
-    brief: textOrFile.optional(),
-    responder: z.string().trim().min(1).optional(),
-  }).strict()).optional(),
 }).strict();
 
 export type Secret = z.infer<typeof secret>;
@@ -98,7 +90,6 @@ export interface DesiredBot {
   tools?: ToolScope | null;
   skills: DesiredSkill[];
 }
-export interface DesiredRoom { name: string; team?: string; members: string[]; brief?: string; responder?: string }
 export interface DesiredTeam { name: string; brief?: string; prune: boolean }
 export interface DesiredEngine { kind: string; key: Secret; baseUrl?: string | Secret; everyClaudeBot?: boolean; install?: boolean }
 
@@ -107,7 +98,6 @@ export interface TeamFile {
   engines: DesiredEngine[];
   teams: DesiredTeam[];
   bots: DesiredBot[];
-  rooms: DesiredRoom[];
   warnings: string[];
 }
 
@@ -241,19 +231,6 @@ export function checkTeamFile(input: TeamFileInput, file: string, dir: string): 
     if (chiefs.has(team)) throw usageError(`team "${bot.team ?? "(no team)"}" has two chiefs: ${chiefs.get(team)} and ${bot.name}`);
     chiefs.set(team, bot.name);
   }
-  const roomSeen = new Set<string>();
-  const rooms: DesiredRoom[] = (input.rooms ?? []).map((room) => {
-    const where = `room "${room.name}"`;
-    if (roomSeen.has(key(room.name))) throw usageError(`rooms: "${room.name}" is listed twice`);
-    roomSeen.add(key(room.name));
-    if (new Set(room.members.map(key)).size !== room.members.length) throw usageError(`${where}: a member is listed twice`);
-    if (room.responder && !["everyone", "mentions"].includes(room.responder) && !room.members.some((member) => key(member) === key(room.responder!))) {
-      throw usageError(`${where}: responder must be everyone, mentions, or one of its members`);
-    }
-    const brief = kept(text(dir, room.brief, `${where} brief`), `${where}: its brief`);
-    if (brief !== undefined && brief.trimEnd().length > ROOM_BRIEF_MAX_CHARS) throw usageError(`${where}: brief is over ${ROOM_BRIEF_MAX_CHARS} characters`);
-    return { name: room.name, ...(room.team ? { team: room.team } : {}), members: room.members, ...(brief !== undefined ? { brief } : {}), ...(room.responder ? { responder: room.responder } : {}) };
-  });
   const engines: DesiredEngine[] = Object.entries(input.engines ?? {}).flatMap(([name, value]) => {
     if (!value) return [];
     const spec = value as { key: Secret; baseUrl?: string | Secret; everyClaudeBot?: boolean; install?: boolean };
@@ -261,5 +238,5 @@ export function checkTeamFile(input: TeamFileInput, file: string, dir: string): 
     return [{ kind: ENGINE_KIND[name]!, key: anchored(spec.key), ...(spec.baseUrl !== undefined ? { baseUrl: anchored(spec.baseUrl) } : {}),
       ...(spec.everyClaudeBot !== undefined ? { everyClaudeBot: spec.everyClaudeBot } : {}), ...(spec.install ? { install: true } : {}) }];
   });
-  return { path: file, engines, teams, bots, rooms, warnings };
+  return { path: file, engines, teams, bots, warnings };
 }

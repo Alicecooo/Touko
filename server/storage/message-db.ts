@@ -8,17 +8,12 @@ import { peerProvenanceAuthor, type WorkOrigin } from "../teams/peer-provenance.
 import type { ResolvedSender, SteerQueueReason } from "../../shared/wire.ts";
 import type { Message } from "./store.ts";
 import type { UsageTrigger } from "../usage/usage-ledger.ts";
-import { MessageSearchWorker } from "./message-search-worker.ts";
-import { searchMessagesInDatabase, type SearchHit } from "./message-search-query.ts";
 import type { Notification, NotificationLogEntry } from "../../shared/notification.ts";
-export type { SearchHit } from "./message-search-query.ts";
 
 const DB_FILE = () => join(DATA_DIR, "messages.db");
 
 let handle: DatabaseSync | null = null;
 let handlePath: string | null = null;
-let searchWorker: MessageSearchWorker | null = null;
-let closingSearch: Promise<void> = Promise.resolve();
 
 function open(): DatabaseSync {
   mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
@@ -434,13 +429,9 @@ export function updateMessage(threadId: string, message: Message): void {
 }
 
 export function workingGoalRunMessages(): Array<{ threadId: string; message: Message }> {
-  const rows = db()
-    .prepare(
-      "SELECT thread_id, json FROM messages " +
-      "WHERE kind = 'goal.run' AND json_extract(json, '$.goalRun.status') = 'working'",
-    )
-    .all() as Array<{ thread_id: string; json: string }>;
-  return rows.map((row) => ({ threadId: row.thread_id, message: JSON.parse(row.json) as Message }));
+  // Group goal runs are no longer a supported conversation mode. Keep this
+  // compatibility function for older stores, but never revive a persisted run.
+  return [];
 }
 
 export function setActiveLeaf(threadId: string, leafId: string | null): void {
@@ -503,17 +494,6 @@ export function threadsReferencing(fragment: string): string[] {
   if (!fragment) return [];
   const rows = db().prepare("SELECT DISTINCT thread_id FROM messages WHERE instr(json, ?) > 0").all(fragment) as Array<{ thread_id: string }>;
   return rows.map((row) => row.thread_id);
-}
-
-export function searchMessages(query: string, limit = 40, threadId?: string): SearchHit[] {
-  return searchMessagesInDatabase(db(), query, limit, threadId);
-}
-
-export function searchMessagesAsync(query: string, limit = 40, threadId?: string): Promise<SearchHit[]> {
-  if (!query.trim()) return Promise.resolve([]);
-  db(); // The owner initializes/migrates the schema before any read-only scan.
-  searchWorker ??= new MessageSearchWorker(DB_FILE());
-  return searchWorker.search(query, limit, threadId);
 }
 
 export interface RecallHit {
@@ -785,16 +765,7 @@ export function recallMemory(query: string, botId: string, limit = 12, mode: Sea
   return rows.map((row) => ({ file: row.path, at: row.mtime_ms, snippet: row.snippet.replace(/\s+/g, " ").trim() }));
 }
 
-/** Await before maintenance replaces the database or shutdown releases its lease. */
-export async function closeMessageSearch(): Promise<void> {
-  const worker = searchWorker;
-  searchWorker = null;
-  if (worker) closingSearch = Promise.all([closingSearch, worker.close()]).then(() => {});
-  await closingSearch;
-}
-
 export function closeMessageDb(): void {
-  void closeMessageSearch();
   try {
     handle?.close();
   } catch {}

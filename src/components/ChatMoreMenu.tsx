@@ -1,14 +1,12 @@
 import { useMemo, useState, type JSX } from "react";
-import { Bug, Copy, Download, Gauge, ListChecks, MoreHorizontal, Search } from "lucide-react";
+import { Bug, Copy, Download, Gauge, ListChecks, MoreHorizontal } from "lucide-react";
 import { currentTaskBot, useStore, visibleMessages, type Bot } from "@/state/store";
 
-import { requestChatFind, useChatFindOpen } from "@/lib/chat-find";
 import { usageSummary } from "@/lib/chat-usage-summary";
 import { copyTranscriptToClipboard, downloadMarkdownTranscript, formatTranscriptMarkdown, slugifyTranscriptFilename } from "@/lib/export-transcript";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 
-import { ShortcutHint } from "./ShortcutHint";
 import { SidebarPopoverMenu, type SidebarMenuItem } from "./SidebarPopoverMenu";
 
 import { openBotSettings } from "./bot-panel/panel-link";
@@ -18,22 +16,12 @@ function useChatMoreItems(profile: Bot): { items: SidebarMenuItem[]; on: boolean
   const bot = useMemo(() => currentTaskBot(profile), [profile]);
   const messages = useMemo(() => visibleMessages(bot), [bot]);
   const { state, dispatch } = useStore();
-  const findOpen = useChatFindOpen(bot.threadId);
   const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(null);
   const remoteClient = window.ogb?.remoteClient?.active === true;
   const usage = usageSummary(bot, state.instances);
   const hasMessages = messages.length > 0;
   const transcript = () => formatTranscriptMarkdown({ title: bot.name, messages, botName: bot.name, isGroup: false });
   const items: SidebarMenuItem[] = [
-    {
-      key: "find",
-      label: t("chat.find"),
-      icon: <Search size={16} />,
-      active: findOpen,
-      trailing: <ShortcutHint id="find-conversation" />,
-      onSelect: () => requestChatFind(bot.threadId),
-    },
-
     {
       key: "copy",
       heading: t("chat.export.heading"),
@@ -76,7 +64,7 @@ function useChatMoreItems(profile: Bot): { items: SidebarMenuItem[]; on: boolean
       onSelect: () => dispatch({ type: "toggleInspector" }),
     } satisfies SidebarMenuItem]),
   ];
-  return { items, on: findOpen || state.inspectorOpen || state.activityOpen };
+  return { items, on: state.inspectorOpen || state.activityOpen };
 }
 
 function RoundChatMoreMenu({ bot }: { bot: Bot }) {
@@ -103,8 +91,7 @@ function RoundChatMoreMenu({ bot }: { bot: Bot }) {
 }
 
 /**
- * The chat's ⋯ menu as a round button, for a spot outside the chat such as the bot panel's top bar: find in
- * conversation (opens the chat's find bar), share, usage, activity and the inspector.
+ * The chat's ⋯ menu as a round button, for a spot outside the chat such as the bot panel's top bar.
  */
 export function ChatMoreMenu({ bot }: { bot: Bot }): JSX.Element {
   // Keyed by thread so a "Copied" note never follows the panel into another conversation.

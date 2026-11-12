@@ -6,7 +6,6 @@ import { automationsFrom, automationSentence, automationStatus, orderAutomations
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import { isRoutineProblemRun } from "@/lib/routines";
-import { saveWebhookCredential, webhookCredentialStore } from "@/lib/webhook-credentials";
 import { useStore } from "@/state/store";
 import { useAutomationActions } from "./automations/actions";
 import { AutomationPanel } from "./automations/AutomationPanel";
@@ -16,13 +15,12 @@ import { FixButton, StatusMark } from "./automations/parts";
 import { RoutineEditor } from "./RoutineCalendarPage";
 import { Select } from "./Select";
 import { Switch } from "./SettingsPrimitives";
-import { WebhookEditor } from "./WebhookTrigger";
 
 /** The bot filter earns its place only on a long list shared by several bots. */
 const FILTER_FROM = 9;
 
-/** Automations: every schedule and every "when another app sends something", each as one plain sentence. */
-export function TriggersPage({ onBack, onOpenRoom }: { onBack: () => void; onOpenRoom: (id: string) => void }) {
+/** Automations: each schedule as one plain sentence. */
+export function TriggersPage({ onBack }: { onBack: () => void }) {
   const { state, dispatch } = useStore();
   const { capabilities } = useDesktopCapabilities();
   const actions = useAutomationActions();
@@ -33,7 +31,6 @@ export function TriggersPage({ onBack, onOpenRoom }: { onBack: () => void; onOpe
   const [botFilter, setBotFilter] = useState(focus?.botId ?? "all");
   const [newText, setNewText] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ kind: SetUpKind; id?: string } | null>(null);
-  const routinesOnly = window.ogb?.remoteClient?.active === true;
   const visibleBots = state.bots.filter((bot) => !bot.hidden);
   const botName = (botId: string) => state.bots.find((bot) => bot.id === botId)?.name ?? t("routines.unavailableBot");
 
@@ -44,8 +41,8 @@ export function TriggersPage({ onBack, onOpenRoom }: { onBack: () => void; onOpe
   }, [focus]);
   useEffect(() => { backButtonRef.current?.focus({ preventScroll: true }); }, []);
 
-  const all = useMemo(() => automationsFrom({ routines: state.routines, webhooks: routinesOnly ? [] : state.webhooks, runs: state.routineRuns }),
-    [state.routines, state.webhooks, state.routineRuns, routinesOnly]);
+  const all = useMemo(() => automationsFrom({ routines: state.routines, runs: state.routineRuns }),
+    [state.routines, state.routineRuns]);
   const showFilter = all.length >= FILTER_FROM && new Set(all.map((automation) => automation.botId)).size > 1;
   const listed = orderAutomations(all.filter((automation) => !showFilter || botFilter === "all" || automation.botId === botFilter));
   const open = all.find((automation) => automation.id === openId) ?? null;
@@ -60,7 +57,6 @@ export function TriggersPage({ onBack, onOpenRoom }: { onBack: () => void; onOpe
   const windowDragStyle = macInset ? ({ WebkitAppRegion: "drag" } as CSSProperties) : undefined;
   const windowNoDragStyle = macInset ? ({ WebkitAppRegion: "no-drag" } as CSSProperties) : undefined;
   const editRoutine = editing?.kind === "schedule" ? state.routines.find((routine) => routine.id === editing.id) : undefined;
-  const editWebhook = editing?.kind === "webhook" ? state.webhooks.find((webhook) => webhook.id === editing.id) : undefined;
 
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-app animate-workspace-in">
@@ -89,7 +85,7 @@ export function TriggersPage({ onBack, onOpenRoom }: { onBack: () => void; onOpe
       </header>
 
       <div className="relative flex min-h-0 flex-1">
-        {view === "calendar" ? <AutomationsCalendar botFilter={botFilter} selectedAutomationId={openId} onOpenAutomation={setOpenId} onOpenRoom={onOpenRoom} /> : (
+        {view === "calendar" ? <AutomationsCalendar botFilter={botFilter} selectedAutomationId={openId} onOpenAutomation={setOpenId} /> : (
           <div className="min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
               {all.length === 0 && state.routinesLoadState !== "loading" ? (
@@ -134,9 +130,6 @@ export function TriggersPage({ onBack, onOpenRoom }: { onBack: () => void; onOpe
         <NewAutomation initialText={newText} onClose={() => setNewText(null)} onSetUpYourself={(kind) => { setNewText(null); setEditing({ kind }); }} />
       )}
       {editing?.kind === "schedule" && (editRoutine || !editing.id) && <RoutineEditor routine={editRoutine} bots={visibleBots} plain onClose={() => setEditing(null)} />}
-      {editing?.kind === "webhook" && (editWebhook || !editing.id) && (
-        <WebhookEditor webhook={editWebhook} bots={visibleBots} onClose={() => setEditing(null)} onCredential={(credential, id) => { saveWebhookCredential(webhookCredentialStore(), id, credential); setOpenId(id); }} />
-      )}
     </main>
   );
 }

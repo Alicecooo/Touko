@@ -34,7 +34,7 @@ const SKILL_SETTLED_LABEL = {
   update: "approval.status.skillUpdated",
 } as const;
 
-/** Schedules and webhooks alike are "automations" to a person. */
+/** Scheduled routines are shown as "automations" to a person. */
 const AUTOMATION_APPLIED_LINE = {
   create: "approval.applied.automation.create",
   update: "approval.applied.automation.update",
@@ -140,11 +140,6 @@ export function appliedChange(card: OptionCardData, name: string): { line: strin
           : operation.action === "delete" ? Boolean(undo?.before)
             : false;
     return { line: t(AUTOMATION_APPLIED_LINE[operation.action], { name, title }), canUndo };
-  }
-  const webhook = card.webhookRequest;
-  if (webhook) {
-    const target = webhook.operation.forBot ? ` · ${t("approval.applied.forBot", { target: `@${webhook.operation.forBot.name}` })}` : "";
-    return { line: t(AUTOMATION_APPLIED_LINE[webhook.operation.action], { name, title: `${webhook.undo?.name ?? ""}${target}` }), canUndo: webhook.operation.action !== "run_now" };
   }
   const skill = card.skillRequest;
   if (skill) {

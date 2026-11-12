@@ -1,7 +1,6 @@
 import { approvalModeFor, approvalModeWidens, isApprovalMode, type ApprovalMode } from "../../shared/approval-mode.ts";
 import { threadLinkUrl } from "../../shared/thread-link.ts";
 import type { WireBot, WireTask } from "../../shared/wire.ts";
-import { validateBotCwd } from "../bots/bot-cwd.ts";
 import type { ModelSelection, ProviderInstance } from "../harness/contracts.ts";
 import type { Coordinator } from "../teams/coordinator.ts";
 import type { Handoffs } from "../agent/delta-context.ts";
@@ -12,7 +11,7 @@ import type { SkillReview } from "../skills/skill-review.ts";
 import { isProjectEmoji, type BotRecord, type Store, type TaskRecord } from "../storage/store.ts";
 import type { ThreadStarters } from "../agent/thread-starters.ts";
 import { titleConversationExcerpt, type ThreadTitleSource } from "../agent/thread-title.ts";
-import type { MessagePage } from "./channels.ts";
+import type { MessagePage } from "./threads.ts";
 import { bulkDeleteThreadIds, type BulkDeleteRefusal } from "./bulk-delete.ts";
 import { PASS, type RouteHandler } from "./table.ts";
 
@@ -66,7 +65,7 @@ export interface TaskRouteDeps {
 }
 
 export function createTaskRoutes(deps: TaskRouteDeps): RouteHandler {
-  const {store, hostedModels, coordinator, handoffs, skillReview, threadStarters, titleRegenerations, directTurnGenerationByThread, actorKey, cloudOwnerSession, sharedWorkspaceFullAccessEnabled, supportsApprovalMode, threadBusy, publicBot, wireBot, wireTask, pageSize, messagePage, checkedModelSelection, checkedTaskModelSwitch, threadTitleGate, generateThreadTitle, settleDirectFollowup, clearTurnDigestState, revokeInternalCapabilitiesForThread, stagedSkillCleanupsForThread, rejectDeletedThreadSkillStages} = deps;
+  const {store, hostedModels, coordinator, handoffs, skillReview, titleRegenerations, directTurnGenerationByThread, cloudOwnerSession, supportsApprovalMode, threadBusy, publicBot, wireBot, wireTask, pageSize, messagePage, checkedModelSelection, checkedTaskModelSwitch, threadTitleGate, generateThreadTitle, settleDirectFollowup, clearTurnDigestState, revokeInternalCapabilitiesForThread, stagedSkillCleanupsForThread, rejectDeletedThreadSkillStages} = deps;
   const CLOUD_HOME = deps.cloudHome;
   const DESKTOP_MANAGED = deps.desktopManaged;
   const HOSTED_WORKSPACE = deps.hostedWorkspace;
@@ -145,6 +144,8 @@ export function createTaskRoutes(deps: TaskRouteDeps): RouteHandler {
 
     m = path.match(/^\/api\/bots\/([\w-]+)\/tasks$/);
     if (m && method === "POST") {
+      return json(res, 410, { error: "Bots have one conversation; routine executions create internal tasks automatically." });
+      /*
       const body = await readBody(req);
       if (!body || typeof body !== "object" || Array.isArray(body)) return json(res, 400, { error: "body must be a JSON object" });
       const bot = store.bot(m[1]);
@@ -178,6 +179,7 @@ export function createTaskRoutes(deps: TaskRouteDeps): RouteHandler {
       // Who opened it decides who may answer its cards on a shared workspace.
       if (auth.kind === "session") threadStarters.set(task.threadId, actorKey(auth));
       return json(res, 201, { bot: publicBot(store.bot(bot.id)!), task: wireTask(task, store.bot(bot.id)!.modelSelection) });
+      */
     }
     m = path.match(/^\/api\/bots\/([\w-]+)\/tasks\/delete$/);
     if (m && method === "POST") {

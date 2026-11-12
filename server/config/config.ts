@@ -9,7 +9,7 @@ import { writeFileAtomic } from "../storage/atomic.ts";
 import { withoutComputerEngine } from "../computers/computer-engine-removal.ts";
 import { newBotDefaultsSchema, type NewBotDefaults } from "../bots/new-bot-defaults.ts";
 import { replaySettings } from "../agent/replay-settings.ts";
-import { EFFORT_LEVELS, type EffortLevel } from "../../shared/wire.ts";
+import { EFFORT_LEVELS } from "../../shared/wire.ts";
 import { isModelVariant, type InstanceConfigMap, type McpServerSpec, type ModelSelection } from "../harness/contracts.ts";
 import { DEFAULT_WINDOW_MINUTES, MAX_WINDOW_MINUTES } from "../agent/cache-keepwarm.ts";
 import { PROVIDER_ICON_PRESETS, providerIconError } from "../../shared/provider-icon.ts";
@@ -23,9 +23,6 @@ import { roomContextSettings } from "../teams/room-context-settings.ts";
 
 const optionalText = z.string().optional();
 
-export const DEFAULT_ROOM_TURN_TIMEOUT_MINUTES = 5;
-export const MIN_ROOM_TURN_TIMEOUT_MINUTES = 1;
-export const MAX_ROOM_TURN_TIMEOUT_MINUTES = 1_440;
 export const DEFAULT_MCP_CALL_TIMEOUT_MINUTES = 10;
 export const MIN_MCP_CALL_TIMEOUT_MINUTES = 1;
 export const MAX_MCP_CALL_TIMEOUT_MINUTES = 60;
@@ -35,13 +32,6 @@ export const MAX_CONCURRENT_BOT_THREADS = 10;
 export const MIN_THREAD_EVENT_LOG_BYTES = 256 * 1024;
 export const MAX_THREAD_EVENT_LOG_BYTES = 4 * 1024 * 1024 * 1024;
 
-const roomConfigSchema = z.object({
-  turnTimeoutMinutes: z
-    .number()
-    .int()
-    .min(MIN_ROOM_TURN_TIMEOUT_MINUTES)
-    .max(MAX_ROOM_TURN_TIMEOUT_MINUTES),
-});
 const mcpConfigSchema = z.object({
   /** Minutes one bot MCP tool call may run; default 10. */
   callTimeoutMinutes: z
@@ -78,10 +68,6 @@ const featureConfigSchema = z.object({
   /** One shared skills store that bots read by assignment. Off unless true. */
   skillsLibrary: z.boolean().optional(),
   shareLearnedSkills: z.enum(["off", "ask", "auto"]).optional(),
-  /** Memory upkeep also reads a member bot's room turns. Off unless true. */
-  roomMemoryCapture: z.boolean().optional(),
-  /** Room jobs to several members run side by side, each in a thread of its own. Off unless true. */
-  parallelRoomJobs: z.boolean().optional(),
   /** A teammate parked on a gate only the person can lift is reported to its Chief of Staff. Off unless true. */
   chiefEscalations: z.boolean().optional(),
   acpPlanLines: z.boolean().optional(), // An ACP agent's plan as activity lines. Off unless true.
@@ -132,13 +118,6 @@ const threadsConfigSchema = z.object({
   /** Days a closed or archived thread's event logs survive; absent keeps them forever. */
   eventLogRetentionDays: z.number().int().min(1).max(3650).optional(),
 }).strict();
-const newBotsConfigSchema = z.object({
-  /** Effort for a new bot whose model selection names none. */
-  effort: z.enum(EFFORT_LEVELS).optional(),
-}).strict();
-const newBotsPatchSchema = z.object({
-  effort: newBotsConfigSchema.shape.effort.nullable(),
-}).strict();
 const threadsPatchSchema = threadsConfigSchema.extend({
   maxConcurrentPerBot: threadsConfigSchema.shape.maxConcurrentPerBot.optional(),
   eventLogMaxBytes: threadsConfigSchema.shape.eventLogMaxBytes.nullable(),
@@ -153,7 +132,6 @@ const appConfigSchema = z.object( {
   automaticRecovery: automaticRecoverySchema.optional(),
   cacheKeepWarm: cacheKeepWarmSchema.optional(),
   newBotDefaults: newBotDefaultsSchema.optional(),
-  newBots: newBotsConfigSchema.optional(),
   /** CLI launch preferences; never enables remote access implicitly. */
   cliStartup: z.object({
     access: z.enum(["local", "tunnel", "tailscale", "public-url"]),
@@ -207,7 +185,6 @@ const appConfigSchema = z.object( {
   profile: z.object({ name: optionalText, email: optionalText, aboutMe: z.string().max(24_000).optional() }).optional(),
   /** UI language override (BCP-47, lowercase); absent follows the system. */
   language: optionalText,
-  rooms: roomConfigSchema.optional(),
   mcp: mcpConfigSchema.optional(),
   context: z.object({
     compactAt: z.number().positive().max(10_000_000).optional(),
@@ -235,7 +212,7 @@ const storedAppConfigSchema = appConfigSchema.extend(helperStoredShape).extend({
 
 });
 const appConfigPatchSchema = appConfigSchema.omit({ instances: true, mcpServers: true, cliStartup: true, customDomain: true })
-  .extend({ threads: threadsPatchSchema.optional(), newBots: newBotsPatchSchema.optional() });
+  .extend({ threads: threadsPatchSchema.optional() });
 const jsonObjectSchema = z.record(z.string(), z.json());
 
 export interface AppConfig extends HelperConfig {
@@ -248,7 +225,6 @@ export interface AppConfig extends HelperConfig {
   cacheKeepWarm?: { enabled: boolean; windowMinutes?: number };
   /** UI creation template. Saving it never mutates a bot or grants access. */
   newBotDefaults?: NewBotDefaults;
-  newBots?: { effort?: EffortLevel };
   cliStartup?: {
     access: "local" | "tunnel" | "tailscale" | "public-url";
     publicUrl?: string;
@@ -276,12 +252,11 @@ export interface AppConfig extends HelperConfig {
 
   opencodeGo?: { apiKey?: string };
   profile?: { name?: string; email?: string; aboutMe?: string };
-  rooms?: { turnTimeoutMinutes: number };
   mcp?: { callTimeoutMinutes?: number };
   threads?: { maxConcurrentPerBot: number; eventLogMaxBytes?: number; eventLogRetentionDays?: number };
   context?: { rebuildBytes?: number; compactAt?: number; autoCompact?: boolean; roomCompactAt?: number; roomSessions?: boolean; replayToolHistory?: boolean };
   memory?: { captureQuietMs?: number; tidyHour?: number };
-  features?: { skillAuthoring?: boolean; skillReview?: boolean; skillReviewSteps?: number; showToolCalls?: boolean;  sharedComputers?: boolean; claudeUserMcp?: boolean; claudeUserSkills?: boolean; llmThreadTitles?: boolean; autoRecall?: boolean; routinesInConversation?: boolean; skillsLibrary?: boolean; shareLearnedSkills?: "off" | "ask" | "auto"; roomMemoryCapture?: boolean; parallelRoomJobs?: boolean; chiefEscalations?: boolean; acpPlanLines?: boolean; agentsToolBridge?: boolean };
+  features?: { skillAuthoring?: boolean; skillReview?: boolean; skillReviewSteps?: number; showToolCalls?: boolean;  sharedComputers?: boolean; claudeUserMcp?: boolean; claudeUserSkills?: boolean; llmThreadTitles?: boolean; autoRecall?: boolean; routinesInConversation?: boolean; skillsLibrary?: boolean; shareLearnedSkills?: "off" | "ask" | "auto"; chiefEscalations?: boolean; acpPlanLines?: boolean; agentsToolBridge?: boolean };
   onboarding?: { completedAt?: string; version?: number; reelSeen?: boolean; hintsSeen?: string[]; firstTurnAt?: string };
 
   instances?: InstanceConfigMap;
@@ -310,10 +285,6 @@ export function parseConfigPatch(value: JsonValue): ConfigPatch {
 }
 
 /** Revalidated because the value is forwarded into a child process environment. */
-
-export function roomTurnTimeoutMinutes(cfg: AppConfig): number {
-  return cfg.rooms?.turnTimeoutMinutes ?? DEFAULT_ROOM_TURN_TIMEOUT_MINUTES;
-}
 
 export function mcpCallTimeoutMinutes(cfg: AppConfig): number {
   return cfg.mcp?.callTimeoutMinutes ?? DEFAULT_MCP_CALL_TIMEOUT_MINUTES;
@@ -356,10 +327,6 @@ export function skillReviewSteps(cfg: AppConfig): number {
 
 export function autoRecallEnabled(cfg: AppConfig): boolean {
   return cfg.features?.autoRecall !== false;
-}
-
-export function roomMemoryCaptureEnabled(cfg: AppConfig): boolean {
-  return cfg.features?.roomMemoryCapture === true;
 }
 
 export const DEFAULT_CAPTURE_QUIET_MS = 2 * 60_000;
@@ -517,7 +484,7 @@ export function cacheUntilConfigChanges<T>(derive: (config: AppConfig) => T): ()
 }
 
 /** Keeps process.env in step with a saved credential ("" drops the var), because loadConfig() prefers env. */
-export function syncCredentialEnv(patch: Partial<Omit<AppConfig, "threads" | "newBots">>): void {
+export function syncCredentialEnv(patch: Partial<Omit<AppConfig, "threads">>): void {
   const secrets: Array<[value: string | undefined, name: string]> = [[patch.xai?.key, "XAI_API_KEY"],
 [patch.mistral?.key, "MISTRAL_API_KEY"],
 [patch.cerebras?.key, "CEREBRAS_API_KEY"],
@@ -638,9 +605,8 @@ export function onConfigSaved(listener: (before: JsonObject, after: JsonObject) 
 
 /** Secrets are never echoed back; callers report configured-or-not only. */
 export function saveConfig(
-  patch: Partial<Omit<AppConfig, "threads" | "newBots">> & {
+  patch: Partial<Omit<AppConfig, "threads">> & {
     threads?: z.output<typeof threadsPatchSchema>;
-    newBots?: z.output<typeof newBotsPatchSchema>;
   },
   options: { replaceInstances?: boolean } = {},
 ): void {
@@ -651,12 +617,12 @@ export function saveConfig(
     if (parsed.success) disk = parsed.data;
   } catch {
   }
-  const checkedPatch = appConfigSchema.partial().extend({ threads: threadsPatchSchema.optional(), newBots: newBotsPatchSchema.optional() }).parse(patch);
+  const checkedPatch = appConfigSchema.partial().extend({ threads: threadsPatchSchema.optional() }).parse(patch);
   const before = configSaveListeners.size ? structuredClone(disk) : disk;
 
   delete disk.localVm;
   delete disk.imageGen;
-  for (const key of ["xai", "anthropic", "mistral", "cerebras", "groq", "meta", "openai", "openrouter", "openaiCompat", "composio", "opencodeGo", "profile", "rooms", "mcp", "threads", "context", "memory", "features", "budgets", "billing", "decisions", "loopGuard", "onboarding", "newBots", "safetyFloor"] as const) {
+  for (const key of ["xai", "anthropic", "mistral", "cerebras", "groq", "meta", "openai", "openrouter", "openaiCompat", "composio", "opencodeGo", "profile", "mcp", "threads", "context", "memory", "features", "budgets", "billing", "decisions", "loopGuard", "onboarding", "safetyFloor"] as const) {
     const section = checkedPatch[key];
     if (!section) continue;
     const current = jsonObjectSchema.safeParse(disk[key]);

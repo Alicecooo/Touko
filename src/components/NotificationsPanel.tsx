@@ -27,7 +27,6 @@ const KIND_LOOK: Record<NotifyKind, { Icon: LucideIcon; className: string; statu
 interface TitledThread { threadId: string; title: string }
 interface ThreadLookupState {
   bots: Array<{ id: string; threadId: string; tasks?: TitledThread[] }>;
-  groups: Array<{ threadId: string; name: string; tasks?: TitledThread[] }>;
 }
 
 export function notificationBotForAvatar<T extends { id: string }>(entry: { botId: string }, bots: T[]): T | null {
@@ -36,13 +35,6 @@ export function notificationBotForAvatar<T extends { id: string }>(entry: { botI
 
 /** Null for an unknown or deleted thread, so the row falls back to the stored title. */
 export function notificationThreadName(entry: { botId: string; threadId: string }, state: ThreadLookupState): string | null {
-  const group = state.groups.find(
-    (candidate) => candidate.threadId === entry.threadId || (candidate.tasks ?? []).some((task) => task.threadId === entry.threadId),
-  );
-  if (group) {
-    const task = (group.tasks ?? []).find((candidate) => candidate.threadId === entry.threadId);
-    return task?.title || group.name || null;
-  }
   const bot = state.bots.find((candidate) => candidate.threadId === entry.threadId || candidate.tasks?.some((task) => task.threadId === entry.threadId));
   const task = bot?.tasks?.find((candidate) => candidate.threadId === entry.threadId);
   return task?.title || null;

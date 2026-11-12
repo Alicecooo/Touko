@@ -8,7 +8,6 @@ import type { BotAvatarCrop } from "./bot-avatar.ts";
 import type { CredentialTargetId } from "./credential-request.ts";
 import type { TeamSetupRequest } from "./team-setup.ts";
 import type { RoutineRequestCardData } from "./routine-request.ts";
-import type { WebhookRequestCardData } from "./webhook-request.ts";
 import type { ProfileRequestCardData } from "./profile-request.ts";
 import type { PlaceRow } from "./place-view.ts";
 import type { ModelRequestCardData } from "./model-request.ts";
@@ -20,7 +19,6 @@ import type { GroupGoalRunCardData } from "./group-goal-run.ts";
 import type { RuntimeEvent } from "./runtime-events.ts";
 import type { NotificationLogEntry } from "./notification.ts";
 import type { Routine, RoutineRun } from "./routines.ts";
-import type { WebhookAttempt, WebhookTrigger } from "./webhooks.ts";
 
 /** Reasoning-effort levels, ascending: a union of what any engine accepts;
  * each driver declares the subset its CLI will take. */
@@ -100,11 +98,6 @@ export interface TaskUsage {
   lastTurn?: { input: number; output: number; cachedInput?: number; costUsd: number | null };
   /** what filled the model's window on the last model call, and the window's size when known */
   context?: { tokens: number; window?: number };
-}
-
-/** Accounting for the currently displayed room thread, across all speakers. */
-export interface GroupThreadUsage extends TaskUsage {
-  lastSpeaker?: { botId: string; name: string };
 }
 
 /** One task = one conversation with its own context, thread and provider
@@ -374,7 +367,7 @@ export interface WireMessage {
   roomRequest?: { id: string; phase: "request" | "result" };
   id: string;
   role: "bot" | "user";
-  kind: "text" | "options" | "activity" | "screen" | "connector" | "secret" | "signin" | "routine.run" | "goal.run" | "digest" | "compaction" | "widget";
+  kind: "text" | "options" | "activity" | "screen" | "connector" | "secret" | "signin" | "routine.run" | "digest" | "compaction" | "widget";
   text?: string;
   digest?: TurnDigest;
   compaction?: {
@@ -417,9 +410,6 @@ export interface WireMessage {
      * server-local spill paths are not exposed to clients. */
     fullResult?: boolean;
   };
-  /** A bot line a "post" webhook wrote: whoever called the webhook chose
-   * its words. */
-  webhookPost?: boolean;
   /** user messages sent INTO a running turn (capabilities.queueing). */
   steered?: boolean;
   /** user messages a peer bot handed to this thread's RUNNING turn: peer
@@ -465,8 +455,6 @@ export interface WireMessage {
   channelMode?: "chat" | "goal";
   /** group threads: which member said this (sender attribution). */
   from?: { botId: string; name: string; color: string };
-  /** Set on a room message a bot pushed in with post_to_room. */
-  peerPost?: { unattended?: boolean };
   /** A room reply whose speaker the decision model picked (an Auto room),
    * with how sure it was. Absent on every other message; clients that do
    * not know it ignore it. */
@@ -536,8 +524,6 @@ export interface OptionCardData {
   undone?: boolean;
   /** A durable chat-created routine proposal. */
   routineRequest?: RoutineRequestCardData;
-  /** A webhook trigger a bot made or changed from chat. */
-  webhookRequest?: WebhookRequestCardData;
   /** A durable profile-change proposal (propose_profile). */
   profileRequest?: ProfileRequestCardData;
   /** A durable default-model proposal (propose_model). */
@@ -638,90 +624,58 @@ export interface ComputerHelpRef {
   place: Surface;
 }
 
-/** Who answers a room message nobody was @mentioned in. */
+/** Accounting for the currently displayed room thread, across all speakers. */
+export interface GroupThreadUsage extends TaskUsage {
+  lastSpeaker?: { botId: string; name: string };
+}
+
+/** Legacy room fields retained for wire/storage compatibility while room chat is removed from the UI. */
 export type GroupDefaultResponder =
   | { kind: "member"; botId: string }
   | { kind: "everyone" }
   | { kind: "mentions" };
 
-/** One independent conversation inside a user-created channel. */
 export interface GroupTask {
   threadId: string;
   title: string;
   createdAt: number;
   pinnedCwd?: string | null;
   pinnedMessageId?: string;
-  /** The person pinned this channel thread above the update-ordered list. */
   pinned?: boolean;
-  /** This conversation's own turn ceiling, in whole minutes. Absent uses
-   * the global group turn limit. Direct chats do not use this ceiling. */
-  turnTimeoutMinutes?: number;
-  /** Epoch ms of the newest message, or createdAt when the thread has none. */
   updatedAt?: number;
   lastThreadOrderAt?: number;
-  /** The first message already drove a title attempt for this thread, so a
-   * later one does not rename a room the person may have retitled. */
   titleFromFirstMessage?: true;
-  /** Whether a turn is actively running in this thread. */
   working?: boolean;
-  /** The member bot currently speaking or generating in this thread, if any. */
   busyBotId?: string | null;
 }
 
-/** A room as a client may see it: the record plus the computed working flag. */
+/** A grouping container. Legacy room fields remain on the wire for migration compatibility. */
 export interface WireGroup {
-  /** Computed from the usage ledger, not stored in groups.json. */
   usage?: GroupThreadUsage | null;
-  /** transient: each member's context in the active thread, from its last
-   * turn there, and whether its next turn there was asked to start
-   * compacted. */
   memberContext?: Record<string, { tokens: number; window: number; compactRequested?: true }> | null;
   id: string;
-  /** The active task's thread. Direct-message channels stay single-threaded. */
   threadId: string;
-  /** User-created channels have independent tasks, newest first. */
   tasks?: GroupTask[];
   name: string;
   memberIds: string[];
   defaultResponder: GroupDefaultResponder;
-  /** The room's shared instructions. */
   bulletin: string;
   unread: boolean;
-  /** The newest message on screen the last time the person read this
-   * conversation. The New divider goes after it. */
   lastReadMessageId?: string;
   createdAt: number;
-  /** true for auto-created bot-bot channels. */
   dm?: boolean;
-  /** transient: the member currently running a turn. */
   busyBotId?: string | null;
-  /** transient: when the busy member's turn started; never persisted. */
   turnStartedAt?: number;
-  /** the room's shared desk; absent = each member's own default. */
   cwd?: string;
   pinnedCwd?: string | null;
   pinnedMessageId?: string;
-  /** sidebar section heading this room is filed under. */
   section?: string;
-  /** New user-created rooms start with setup pending. */
   setupCompletedAt?: number | null;
   setupSkippedAt?: number | null;
-  /** The narrowest audience this room has ever had: a bot leaving never
-   * widens who may see the transcript. Sent to admins only. */
   audienceFloor?: BotVisibility;
-  /** True while any member (or hand-off) is mid-turn. Computed at
-   * projection time, never persisted. */
   working: boolean;
-  /** A direct-message channel's turn ceiling. Null on the wire means the
-   * global group limit. Channel conversations store theirs on each task. */
-  turnTimeoutMinutes?: number | null;
-  /** Members the person stopped in this room ("stop @Bot"), by bot id. A
-   * held member gets no turn until it is @mentioned again or resumed. */
   holds?: Record<string, RoomHold>;
-  /** Room messages addressed to a member while it was held, by bot id;
-   * its next turn is shown them, then they are cleared. */
   heldMessages?: Record<string, RoomHeldMessage[]>;
-  /** transient: who waits in each of the room's threads, and on whom; absent or empty when nobody waits. */
   queue?: RoomQueueEntry[];
 }
 
@@ -729,33 +683,25 @@ export interface RoomQueueEntry {
   botId: string;
   threadId: string;
   state: "running" | "queued";
-  /** 1-based place in that thread's line; `of` counts the whole line. */
   position: number;
   of: number;
-  /** Who a queued member waits on: the member running now, else the one speaking (or the one ahead). */
   waitingForBotId?: string;
   assignmentId?: string;
 }
 
-/** One member's hold in a room: when the person stopped it, and whether the
- * room has already said so (the held line is written once per hold). */
 export interface RoomHold {
   at: number;
   noted?: boolean;
 }
 
-/** A room message that reached a member while it was held. */
 export interface RoomHeldMessage {
   threadId: string;
   messageId: string;
 }
 
-/** Why a steer-queue entry waits: a shared thread slot, or the bot's room
- * turn (which runs one at a time per bot). */
-export type SteerQueueReason = "capacity" | "group-turn";
-
 /** Pending steer-queue chips, as `queuedSteerSnapshot` emits them and the
  * `bot.queued` frame carries them: threadId → queued items. */
+export type SteerQueueReason = "capacity" | "group-turn";
 export type BotQueuedMessages = Record<string, Array<{ queueId: string; text: string; reason?: SteerQueueReason }>>;
 
 /** Skills library browse surface: one row per library entry, with the bots
@@ -793,9 +739,6 @@ export type ServerFrame =
   | { kind: "routine"; routine: Routine }
   | { kind: "routine.deleted"; routineId: string }
   | { kind: "routine.run"; run: RoutineRun }
-  | { kind: "webhook"; webhook: WebhookTrigger }
-  | { kind: "webhook.attempt"; attempt: WebhookAttempt }
-  | { kind: "webhook.deleted"; webhookId: string }
   | { kind: "runtime"; event: RuntimeEvent }
   | { kind: "screen"; botId: string; threadId: string; png: string; mime?: string }
   /** A bot's cloud computer is being set up or woken for a turn; the chat shows

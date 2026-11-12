@@ -11,8 +11,8 @@ const isFree = (port: number): Promise<boolean> =>
     probe.listen(port, "127.0.0.1", () => probe.close(() => resolve(true)));
   });
 
-/** A base where every `base + offset` is free (the harness also opens a webhook receiver one above
- * itself). A probe, not a reservation: the ports are released before they are returned. */
+/** A base where every requested offset is free. A probe, not a reservation: the ports are released
+ * before they are returned. */
 export async function freePortBlock(offsets: number[], from = 19_600, span = 3_000): Promise<number> {
   for (let attempt = 0; attempt < 40; attempt++) {
     const base = from + Math.floor(Math.random() * span);

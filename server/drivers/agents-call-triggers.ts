@@ -10,7 +10,6 @@ export const TRIGGER_TOOL_NAMES: ReadonlySet<string> = new Set(["list_triggers",
 
 const LIST_ROUTE = "/api/internal/triggers";
 const REQUEST_ROUTE = "/api/internal/trigger-requests";
-const SCHEDULE_ONLY = ["schedule", "timeout_minutes", "timeoutMinutes", "clear_timeout", "continuity", "overlap", "run_on_startup", "runOnStartup"] as const;
 
 function jsonRecord(value: unknown): value is Json {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -253,18 +252,10 @@ function routineFields(args: Json): { fields: Json; error?: string } {
 }
 
 
-/** Schedule fields plus the webhook's event types, normalized once; which apply is checked against the trigger's kind. */
+/** Schedule fields normalized once. */
 function triggerFields(args: Json): { fields: Json; error?: string } {
   const { fields, error } = routineFields(args);
-  if (error) return { fields, error };
-  const eventTypes = args.webhook_event_types;
-  if (eventTypes !== undefined && eventTypes !== null) {
-    if (!Array.isArray(eventTypes) || eventTypes.some((value) => typeof value !== "string")) {
-      return { fields, error: "webhook_event_types must be a list of event names." };
-    }
-    fields.eventTypes = eventTypes.map((value) => String(value).trim()).filter(Boolean);
-  }
-  return { fields };
+  return { fields, ...(error ? { error } : {}) };
 }
 
 function appliedText(r: Json, done: string): ToolCallResult {
@@ -308,21 +299,13 @@ export async function callTriggerTool(name: string, args: Json, context: ToolCal
   }
   if (name === "create_trigger") {
     const when = args.when;
-    if (when !== "schedule" && when !== "webhook") return { text: 'create_trigger needs when: "schedule" or "webhook".', isError: true };
+    if (when !== "schedule") return { text: 'create_trigger needs when: "schedule".', isError: true };
     const { fields, error } = triggerFields(args);
     if (error) return { text: error, isError: true };
     if (!fields.name || !fields.instructions) return { text: "create_trigger needs name and instructions.", isError: true };
-    const label = `the ${when === "webhook" ? "webhook" : "schedule"} trigger “${String(fields.name)}”`;
-    if (when === "schedule") {
-      if (!fields.schedule) return { text: "A schedule trigger needs schedule.", isError: true };
-      if (fields.eventTypes) return { text: "webhook_event_types applies only to when=webhook.", isError: true };
-      const { eventTypes: _unused, ...routine } = fields;
-      return request({ action: "create", kind: "schedule", routine, ...(forBotId ? { forBotId } : {}) }, context, `Created ${label}`);
-    }
-    const misplaced = SCHEDULE_ONLY.find((key) => args[key] !== undefined && args[key] !== null);
-    if (misplaced) return { text: `A webhook trigger fires when its link is called, so it takes no ${misplaced}.`, isError: true };
-    const webhook = { name: fields.name, instructions: fields.instructions, ...(fields.runOn ? { runOn: fields.runOn } : {}), ...(fields.eventTypes ? { eventTypes: fields.eventTypes } : {}) };
-    return request({ action: "create", kind: "webhook", webhook, ...(forBotId ? { forBotId } : {}) }, context, `Created ${label}`);
+    const label = `the schedule trigger “${String(fields.name)}”`;
+    if (!fields.schedule) return { text: "A schedule trigger needs schedule.", isError: true };
+    return request({ action: "create", kind: "schedule", routine: fields, ...(forBotId ? { forBotId } : {}) }, context, `Created ${label}`);
   }
   const triggerId = typeof args.trigger_id === "string" ? args.trigger_id.trim() : "";
   const action = routineAction(args.action);

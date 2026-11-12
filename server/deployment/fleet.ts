@@ -72,7 +72,6 @@ export interface FleetWorkspace {
   slug: string;
   host: string;
   port: number;
-  webhookPort: number;
   status: "running" | "suspended" | "provisioning" | "error" | "retained";
   createdAt: string;
   /** Incomplete provisioning keeps its fence once the Unix account exists. */
@@ -201,13 +200,13 @@ export function fenceRules(workspaces: FleetWorkspace[]): string {
   const lines = ["#!/usr/sbin/nft -f", "# Written by `openmausbot fleet`; regenerated on every create, suspend, resume and delete.", "add table inet openmausbot", "flush table inet openmausbot", "table inet openmausbot {", "\tchain output {", "\t\ttype filter hook output priority 0; policy accept;"];
   for (const workspace of [...workspaces].sort((a, b) => a.slug.localeCompare(b.slug))) {
     if (workspace.status !== "running" && workspace.status !== "suspended" && workspace.status !== "retained" && !workspace.accountCreated) continue;
-    lines.push(`\t\toif lo tcp dport { ${workspace.port}, ${workspace.webhookPort} } meta skuid != { ${fleetUser(workspace.slug)}, caddy, root } reject`);
+    lines.push(`\t\toif lo tcp dport ${workspace.port} meta skuid != { ${fleetUser(workspace.slug)}, caddy, root } reject`);
   }
   lines.push("\t}", "}", "");
   return lines.join("\n");
 }
 
-export function caddySite(workspace: Pick<FleetWorkspace, "host" | "port" | "webhookPort" | "status">): string {
+export function caddySite(workspace: Pick<FleetWorkspace, "host" | "port" | "status">): string {
   if (workspace.status !== "running") {
     const message = workspace.status === "suspended" ? "This workspace is suspended." : "This workspace is not available.";
     return [`${workspace.host} {`, `\trespond "${message}" 503`, "}", ""].join("\n");
@@ -215,9 +214,6 @@ export function caddySite(workspace: Pick<FleetWorkspace, "host" | "port" | "web
   return [
     `${workspace.host} {`,
     "\tencode zstd gzip",
-    "\thandle /hooks/* {",
-    `\t\treverse_proxy 127.0.0.1:${workspace.webhookPort}`,
-    "\t}",
     "\thandle {",
     `\t\treverse_proxy 127.0.0.1:${workspace.port} {`,
     "\t\t\tflush_interval -1",
@@ -236,7 +232,6 @@ export function instanceEnv(input: { workspace: FleetWorkspace; dataDir: string;
   const lines = [
     `OMB_DATA_DIR=${input.dataDir}`,
     `OMB_PORT=${input.workspace.port}`,
-    `OMB_WEBHOOK_PORT=${input.workspace.webhookPort}`,
     `OMB_PUBLIC_URL=https://${input.workspace.host}`,
   ];
   if (input.licenseKey) lines.push(`OMB_LICENSE_KEY=${input.licenseKey}`);
@@ -353,7 +348,6 @@ export function createPlan(input: {
     slug: input.slug,
     host: `${input.slug}.${input.registry.domain}`,
     port,
-    webhookPort: port + 1,
     status: "running",
     createdAt: (input.now ?? new Date()).toISOString(),
   };

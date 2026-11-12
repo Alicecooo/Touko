@@ -112,7 +112,6 @@ export async function reconcile(client: HeadlessClient, file: TeamFile, options:
     if (kind !== "kept") tally[kind] += 1;
   };
   const write = async (path: string, init: RequestInit): Promise<any> => { tally.writes += 1; return client.json(path, init); };
-  const tool = async (name: string, args: Rec): Promise<any> => { tally.writes += 1; return client.tool(name, args); };
   const fleet = async () => client.json<Rec>("/api/bots?messages=0");
   const findBot = (bots: Rec[], name: string, team?: string) => {
     const inTeam = (bot: Rec) => Number(team !== undefined && key(bot.section) === key(team));
@@ -150,7 +149,7 @@ export async function reconcile(client: HeadlessClient, file: TeamFile, options:
   const sections: string[] = [...((await client.json<Rec>("/api/sidebar-sections")).sections ?? [])];
   const sectionNamed = (name: string) => sections.find((section) => key(section) === key(name));
   const teamNames: string[] = [];
-  for (const name of [...file.teams.map((team) => team.name), ...file.bots.flatMap((bot) => [bot.team, ...bot.manages]), ...file.rooms.map((room) => room.team)]) {
+  for (const name of [...file.teams.map((team) => team.name), ...file.bots.flatMap((bot) => [bot.team, ...bot.manages])]) {
     if (name && !teamNames.some((known) => key(known) === key(name))) teamNames.push(name);
   }
   for (const name of teamNames) {
@@ -278,37 +277,6 @@ export async function reconcile(client: HeadlessClient, file: TeamFile, options:
     if (options.apply) await write(`/api/bots/${enc(bot!.id)}`, { method: "PATCH", body: JSON.stringify({ chiefOfStaff: true, managedSections: managed, acknowledgePeerScope: true }) });
   }
 
-  const rooms: Rec[] = (current.groups ?? []).filter((group: Rec) => !group.dm);
-  for (const room of file.rooms) {
-    const memberIds = room.members.map((name) => botId(name) ?? (!options.apply && created.has(key(name)) ? `new:${name}` : undefined));
-    const missing = room.members.filter((_name, index) => !memberIds[index]);
-    if (missing.length) throw new HeadlessError(`room "${room.name}": no bot named ${missing.map((name) => `"${name}"`).join(", ")}`, EXIT.failed);
-    const ids = memberIds as string[];
-    const responder = room.responder === undefined ? undefined : room.responder === "everyone" || room.responder === "mentions" ? { kind: room.responder }
-      : { kind: "member", bot_id: ids[room.members.findIndex((member) => key(member) === key(room.responder))]! };
-    const team = room.team ? sectionNamed(room.team) ?? room.team : undefined;
-    const existing = rooms.find((group) => key(group.name) === key(room.name));
-    if (!existing) {
-      note(`room "${room.name}": create (${room.members.length} member${room.members.length === 1 ? "" : "s"}${team ? `, team ${team}` : ""})`, "created");
-      if (options.apply) await tool("create_channel", { name: room.name, member_ids: ids, ...(team ? { section: team } : {}),
-        ...(room.brief !== undefined ? { bulletin: room.brief.trimEnd() } : {}), ...(responder ? { default_responder: responder } : {}) });
-      continue;
-    }
-    const change: Rec = {};
-    const words: string[] = [];
-    if (!sameSet(existing.memberIds ?? [], ids)) { change.member_ids = ids; words.push(`members → ${room.members.join(", ")}`); }
-    if (team !== undefined && key(existing.section) !== key(team)) { change.section = team; words.push(`team → ${team}`); }
-    if (room.brief !== undefined && String(existing.bulletin ?? "").trimEnd() !== room.brief.trimEnd()) { change.bulletin = room.brief.trimEnd(); words.push("brief changed"); }
-    const echo: Rec = existing.defaultResponder ?? {};
-    if (responder && (echo.kind !== responder.kind || (responder.kind === "member" && echo.botId !== (responder as Rec).bot_id))) {
-      change.default_responder = responder;
-      words.push(`answered by ${room.responder}`);
-    }
-    if (!words.length) { note("", "unchanged"); continue; }
-    note(`room "${room.name}": update ${words.join("; ")}`, "changed");
-    if (options.apply) await tool("update_channel", { channel_id: existing.id, ...change });
-  }
-
   for (const team of file.teams) {
     const section = sectionNamed(team.name);
     if (!section) continue;
@@ -317,12 +285,6 @@ export async function reconcile(client: HeadlessClient, file: TeamFile, options:
       if (!options.prune || !team.prune) { note(`bot "${bot.name}": not in file (kept${team.prune ? "; --prune deletes it" : ""})`, "kept"); continue; }
       note(`bot "${bot.name}": delete (not in file)`, "deleted");
       if (options.apply) await write(`/api/bots/${enc(bot.id)}`, { method: "DELETE" });
-    }
-    const roomNames = new Set(file.rooms.map((room) => key(room.name)));
-    for (const group of rooms.filter((candidate) => key(candidate.section) === key(section) && !roomNames.has(key(candidate.name)))) {
-      if (!options.prune || !team.prune) { note(`room "${group.name}": not in file (kept${team.prune ? "; --prune deletes it" : ""})`, "kept"); continue; }
-      note(`room "${group.name}": delete (not in file)`, "deleted");
-      if (options.apply) await write(`/api/groups/${enc(group.id)}`, { method: "DELETE" });
     }
   }
   return tally;
@@ -441,16 +403,6 @@ export async function teamExportVerb(ctx: VerbContext): Promise<VerbOutcome> {
     }
     botEntries.push(entry);
   }
-  const byId = new Map((fleet.bots ?? []).map((bot: Rec) => [bot.id, bot.name]));
-  const roomEntries = (fleet.groups ?? []).filter((group: Rec) => !group.dm && inScope(group.section)).map((group: Rec) => {
-    const responder: Rec = group.defaultResponder ?? {};
-    return {
-      name: group.name, ...(group.section ? { team: group.section } : {}), members: (group.memberIds ?? []).map((id: string) => byId.get(id) ?? id),
-      ...(String(group.bulletin ?? "").trim() ? { brief: clean(String(group.bulletin), `room "${group.name}" brief`) } : {}),
-      ...(responder.kind === "everyone" || responder.kind === "mentions" ? { responder: responder.kind }
-        : responder.kind === "member" && byId.has(responder.botId) ? { responder: byId.get(responder.botId) } : {}),
-    };
-  });
   const config = await client.json<Rec>("/api/config");
   const engines: Rec = {};
   for (const [kind, spec] of Object.entries(ENGINE_KINDS)) {
@@ -459,14 +411,13 @@ export async function teamExportVerb(ctx: VerbContext): Promise<VerbOutcome> {
     engines[name] = { key: { env: "SET_ME" }, ...(kind === "openai-compatible" && config.openaiCompat?.url ? { baseUrl: config.openaiCompat.url } : {}),
       ...(kind === "claude" && config.anthropic?.everyClaudeBot === false ? { everyClaudeBot: false } : {}) };
   }
-  const document = { version: 1, ...(Object.keys(engines).length ? { engines } : {}), ...(teamEntries.length ? { teams: teamEntries } : {}),
-    bots: botEntries, ...(roomEntries.length ? { rooms: roomEntries } : {}) };
+  const document = { version: 1, ...(Object.keys(engines).length ? { engines } : {}), ...(teamEntries.length ? { teams: teamEntries } : {}), bots: botEntries };
   if (!botEntries.length) throw new HeadlessError("no bots to export", EXIT.failed);
   writeFileSync(resolve(out), `# Written by openmausbot team export on ${new Date().toISOString().slice(0, 10)}.\n# Engine keys are placeholders (SET_ME): set them before applying this elsewhere.\n${stringifyYaml(document, { lineWidth: 0 })}`);
   return {
-    result: { ok: true, file: resolve(out), teams: teamEntries.length, bots: botEntries.length, rooms: roomEntries.length, skills, engines: Object.keys(engines), skipped, redacted },
+    result: { ok: true, file: resolve(out), teams: teamEntries.length, bots: botEntries.length, skills, engines: Object.keys(engines), skipped, redacted },
     exitCode: EXIT.done,
-    human: [`Wrote ${out}: ${teamEntries.length} teams, ${botEntries.length} bots, ${roomEntries.length} rooms, ${skills} skills.`,
+    human: [`Wrote ${out}: ${teamEntries.length} teams, ${botEntries.length} bots, ${skills} skills.`,
       ...(Object.keys(engines).length ? ["Engine keys are placeholders (SET_ME): set them before applying it elsewhere."] : []),
       ...(redacted.length ? [`A secret was taken out of: ${redacted.join(", ")} (apply leaves those as they are).`] : []),
       ...skipped.map((line) => `not exported: ${line}`)],

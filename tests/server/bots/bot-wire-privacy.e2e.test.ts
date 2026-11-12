@@ -48,7 +48,7 @@ describe("bot wire privacy against the real server", () => {
         PATH: dirname(process.execPath), ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
         HOME: home, USERPROFILE: home, OMB_DATA_DIR: data,
         APPDATA: join(home, "appdata"), LOCALAPPDATA: join(home, "localappdata"),
-        OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1),
+        OMB_PORT: String(port),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

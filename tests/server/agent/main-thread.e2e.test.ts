@@ -39,7 +39,7 @@ async function launch() {
   return { fixture, url, dataDir, api, cli, wire, tasks, stamps, thread, idle, said, replied, finished };
 }
 
-it("stamps askedAt where a person writes, never for a routine, a webhook, start_thread, a teammate's hand-off or a Slack relay", async () => {
+it("stamps askedAt where a person writes, never for a routine, start_thread, a teammate's hand-off or a Slack relay", async () => {
   const { fixture, dataDir, api, cli, wire, stamps, thread, idle, said, replied, finished } = await launch();
   try {
     // One turn at a time per bot, each step settling first, so every turn meets its own scripted entry.
@@ -52,7 +52,6 @@ it("stamps askedAt where a person writes, never for a routine, a webhook, start_
         { reply: "Side job checked." },
         { reply: "Relayed line handled." },
         { reply: "Routine report." },
-        { reply: "Webhook handled." },
         { reply: "Hand-off done." },
       ] },
       [teammate.id]: { turns: [
@@ -83,12 +82,6 @@ it("stamps askedAt where a person writes, never for a routine, a webhook, start_
     const routineThread = await finished((candidate) => candidate.id === run.id);
     await replied(bot.id, routineThread, "Routine report.");
     expect(run.resultsThreadId).toBe(first);
-
-    const hook = await api("POST", "/api/webhooks", { name: "Build", prompt: "Handle the build event.", botId: bot.id, runOn: "maus" }, 201);
-    const delivered = await fetch(hook.credential.url, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-    expect(delivered.status).toBe(202);
-    const webhookThread = await finished((candidate) => candidate.webhookId === hook.webhook.id);
-    await replied(bot.id, webhookThread, "Webhook handled.");
 
     await cli("send", "--bot", teammate.id, "--task", teammate.activeTaskId, "--text", "Hand this to Asker.");
     const handoff = await thread(bot.id, "Take this over.");
@@ -154,7 +147,7 @@ it("moves no main thread for a teammate's work or results or a team incident; re
   }
 }, 120_000);
 
-it("marks a job's review answer and a webhook post unread where they land", async () => {
+it("marks a job's review answer unread where it lands", async () => {
   const { fixture, dataDir, api, cli, tasks, replied } = await launch();
   try {
     const asker = (await cli("new-bot", "--name", "Asker", "--section", "Ops")).bot;
@@ -177,10 +170,6 @@ it("marks a job's review answer and a webhook post unread where they land", asyn
     await replied(asker.id, asker.activeTaskId, "Reviewed: the books balance.");
     expect(await unread(asker.id, asker.activeTaskId)).toBe(true);
 
-    const hook = await api("POST", "/api/webhooks", { name: "Deploys", prompt: "", botId: asker.id, delivery: "post" }, 201);
-    const delivered = await fetch(hook.credential.url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: "Deploy finished." }) });
-    expect(delivered.ok).toBe(true);
-    await expect.poll(async () => (await tasks(asker.id)).find((task) => task.title === "Updates")?.unread, { timeout: 20_000 }).toBe(true);
   } finally {
     await fixture.close();
   }

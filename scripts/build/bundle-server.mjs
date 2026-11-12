@@ -38,7 +38,6 @@ const NODE_REQUIRE = {
 // which bundling already points at the output directory.
 const ENTRY_POINTS = [
   "index.ts",
-  "storage/message-search.worker.ts",
   // the `openmausbot` command
   "openmausbot.ts",
   "workspace/workspace-backup.worker.ts",

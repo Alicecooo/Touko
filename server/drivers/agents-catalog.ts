@@ -130,12 +130,6 @@ const TRIGGER_FIELDS_SCHEMA = {
     description: "Complete steps for each run, which does NOT see this conversation. Put judgement here, e.g. \"if it is not about an order, stop\".",
   },
   schedule: { ...ROUTINE_SCHEDULE_SCHEMA, description: `Only for when=schedule. ${ROUTINE_SCHEDULE_SCHEMA.description}` },
-  webhook_event_types: {
-    type: "array",
-    maxItems: 20,
-    items: { type: "string", maxLength: 200 },
-    description: "Only for when=webhook: optional event names to accept (from the caller's event-type header, e.g. push). Omit to accept every call.",
-  },
   run_on: {
     type: "string",
     // "box" is Boat's historical run_on destination id (agents wire contract).
@@ -222,15 +216,9 @@ const TOOL_DEFINITIONS = [
     }, required: ["computer_id", "action"] },
   },
   {
-    name: "list_room_targets",
-    description: "Discover actual OpenMausBot teammates and rooms in your allowed teams. Works in a normal bot conversation too; no room is required. Returns bot and room IDs, roles and working folders, never other conversations' history. Use these bots, not native coding helpers with similar names, when the user asks their team to work together.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  },
-  {
     name: "coordinate_bots",
-    description: "The one way to hand work on: ask existing OpenMausBot teammates a question or assign them concrete work. In a room it defaults to this room; use group_id from list_room_targets for a specific room. Outside a room, everything you send a teammate from this conversation goes to one standing work thread with them and runs after anything still running there; thread \"new\" opens a fresh thread on them instead. Give 1-4 bot_ids — teammate ids as list_bots or your roster prints them; a unique teammate name also resolves: they see only what you send them and use their own model, tools and permissions. They can consult their own specialists; every result returns here and resumes you automatically, so after sending all assignments END your turn: do not poll or wait, and never call assignment_status in the same turn. consult true asks a question the teammate answers from what it knows, acting on nothing; reply \"none\" is a one-way notice nothing comes back from. Include exact file paths, constraints and what must be verified (done_when). On return, resolve tradeoffs, verify the requested outcome and request concrete corrections with rework true if necessary before giving one final answer. Never target whoever assigned you this work or anyone above it: to ask or report back, end your turn and your reply resumes them. Never thank or approve a finished teammate; its result already returned. Never repeat a refused call unchanged.",
+    description: "The one way to hand work on: ask existing OpenMausBot teammates a question or assign them concrete work. Everything you send a teammate from this conversation goes to one standing work thread with them and runs after anything still running there; thread \"new\" opens a fresh thread on them instead. Give 1-4 bot_ids — teammate ids as list_bots or your roster prints them; a unique teammate name also resolves: they see only what you send them and use their own model, tools and permissions. They can consult their own specialists; every result returns here and resumes you automatically, so after sending all assignments END your turn: do not poll or wait, and never call assignment_status in the same turn. consult true asks a question the teammate answers from what it knows, acting on nothing; reply \"none\" is a one-way notice nothing comes back from. Include exact file paths, constraints and what must be verified (done_when). On return, resolve tradeoffs, verify the requested outcome and request concrete corrections with rework true if necessary before giving one final answer. Never target whoever assigned you this work or anyone above it: to ask or report back, end your turn and your reply resumes them. Never thank or approve a finished teammate; its result already returned. Never repeat a refused call unchanged.",
     inputSchema: { type: "object", additionalProperties: false, properties: {
-      group_id: { type: "string", description: "Optional destination room; omit for this room or, outside a room, your thread with each teammate." },
       bot_ids: { type: "array", items: { type: "string", description: "A teammate's id exactly as list_bots or your roster prints it ([id: …]). A teammate's unique display name also resolves; a name shared by two reachable teammates is refused." }, minItems: 1, maxItems: 4, uniqueItems: true },
       message: { type: "string", minLength: 1, maxLength: 4000, description: "Question or task for these teammates; later requests in the same conversation can build on earlier ones. Send separate requests when responsibilities differ." },
       reason: { type: "string", maxLength: 200, description: "Optional one line for the person about why this goes to them (shown as a chip)." },
@@ -262,12 +250,6 @@ const TOOL_DEFINITIONS = [
     description:
       "List the other bots (agents) you may contact in your own team and any additional teams the owner has explicitly allowed you to coordinate, with their team, model and current status. Call this to discover exact teammate IDs before assigning work or asking advice with coordinate_bots.",
     inputSchema: { type: "object", properties: {} },
-  },
-  {
-    name: "list_rooms",
-    description:
-      "List the shared rooms (team channels) you belong to, with the other members of each. Call this before post_to_room. One-to-one bot channels are never listed; discover individual teammates with list_bots. A room you are in but cannot post into is named without an id, together with the reason, so you can tell the user why.",
-    inputSchema: { type: "object", additionalProperties: false, properties: {} },
   },
   {
     name: "select_computer",
@@ -326,19 +308,6 @@ const TOOL_DEFINITIONS = [
     },
   },
   ...WIDGET_TOOL_DEFINITIONS,
-  {
-    name: "post_to_room",
-    description:
-      "Put one message into a shared room you belong to, for example when the user asks you to tell the team something. Get group_id from list_rooms. This posts and returns: no room member's turn starts, nobody replies, and nothing comes back except confirmation — so never use it to ask a question or hand out work (use coordinate_bots for those). Post once, say it in full, and tell the user what you posted. If a post is refused, do not retry it: say what you wanted to post in your reply instead.",
-    inputSchema: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        group_id: { type: "string", description: "The room's id, copied exactly from list_rooms." },
-        message: { type: "string", description: "The complete message to post, written for the room to read as it stands." }},
-      required: ["group_id", "message"],
-    },
-  },
   {
     name: "create_bot",
     description:
@@ -403,56 +372,6 @@ const TOOL_DEFINITIONS = [
     inputSchema: { type: "object", additionalProperties: false, properties: {
       bot_id: { type: "string", minLength: 1 }, reason: { type: "string", minLength: 1, maxLength: 500 },
     }, required: ["bot_id", "reason"] },
-  },
-  {
-    name: "create_room",
-    description:
-      "Create a room in your own section when the user asks for one (maximum four per turn). Chiefs only. Choose active peers from list_bots; you are included automatically as the default responder. This creates no turns or messages. Section moves stay with the user. Follow the tool result under the effective access level; if permission is refused, ask the user to make the room change instead, without trying another route.",
-    inputSchema: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        name: { type: "string", minLength: 1, maxLength: 100, description: "Display name for the room (e.g. \"Nalamdesk Team\")." },
-        member_bot_ids: {
-          type: "array",
-          minItems: 1,
-          maxItems: 100,
-          items: { type: "string" },
-          description: "List of bot IDs to include as members of the room.",
-        },
-        bulletin: {
-          type: "string",
-          maxLength: 12_000,
-          description: "Optional initial bulletin / goal / instructions pinned for this room.",
-        },
-      },
-      required: ["name", "member_bot_ids"],
-    },
-  },
-  {
-    name: "manage_room",
-    description:
-      "Manage a room from list_rooms: rename it, change its bulletin, or add/remove/set members. Chiefs only, within your own section and allowed peers; keep yourself as a member. Busy rooms, pending approvals and team-goal leads are protected. You cannot move rooms or bots between sections. Follow the tool result under the effective access level; if the change is refused, report the blocker and ask the user to make the change instead, without trying another route.",
-    inputSchema: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        room_id: { type: "string", description: "The ID of the group room to manage." },
-        action: {
-          type: "string",
-          enum: ["add_members", "remove_members", "set_members", "rename", "set_bulletin"],
-          description: "The action to perform on the room.",
-        },
-        member_bot_ids: {
-          type: "array",
-          items: { type: "string" },
-          description: "List of bot IDs when action is add_members, remove_members, or set_members.",
-        },
-        name: { type: "string", minLength: 1, maxLength: 100, description: "New name for the room when action is rename." },
-        bulletin: { type: "string", maxLength: 12_000, description: "New bulletin text when action is set_bulletin; an empty string clears it." },
-      },
-      required: ["room_id", "action"],
-    },
   },
   {
     name: "request_credential",
@@ -575,7 +494,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "list_triggers",
     description:
-      "List this bot's triggers, its routines (schedules) and webhooks: ids, when they fire, on or paused, next run or last fire. trigger_id: one trigger with its last 10 fires. Includes the computer's authoritative current time and timezone.",
+      "List this bot's scheduled routines: ids, when they fire, on or paused, and next run. trigger_id: one trigger with its last 10 fires. Includes the computer's authoritative current time and timezone.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -588,15 +507,15 @@ const TOOL_DEFINITIONS = [
   {
     name: "create_trigger",
     description:
-      "Set up work that happens on its own: when <something happens>, a bot does <instructions>. Call it in this turn whenever the person describes recurring or event-based work (\"every morning send me…\", \"when another app calls…\"); never ask for confirmation first. It applies at once and the person sees a card with Edit, Pause and Undo. when=schedule runs on a time rule (call list_triggers first for relative dates: it has the authoritative time and timezone); when=webhook gives an address another app sends to (the person copies it from the card; you never see its secret). To the person these are automations. Something to do once, now, is not a trigger. for_bot_id: a trigger for ANOTHER bot in your section, which keeps that bot's engine and permissions.",
+      "Set up scheduled work: a bot does <instructions> on a time rule. Call it in this turn whenever the person describes recurring work (\"every morning send me…\"); never ask for confirmation first. It applies at once and the person sees a card with Edit, Pause and Undo. Call list_triggers first for relative dates: it has the authoritative time and timezone. Something to do once, now, is not a trigger. for_bot_id: a trigger for ANOTHER bot in your section, which keeps that bot's engine and permissions.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
       properties: {
         when: {
           type: "string",
-          enum: ["schedule", "webhook"],
-          description: "schedule = on a time rule (give schedule); webhook = when another app calls a link.",
+          enum: ["schedule"],
+          description: "schedule = on a time rule (give schedule).",
         },
         ...TRIGGER_FIELDS_SCHEMA,
         for_bot_id: {
@@ -611,7 +530,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "manage_trigger",
     description:
-      "Change one of this bot's triggers, its routines or webhooks: update, pause, resume, run once now (a webhook gets a test call) or delete. Get the id from list_triggers. It applies at once, with an Undo where possible. for_bot_id: ANOTHER bot's trigger in your section.",
+      "Change one of this bot's scheduled routines: update, pause, resume, run once now or delete. Get the id from list_triggers. It applies at once, with an Undo where possible. for_bot_id: ANOTHER bot's trigger in your section.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -845,7 +764,7 @@ const SKILL_TOOL_NAMES = new Set(["skills_list", "skill_manage"]);
 // Never advertised when sharing is off: a model shown a tool it cannot use spends turns finding out.
 export const SHARED_COMPUTER_TOOL_NAMES = new Set(["list_shared_computers", "shared_computer"]);
 const CHIEF_ONLY_TOOL_NAMES = new Set([
-  "create_bot", "list_team_setup", "propose_team_setup", "propose_bot_deletion", "create_room", "manage_room", "retry_thread",
+  "create_bot", "list_team_setup", "propose_team_setup", "propose_bot_deletion", "retry_thread",
 ]);
 const CHIEF_TARGET_TOOL_NAMES = new Set(["propose_profile", "propose_model"]);
 const WATCHER_TOOL_NAMES = new Set(["create_options_card"]);

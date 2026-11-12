@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Plus, Trash2, X } from "lucide-react";
 import { api, BotEditorStore, useStore, type Bot, type ModelSelection } from "@/state/store";
+import type { NewBotDefaults } from "../../shared/new-bot-defaults";
 import { BotCreationDraft, EMPTY_BOT_DEFAULTS } from "@/lib/bot-creation-draft";
-import { createConfiguredBot, preparedBotTemplate } from "@/lib/create-configured-bot";
+import { createConfiguredBot } from "@/lib/create-configured-bot";
 import { BOT_ROLES, roleProfilePatch } from "@/lib/bot-roles";
 import { chosenPreset, presetDraftPatch, presetGroups, presetPictureFile, presetSummaryLines, type BotPreset } from "@/lib/bot-presets";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import type { LocaleKey } from "@/locales";
 import { botCreated } from "@/lib/product-events";
-import type { NewBotDefaults } from "../../shared/new-bot-defaults";
 import type { Routine } from "@/lib/routines";
 import { IdentitySection } from "./bot-settings/IdentitySection";
 import { SkillsSection } from "./bot-settings/SkillsSection";
@@ -22,9 +22,7 @@ import { BotEditorContext } from "./bot-settings/BotEditorContext";
 import { inputCls } from "./bot-settings/field";
 import { RoutineEditor } from "./RoutinesPage";
 import { LocalComputerAutoWarning } from "./LocalComputerAutoWarning";
-import { SettingRow } from "./SettingsPrimitives";
 import { Select } from "./Select";
-
 const SECTIONS = ["Identity", "Skills", "Memory", "Routines", "Access", "Model", "Permissions", "Notifications"] as const;
 type Section = typeof SECTIONS[number];
 const SECTION_KEYS: Record<Section, LocaleKey> = {
@@ -64,14 +62,13 @@ export function CompanionNewBotDialog() {
     </div>
   </div>;
 }
-
 export function NewBotDialog(props: Parameters<typeof LocalNewBotDialog>[0] = {}) {
   return typeof window !== "undefined" && window.ogb?.remoteClient?.active
     ? <CompanionNewBotDialog /> : <LocalNewBotDialog {...props} />;
 }
 
-export function LocalNewBotDialog({ defaultsMode = false, onClose, section, onCreated, preserveSelection = false }: {
-  defaultsMode?: boolean; onClose?: () => void; section?: string; onCreated?: (bot: Bot) => void | Promise<void>; preserveSelection?: boolean;
+export function LocalNewBotDialog({ onClose, section, onCreated, preserveSelection = false }: {
+  onClose?: () => void; section?: string; onCreated?: (bot: Bot) => void | Promise<void>; preserveSelection?: boolean;
 } = {}) {
   const parent = useStore();
   const [, render] = useState(0);
@@ -100,13 +97,13 @@ export function LocalNewBotDialog({ defaultsMode = false, onClose, section, onCr
         if (!selection || (selection.instanceId === "" && selection.model === "")) {
           defaults.profile.modelSelection = result.modelSelection;
         }
-        if (!defaultsMode) defaults.profile.name = defaults.profile.name?.trim() || result.suggestedName;
+        defaults.profile.name = defaults.profile.name?.trim() || result.suggestedName;
         if (section !== undefined) defaults.profile.section = section;
         setDraft(new BotCreationDraft(defaults, () => render(value => value + 1)));
         setReady(true);
       }).catch(cause => { if (!cancelled) setError(String(cause)); });
     return () => { cancelled = true; };
-  }, [defaultsMode, section]);
+  }, [section]);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => () => draft.dispose(), [draft]);
   // Disabling the focused Create button drops focus to the page in Chromium.
@@ -133,19 +130,16 @@ export function LocalNewBotDialog({ defaultsMode = false, onClose, section, onCr
   }, []);
   const save = async () => {
     if (!ready || savingRef.current || parent.state.botCreationPending) return;
-    if (!defaultsMode && draft.bot.approvalMode === "auto" && draft.bot.computer === "local" && !draft.consent.acknowledgeLocalAuto) { setWarning("local"); return; }
+    if (draft.bot.approvalMode === "auto" && draft.bot.computer === "local" && !draft.consent.acknowledgeLocalAuto) { setWarning("local"); return; }
     savingRef.current = true; setSaving(true); setError("");
     parent.dispatch({ type: "botCreationPending", on: true });
     try {
-      if (defaultsMode) await api("/api/config", { method: "PATCH", body: JSON.stringify({ newBotDefaults: await preparedBotTemplate(draft) }) });
-      else {
-        const { bot, warnings } = await createConfiguredBot(draft);
-        botCreated(draft.preset ? "preset" : draft.role ? "template" : "blank", draft.role);
-        parent.dispatch({ type: "botAdded", bot, preserveSelection });
-        if (warnings.length) parent.dispatch({ type: "error", message: warnings.join("\n") });
-        try { await onCreated?.(bot); }
-        catch (cause) { parent.dispatch({ type: "error", message: cause instanceof Error ? cause.message : String(cause) }); }
-      }
+      const { bot, warnings } = await createConfiguredBot(draft);
+      botCreated(draft.preset ? "preset" : draft.role ? "template" : "blank", draft.role);
+      parent.dispatch({ type: "botAdded", bot, preserveSelection });
+      if (warnings.length) parent.dispatch({ type: "error", message: warnings.join("\n") });
+      try { await onCreated?.(bot); }
+      catch (cause) { parent.dispatch({ type: "error", message: cause instanceof Error ? cause.message : String(cause) }); }
       savingRef.current = false; if (alive.current) closeRef.current();
     } catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : String(cause)); }
     finally {
@@ -169,7 +163,7 @@ export function LocalNewBotDialog({ defaultsMode = false, onClose, section, onCr
       else parent.dispatch(action);
     },
   };
-  const title = defaultsMode ? t("newBot.defaults") : t("sidebar.newBot");
+  const title = t("sidebar.newBot");
   return <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-3 sm:p-5">
     <div ref={dialog} role="dialog" aria-modal="true" aria-label={title} aria-busy={saving} tabIndex={-1}
       className="flex h-[min(760px,94dvh)] w-full max-w-[900px] flex-col overflow-hidden rounded-2xl border border-hairline/50 bg-panel shadow-2xl outline-none">
@@ -187,7 +181,7 @@ export function LocalNewBotDialog({ defaultsMode = false, onClose, section, onCr
           {!ready && !error && <div role="status" className="flex items-center gap-2 text-[13px] text-ink-secondary"><Loader2 size={16} className="animate-spin" />{t("newBot.loading")}</div>}
           {ready && <fieldset disabled={saving} className="min-w-0">
             <BotEditorStore value={scopedStore}><BotEditorContext.Provider value={{ request: draft.request, draft: true, uploadAvatar: draft.uploadAvatar }}>
-              <DraftSection active={active} draft={draft} defaultsMode={defaultsMode} />
+              <DraftSection active={active} draft={draft} />
             </BotEditorContext.Provider></BotEditorStore>
           </fieldset>}
         </div>
@@ -195,9 +189,9 @@ export function LocalNewBotDialog({ defaultsMode = false, onClose, section, onCr
       {error && <p role="alert" className="max-h-24 overflow-y-auto border-t border-hairline/40 px-5 py-3 text-[13px] text-danger">{error}</p>}
       <div className="flex shrink-0 justify-end gap-2 border-t border-hairline/40 px-5 py-3">
         <button type="button" onClick={() => closeRef.current()} className="rounded-lg px-4 py-2 text-[13px] text-ink-secondary hover:bg-control">{t("common.cancel")}</button>
-        <button type="button" disabled={!ready || saving || (!defaultsMode && !bot.name.trim())} onClick={() => void save()}
+        <button type="button" disabled={!ready || saving || !bot.name.trim()} onClick={() => void save()}
           className="flex items-center gap-2 rounded-lg bg-accent px-5 py-2 text-[13px] font-medium text-white hover:brightness-110 disabled:opacity-40">
-          {saving && <Loader2 size={15} className="animate-spin" />}{t(defaultsMode ? "newBot.saveDefaults" : "newBot.create")}
+          {saving && <Loader2 size={15} className="animate-spin" />}{t("newBot.create")}
         </button>
       </div>
       <LocalComputerAutoWarning open={warning === "local"} onCancel={() => setWarning(null)} onConfirm={() => { draft.consent.acknowledgeLocalAuto = true; setWarning(null); void save(); }} />
@@ -205,14 +199,14 @@ export function LocalNewBotDialog({ defaultsMode = false, onClose, section, onCr
   </div>;
 }
 
-function DraftSection({ active, draft, defaultsMode }: { active: Section; draft: BotCreationDraft; defaultsMode: boolean }) {
+function DraftSection({ active, draft }: { active: Section; draft: BotCreationDraft }) {
   const bot = draft.bot;
   const { state } = useStore();
   const derived = useBotSettingsDerived(bot);
   if (active === "Identity") return <div className="space-y-4">
-    <StartingRole draft={draft} defaultsMode={defaultsMode} />
+    <StartingRole draft={draft} />
     <IdentitySection bot={bot} patch={derived.patch}
-      namePlaceholder={defaultsMode ? t("newBot.randomName") : undefined} />
+      />
     <label className="block text-[13px] text-ink-secondary">{t("newBot.team")}
       <Select size="lg" className="mt-1.5 w-full" value={bot.section ?? ""} onChange={event => draft.patch({ section: event.target.value })}>
         <option value="">{t("teamSettings.general")}</option>{[...new Set([...(state.sections ?? []), ...state.bots.map(bot => bot.section ?? "")])].filter(Boolean).map(name => <option key={name}>{name}</option>)}
@@ -228,19 +222,18 @@ function DraftSection({ active, draft, defaultsMode }: { active: Section; draft:
   return <NotificationsSection bot={bot} derived={derived} />;
 }
 
-function StartingRole({ draft, defaultsMode }: { draft: BotCreationDraft; defaultsMode: boolean }) {
+function StartingRole({ draft }: { draft: BotCreationDraft }) {
   const [presets, setPresets] = useState<BotPreset[]>([]);
   const [loads, setLoads] = useState(0);
   const [error, setError] = useState("");
   const presetPicture = useRef(false);
   useEffect(() => {
-    if (defaultsMode) return;
     let cancelled = false;
     void api<{ presets: BotPreset[] }>("/api/bot-presets")
       .then(result => { if (!cancelled) setPresets(result.presets); })
       .catch(() => { if (!cancelled) setPresets([]); });
     return () => { cancelled = true; };
-  }, [defaultsMode, loads]);
+  }, [loads]);
   const chosen = draft.preset ? presets.find(preset => preset.id === draft.preset!.id) : undefined;
   const choose = async (value: string) => {
     setError("");
@@ -325,18 +318,3 @@ function DraftRoutines({ draft }: { draft: BotCreationDraft }) {
   </div>;
 }
 
-export function DefaultBotSettings() {
-  const [open, setOpen] = useState(false);
-
-    const content = <>
-      <div className="flex shrink-0 gap-2">
-        <button type="button" onClick={() => setOpen(true)} className="cursor-pointer rounded-lg bg-control px-3 py-1.5 text-[13px] text-ink hover:bg-raised-hover">{t("newBot.edit")}</button>
-      </div>
-      {open && <NewBotDialog defaultsMode onClose={() => setOpen(false)} />}
-    </>
-
-  return <>
-    <SettingRow title={t("newBot.defaults")} children={content} />
-
-  </>;
-}

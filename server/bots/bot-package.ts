@@ -66,13 +66,6 @@ export function renderBotPackageMarkdown(document: ParsedBotPackage): string {
     "",
     agent.description,
   ].filter(Boolean).join("\n\n")).join("\n\n");
-  const rooms = (pkg.rooms ?? []).map((room) => [
-    `### ${room.name}`,
-    `**Members:** ${room.members.map((key) => `\`${key}\``).join(", ")}`,
-    `**Default responder:** ${room.defaultResponder.kind === "agent" ? `\`${room.defaultResponder.agent}\`` : room.defaultResponder.kind}`,
-    "",
-    room.bulletin,
-  ].join("\n\n")).join("\n\n");
   const routines = (pkg.routines ?? []).map((routine) => [
     `### ${routine.name}`,
     `**Owner:** \`${routine.agent}\`  `,
@@ -113,6 +106,7 @@ export function renderBotPackageMarkdown(document: ParsedBotPackage): string {
   const connections = pkg.requirements.apps.length
     ? pkg.requirements.apps.map((app) => `- **${app.label}${app.optional ? " (optional)" : ""}:** ${app.reason}`).join("\n")
     : "- No connected apps are required.";
+  const rooms: string | undefined = undefined;
 
   const markdown = `---\n${frontmatter}\n---\n\n# ${pkg.name}\n\n${pkg.tagline}\n\n> **Give this file to your Chief of Staff.** It is the complete team blueprint. Any agent system can run it; OpenMausBot can also install it directly.\n\n## Activation\n\nYou are the Chief of Staff for this blueprint. Read the whole document before acting. Confirm the user's goal and any missing inputs, then create or delegate to the specialist roles below. Preserve their names, ownership, boundaries, shared-room rules, and playbooks. If your platform cannot literally spawn agents, perform the roles one at a time and keep their outputs clearly separated.\n\nNever request pasted passwords or secret keys. Use the platform's normal connection flow. Do not send messages, publish content, spend money, delete data, or enable a schedule without the user's explicit approval. All routines start paused.\n\n## Mission\n\n${pkg.summary}\n\n## Outcomes\n\n${list(pkg.outcomes)}\n\n## Connections\n\n${connections}\n\n## Team\n\n${agents}\n\n## Chief of Staff\n\nThe Chief of Staff role is \`${pkg.chiefOfStaff ?? pkg.agents[0].key}\`. This role owns delegation, synthesis, conflict resolution, and the final answer to the user.\n${rooms ? `\n## Shared rooms\n\n${rooms}\n` : ""}${routines ? `\n## Suggested routines\n\n${routines}\n` : ""}${playbooks ? `\n## Playbooks\n\n${playbooks}\n` : ""}${examples ? `\n## Example job\n\n${examples}\n` : ""}\n## Completion rule\n\nReturn one clear result to the user, distinguish evidence from inference, cite source links when the work uses external material, and state what still needs human approval or a connected app.\n`;
   if (utf8Bytes(markdown) > BOT_PACKAGE_MARKDOWN_MAX_BYTES) throw new Error("The bot playbook is too large");

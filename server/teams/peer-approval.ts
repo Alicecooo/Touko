@@ -79,7 +79,6 @@ export interface PeerApprovalTarget {
 const ACTION_VERB: Record<PeerAction, string> = {
   ask_bot: "contact",
   delegate_bot: "delegate to",
-  post_to_room: "post in",
 };
 
 function pushApprovalCard(
@@ -96,7 +95,7 @@ function pushApprovalCard(
     role: "bot",
     kind: "options",
     card: {
-      title: `@${from.name} wants to ${ACTION_VERB[action]} ${action === "post_to_room" ? `“${target.name}”` : `@${target.name}`}`,
+      title: `@${from.name} wants to ${ACTION_VERB[action]} @${target.name}`,
       subtitle,
       options: ["Allow", "Deny", "Always allow"],
       requestId,
@@ -218,7 +217,7 @@ export function dismissStalePeerCards(bus: ApprovalBus): number {
     for (const message of bus.store.messagesFor(threadId)) {
       const card = message.card;
       if (!card?.requestId || card.answered || card.dismissed) continue;
-      if (card.tool !== "ask_bot" && card.tool !== "delegate_bot" && card.tool !== "post_to_room") continue;
+       if (card.tool !== "ask_bot" && card.tool !== "delegate_bot") continue;
       if (pendingComms.has(card.requestId)) continue;
       const patched = bus.store.patchMessage(threadId, message.id, {
         card: { ...card, answered: "deny", dismissed: true },

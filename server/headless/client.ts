@@ -143,8 +143,8 @@ export async function explain(error: unknown, baseUrl?: string): Promise<Headles
     return new HeadlessError(`not allowed: ${message}`, EXIT.unreachable,
       "this needs a paired session with the right scope: `openmausbot connect` mints one on this computer");
   }
-  if (status === 404 && /^no such (bot|channel|conversation|task|message)\b/i.test(message)) {
-    return usageError(message, "openmausbot bots and openmausbot channels list the ids");
+  if (status === 404 && /^no such (bot|conversation|task|message)\b/i.test(message)) {
+    return usageError(message, "openmausbot bots lists the ids");
   }
   if (/cannot report a conversation's job/.test(message)) return new HeadlessError(message, EXIT.unreachable, "update OpenMausBot on the server");
   const cause = (error as { cause?: { code?: unknown } })?.cause?.code;

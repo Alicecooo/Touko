@@ -10,7 +10,6 @@ interface NotificationThreadOwner {
 
 interface NotificationRoutingState {
   bots: NotificationThreadOwner[];
-  groups: NotificationThreadOwner[];
 }
 
 export function visibleNotificationThread(
@@ -19,7 +18,6 @@ export function visibleNotificationThread(
   if (state.activeView !== "chat") return null;
   return (
     state.bots.find((candidate) => candidate.id === state.selectedId)?.threadId ??
-    state.groups.find((candidate) => candidate.id === state.selectedId)?.threadId ??
     null
   );
 }
@@ -30,19 +28,6 @@ export function openNotificationTarget(
   state: NotificationRoutingState,
   threadsShown: boolean,
 ) {
-  // A room notification carries the asker bot with the room's thread id; switching the bot to it would 404.
-  const group = state.groups.find(
-    (candidate) =>
-      candidate.threadId === target.threadId ||
-      (candidate.tasks ?? []).some((task) => task.threadId === target.threadId),
-  );
-  if (group) {
-    dispatch({ type: "select", id: group.id });
-    if (group.threadId !== target.threadId) {
-      dispatch({ type: "switchGroupTask", groupId: group.id, threadId: target.threadId });
-    }
-    return;
-  }
   const bot = state.bots.find((candidate) =>
     candidate.threadId === target.threadId || candidate.tasks?.some((task) => task.threadId === target.threadId)
   ) ?? state.bots.find((candidate) => candidate.id === target.botId);
@@ -104,7 +89,7 @@ export function openThread(
 ): boolean {
   const owns = (owner: NotificationThreadOwner) =>
     owner.threadId === target.threadId || (owner.tasks ?? []).some((task) => task.threadId === target.threadId);
-  if (state.groups.some(owns) || state.bots.some(owns)) {
+  if (state.bots.some(owns)) {
     openNotificationTarget(dispatch, target, state, threadsShown);
     dispatch({ type: "revealThread", threadId: target.threadId });
     return true;

@@ -85,7 +85,7 @@ export function routeTurn(input: RouteInput): RouteResult {
   return { tier, model: fast, quickModel: option?.label ?? fast };
 }
 
-/** Routines, webhooks, peer turns, card continuations and unattended runs pass `automated`. */
+/** Routines, peer turns, card continuations and unattended runs pass `automated`. */
 export function routeDirectTurn(
   bot: { modelSelection: ModelSelection },
   task: { modelSelection?: ModelSelection; usage?: { context?: { tokens: number } } },

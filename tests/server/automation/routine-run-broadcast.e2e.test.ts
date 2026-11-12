@@ -89,7 +89,7 @@ posixOnly("a routine run's task on the event stream", () => {
       cwd: join(SERVER_DIR, "../../.."),
       env: {
         ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
-        HOME: home, OMB_PORT: String(PORT), OMB_WEBHOOK_PORT: String(PORT + 1),
+        HOME: home, OMB_PORT: String(PORT),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

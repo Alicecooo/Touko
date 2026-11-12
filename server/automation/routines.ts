@@ -7,7 +7,6 @@ import { DATA_DIR } from "../config/config.ts";
 import type { RuntimeEvent } from "../harness/contracts.ts";
 import { writeFileAtomic } from "../storage/atomic.ts";
 import { redactSecretsInText } from "../security/redact.ts";
-import type { GroupGoalRunStatus } from "../../shared/group-goal-run.ts";
 import type { RoutineRequestOperation } from "../../shared/routine-request.ts";
 import { normalizeCronSchedule, nextCronRuns, type RoutineCronSchedule } from "../../shared/routine-schedule.ts";
 import { isRoutineProblemRun, type RoutineContextAttachment, type RoutineIntervalWindow, type RoutineRetryCause, type RoutineRunStatus, type RoutineRunTrigger } from "../../shared/routines.ts";
@@ -46,8 +45,7 @@ export type RoutineScheduleInput =
 
 /** `cloud` runs the agent inside the bot's Boat VM; `maus` runs the bot's own provider and borrows only its computer tools. */
 export type RoutineRunOn = "maus" | "cloud";
-export type RoutineTarget = "bot" | "room-goal";
-export type RoutineGoalStatus = Exclude<GroupGoalRunStatus, "working">;
+export type RoutineTarget = "bot";
 
 const persistedSourceThreadId = z.string().trim().min(1).optional().catch(undefined);
 
@@ -57,7 +55,6 @@ export interface Routine {
   prompt: string;
   target: RoutineTarget;
   botId: string;
-  groupId?: string;
   runOn: RoutineRunOn;
   enabled: boolean;
   schedule: RoutineSchedule;
@@ -109,8 +106,6 @@ export interface RoutineRun {
   timeoutMinutes?: number;
   attachments?: RoutineContextAttachment[];
   target: RoutineTarget;
-  goalStatus?: RoutineGoalStatus;
-  groupId?: string;
   botId: string;
   runOn: RoutineRunOn;
   scheduledFor: number;
@@ -127,8 +122,6 @@ export interface RoutineRun {
   /** Time spent waiting on the person's answers, which the run limit does not count. */
   waitedMs?: number;
   triggerSource?: RoutineRunTrigger;
-  webhookId?: string;
-  deliveryId?: string;
   sourceThreadId?: string;
   resultsThreadId?: string;
   threadId?: string;
@@ -171,9 +164,8 @@ type RoutineRequestCommitFor<Action extends RoutineRequestOperation["action"]> =
 export interface RoutineInput {
   name: string;
   prompt: string;
-  target?: RoutineTarget;
+  target?: "bot";
   botId: string;
-  groupId?: string | null;
   runOn?: RoutineRunOn;
   enabled?: boolean;
   schedule: RoutineScheduleInput;
@@ -192,20 +184,10 @@ interface RoutineFile {
   routines: Routine[];
   runs: RoutineRun[];
   routineRequestReceipts?: RoutineRequestReceipt[];
-  webhookRunReceipts?: WebhookRunReceipt[];
   startupLaunchId?: string;
   ownerNotices?: RoutineOwnerNotice[];
 }
 
-const webhookRunReceiptSchema = z.object({
-  webhookId: z.string().min(1).max(200),
-  deliveryId: z.string().min(1).max(200),
-  runId: z.string().min(1),
-  acceptedAt: z.number().finite().nonnegative(),
-});
-type WebhookRunReceipt = z.infer<typeof webhookRunReceiptSchema>;
-const WEBHOOK_RETRY_WINDOW_MS = 7 * 24 * 60 * 60_000;
-const MAX_WEBHOOK_RECEIPTS = 20_000;
 
 export type RoutineRequestOwner = Pick<RoutineRequestReceipt, "requestId" | "messageId" | "botId" | "threadId">;
 
@@ -221,10 +203,8 @@ export interface RoutineManagerOptions {
   /** Every payload must be `{ kind, … }`: the server numbers and replays frames by it. */
   emit?: (payload: Record<string, unknown>) => void;
   botState: (botId: string) => "ready" | "busy" | "missing";
-  goalState?: (groupId: string, coordinatorBotId: string) => "ready" | "busy" | "missing";
   createTask: (botId: string, title: string, activate?: boolean, run?: RoutineRun) => { threadId: string } | null;
   joinConversation?: (run: RoutineRun) => string | null;
-  createGoalTask?: (groupId: string, title: string) => { threadId: string } | null;
   isResultsThread?: (botId: string, threadId: string) => boolean;
   resolveResultsThread?: (routine: Routine, forceNew: boolean) => { threadId: string; main?: true } | undefined;
   frozenResultsThread?: (botId: string, threadId: string) => boolean;
@@ -237,20 +217,7 @@ export interface RoutineManagerOptions {
     triggerSource: RoutineRunTrigger,
     onDispatchError: (message: string) => void,
   ) => Promise<void>;
-  startGoal?: (
-    groupId: string,
-    threadId: string,
-    prompt: string,
-    coordinatorBotId: string,
-    runId: string,
-    onDispatchError: (message: string) => void,
-  ) => Promise<void>;
   interruptTurn?: (botId: string, threadId: string) => Promise<void>;
-  interruptGoal?: (
-    groupId: string,
-    threadId: string,
-    outcome?: { status: "stopped" | "limit-reached"; detail: string },
-  ) => Promise<void>;
   onRunChanged?: (run: RoutineRun) => void;
   onRunFailed?: (run: RoutineRun, alert?: RoutineAlert | null) => void;
   onRunDeferred?: (run: RoutineRun, alert?: RoutineAlert) => void;
@@ -360,29 +327,8 @@ function cloneAttachments(attachments: readonly RoutineContextAttachment[] | und
   return attachments?.map((attachment) => ({ ...attachment })) ?? [];
 }
 
-function loadTarget(value: unknown): RoutineTarget {
-  return value === "room-goal" ? "room-goal" : "bot";
-}
-
-const ROUTINE_GOAL_STATUSES = new Set<RoutineGoalStatus>([
-  "completed",
-  "needs-input",
-  "blocked",
-  "limit-reached",
-  "paused",
-  "stopped",
-  "failed",
-]);
-
-function loadGoalStatus(value: unknown, target: RoutineTarget): RoutineGoalStatus | undefined {
-  return target === "room-goal" && typeof value === "string" && ROUTINE_GOAL_STATUSES.has(value as RoutineGoalStatus)
-    ? value as RoutineGoalStatus
-    : undefined;
-}
-
-function loadGroupId(value: unknown, target: RoutineTarget): string | undefined {
-  if (target !== "room-goal" || typeof value !== "string") return undefined;
-  return value.trim() || undefined;
+function loadTarget(_value: unknown): RoutineTarget {
+  return "bot";
 }
 
 function cloneRoutine(routine: Routine): Routine {
@@ -615,20 +561,11 @@ function sanitizeInput(input: RoutineInput, after: number): Omit<Routine, "id" |
   if (!name) throw new Error("Give the routine a name");
   if (!prompt) throw new Error("Tell the bot what to do");
   if (!botId) throw new Error("Choose a bot");
-  const target = input.target ?? "bot";
-  if (target !== "bot" && target !== "room-goal") throw new Error("Choose a valid routine target");
-  const groupId = typeof input.groupId === "string" ? input.groupId.trim() : "";
-  if (target === "room-goal" && !groupId) throw new Error("Choose a room for this goal");
+  const target = "bot" as const;
   const runOn = input.runOn ?? "maus";
   if (runOn !== "maus" && runOn !== "cloud") throw new Error("Choose where this routine runs");
   const attachments = cleanAttachments(input.attachments);
   const timeoutMinutes = cleanTimeoutMinutes(input.timeoutMinutes);
-  if (target === "room-goal" && runOn === "cloud") {
-    throw new Error("Room goals can only run on this computer");
-  }
-  if (target === "room-goal" && attachments.length > 0) {
-    throw new Error("Room goals do not support attachments yet");
-  }
   if (runOn === "cloud" && attachments.length > 0) {
     throw new Error("Attachments can only run on this computer until cloud file staging is available");
   }
@@ -636,16 +573,12 @@ function sanitizeInput(input: RoutineInput, after: number): Omit<Routine, "id" |
   if (input.overlap !== undefined && input.overlap !== "skip" && input.overlap !== "queue") {
     throw new Error("Choose skip or queue for overlapping runs");
   }
-  if (continuity && target === "room-goal") {
-    throw new Error("Room goals do not carry continuity yet");
-  }
   const schedule = cleanSchedule(input.schedule, after);
   return {
     name,
     prompt,
     target,
     botId,
-    groupId: target === "room-goal" ? groupId : undefined,
     runOn,
     enabled: input.enabled !== false,
     schedule,
@@ -667,7 +600,6 @@ export class RoutineManager {
   private unloadedRoutines: Routine[] = [];
   private runs: RoutineRun[] = [];
   private routineRequestReceipts: RoutineRequestReceipt[] = [];
-  private webhookRunReceipts: WebhookRunReceipt[] = [];
   private timer: ReturnType<typeof setInterval> | null = null;
   private startupRunsQueued = false;
   private startupLaunchId: string | undefined;
@@ -686,7 +618,7 @@ export class RoutineManager {
     try {
       const disk = JSON.parse(readFileSync(this.file, "utf8")) as Partial<RoutineFile>;
       if (disk === null || typeof disk !== "object" || Array.isArray(disk)) throw new Error("Invalid routines file");
-      for (const key of ["routines", "runs", "routineRequestReceipts", "webhookRunReceipts"] as const) {
+      for (const key of ["routines", "runs", "routineRequestReceipts"] as const) {
         if (key in disk && !Array.isArray(disk[key])) throw new Error(`Invalid routines file: ${key} is not a list`);
       }
       this.routines = Array.isArray(disk.routines)
@@ -702,7 +634,6 @@ export class RoutineManager {
               ...routine,
               schedule,
               target,
-              groupId: loadGroupId(routine.groupId, target),
               runOn: routine.runOn ?? "maus",
               timeoutMinutes: loadTimeoutMinutes(routine.timeoutMinutes),
               attachments: loadAttachments(routine.attachments),
@@ -727,8 +658,6 @@ export class RoutineManager {
             const loaded: RoutineRun = {
               ...run,
               target,
-              goalStatus: loadGoalStatus(run.goalStatus, target),
-              groupId: loadGroupId(run.groupId, target),
               runOn: run.runOn ?? "maus",
               timeoutMinutes: loadTimeoutMinutes(run.timeoutMinutes),
               attachments: loadAttachments(run.attachments),
@@ -752,29 +681,14 @@ export class RoutineManager {
             Number.isFinite(receipt?.appliedAt)
           )
         : [];
-      this.webhookRunReceipts = Array.isArray(disk.webhookRunReceipts)
-        ? disk.webhookRunReceipts.flatMap((receipt) => {
-            const parsed = webhookRunReceiptSchema.safeParse(receipt);
-            return parsed.success ? [parsed.data] : [];
-          })
-        : [];
       this.frozenPending = disk.frozenResultsCleared !== true;
       this.ownerNotices = loadOwnerNotices(disk.ownerNotices);
       if (typeof disk.startupLaunchId === "string") this.startupLaunchId = disk.startupLaunchId;
-      const known = new Set(this.webhookRunReceipts.map((r) => JSON.stringify([r.webhookId, r.deliveryId])));
-      for (const run of this.runs) {
-        if (!run.webhookId || !run.deliveryId || run.createdAt < this.now() - WEBHOOK_RETRY_WINDOW_MS) continue;
-        const key = JSON.stringify([run.webhookId, run.deliveryId]);
-        if (known.has(key)) continue;
-        this.webhookRunReceipts.push({ webhookId: run.webhookId, deliveryId: run.deliveryId, runId: run.id, acceptedAt: run.createdAt });
-        known.add(key);
-      }
     } catch (error) {
       this.routines = [];
       this.unloadedRoutines = [];
       this.runs = [];
       this.routineRequestReceipts = [];
-      this.webhookRunReceipts = [];
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
         this.unreadable = true;
         // JSON.parse errors can echo a fragment of the input, so they never reach the log.
@@ -792,7 +706,6 @@ export class RoutineManager {
       }
       if (!requeueOnce(run, "restarted", ROUTINE_RESTARTED, this.now())) {
         Object.assign(run, { status: "failed", error: ROUTINE_RESTARTED, attention: undefined, finishedAt: this.now() } satisfies Partial<RoutineRun>);
-        if (run.target === "room-goal") run.goalStatus = "failed";
       }
       cut.push(cloneRun(run));
     }
@@ -991,7 +904,6 @@ export class RoutineManager {
       prompt: patch.prompt ?? routine.prompt,
       target: patch.target ?? routine.target,
       botId: patch.botId ?? routine.botId,
-      groupId: Object.hasOwn(patch, "groupId") ? patch.groupId : routine.groupId,
       runOn: patch.runOn ?? routine.runOn,
       enabled: patch.enabled ?? routine.enabled,
       schedule: patch.schedule ? mergeScheduleUpdate(routine.schedule, patch.schedule) : routine.schedule,
@@ -1085,47 +997,12 @@ export class RoutineManager {
     for (const run of this.runs) {
       if (run.botId !== botId || !["queued", "running", "waiting"].includes(run.status)) continue;
       run.status = "cancelled";
-      if (run.target === "room-goal") run.goalStatus = "stopped";
       run.attention = undefined;
       run.finishedAt = this.now();
       run.error = "The assigned bot was deleted";
       this.emitRun(run);
       if (run.threadId) {
-        if (run.target === "room-goal" && run.groupId) {
-          void this.options.interruptGoal?.(run.groupId, run.threadId).catch(() => {});
-        } else {
-          void this.options.interruptTurn?.(run.botId, run.threadId).catch(() => {});
-        }
-      }
-      changed = true;
-    }
-    if (changed) this.save();
-  }
-
-  disableForGroup(groupId: string) {
-    let changed = false;
-    for (const routine of this.routines) {
-      if (routine.target !== "room-goal" || routine.groupId !== groupId || !routine.enabled) continue;
-      routine.enabled = false;
-      routine.nextRunAt = null;
-      routine.updatedAt = Math.max(this.now(), routine.updatedAt + 1);
-      this.emitRoutine(routine);
-      changed = true;
-    }
-    for (const run of this.runs) {
-      if (
-        run.target !== "room-goal" ||
-        run.groupId !== groupId ||
-        !["queued", "running", "waiting"].includes(run.status)
-      ) continue;
-      run.status = "cancelled";
-      run.goalStatus = "stopped";
-      run.attention = undefined;
-      run.finishedAt = this.now();
-      run.error = "The assigned room was deleted";
-      this.emitRun(run);
-      if (run.threadId) {
-        void this.options.interruptGoal?.(groupId, run.threadId).catch(() => {});
+        void this.options.interruptTurn?.(run.botId, run.threadId).catch(() => {});
       }
       changed = true;
     }
@@ -1156,107 +1033,18 @@ export class RoutineManager {
     return cloneRun(run);
   }
 
-  webhookRunReceipt(webhookId: string, deliveryId: string): { id: string } | null {
-    const receipt = this.webhookRunReceipts.find((candidate) =>
-      candidate.webhookId === webhookId && candidate.deliveryId === deliveryId &&
-      candidate.acceptedAt >= this.now() - WEBHOOK_RETRY_WINDOW_MS);
-    if (receipt) return { id: receipt.runId };
-    const active = this.runs.find((run) => run.webhookId === webhookId && run.deliveryId === deliveryId &&
-      ["queued", "running", "waiting"].includes(run.status));
-    return active ? { id: active.id } : null;
-  }
-
-  enqueueWebhook(input: {
-    webhookId: string;
-    webhookName: string;
-    prompt: string;
-    botId: string;
-    runOn: RoutineRunOn;
-    deliveryId: string;
-    receivedAt: number;
-  }): { id: string } {
-    this.assertWritable();
-    const existing = this.webhookRunReceipt(input.webhookId, input.deliveryId);
-    if (existing) return existing;
-    if (this.options.botState(input.botId) === "missing") {
-      throw Object.assign(new Error("The assigned MAUS no longer exists"), { status: 410 });
-    }
-    const run: RoutineRun = {
-      id: randomUUID(),
-      routineId: input.webhookId,
-      routineName: input.webhookName,
-      prompt: input.prompt,
-      target: "bot",
-      botId: input.botId,
-      runOn: input.runOn,
-      scheduledFor: input.receivedAt,
-      status: "queued",
-      manual: false,
-      triggerSource: "webhook",
-      webhookId: input.webhookId,
-      deliveryId: input.deliveryId,
-      attachments: [],
-      createdAt: this.now(),
-    };
-    const previousReceipts = this.webhookRunReceipts;
-    const receipts = previousReceipts.filter((receipt) =>
-      receipt.acceptedAt >= this.now() - WEBHOOK_RETRY_WINDOW_MS);
-    // Never evict a promised retry identity to admit fresh work.
-    if (receipts.length >= MAX_WEBHOOK_RECEIPTS) {
-      throw Object.assign(new Error("Webhook retry history is full; try again later"), { status: 429 });
-    }
-    receipts.push({ webhookId: input.webhookId, deliveryId: input.deliveryId, runId: run.id, acceptedAt: this.now() });
-    const previousRuns = this.runs.slice();
-    this.runs.push(run);
-    this.webhookRunReceipts = receipts;
-    try { this.save(); }
-    catch (error) {
-      // Keep the live run objects tick() may be awaiting, not cloned snapshots.
-      this.runs = previousRuns;
-      this.webhookRunReceipts = previousReceipts;
-      throw error;
-    }
-    this.emitRun(run);
-    queueMicrotask(() => void this.tick());
-    return cloneRun(run);
-  }
-
-  activeWebhookRunCount(webhookId: string): number {
-    return this.runs.filter(
-      (run) => run.webhookId === webhookId && ["queued", "running", "waiting"].includes(run.status),
-    ).length;
-  }
-
-  cancelQueuedWebhook(webhookId: string, message: string): void {
-    let changed = false;
-    for (const run of this.runs) {
-      if (run.webhookId !== webhookId || run.status !== "queued") continue;
-      run.status = "cancelled";
-      run.attention = undefined;
-      run.finishedAt = this.now();
-      run.error = message.slice(0, 500);
-      this.emitRun(run);
-      changed = true;
-    }
-    if (changed) this.save();
-  }
 
   async cancelRun(id: string, reason?: string): Promise<RoutineRun | null> {
     const run = this.runs.find((r) => r.id === id);
     if (!run || !["queued", "running", "waiting"].includes(run.status)) return null;
     run.status = "cancelled";
-    if (run.target === "room-goal") run.goalStatus = "stopped";
     run.attention = undefined;
     run.finishedAt = this.now();
     if (reason) run.error = reason;
     this.save();
     this.emitRun(run);
     if (run.threadId) {
-      if (run.target === "room-goal" && run.groupId) {
-        await this.options.interruptGoal?.(run.groupId, run.threadId).catch(() => {});
-      } else {
-        await this.options.interruptTurn?.(run.botId, run.threadId).catch(() => {});
-      }
+      await this.options.interruptTurn?.(run.botId, run.threadId).catch(() => {});
     }
     queueMicrotask(() => void this.tick());
     return cloneRun(run);
@@ -1461,18 +1249,10 @@ export class RoutineManager {
         const startedAt = this.now();
         const suffix = ` · ${new Date(startedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`;
         const title = `${run.routineName.slice(0, 80 - suffix.length).trimEnd()}${suffix}`;
-        const joined = run.target === "room-goal" ? null : run.threadId || this.options.joinConversation?.(run) || null;
-        const task = joined
-          ? { threadId: joined }
-          : run.target === "room-goal"
-          ? run.groupId
-            ? this.options.createGoalTask?.(run.groupId, title) ?? null
-            : null
-          : this.options.createTask(run.botId, title, run.triggerSource === "webhook", run);
+        const joined = run.threadId || this.options.joinConversation?.(run) || null;
+        const task = joined ? { threadId: joined } : this.options.createTask(run.botId, title, false, run);
         if (!task) {
-          this.failRun(run, run.target === "room-goal"
-            ? "Could not create a room task for this goal"
-            : "Could not create a task for this run");
+          this.failRun(run, "Could not create a task for this run");
           continue;
         }
         run.threadId = task.threadId;
@@ -1487,29 +1267,14 @@ export class RoutineManager {
             continue;
           }
           const triggerSource = run.triggerSource ?? (run.manual ? "manual" : "schedule");
-          if (run.target === "room-goal") {
-            if (!run.groupId || !this.options.startGoal) {
-              this.failThread(task.threadId, "Room goal routines are unavailable");
-              continue;
-            }
-            await this.options.startGoal(
-              run.groupId,
-              task.threadId,
-              prompt,
-              run.botId,
-              run.id,
-              (message) => this.failThread(task.threadId, message),
-            );
-          } else {
-            await this.options.startTurn(
-              run.botId,
-              task.threadId,
-              composeExecutionPrompt({ name: run.routineName, trigger: triggerSource, runOn: run.runOn ?? "maus" }, prompt, run.attachments, continuityCarry(run, this.routines, this.runs), run.retried),
-              run.runOn ?? "maus",
-              triggerSource,
-              (message) => this.failThread(task.threadId, message),
-            );
-          }
+          await this.options.startTurn(
+            run.botId,
+            task.threadId,
+            composeExecutionPrompt({ name: run.routineName, trigger: triggerSource, runOn: run.runOn ?? "maus" }, prompt, run.attachments, continuityCarry(run, this.routines, this.runs), run.retried),
+            run.runOn ?? "maus",
+            triggerSource,
+            (message) => this.failThread(task.threadId, message),
+          );
         } catch (error) {
           this.failThread(task.threadId, error instanceof Error ? error.message : String(error), dispatchRefusal(error));
         }
@@ -1523,14 +1288,6 @@ export class RoutineManager {
     const run = this.runs.find((r) => r.threadId === event.threadId && ["running", "waiting"].includes(r.status));
     if (!run) return null;
     if (event.type === "turn.started" || event.type === "turn.completed") settleAsk(run, undefined, this.now());
-    // A room goal's orchestrator owns its result (finishGoalRun); a member's completion is intermediate.
-    if (
-      run.target === "room-goal" &&
-      (
-        run.goalStatus === "needs-input" || run.goalStatus === "paused" ||
-        event.type === "turn.completed" || (event.type === "item.completed" && event.itemType === "assistant_text")
-      )
-    ) return null;
     if (event.type === "turn.started") {
       run.status = "running";
       run.attention = undefined;
@@ -1592,39 +1349,6 @@ export class RoutineManager {
     queueMicrotask(() => void this.tick());
   }
 
-  finishGoalRun(runId: string, status: GroupGoalRunStatus, detail: string): RoutineRun | null {
-    const run = this.runs.find(
-      (candidate) => candidate.id === runId &&
-        candidate.target === "room-goal" &&
-        ["running", "waiting"].includes(candidate.status),
-    );
-    if (!run || status === "working") return null;
-    const safeDetail = redactSecretsInText(detail).trim();
-    run.goalStatus = status;
-    if (status === "failed" || status === "blocked" || status === "limit-reached") {
-      this.failRun(
-        run,
-        safeDetail ||
-          (status === "limit-reached" ? "The room goal reached its turn limit" : "The room goal is blocked"),
-      );
-    } else if (status === "needs-input" || status === "paused") {
-      this.wait(run, safeDetail.slice(0, 500) || (status === "paused" ? "The room goal is paused" : "The team needs your input"));
-      run.error = undefined;
-      this.save();
-      this.emitRun(run);
-    } else {
-      run.status = status === "stopped" ? "cancelled" : "completed";
-      run.attention = undefined;
-      run.finishedAt = this.now();
-      run.error = undefined;
-      if (status !== "stopped") run.output = safeDetail.slice(0, 2_000) || undefined;
-      this.save();
-      this.emitRun(run);
-    }
-    queueMicrotask(() => void this.tick());
-    return cloneRun(run);
-  }
-
   /** Timed from when it began, so a later occurrence can tell a wait that went unanswered. */
   private wait(run: RoutineRun, attention: string | undefined) {
     if (run.status !== "waiting" || run.waitingSince === undefined) run.waitingSince = this.now();
@@ -1632,12 +1356,10 @@ export class RoutineManager {
     run.attention = attention;
   }
 
-  private async stopRun(run: RoutineRun, detail: string, status: "stopped" | "limit-reached") {
-    if (run.target === "room-goal") run.goalStatus = status;
+  private async stopRun(run: RoutineRun, detail: string, _status: "stopped" | "limit-reached") {
     this.failRun(run, detail);
     if (!run.threadId) return;
-    if (run.target === "room-goal" && run.groupId) await this.options.interruptGoal?.(run.groupId, run.threadId, { status, detail }).catch(() => {});
-    else await this.options.interruptTurn?.(run.botId, run.threadId).catch(() => {});
+    await this.options.interruptTurn?.(run.botId, run.threadId).catch(() => {});
   }
 
   private failRun(run: RoutineRun, message: string, status: "failed" | "missed" = "failed", alert?: RoutineAlert | null) {
@@ -1663,18 +1385,12 @@ export class RoutineManager {
     }
   }
 
-  private targetState(target: Pick<RoutineRun, "target" | "groupId" | "botId">): "ready" | "busy" | "missing" {
-    if (target.target === "room-goal") {
-      if (!target.groupId || !this.options.goalState) return "missing";
-      return this.options.goalState(target.groupId, target.botId);
-    }
+  private targetState(target: Pick<RoutineRun, "botId">): "ready" | "busy" | "missing" {
     return this.options.botState(target.botId);
   }
 
-  private missingTargetMessage(target: RoutineTarget): string {
-    return target === "room-goal"
-      ? "The assigned room or coordinator no longer exists"
-      : "The assigned bot no longer exists";
+  private missingTargetMessage(_target: RoutineTarget): string {
+    return "The assigned bot no longer exists";
   }
 
   private initialOccurrence(schedule: RoutineSchedule, now: number): number | null {
@@ -1710,8 +1426,7 @@ export class RoutineManager {
       durationMinutes: routine.durationMinutes,
       ...(routine.timeoutMinutes === undefined ? {} : { timeoutMinutes: routine.timeoutMinutes }),
       attachments: cloneAttachments(routine.attachments),
-      target: routine.target,
-      groupId: routine.groupId,
+      target: "bot",
       botId: routine.botId,
       runOn: routine.runOn ?? "maus",
       scheduledFor,
@@ -1854,7 +1569,6 @@ export class RoutineManager {
       routines: [...this.routines, ...this.unloadedRoutines],
       runs: this.runs,
       routineRequestReceipts: this.routineRequestReceipts,
-      webhookRunReceipts: this.webhookRunReceipts,
       ...(this.startupLaunchId === undefined ? {} : { startupLaunchId: this.startupLaunchId }),
       ...(this.ownerNotices.length ? { ownerNotices: this.ownerNotices } : {}),
     } satisfies RoutineFile, null, 2), { mode: 0o600 });

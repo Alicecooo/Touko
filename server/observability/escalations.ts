@@ -72,7 +72,7 @@ export class EscalationLedger {
 
 export function peerApprovalGate(action: PeerAction, targetName: string): string {
   const verb = action === "ask_bot" ? "contact" : action === "delegate_bot" ? "delegate to" : "post in";
-  const named = action === "post_to_room" ? `the room “${peerName(targetName)}”` : `@${peerName(targetName)}`;
+  const named = `@${peerName(targetName)}`;
   return `its approval card to ${verb} ${named} is waiting on the person`;
 }
 

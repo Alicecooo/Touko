@@ -21,7 +21,7 @@ let output = "";
 const environment = () => ({
   ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
   ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-  HOME: home, USERPROFILE: home, OMB_WEBHOOK_PORT: String(PORT + 1), OMB_LOOPBACK_TRUST: "service",
+  HOME: home, USERPROFILE: home, OMB_LOOPBACK_TRUST: "service",
 });
 const cli = async (args: string[]) => {
   try {

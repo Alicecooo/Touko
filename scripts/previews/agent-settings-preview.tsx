@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { SettingsModal } from "../../src/components/SettingsModal";
 import { BotSettingsDialog } from "../../src/components/BotSettingsDialog";
-import { DefaultBotSettings, NewBotDialog } from "../../src/components/NewBotDialog";
+import { NewBotDialog } from "../../src/components/NewBotDialog";
 import { StoreProvider, api, useStore, type Bot } from "../../src/state/store";
 import { applySkin } from "../../src/lib/skins";
 import { setLocale } from "../../src/lib/i18n";
@@ -75,11 +75,10 @@ function Fixture() {
     <p className="my-3">Selected: {bot?.name ?? "Loading…"}</p>
     <button onClick={() => dispatch({ type: "toggleAppSettings", open: true, section: "general" })}>Open app settings</button>
     {state.appSettingsOpen && <SettingsModal />}
-    <DefaultBotSettings />
     <button className="rounded bg-control px-3 py-2" onClick={() => dispatch({ type: "toggleNewBot", open: true })}>Configure new bot</button>
     {state.newBotOpen && <NewBotDialog />}
     {state.error && <p role="alert" className="text-danger">{state.error}</p>}
-    <pre aria-label="Saved profiles" className="my-4 whitespace-pre-wrap">{JSON.stringify(saved.map(({ id, name, description, soul }) => ({ id, name, description, soul })), null, 2)}</pre>
+    <pre aria-label="Saved profiles" className="my-4 whitespace-pre-wrap">{JSON.stringify(saved.map(({ id, name, description }) => ({ id, name, description })), null, 2)}</pre>
     {state.settingsOpen && bot && <BotSettingsDialog key={bot.id} bot={bot} />}
   </main>;
 }

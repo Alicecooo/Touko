@@ -162,33 +162,6 @@ const requirementsSchema = z.object({
   capabilities: z.array(requiredText(80)).max(20),
   platforms: z.array(requiredText(80)).max(10).optional(),
 });
-const ROOM_RESPONDER_KINDS = new Set(["agent", "everyone", "mentions", "auto"]);
-/** A responder kind from a newer release degrades to the room's first member
- * as lead, which is what a room without a responder does, instead of
- * refusing the whole package. Malformed values still fail below. */
-function knownRoomResponder(value: unknown): unknown {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-  const room = value as { members?: unknown; defaultResponder?: unknown };
-  const responder = room.defaultResponder;
-  if (!responder || typeof responder !== "object" || Array.isArray(responder)) return value;
-  const kind = (responder as { kind?: unknown }).kind;
-  if (typeof kind !== "string" || ROOM_RESPONDER_KINDS.has(kind)) return value;
-  const first = Array.isArray(room.members) && typeof room.members[0] === "string" ? room.members[0] : undefined;
-  return { ...room, defaultResponder: first ? { kind: "agent", agent: first } : { kind: "mentions" } };
-}
-const roomSchema = z.preprocess(knownRoomResponder, z.object({
-  key,
-  name: requiredText(100),
-  members: z.array(key).min(1).max(200),
-  bulletin: optionalText(12_000),
-  defaultResponder: z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("agent"), agent: key }),
-    z.object({ kind: z.literal("everyone") }),
-    z.object({ kind: z.literal("mentions") }),
-    // Read, not written: exports spell an Auto room as its lead.
-    z.object({ kind: z.literal("auto"), agent: key.optional() }),
-  ]),
-}));
 const exampleSchema = z.object({
   title: requiredText(120),
   input: requiredText(4_000),
@@ -226,7 +199,6 @@ const packageDocumentV1Schema = z.object({
       skills: z.array(skillName).max(PACKAGE_V1_MAX_SKILLS).optional(),
     })).min(1).max(200),
     chiefOfStaff: key.optional(),
-    rooms: z.array(roomSchema).max(30).optional(),
     routines: z.array(z.object({
       key,
       name: requiredText(80),
@@ -352,10 +324,7 @@ const agentSchema = z.object({
 const routineSchema = z.object({
   key,
   name: requiredText(80),
-  /** The owner; for a room goal, the lead coordinator. */
   agent: key,
-  /** Present = a room goal (runs on this computer, no continuity). */
-  room: key.optional(),
   prompt: requiredText(20_000),
   runOn: z.enum(["maus", "cloud"]),
   schedule: packageRoutineScheduleSchema,
@@ -449,7 +418,6 @@ export const packageDocumentSchema = z.object({
       leader: key.optional(),
     }).optional(),
     agents: z.array(agentSchema).max(200).default([]),
-    rooms: z.array(roomSchema).max(30).optional(),
     routines: z.array(routineSchema).max(50).optional(),
     playbooks: z.array(playbookSchema).max(80).optional(),
     skills: z.object({
@@ -465,7 +433,6 @@ export const packageDocumentSchema = z.object({
 export type PackageDocument = z.output<typeof packageDocumentSchema>;
 export type PackageDefinition = PackageDocument["package"];
 export type PackageAgent = PackageDefinition["agents"][number];
-export type PackageRoom = NonNullable<PackageDefinition["rooms"]>[number];
 export type PackageRoutine = NonNullable<PackageDefinition["routines"]>[number];
 export type PackagePlaybook = NonNullable<PackageDefinition["playbooks"]>[number];
 export type PackageSkill = NonNullable<PackageDefinition["skills"]>["entries"][number];
@@ -476,7 +443,7 @@ export type PackageRoutineSchedule = PackageRoutine["schedule"];
 
 
 /** Lists whose items are named by `key` in part paths. */
-const KEYED_LISTS = new Set(["agents", "rooms", "routines", "playbooks", "presets", "connections"]);
+const KEYED_LISTS = new Set(["agents", "routines", "playbooks", "presets", "connections"]);
 
 function segmentsAfter(head: string, rest: ReadonlyArray<PropertyKey>): string {
   let out = head;
@@ -584,7 +551,6 @@ function checkV1References(pkg: PackageDocumentV1["package"]): void {
   const agents = uniqueKeys(pkg.agents.map((agent) => agent.key), "agent");
   const playbooks = uniqueKeys((pkg.playbooks ?? []).map((playbook) => playbook.key), "playbook");
   const skills = uniqueKeys((pkg.skills?.entries ?? []).map((skill) => skill.name), "skill");
-  uniqueKeys((pkg.rooms ?? []).map((room) => room.key), "room");
   uniqueKeys((pkg.routines ?? []).map((routine) => routine.key), "routine");
   if (pkg.chiefOfStaff && !agents.has(pkg.chiefOfStaff)) throw invalid(`Unknown Chief of Staff: ${pkg.chiefOfStaff}`);
   for (const agent of pkg.agents) {
@@ -600,16 +566,6 @@ function checkV1References(pkg: PackageDocumentV1["package"]): void {
   for (const skill of pkg.skills?.entries ?? []) {
     if (!referenced.has(skill.name)) throw invalid(`Skill ${skill.name} is not referenced by an agent`);
   }
-  for (const room of pkg.rooms ?? []) {
-    const members = uniqueKeys(room.members, `member in room ${room.key}`);
-    for (const member of members) {
-      if (!agents.has(member)) throw invalid(`Room ${room.key} references unknown agent: ${member}`);
-    }
-    if ((room.defaultResponder.kind === "agent" || room.defaultResponder.kind === "auto") && room.defaultResponder.agent !== undefined &&
-      !members.has(room.defaultResponder.agent)) {
-      throw invalid(`Room ${room.key} has an unknown default responder`);
-    }
-  }
   for (const routine of pkg.routines ?? []) {
     if (!agents.has(routine.agent)) throw invalid(`Routine ${routine.key} references unknown agent: ${routine.agent}`);
   }
@@ -619,15 +575,14 @@ function checkV2References(pkg: PackageDefinition): void {
   const isTeam = pkg.agents.length > 0;
   if (isTeam && !pkg.team) throw invalid("A package with bots needs a team");
   if (!isTeam) {
-    if (pkg.team || pkg.rooms?.length || pkg.routines?.length) {
-      throw invalid("A package without bots cannot have a team, group chats or routines");
+    if (pkg.team || pkg.routines?.length) {
+      throw invalid("A package without bots cannot have a team or routines");
     }
     if (!pkg.skills?.entries.length && !pkg.presets?.length) {
       throw invalid("A package without bots needs at least one skill or preset");
     }
   }
   const agents = uniqueKeys(pkg.agents.map((agent) => agent.key), "agent");
-  const rooms = uniqueKeys((pkg.rooms ?? []).map((room) => room.key), "room");
   uniqueKeys((pkg.routines ?? []).map((routine) => routine.key), "routine");
   const playbooks = uniqueKeys((pkg.playbooks ?? []).map((playbook) => playbook.key), "playbook");
   uniqueKeys((pkg.presets ?? []).map((preset) => preset.key), "preset");
@@ -651,28 +606,8 @@ function checkV2References(pkg: PackageDefinition): void {
   }
   for (const preset of pkg.presets ?? []) checkAssignments(`Preset ${preset.key}`, preset);
   checkSkillEntries(pkg.skills?.entries ?? []);
-  const roomMembers = new Map<string, Set<string>>();
-  for (const room of pkg.rooms ?? []) {
-    const members = uniqueKeys(room.members, `member in room ${room.key}`);
-    for (const member of members) {
-      if (!agents.has(member)) throw invalid(`Room ${room.key} references unknown agent: ${member}`);
-    }
-    if ((room.defaultResponder.kind === "agent" || room.defaultResponder.kind === "auto") && room.defaultResponder.agent !== undefined &&
-      !members.has(room.defaultResponder.agent)) {
-      throw invalid(`Room ${room.key} has a default responder who is not a member: ${room.defaultResponder.agent}`);
-    }
-    roomMembers.set(room.key, members);
-  }
   for (const routine of pkg.routines ?? []) {
     if (!agents.has(routine.agent)) throw invalid(`Routine ${routine.key} references unknown agent: ${routine.agent}`);
-    if (routine.room === undefined) continue;
-    if (!rooms.has(routine.room)) throw invalid(`Routine ${routine.key} references unknown group chat: ${routine.room}`);
-    if (routine.runOn !== "maus") throw invalid(`Routine ${routine.key} is a group chat goal, which only runs on this computer`);
-    if (routine.continuity) throw invalid(`Routine ${routine.key} is a group chat goal, which cannot carry continuity`);
-    // The goal scheduler refuses a lead who is not in the room.
-    if (!roomMembers.get(routine.room)!.has(routine.agent)) {
-      throw invalid(`Routine ${routine.key} is led by ${routine.agent}, who is not a member of group chat ${routine.room}`);
-    }
   }
 }
 
@@ -807,26 +742,18 @@ export function downgradeToV1(document: PackageDocument):
     if (seed) dropped.push(`agents[${agent.key}].seed`);
     return { ...kept, appearance: look };
   });
-  const routines = (pkg.routines ?? []).flatMap((routine) => {
-    if (routine.room !== undefined) {
-      dropped.push(`routines[${routine.key}]`);
-      return [];
-    }
-    const { room: _room, continuity, runOnStartup, ...kept } = routine;
+  const routines = (pkg.routines ?? []).map((routine) => {
+    const { continuity, runOnStartup, ...kept } = routine;
     if (continuity !== undefined) dropped.push(`routines[${routine.key}].continuity`);
     if (runOnStartup !== undefined) dropped.push(`routines[${routine.key}].runOnStartup`);
-    return [{ ...kept, enabledAfterInstall: false as const }];
+    return { ...kept, enabledAfterInstall: false as const };
   });
   const {
     team, publisher: _publisher, notes: _notes, presets: _presets, connections: _connections,
     skills: _skills, agents: _agents, routines: _routines, ...rest
   } = pkg;
-  // Older apps know no Auto room: spell one as its lead, as exports do.
-  const rooms = rest.rooms?.map((room) => room.defaultResponder.kind !== "auto" ? room
-    : { ...room, defaultResponder: { kind: "agent" as const, agent: room.defaultResponder.agent ?? room.members[0]! } });
   const v1: Record<string, unknown> = {
     ...rest,
-    ...(rooms ? { rooms } : {}),
     agents,
     ...(team.leader ? { chiefOfStaff: team.leader } : {}),
     ...(routines.length ? { routines } : {}),
@@ -930,7 +857,6 @@ export function packageKeys(document: PackageDocument): string[] {
   const pkg = document.package;
   return [
     ...pkg.agents.map((agent) => `agents:${agent.key}`),
-    ...(pkg.rooms ?? []).map((room) => `rooms:${room.key}`),
     ...(pkg.routines ?? []).map((routine) => `routines:${routine.key}`),
     ...(pkg.skills?.entries ?? []).map((skill) => `skills:${skill.name}`),
     ...(pkg.presets ?? []).map((preset) => `presets:${preset.key}`),
@@ -943,7 +869,7 @@ export interface PackageSummary {
   kind: "team" | "library";
   name: string;
   tagline: string;
-  counts: { bots: number; skills: number; presets: number; rooms: number; routines: number; connections: number; playbooks: number };
+  counts: { bots: number; skills: number; presets: number; routines: number; connections: number; playbooks: number };
   botNames: string[];
   skillNames: string[];
   presetNames: string[];
@@ -961,7 +887,6 @@ export function packageSummary(document: PackageDocument): PackageSummary {
       bots: pkg.agents.length,
       skills: pkg.skills?.entries.length ?? 0,
       presets: pkg.presets?.length ?? 0,
-      rooms: pkg.rooms?.length ?? 0,
       routines: pkg.routines?.length ?? 0,
       connections: pkg.connections?.length ?? 0,
       playbooks: pkg.playbooks?.length ?? 0,

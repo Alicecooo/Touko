@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useStore, type Bot } from "@/state/store";
 import { useBotEditor } from "./BotEditorContext";
-import { skillAuthoringEnabled, skillsLibraryEnabled } from "@/lib/feature-flags";
+import { skillsLibraryEnabled } from "@/lib/feature-flags";
 import { Switch } from "../SettingsPrimitives";
 import { inputCls } from "./field";
 import { OrgSkillsCard } from "./OrgSkillsCard";
@@ -264,7 +264,6 @@ export function SkillReviewDialog({
 export function SkillsSection({ bot }: { bot: Bot }) {
   const { request: api } = useBotEditor();
   const { state } = useStore();
-  const featureEnabled = skillAuthoringEnabled(state.config);
   const libraryOn = skillsLibraryEnabled(state.config);
   const {
     skills, staged, loading, working, setWorking, error, setError, reviewing, setReviewing, refresh, toggle, enableReviewed,
@@ -384,10 +383,6 @@ export function SkillsSection({ bot }: { bot: Bot }) {
           <BookOpen size={16} className="text-ink-secondary" />
           <div className="text-[15px] font-medium text-ink">{t("skills.learned.title")}</div>
         </div>
-        <div className="mt-1 text-[12px] leading-relaxed text-ink-secondary">
-          {featureEnabled ? t("skills.learned.hintOn") : t("skills.learned.hintOff")}
-        </div>
-
         {libraryOn ? (
           <div className="mt-3 flex flex-col gap-1.5">
             {libraryPool.length > 0 ? (
@@ -415,7 +410,6 @@ export function SkillsSection({ bot }: { bot: Bot }) {
             ) : (
               <div className="text-[12px] text-ink-secondary">{t("skills.library.allAssigned")}</div>
             )}
-            <div className="text-[11.5px] text-ink-secondary">{t("skills.library.manageHint")}</div>
           </div>
         ) : (
           <>
@@ -469,7 +463,6 @@ export function SkillsSection({ bot }: { bot: Bot }) {
                       </span>
                     )}
                     <div className="mt-0.5 line-clamp-2 text-[11.5px] text-ink-secondary">{skill.description}</div>
-                    <div className="mt-0.5 text-[10.5px] text-ink-secondary">{t("ui.skill.used")}</div>
                   </button>
                   <Switch
                     checked={skill.enabled}
@@ -489,7 +482,6 @@ export function SkillsSection({ bot }: { bot: Bot }) {
                     </button>
                   )}
                 </div>
-                <div className="mt-1 truncate text-[10.5px] text-ink-secondary" title={skill.source}>{t("ui.skill.source")}{skill.source}</div>
                 {skill.warnings.length > 0 && (
                   <div className="mt-1 text-[10.5px] text-warning">{skill.warnings.join(" · ")}</div>
                 )}

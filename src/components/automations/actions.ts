@@ -2,19 +2,15 @@
 import { useState } from "react";
 
 import type { Automation } from "@/lib/automations";
-import { copyText } from "@/lib/copy-text";
 import type { RoutineRun } from "@/lib/routines";
 import { useShowThreads } from "@/lib/thread-preferences";
-import { loadWebhookCredentials, removeWebhookCredential, saveWebhookCredential, webhookCredentialStore } from "@/lib/webhook-credentials";
-import type { WebhookCredential } from "@/lib/webhooks";
-import { api, openBotThread, useStore } from "@/state/store";
+import { openBotThread, useStore } from "@/state/store";
 
 export function useAutomationActions() {
   const { state, dispatch } = useStore();
   const showThreads = useShowThreads();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState<string | null>(null);
 
   const attempt = async (key: string, work: () => Promise<unknown>) => {
     if (busy) return;
@@ -30,15 +26,12 @@ export function useAutomationActions() {
       dispatch({ type: "updateRoutine", routineId: automation.id, patch: { enabled: !automation.enabled } });
       return;
     }
-    void attempt(`toggle:${automation.id}`, async () => {
-      const response = await api(`/api/webhooks/${automation.id}`, { method: "PATCH", body: JSON.stringify({ enabled: !automation.enabled, verificationPending: false }) });
-      dispatch({ type: "webhookPatched", webhook: response.webhook });
-    });
+    return;
   };
 
   const runNow = (automation: Automation) => attempt(`run:${automation.id}`, () => automation.kind === "schedule"
     ? new Promise<void>((resolve, reject) => dispatch({ type: "runRoutine", routineId: automation.id, onStarted: () => resolve(), onError: reject }))
-    : api(`/api/webhooks/${automation.id}/test`, { method: "POST", body: JSON.stringify({ event: "openmaus.test", message: "A test run from Automations" }) }));
+    : Promise.resolve());
 
   /** Asks once (a person deleting their own automation), then deletes it. */
   const remove = async (automation: Automation, question: string): Promise<boolean> => {
@@ -47,32 +40,14 @@ export function useAutomationActions() {
       dispatch({ type: "deleteRoutine", routineId: automation.id });
       return true;
     }
-    await attempt(`delete:${automation.id}`, async () => {
-      await api(`/api/webhooks/${automation.id}`, { method: "DELETE" });
-      dispatch({ type: "webhookDeleted", webhookId: automation.id });
-      removeWebhookCredential(webhookCredentialStore(), automation.id);
-    });
-    return true;
+    return false;
   };
 
-  /** The address another app sends to. A bot-made one has no usable secret until the person asks for it: this mints it, once. */
-  const copyAddress = (webhookId: string, replace = false) => attempt(`copy:${webhookId}`, async () => {
-    let credential: WebhookCredential | undefined = replace ? undefined : loadWebhookCredentials(webhookCredentialStore())[webhookId];
-    if (!credential) {
-      const response = await api(`/api/webhooks/${webhookId}/rotate`, { method: "POST" });
-      credential = response.credential as WebhookCredential;
-      dispatch({ type: "webhookPatched", webhook: response.webhook });
-      saveWebhookCredential(webhookCredentialStore(), webhookId, credential);
-    }
-    if (await copyText(credential.url) !== "copied") throw new Error("Couldn't copy the address");
-    setCopied(webhookId);
-    setTimeout(() => setCopied((current) => (current === webhookId ? null : current)), 1_800);
-  });
 
   const openRun = (automation: Automation, run: RoutineRun | undefined) => {
     const bot = state.bots.find((candidate) => candidate.id === automation.botId);
     if (bot && run?.threadId) openBotThread(dispatch, bot, run.threadId, showThreads);
   };
 
-  return { busy, error, setError, copied, toggle, runNow, remove, copyAddress, openRun };
+  return { busy, error, setError, toggle, runNow, remove, openRun };
 }
