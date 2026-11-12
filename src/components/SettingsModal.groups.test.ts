@@ -69,7 +69,6 @@ beforeEach(() => {
   fixture.showRunCard = true;
   fixture.sidebarDensity = "comfortable";
   fixture.notificationSounds = true;
-  // these pin the Advanced rail; Simple has its own suite (SettingsModal.simple.test.ts)
   fixture.switches = [];
   fixture.ownerOrAdmin = null;
   vi.stubGlobal("window", {});

@@ -8,7 +8,6 @@ node_modules/
 # Generated application bundles and release packages
 /dist/
 /dist-server/
-/dist-electron/
 /dist-native/
 /release/
 /electron/vendor/

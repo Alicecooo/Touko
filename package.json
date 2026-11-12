@@ -68,7 +68,6 @@
     "generate:translations": "node scripts/generators/generate-translations.mjs",
     "test:server:unit": "vitest run server --exclude \"tests/**\" --exclude \"src/**\" --exclude \"electron/**\" --exclude \"shared/**\"",
     "test:server": "vitest run tests/server",
-    "generate:app-icons": "node scripts/generators/generate-app-icons.mjs",
     "generate:portrait-preview": "node scripts/generators/generate-portrait-preview.mjs"
   },
   "dependencies": {

@@ -12,7 +12,6 @@
     ".roo/**",
     ".windsurf/**",
     "dist/**",
-    "dist-electron/**",
     "dist-native/**",
     "dist-server/**",
     "electron/vendor/**",

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { llmThreadTitlesEnabled, roomMemoryCaptureEnabled, routinesInConversationEnabled, shareLearnedSkillsMode, sharedComputersEnabled, showToolCallsEnabled, skillAuthoringEnabled } from "./feature-flags";
 
-describe("experimental feature flags", () => {
+describe("feature flags", () => {
   it("keeps skill authoring on by default, before and after the config arrives", () => {
     expect(skillAuthoringEnabled(null)).toBe(true);
     expect(skillAuthoringEnabled({})).toBe(true);
