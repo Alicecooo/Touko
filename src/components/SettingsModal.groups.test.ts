@@ -106,7 +106,7 @@ describe("Settings rail groups", () => {
       you: ["general", "appearance", "companion"],
       ai: ["engines", "connections", "appConnections", "decisionModel"],
       computers: ["desktopWorkspaces", "logins"],
-      account: ["organization", "usage", "backups", "experimental"],
+      account: ["organization", "usage", "backups"],
     });
     expect(html).toContain('<optgroup label="AI">');
   });
@@ -114,7 +114,7 @@ describe("Settings rail groups", () => {
   it("keeps the browser-only pages for a hosted workspace's admins", () => {
     fixture.ownerOrAdmin = true;
     const groups = rail(render());
-    expect(groups.account).toEqual(["usage", "backups", "activity", "experimental"]);
+    expect(groups.account).toEqual(["usage", "backups", "activity"]);
     expect(Object.values(groups).flat()).not.toContain("desktopWorkspaces");
     expect(Object.values(groups).flat()).not.toContain("cloudAccount");
   });

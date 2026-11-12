@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Archive, Coins, FlaskConical, KeyRound, LockKeyhole, Monitor, Palette, Plug, ScrollText, Search, Terminal, User, X, Building2, Zap, BookOpen } from "lucide-react";
+import { Archive, Coins, KeyRound, LockKeyhole, Monitor, Palette, Plug, ScrollText, Search, Terminal, User, X, Building2, Zap, BookOpen } from "lucide-react";
 import { api, useStore, type AppSettingsSection, type ConfigStatus } from "@/state/store";
-import { routinesInConversationEnabled, showToolCallsEnabled, skillAuthoringEnabled, skillsLibraryEnabled } from "@/lib/feature-flags";
+import { routinesInConversationEnabled, showToolCallsEnabled, skillsLibraryEnabled } from "@/lib/feature-flags";
 import { localeChoices, type LocaleKey } from "@/locales";
 import { t } from "@/lib/i18n";
 import { AppConnectionSettings, ModelApiSettings } from "./ConnectionSettings";
@@ -16,7 +16,6 @@ import { LoginsSettings } from "./LoginsSettings";
 import { ConnectedWorkspacesSettings } from "./ConnectedWorkspacesSettings";
 import { OrganizationSettings } from "./OrganizationSettings";
 import { Card, SettingRow, Switch } from "./SettingsPrimitives";
-import { LearnedSkillsSettings } from "./ShareLearnedSkillsSettings";
 import { effortLabel } from "./ModelPicker";
 import { EFFORT_LEVELS, isEffortLevel } from "../../shared/wire";
 import { shortcutLabel } from "./ShortcutHint";
@@ -78,7 +77,6 @@ export const SECTIONS: Array<{
   { id: "backups", group: "account", labelKey: "settings.section.backups", icon: Archive, keywords: ["export", "import", "restore", "full backup", "password", "recovery"] },
   { id: "activity", group: "account", labelKey: "settings.section.activity", icon: ScrollText, keywords: ["activity", "audit", "log", "history", "who changed", "approvals", "decisions", "admin"] },
   { id: "workspaces", group: "account", labelKey: "settings.section.workspaces", icon: Building2, keywords: ["clients", "tenants", "fleet", "workspaces", "installation", "installations"] },
-  { id: "experimental", group: "account", labelKey: "settings.section.experimental", icon: FlaskConical, keywords: ["early", "preview", "learn", "skill", "authoring"] },
 ];
 
 export function sectionMatches(section: (typeof SECTIONS)[number], query: string): boolean {
@@ -382,53 +380,6 @@ function ToolCallsRow() {
   );
 }
 
-function ExperimentalFeaturesRow() {
-  const { state, dispatch } = useStore();
-  const skillAuthoring = skillAuthoringEnabled(state.config);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const toggle = async (next: boolean) => {
-    if (saving) return;
-    setSaving(true);
-    setError("");
-    try {
-      const config: ConfigStatus = await api("/api/config", {
-        method: "PATCH",
-        body: JSON.stringify({ features: { skillAuthoring: next } }),
-      });
-      dispatch({ type: "configStatus", config });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("settings.experimental.error"));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Card title={t("settings.experimental.title")} subtitle={t("settings.experimental.subtitle")}>
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <div className="text-[14px] font-medium text-ink">{t("settings.experimental.skillAuthoring")}</div>
-          <div className="mt-0.5 text-[12px] leading-relaxed text-ink-secondary">
-            {t("settings.experimental.skillAuthoringDetail")}
-          </div>
-        </div>
-        <Switch
-          checked={skillAuthoring}
-          aria-label={t("settings.experimental.skillAuthoringAria")}
-          disabled={saving}
-          onClick={() => void toggle(!skillAuthoring)}
-          className="disabled:cursor-wait disabled:opacity-50"
-        />
-      </div>
-      {error ? <p role="alert" className="mt-2 text-[12px] text-danger">{error}</p> : null}
-      <LearnedSkillsSettings />
-
-    </Card>
-  );
-}
-
 /** Security: the report never holds credential values; the desktop shell does not read secret fields. */
 
 export function SettingsModal() {
@@ -571,8 +522,6 @@ export function SettingsModal() {
             <RunCardRow />
           </>
         );
-      case "experimental":
-        return <ExperimentalFeaturesRow />;
       case "connections":
         return <ModelApiSettings />;
       case "appConnections":

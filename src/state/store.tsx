@@ -529,7 +529,6 @@ export type AppSettingsSection =
   | "organization"
   | "cloudAccount"
   | "appearance"
-  | "experimental"
   | "connections"
   | "appConnections"
   | "decisionModel"
