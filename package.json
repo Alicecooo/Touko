@@ -42,7 +42,7 @@
     "check:desktop-control-container": "node tests/checks/desktop-control-container.check.mjs",
     "check:electron-syntax": "node tests/checks/electron-module-syntax.check.mjs",
     "preview": "vite preview",
-    "build:server": "tsc -p tsconfig.server.build.json && node scripts/build/bundle-server.mjs",
+    "build:server": "tsc -p tsconfig.server.json && node scripts/build/bundle-server.mjs",
     "prepare:windows-desktop-control": "node scripts/setup/prepare-windows-desktop-control.mjs",
     "check:windows-desktop-control": "node tests/checks/windows-desktop-control.check.mjs",
     "prepare:https-tunnel": "node scripts/setup/prepare-https-tunnel.mjs",

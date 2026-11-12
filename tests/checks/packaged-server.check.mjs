@@ -1,9 +1,6 @@
 // Prove the built server starts with no node_modules in reach. dist-server is
 // copied out of the repo first: inside it, a bare import still resolves by
 // walking up to ./node_modules.
-// Prove the built server starts with no node_modules in reach. dist-server is
-// copied out of the repo first: inside it, a bare import still resolves by
-// walking up to ./node_modules.
 import { execFile, spawn } from "node:child_process";
 import assert from "node:assert/strict";
 import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";

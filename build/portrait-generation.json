@@ -2,7 +2,7 @@
   "date": "2026-11-10",
   "tool": "Built-in image_gen",
   "style": "Classic Japanese visual-novel illustration; fine contours, natural adult face proportions balanced between sharp and soft, restrained cel shading.",
-  "appSource": "build/app-icon-source.svg",
+  "appSource": "public/app-icon.svg",
   "appIconMethod": "Hand-authored vector symbol; character artwork is for bot avatars only.",
   "shyDirection": "No blush, cheek tint or hatching. Use averted gaze, reserved brows and a small bashful smile.",
   "assets": [
