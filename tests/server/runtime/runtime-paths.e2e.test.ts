@@ -13,7 +13,7 @@ import { hostTimeout } from "../../support/environment/platform-timeout.ts";
 import { ownTurnText } from "../../support/teams/scripted-handoff-agent.ts";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
-const SETTLED = "Your downstream room requests have settled.";
+const SETTLED = "Your downstream teammate requests have settled.";
 const REPORT_FROM_PEER = "[OpenMausBot report from @Peer";
 const ROUTINE_TURN = "Execute this routine now";
 const TEAMMATES_CUT = "A restart cut these teammates' turns";

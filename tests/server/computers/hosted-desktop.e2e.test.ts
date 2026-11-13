@@ -163,33 +163,26 @@ it("keeps the bot's own engine on the cloud computer, and a failed place never b
     const model = (await apiOk("GET", "/api/bots")).bots.find((entry: any) => entry.id === bot.id).modelSelection.model as string;
     expect(model).not.toBe("claude-fable-5");
 
-    await apiOk("PATCH", `/api/bots/${bot.id}`, { computer: "cloud" });
     await hostedTurn(bot.id, bot.activeTaskId, model);
     expect(boxesCreated).toBe(1);
-    const fresh = (await apiOk("POST", `/api/bots/${bot.id}/tasks`, {})).task.threadId as string;
-    await hostedTurn(bot.id, fresh, model);
-    await apiOk("PATCH", `/api/bots/${bot.id}`, { computer: null });
-    await apiOk("PATCH", `/api/bots/${bot.id}/tasks/${bot.activeTaskId}`, { surface: "cloud" });
     await hostedTurn(bot.id, bot.activeTaskId, model);
     expect(boxesCreated).toBe(1);
 
-    const autoThread = (await apiOk("POST", `/api/bots/${bot.id}/tasks`, {})).task.threadId as string;
     const callsBeforeAuto = boatCalls;
     rmSync(fixture.fixtureDumpPath, { force: true });
-    await control(["send", "--bot", bot.id, "--task", autoThread, "--text", "what is 2+2?"]);
+    await control(["send", "--bot", bot.id, "--task", bot.activeTaskId, "--text", "what is 2+2?"]);
     expect((await dump()).mcpConfig?.mcpServers?.computer?.args?.[1]).not.toBe("computer");
-    await finish(bot.id, autoThread);
+    await finish(bot.id, bot.activeTaskId);
     expect(boatCalls - callsBeforeAuto, "an Auto turn read the Boat account").toBe(0);
-    expect((await task(bot.id, autoThread)).surface).toBeUndefined();
+    expect((await task(bot.id, bot.activeTaskId)).surface).toBeUndefined();
     rows.length = 0;
-    await control(["send", "--bot", bot.id, "--task", autoThread, "--text", "and 3+3?"]);
-    await finish(bot.id, autoThread);
+    await control(["send", "--bot", bot.id, "--task", bot.activeTaskId, "--text", "and 3+3?"]);
+    await finish(bot.id, bot.activeTaskId);
     expect(boxesCreated).toBe(1);
     expect(boatCalls - callsBeforeAuto).toBe(0);
 
     failNewBoat = true;
     const { bot: fenced } = await control(["new-bot", "--name", "Fenced fixture"]);
-    await apiOk("PATCH", `/api/bots/${fenced.id}`, { computer: "cloud" });
     await control(["send", "--bot", fenced.id, "--task", fenced.activeTaskId, "--text", "Use the hosted desktop."]);
     expect((await control(["wait", "--bot", fenced.id, "--task", fenced.activeTaskId, "--timeout", "30"])).status).toBe("failed");
     expect((await lastRows(fenced.activeTaskId)).at(-1)).toBe("error: Fenced fixture's cloud computer didn't start. Try again.");
@@ -199,7 +192,6 @@ it("keeps the bot's own engine on the cloud computer, and a failed place never b
     await control(["send", "--bot", fenced.id, "--task", fenced.activeTaskId, "--text", "Try the hosted desktop again."]);
     expect((await control(["wait", "--bot", fenced.id, "--task", fenced.activeTaskId, "--timeout", "30"])).status).toBe("failed");
     expect((await lastRows(fenced.activeTaskId)).at(-1)).toBe("error: Fenced fixture's previous cloud computer is still being removed. Try again.");
-    await apiOk("PATCH", `/api/bots/${fenced.id}`, { computer: null });
     const callsBeforeFencedAuto = boatCalls;
     await control(["send", "--bot", fenced.id, "--task", fenced.activeTaskId, "--text", "what is 2+2?"]);
     await finish(fenced.id, fenced.activeTaskId);
@@ -211,7 +203,6 @@ it("keeps the bot's own engine on the cloud computer, and a failed place never b
     await apiOk("PATCH", "/api/instances/openaiCompat", { tools: false });
     const { bot: plain } = await control(["new-bot", "--name", "Tools-off fixture"]);
     await control(["set-model", "--bot", plain.id, "--instance", "openaiCompat", "--model", "tools-off-model"]);
-    await apiOk("PATCH", `/api/bots/${plain.id}`, { computer: "cloud" });
     await control(["send", "--bot", plain.id, "--task", plain.activeTaskId, "--text", "hello"]);
     expect((await control(["wait", "--bot", plain.id, "--task", plain.activeTaskId, "--timeout", "30"])).status).toBe("failed");
     expect((await lastRows(plain.activeTaskId)).at(-1)).toBe("error: tools-off-model can't use a computer. Choose a model that can, such as Claude or ChatGPT. Choose another model in Tools-off fixture's settings.");
@@ -229,7 +220,6 @@ it("keeps the bot's own engine on the cloud computer, and a failed place never b
     expect((await control(["wait", "--bot", plain.id, "--task", routineThread, "--timeout", "30"])).status).toBe("failed");
     expect((await lastRows(routineThread)).at(-1)).toBe("error: tools-off-model can't use a computer. Choose a model that can, such as Claude or ChatGPT. Choose another model in Tools-off fixture's settings.");
     expect(boxesCreated).toBe(2);
-    await apiOk("PATCH", `/api/bots/${plain.id}`, { computer: null });
     await control(["send", "--bot", plain.id, "--task", plain.activeTaskId, "--text", "hello again"]);
     expect((await control(["wait", "--bot", plain.id, "--task", plain.activeTaskId, "--timeout", "30"])).status).toBe("settled");
     expect(prompts).toBe(0);

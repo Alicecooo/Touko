@@ -2,7 +2,6 @@
 import type { RequestAuth } from "../auth/request-auth.ts";
 import type { SessionRegistry } from "../auth/sessions.ts";
 import type { Viewer, VisibleSet } from "../bots/bot-visibility.ts";
-import { queuedChannelSends } from "../teams/channel-queue.ts";
 import type { Coordinator } from "../teams/coordinator.ts";
 import { jobView, type ConversationState, type JobScope, type JobView } from "../agent/job-view.ts";
 import { hasQueuedSteeredMessages } from "../teams/steer-queue.ts";
@@ -15,9 +14,8 @@ const RECHECK_MS = 2_000;
 const SETTLE_MS = 150;
 
 export interface JobRouteDeps {
-  store: Pick<Store, "bot" | "botByThread" | "groupByThread" | "taskByThread" | "groupTaskByThread" | "onChange">;
+  store: Pick<Store, "bot" | "botByThread" | "taskByThread" | "onChange">;
   coordinator: Pick<Coordinator, "job">;
-  groupThreadIsWorking(groupId: string, threadId: string): boolean;
   viewerFor(auth: RequestAuth): Viewer;
   visibleTo(viewer: Viewer): VisibleSet;
   /** A held read outlives its start: the session is asked again before it answers. */
@@ -39,8 +37,7 @@ export function createJobRoutes(deps: JobRouteDeps): RouteHandler {
         ...(task?.activity ? { activity: task.activity } : {}), queued: hasQueuedSteeredMessages(bot.id, threadId) ? 1 : 0,
       };
     }
-    const group = store.groupByThread(threadId);
-    return group ? { kind: "room", busy: deps.groupThreadIsWorking(group.id, threadId), queued: queuedChannelSends(threadId) } : null;
+    return null;
   };
 
   const read = (threadId: string, scope: JobScope, since: number, full: boolean, visible: VisibleSet): JobView | null => {
@@ -50,13 +47,9 @@ export function createJobRoutes(deps: JobRouteDeps): RouteHandler {
     const { scopes, rows } = coordinator.job(threadId, since, owner?.id);
     return jobView({
       threadId, scope, since, now: now(), scopes, rows, conversation, full,
-      activityOf: (row) => row.assignee.destination.groupId
-        ? store.bot(row.assignee.botId)?.activity
-        : store.taskByThread(row.assignee.botId, row.assignee.destination.threadId)?.activity,
+      activityOf: (row) => store.taskByThread(row.assignee.botId, row.assignee.destination.threadId)?.activity,
       nameOf: (botId) => store.bot(botId)?.name,
-      titleOf: (row) => row.assignee.destination.groupId
-        ? store.groupTaskByThread(row.assignee.destination.groupId, row.assignee.destination.threadId)?.title
-        : store.taskByThread(row.assignee.botId, row.assignee.destination.threadId)?.title,
+      titleOf: (row) => store.taskByThread(row.assignee.botId, row.assignee.destination.threadId)?.title,
       visible: (thread) => visible.thread(thread),
     });
   };

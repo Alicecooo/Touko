@@ -26,7 +26,7 @@ function responseEvents(model: string, effort: string | undefined) {
   ].map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join("");
 }
 
-test("persists per-conversation OpenCode efforts and sends them through ACP after server restart", async () => {
+test("persists a thread's OpenCode effort and sends it through ACP after server restart", async () => {
   expect(isAbsolute(cli!), "Supply an explicit absolute fixture CLI path").toBe(true);
   expect(existsSync(cli!)).toBe(true);
   const receipts: Receipt[] = [];
@@ -138,17 +138,14 @@ test("persists per-conversation OpenCode efforts and sends them through ACP afte
     expect(model.variants).toEqual(expect.arrayContaining([{ id: "low", label: expect.any(String) }]));
     expect(model.variants.some((entry: any) => entry.id === "none")).toBe(false);
     const { bot } = await control(["new-bot", "--name", "Variant fixture"]);
-    const taskA = bot.activeTaskId;
-    const taskB = (await api("POST", `/api/bots/${bot.id}/tasks`, { title: "Variant B" }, 201)).task.threadId;
+    const threadId = bot.activeTaskId;
     const selection = (variant: string) => ({ instanceId: "opencodeGo", model: model.id, variant });
-    await api("PATCH", `/api/bots/${bot.id}/tasks/${taskA}`, { modelSelection: selection("low") });
-    await api("PATCH", `/api/bots/${bot.id}/tasks/${taskB}`, { modelSelection: selection("default") });
+    const select = (variant: string) => api("PATCH", `/api/bots/${bot.id}/tasks/${threadId}`, { modelSelection: selection(variant) });
     const state = async () => (await api("GET", "/api/bots")).bots.find((entry: any) => entry.id === bot.id);
-    const assertSelections = async () => {
+    const assertSelection = async (variant: string) => {
       const current = await state();
-      expect(current.tasks.find((task: any) => task.threadId === taskA).modelSelection).toEqual(selection("low"));
-      expect(current.tasks.find((task: any) => task.threadId === taskB).modelSelection).toEqual(selection("default"));
-      evidence.push({ persistedSelections: { A: selection("low"), B: selection("default") } });
+      expect(current.tasks.find((task: any) => task.threadId === threadId).modelSelection).toEqual(selection(variant));
+      evidence.push({ persistedSelection: selection(variant) });
     };
     const turn = async (taskId: string, marker: string, effort: string | undefined) => {
       const before = receipts.length;
@@ -162,16 +159,19 @@ test("persists per-conversation OpenCode efforts and sends them through ACP afte
       const reply = transcript.messages.filter((message: any) => message.role === "bot" && message.kind === "text").at(-1);
       expect(reply?.text).toBe(`fixture-ok:${effort ?? "omitted"}`);
     };
-    await assertSelections();
-    await turn(taskA, "VARIANT_A_1", "low");
-    await turn(taskB, "VARIANT_B_1", undefined);
-    await assertSelections();
+    await select("low");
+    await assertSelection("low");
+    await turn(threadId, "VARIANT_LOW_1", "low");
+    await select("default");
+    await assertSelection("default");
+    await turn(threadId, "VARIANT_DEFAULT_1", undefined);
+    await select("low");
+    await assertSelection("low");
+    await turn(threadId, "VARIANT_LOW_BEFORE_RESTART", "low");
     // A real server restart verifies durable model choices, not just client state.
     await restart();
-    await assertSelections();
-    await turn(taskA, "VARIANT_A_2", "low");
-    await turn(taskB, "VARIANT_B_2", undefined);
-    await assertSelections();
+    await assertSelection("low");
+    await turn(threadId, "VARIANT_LOW_AFTER_RESTART", "low");
   } finally {
     const evidencePath = `${logPath}.opencode-variants.json`;
     writeFileSync(evidencePath, JSON.stringify({ evidence, receipts }, null, 2));

@@ -2210,19 +2210,6 @@ button:disabled.bg-danger {
   -webkit-app-region: no-drag;
 }
 
-/* Room speaker names. Each skin sets a tone of the bot's palette that clears
-   4.5:1 on the thread (--color-app). The class below only picks the token. */
-.bot-identity[data-bot-color="green"] { color: var(--identity-green); }
-.bot-identity[data-bot-color="blue"] { color: var(--identity-blue); }
-.bot-identity[data-bot-color="red"] { color: var(--identity-red); }
-.bot-identity[data-bot-color="orange"] { color: var(--identity-orange); }
-.bot-identity[data-bot-color="purple"] { color: var(--identity-purple); }
-.bot-identity[data-bot-color="cyan"] { color: var(--identity-cyan); }
-.bot-identity[data-bot-color="pink"] { color: var(--identity-pink); }
-.bot-identity[data-bot-color="yellow"] { color: var(--identity-yellow); }
-.bot-identity[data-bot-color="teal"] { color: var(--identity-teal); }
-.bot-identity[data-bot-color="coral"] { color: var(--identity-coral); }
-
 .user-bubble-colored {
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.16);
 }

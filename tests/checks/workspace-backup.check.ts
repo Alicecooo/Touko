@@ -100,8 +100,8 @@ export async function verifyWorkspaceBackup(report: (event: unknown) => void = (
     assert.equal((await control(source, "doctor") as { ok: boolean }).ok, true);
     const { bot } = await control(source, "new-bot", "--name", "Full backup probe", "--section", "Fixture team") as { bot: { id: string; threadId: string } };
     const { bot: oldBot } = await control(destination, "new-bot", "--name", "Original destination") as { bot: { id: string } };
-    const soul = "Retain these exact standing instructions. 🐭\n";
-    assert.equal((await api(source, "PATCH", `/api/bots/${bot.id}/profile`, { soul })).status, 200);
+    const description = "Retain these exact standing instructions.";
+    assert.equal((await api(source, "PATCH", `/api/bots/${bot.id}/profile`, { description })).status, 200);
     const settings = await api(source, "PUT", "/api/config", { profile: { name: "Workspace backup fixture" } });
     assert.equal(settings.status, 200, JSON.stringify(settings.body));
     const destinationConfig = JSON.parse(readFileSync(join(destination.info.dataDir, "config.json"), "utf8"));
@@ -148,7 +148,7 @@ export async function verifyWorkspaceBackup(report: (event: unknown) => void = (
     assert.equal(download.status, 200);
     const encrypted = Buffer.from(await download.arrayBuffer());
     assert.equal(encrypted.byteLength, exported.body.bytes);
-    for (const privateText of [soul, "WORKSPACE_SKILL_MARKER", "Keep draft"]) assert.equal(encrypted.includes(Buffer.from(privateText)), false);
+    for (const privateText of [description, "WORKSPACE_SKILL_MARKER", "Keep draft"]) assert.equal(encrypted.includes(Buffer.from(privateText)), false);
     record({ command: "download encrypted workspace", bytes: encrypted.length, summary: exported.body.summary });
 
     const upload = await fetch(`${destination.info.url}/api/workspace-backup/upload`, {
@@ -183,7 +183,7 @@ export async function verifyWorkspaceBackup(report: (event: unknown) => void = (
     assert.equal(after.bots.some((candidate: { id: string }) => candidate.id === oldBot.id), false);
     const restored = after.bots.find((candidate: { id: string }) => candidate.id === bot.id);
     record({ command: "read restored transcript", botId: bot.id, threadId: restored.threadId, messages: restored.messages });
-    assert.equal(restored.soul, soul);
+    assert.equal(restored.description, description);
     assert.equal(restored.threadId, original.threadId);
     const destinationAttachment = join(destination.info.dataDir, relative(source.info.dataDir, attached.path));
     assert.deepEqual(restored.messages, JSON.parse(JSON.stringify(original.messages)

@@ -64,11 +64,10 @@ it("starts new bots and threads at Full access on each engine family, and keeps 
     }
     const threads: Record<string, string> = {};
     for (const [instanceId, bot] of Object.entries(bots)) {
-      const task = (await api("POST", `/api/bots/${bot.id}/tasks`, { title: `New ${instanceId} thread` }, 201)).task;
-      expect(task.approvalMode).toBe("full");
-      threads[instanceId] = task.threadId;
-      await send(bot.id, task.threadId);
-      expect((await wait(bot.id, task.threadId)).status).toBe("settled");
+      expect(bot.approvalMode).toBe("full");
+      threads[instanceId] = bot.threadId;
+      await send(bot.id, bot.threadId);
+      expect((await wait(bot.id, bot.threadId)).status).toBe("settled");
     }
     const claudeArgv = JSON.parse(readFileSync(fixture.fixtureDumpPath, "utf8")).argv as string[];
     expect(claudeArgv[claudeArgv.indexOf("--permission-mode") + 1]).toBe("bypassPermissions");
@@ -94,8 +93,7 @@ it("starts new bots and threads at Full access on each engine family, and keeps 
     await waitForExit(server!, { signal: "SIGTERM" });
     await start();
     expect(stored(bots.droid.id).approvalMode).toBe("ask");
-    const askThread = (await api("POST", `/api/bots/${bots.droid.id}/tasks`, { title: "Ask thread" }, 201)).task;
-    expect(askThread.approvalMode).toBe("ask");
+    const askThread = { threadId: bots.droid.threadId };
     expect((await api("GET", "/api/bots?messages=0")).bots.find((bot: any) => bot.id === bots.claude.id).approvalMode).toBe("full");
     await send(bots.droid.id, askThread.threadId);
     await expect.poll(() => openCard(askThread.threadId), { timeout: 20_000 }).toBeTruthy();

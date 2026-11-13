@@ -309,15 +309,7 @@ export const CLIENT_ALLOW: ReadonlyArray<{ methods: readonly string[]; path: Reg
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/connector-cards\/[\w-]+\/(?:resume|dismiss)$/ },
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/always-allow$/ }, // must match a pending card
   { methods: ["POST"], path: /^\/api\/groups$/ },
-  { methods: ["POST"], path: /^\/api\/groups\/[\w-]+\/messages$/ },
-  { methods: ["POST"], path: /^\/api\/groups\/[\w-]+\/interrupt$/ },
-  { methods: ["POST"], path: /^\/api\/groups\/[\w-]+\/members\/[\w-]+\/compact$/ },
-  { methods: ["POST"], path: /^\/api\/groups\/[\w-]+\/read$/ },
-  { methods: ["DELETE"], path: /^\/api\/groups\/[\w-]+\/queue\/[\w-]+$/ },
-  { methods: ["POST"], path: /^\/api\/groups\/[\w-]+\/queue\/[\w-]+\/steer$/ },
-  { methods: ["POST"], path: /^\/api\/groups\/[\w-]+\/tasks$/ },
-  { methods: ["POST", "PATCH", "DELETE"], path: /^\/api\/groups\/[\w-]+\/tasks\/[\w-]+$/ },
-  { methods: ["PATCH"], path: /^\/api\/groups\/[\w-]+$/ }, // display fields only: see clientGroupPatchViolation
+  { methods: ["PATCH"], path: /^\/api\/groups\/[\w-]+$/ }, // grouping metadata only: see clientGroupPatchViolation
   { methods: ["POST"], path: /^\/api\/threads\/[\w-]+\/messages\/[\w-]+\/reactions$/ },
   { methods: ["POST"], path: /^\/api\/attachments$/ },
   { methods: ["GET"], path: /^\/api\/attachments\/[\w.-]+$/ },
@@ -353,8 +345,8 @@ export function clientBotPatchViolation(body: unknown): string | null {
   return null;
 }
 
-/** Same for a room: name and reading state, never its folder or who answers. */
-const CLIENT_GROUP_PATCH_FIELDS = new Set(["name", "bulletin", "unread", "pinnedMessageId", "section"]);
+/** A group is a bot-labeling container; clients may only change its display state. */
+const CLIENT_GROUP_PATCH_FIELDS = new Set(["name", "unread", "pinnedMessageId", "section"]);
 export function clientGroupPatchViolation(body: unknown): string | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) return "body";
   for (const key of Object.keys(body)) if (!CLIENT_GROUP_PATCH_FIELDS.has(key)) return key;

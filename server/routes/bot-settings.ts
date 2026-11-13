@@ -6,7 +6,7 @@ import type { ModelSelection } from "../harness/contracts.ts";
 import type { createApprovalModeSupport } from "../agent/harness-capabilities.ts";
 import type { hostedModelPolicy } from "../deployment/hosted-models.ts";
 import type { RequestAuth } from "../auth/request-auth.ts";
-import type { BotRecord, GroupRecord, Store } from "../storage/store.ts";
+import type { BotRecord, Store } from "../storage/store.ts";
 import type { ModelSelectionCheck } from "./bots-create.ts";
 import { PASS, type RouteHandler } from "./table.ts";
 import { pinnedClientThreadGuard } from "./pinned-client-thread.ts";
@@ -25,7 +25,6 @@ export interface BotSettingsRouteDeps {
   storedAvatarExists(avatarUrl: string): boolean;
   requestedTaskBot(botId: string, rawThreadId: unknown): BotRecord;
   threadBusy(botId: string, threadId: string): boolean;
-  activeGroupTurnForBot(botId: string): { group: GroupRecord; threadId: string } | null;
   checkedModelSelection(raw: unknown, current?: { selection: ModelSelection; busy: boolean }, requireAvailableModel?: boolean): ModelSelectionCheck;
   engineSwitchNeedsAsk(mode: ApprovalMode, from: ModelSelection, to: ModelSelection): boolean;
   readCursor(threadId: string): { lastReadMessageId?: string };
@@ -37,7 +36,7 @@ export function createBotSettingsRoutes(deps: BotSettingsRouteDeps): RouteHandle
     store,
     cloudHome: CLOUD_HOME, cloudOwnerProfileFields: CLOUD_OWNER_PROFILE_FIELDS,
     hostedModels, supportsApprovalMode, directTurnBots, broadcast, wireBot, cloudOwnerSession, storedAvatarExists,
-    requestedTaskBot, threadBusy, activeGroupTurnForBot, checkedModelSelection, engineSwitchNeedsAsk, readCursor,
+    requestedTaskBot, threadBusy, checkedModelSelection, engineSwitchNeedsAsk, readCursor,
     cardAnswerRefusal,
   } = deps;
   const pinnedClientThread = pinnedClientThreadGuard(store);
@@ -87,10 +86,6 @@ export function createBotSettingsRoutes(deps: BotSettingsRouteDeps): RouteHandle
         true,
       );
       if (!checked.ok) return json(res, checked.status, { error: checked.error });
-      if (activeGroupTurnForBot(existing.id)) {
-        const groupChecked = checkedModelSelection(checked.selection, { selection: existing.modelSelection, busy: true });
-        if (!groupChecked.ok) return json(res, groupChecked.status, { error: groupChecked.error });
-      }
       if ([existing, selected].some((owner) => {
         const mode = approvalModeFor(owner);
         return mode === "custom" &&

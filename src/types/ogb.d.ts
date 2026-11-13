@@ -244,7 +244,7 @@ const __APP_VERSION__: string;
       pickFolder?(current?: string): Promise<string | null>;
 
       
-      /** Asks where to save a bot-created file (inside ~/.openmausbot), copies
+      /** Asks where to save a bot-created file (inside ~/.touko), copies
        * it there and reveals it. Resolves the chosen path, or null if the
        * user cancelled the dialog. */
       saveFile?(filePath: string): Promise<string | null>;

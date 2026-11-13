@@ -1,5 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import { launchVerificationServer, runControlOmb } from "../../../scripts/dev/isolated-environment.ts";
 
@@ -27,17 +26,12 @@ it("dispatches setup and canonical standing instructions through the real isolat
     expect(setup.systemPrompt).toContain("propose_profile");
     expect(JSON.stringify(setup.prompt)).toContain("Set yourself up for this job: Help me track garden watering");
 
-    await api("PATCH", `/api/bots/${bot.id}`, { description: "Garden helper", soul: "Only water the fixture garden after approval." });
-    writeFileSync(join(fixture.info.dataDir, "bots", bot.id, "SOUL.md"), "UNAPPROVED MIRROR INSTRUCTIONS");
+    await api("PATCH", `/api/bots/${bot.id}`, { description: "Garden helper" });
     const configured = await turn("What is your job?");
-    expect(configured.systemPrompt).toContain("Only water the fixture garden after approval.");
-    expect(configured.systemPrompt).not.toContain("UNAPPROVED MIRROR INSTRUCTIONS");
+    expect(configured.systemPrompt).toContain("About: Garden helper");
     expect(configured.systemPrompt).not.toContain("The user explicitly asked you to set yourself up");
-    const drift = await api("GET", `/api/bots/${bot.id}/soul`);
-    expect(drift.drift).toBe(true);
-    expect(drift.fileText).toBe("UNAPPROVED MIRROR INSTRUCTIONS");
-    expect((await api("GET", `/api/bots/${bot.id}/history`)).rows).toEqual(expect.arrayContaining([
-      expect.objectContaining({ field: "soul" }),
+    expect((await api("GET", "/api/bots")).bots).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: bot.id, description: "Garden helper" }),
     ]));
     const messages = await runControlOmb(["messages", "--bot", bot.id, "--limit", "10"], { env });
     expect(JSON.stringify(messages)).toContain("hello from fake claude");

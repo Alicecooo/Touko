@@ -31,7 +31,6 @@ export interface BeginRequest {
   level: Level;
   /** Default "resume"; external runtimes use "poll". */
   reply?: Reply;
-  goalRunId?: string;
 }
 
 const BRIEF_MAX = 12_000;
@@ -128,7 +127,6 @@ export class Runtime {
       mode: "work", reply: req.reply ?? "resume", brief: clip(req.brief, BRIEF_MAX), status: "running",
       level: req.level, levelSource: "own", executions: 1, restarts: 0, createdAt: now, startedAt: now, lastActivityAt: now,
       result: "", rework: false, budgets: { since: now, requests: 0, executions: 1, wakes: 0 }, version: 1,
-      ...(req.goalRunId ? { goalRunId: req.goalRunId } : {}),
     };
     this.store.transaction(() => {
       this.store.insert(root, { kind: "enqueued", at: now, detail: "queued: root" });
@@ -186,13 +184,12 @@ export class Runtime {
     const lineage = parent ? path(this.store, parent) : [];
     const root = lineage[0];
     const target = req.assignee;
-    if (lineage.some(a => a.assignee.botId === target.botId &&
-      (!a.assignee.destination.groupId || !target.destination.groupId || a.assignee.destination.groupId === target.destination.groupId))) {
+    if (lineage.some(a => a.assignee.botId === target.botId)) {
       return refuse("Cannot assign work back to an ancestor; results return automatically");
     }
     if (parent) {
       const existing = this.store.children(parent.id).findLast(c => c.brief === brief && c.mode === mode && c.assignee.botId === target.botId &&
-        c.assignee.destination.threadId === target.destination.threadId && c.assignee.destination.groupId === target.destination.groupId);
+        c.assignee.destination.threadId === target.destination.threadId);
       if (existing && !(req.rework && isTerminal(existing))) return { ok: true, assignment: existing, duplicate: true };
       if (parent.depth + 1 > this.limits.depth) return refuse(`Assignment depth limit reached (${this.limits.depth})`);
       if (root?.budgets && root.budgets.requests + 1 > this.limits.requests) {
@@ -208,8 +205,7 @@ export class Runtime {
       origin: root ? root.origin : req.origin, requester: req.requester, assignee: target, mode,
       reply: req.reply ?? (mode === "notify" ? "none" : "resume"), brief, ...(req.doneWhen ? { doneWhen: req.doneWhen } : {}),
       status: "queued", level, levelSource: source, executions: 0, restarts: 0, createdAt: now, lastActivityAt: now, result: "",
-      rework: Boolean(req.rework), ...(req.approved !== undefined ? { approved: req.approved } : {}),
-      ...(req.batchKey !== undefined ? { batchKey: req.batchKey } : {}), version: 1,
+      rework: Boolean(req.rework), ...(req.approved !== undefined ? { approved: req.approved } : {}), version: 1,
     };
     if (!parent) { node.rootId = node.id; node.budgets = { since: now, requests: 0, executions: 0, wakes: 0 }; }
     const problem = this.safe("validate", () => this.runner.validate(node, parent));
@@ -303,11 +299,9 @@ export class Runtime {
       const n = this.store.get(snapshot.id);
       if (!n || (n.status !== "queued" && n.status !== "resume")) continue;
       const thread = n.assignee.destination.threadId;
-      // Same-conversation turns never overlap; same-room speakers take turns.
-      if (busyThreads.has(thread)) continue;
       const parent = n.parentId ? this.store.get(n.parentId) : undefined;
-      const group = n.assignee.destination.groupId;
-      if (parent?.status === "running" && group !== undefined && parent.assignee.destination.groupId === group) continue;
+      // Same-conversation turns never overlap.
+      if (busyThreads.has(thread)) continue;
       const resumed = n.status === "resume";
       if (!resumed) {
         const root = n.parentId ? this.store.get(n.rootId) : n;

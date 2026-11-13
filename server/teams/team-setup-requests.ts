@@ -289,7 +289,7 @@ export class TeamSetupRequestService {
       }
     }
     if (!request.deletion) {
-      lines.push("\nDefault models apply to groups and new threads. Every existing thread keeps its current model and permissions.");
+      lines.push("\nBot defaults apply to new conversations. Every existing conversation keeps its current model and permissions.");
       if (request.operations.some((operation) => operation.action === "create")) {
         lines.push("New bots stay owner-owned after creation: connected apps off, the workspace's default access level, a private workspace by default, avatar untouched.");
       }

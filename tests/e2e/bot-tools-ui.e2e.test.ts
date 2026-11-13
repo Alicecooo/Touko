@@ -18,7 +18,7 @@ if (!enabled) console.log("skipping bot tools UI e2e: no agent-browser; set OMB_
 const LAUNCH_TIMEOUT_MS = forced && !binary ? 600_000 : 180_000;
 
 interface FixtureInfo { ui: string; url: string; dataDir: string; logPath: string }
-interface SavedBot { id: string; name: string; soul?: string; mcpServers?: string[]; computer?: string; browser?: boolean }
+interface SavedBot { id: string; name: string; description?: string; mcpServers?: string[]; computer?: string; browser?: boolean }
 
 describe("bot setup and tools in the real renderer", () => {
   let child: ChildProcess | undefined;
@@ -112,7 +112,7 @@ describe("bot setup and tools in the real renderer", () => {
     expect(await dialogCount()).toBe(0);
     await press("Control+n");
     await evaluate("window.releaseBotCreation(); true");
-    await expect.poll(async () => (await bots()).find((bot) => bot.name === coder.name)?.soul, { timeout: 10_000 }).toBe(coder.soul);
+    await expect.poll(async () => (await bots()).find((bot) => bot.name === coder.name)?.description, { timeout: 10_000 }).toBe(coder.description);
     const created = (await bots()).filter((bot) => !original.some((old) => old.id === bot.id));
     expect(created).toHaveLength(1);
     expect(created[0]).toMatchObject(roleProfilePatch(coder));
@@ -204,7 +204,7 @@ describe("bot setup and tools in the real renderer", () => {
       const fetch = window.fetch.bind(window);
       window.fetch = (input, init) => {
         const path = input instanceof Request ? input.url : String(input);
-        if (init?.method === 'PATCH' && /\\/api\\/bots\\/[^/]+$/.test(path) && typeof init.body === 'string' && JSON.parse(init.body).soul) {
+        if (init?.method === 'PATCH' && /\\/api\\/bots\\/[^/]+$/.test(path) && typeof init.body === 'string' && JSON.parse(init.body).description) {
           window.fetch = fetch;
           return Promise.resolve(new Response(JSON.stringify({error:'Fixture preset rejected'}), {status:409, headers:{'content-type':'application/json'}}));
         }
@@ -222,7 +222,7 @@ describe("bot setup and tools in the real renderer", () => {
     await click("Create bot");
     await expect.poll(async () => (await bots()).length, { timeout: 10_000 }).toBe(beforeFailure.length + 1);
     await expect.poll(dialogCount, { timeout: 10_000 }).toBe(0);
-    expect((await bots()).filter(bot => !beforeFailure.some(old => old.id === bot.id))).toMatchObject([{ name: ops.name, soul: ops.soul }]);
+    expect((await bots()).filter(bot => !beforeFailure.some(old => old.id === bot.id))).toMatchObject([{ name: ops.name, description: ops.description }]);
     const logs = await ui("console");
     expect((logs.messages as Array<{ type: string; text: string }>).filter((entry) => entry.type === "error")).toEqual([]);
     if (child?.connected) child.send("stop");

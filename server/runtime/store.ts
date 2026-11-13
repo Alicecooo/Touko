@@ -39,16 +39,14 @@ const assignmentSchema = z.object({
   assignee: z.object({
     botId: z.string().min(1),
     destination: z.object({
-      kind: z.enum(["work_thread", "standing_thread", "room_thread"]),
+      kind: z.enum(["work_thread", "standing_thread"]),
       threadId: z.string(),
-      groupId: z.string().optional(),
     }).refine(d => d.threadId.length > 0 || d.kind === "standing_thread", { message: "threadId must not be empty" }),
   }),
   mode: z.enum(["work", "consult", "notify"]),
   reply: z.enum(["resume", "poll", "none"]),
   brief: z.string(),
   doneWhen: z.string().optional(),
-  goalRunId: z.string().optional(),
   status: z.enum(["queued", "running", "needs_input", "waiting", "resume", "completed", "failed", "cancelled"]),
   outcome: z.enum(["done", "needs_input", "cap_continued", "stalled", "interrupted", "budget", "provider_error", "denied",
     "expired", "stopped", "refused", "duplicate"]).optional(),
@@ -74,7 +72,6 @@ const assignmentSchema = z.object({
   continuation: z.object({ note: z.string(), handoffPath: z.string().optional(), count: z.number().int().nonnegative() }).optional(),
   guard: z.object({ stale: z.number().int().nonnegative(), errors: z.array(z.string()) }).optional(),
   approved: z.boolean().optional(),
-  batchKey: z.string().optional(),
   version: z.literal(1),
 });
 
@@ -154,6 +151,42 @@ const SCHEMA = `
 
 type Row = Record<string, unknown>;
 
+// Drop assignments created by the removed group-chat runtime while opening an existing database.
+function removeLegacyGroupTrees(db: DatabaseSync): void {
+  const roots = new Set<string>();
+  for (const row of db.prepare("SELECT root_id, json FROM assignments").all() as Row[]) {
+    try {
+      const parsed: unknown = JSON.parse(String(row.json));
+      if (!parsed || typeof parsed !== "object") continue;
+      const assignee = (parsed as Record<string, unknown>).assignee;
+      if (!assignee || typeof assignee !== "object") continue;
+      const destination = (assignee as Record<string, unknown>).destination;
+      if (!destination || typeof destination !== "object") continue;
+      const target = destination as Record<string, unknown>;
+      if (target.kind === "room_thread" || typeof target.groupId === "string") roots.add(String(row.root_id));
+    } catch {
+      // Preserve malformed rows so readAssignment can report the original corruption.
+    }
+  }
+  if (roots.size === 0) return;
+
+  const removeEvents = db.prepare("DELETE FROM assignment_events WHERE assignment_id IN (SELECT id FROM assignments WHERE root_id = ?)");
+  const removeInbox = db.prepare("DELETE FROM inbox WHERE assignment_id IN (SELECT id FROM assignments WHERE root_id = ?)");
+  const removeAssignments = db.prepare("DELETE FROM assignments WHERE root_id = ?");
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    for (const root of roots) {
+      removeEvents.run(root);
+      removeInbox.run(root);
+      removeAssignments.run(root);
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 function readAssignment(row: Row): Assignment {
   let parsed: unknown;
   try {
@@ -204,6 +237,7 @@ export function openRuntimeStore(path: string): RuntimeStore {
     db.exec("PRAGMA synchronous = NORMAL");
   }
   db.exec(SCHEMA);
+  removeLegacyGroupTrees(db);
 
   const statements = {
     get: db.prepare("SELECT id, json FROM assignments WHERE id = ?"),

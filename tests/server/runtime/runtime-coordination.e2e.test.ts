@@ -12,7 +12,7 @@ import { hostTimeout } from "../../support/environment/platform-timeout.ts";
 import { ownTurnText } from "../../support/teams/scripted-handoff-agent.ts";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
-const SETTLED = "Your downstream room requests have settled.";
+const SETTLED = "Your downstream teammate requests have settled.";
 const REPORT_FROM_MIRA = "[OpenMausBot report from @Mira";
 const RERUN_NOTE = "OpenMausBot restarted while your previous turn here was running";
 const TEAMMATES_CUT = "A restart cut these teammates' turns";
@@ -238,7 +238,7 @@ it("S2b keeps one question chip across a restart and names the parked thread as 
   expect(await unread(f.clive.id, job)).toBe(false);
   expect(await unread(f.mira.id, work)).toBe(false);
 
-  const check = (await f.api("POST", `/api/bots/${f.clive.id}/tasks`, { title: "Check on Mira" })).body.task.threadId as string;
+  const check = f.clive.activeTaskId;
   f.script(f.clive.id, { key: "C1", match: ["S2B-CHECK"], reply: "C1: checked.", steps: [
     { tool: "list_threads", arguments: {} },
     { tool: "close_thread", arguments: { thread_id: work }, expectError: true },

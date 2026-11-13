@@ -31,13 +31,13 @@ export interface Requester {
   chief?: boolean;
 }
 
-export type DestinationKind = "work_thread" | "standing_thread" | "room_thread";
+export type DestinationKind = "work_thread" | "standing_thread";
 
 export interface Assignee {
   botId: string;
   /** `threadId` is empty only on a legacy-import row that named no thread: the kind is then
    * "standing_thread" and the host resolves or refuses it at dispatch. */
-  destination: { kind: DestinationKind; threadId: string; groupId?: string };
+  destination: { kind: DestinationKind; threadId: string };
 }
 
 /** work: do it with your own tools. consult: answer from what you know, act
@@ -92,9 +92,6 @@ export interface Assignment {
   brief: string;
   /** The requester's own completion criterion, if it gave one. */
   doneWhen?: string;
-  /** A root that is one step of a room goal run (the run's id): it neither parks nor continues in
-   * place and is not run again after a restart. Never changed after begin. */
-  goalRunId?: string;
   status: Status;
   outcome?: Outcome;
   outcomeDetail?: string;
@@ -139,8 +136,6 @@ export interface Assignment {
   guard?: { stale: number; errors: string[] };
   /** A peer-review card allowed this before it was sent. */
   approved?: boolean;
-  /** A room brief shown once per call: every recipient of that call shares it. */
-  batchKey?: string;
   version: 1;
 }
 
@@ -203,7 +198,6 @@ export interface EnqueueRequest {
   /** The assignee's engine, for the level cap. */
   driverKind?: string;
   approved?: boolean;
-  batchKey?: string;
 }
 
 export type EnqueueResult =

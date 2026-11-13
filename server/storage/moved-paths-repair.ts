@@ -10,10 +10,11 @@ import { INSTRUCTION_FILE, restorePaths } from "../workspace/workspace-backup-pa
 const DEFINITIONS = ["bots.json", "groups.json", "config.json", "routines.json", "calendar-calls.json"];
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const MAX_FILE_BYTES = 16 * 1024 ** 2;
-// The folder a desktop keeps its data in by default, <home>\.openmausbot or <home>/.openmausbot, where a path ends.
+// Default data folders named in saved instructions, including legacy and current desktop paths.
 const END = String.raw`(?=[.,;:!?)\]}]*(?:[\s"'\x60<>|]|$)|[\\/])`;
-const WINDOWS_DATA_FOLDER = new RegExp(String.raw`(?<![\w\\/])[A-Za-z]:(?:[\\/][^\\/:*?"<>|\r\n]+?)*?[\\/]\.openmausbot${END}`, "gi");
-const POSIX_DATA_FOLDER = new RegExp(String.raw`(?<![\w.:\\/-])\/(?:[^/\s"'\x60<>|]+\/)*?\.openmausbot${END}`, "g");
+const DATA_FOLDER_NAME = String.raw`\.(?:touko|openmausbot)`;
+const WINDOWS_DATA_FOLDER = new RegExp(String.raw`(?<![\w\\/])[A-Za-z]:(?:[\\/][^\\/:*?"<>|\r\n]+?)*?[\\/]${DATA_FOLDER_NAME}${END}`, "gi");
+const POSIX_DATA_FOLDER = new RegExp(String.raw`(?<![\w.:\\/-])\/(?:[^/\s"'\x60<>|]+\/)*?${DATA_FOLDER_NAME}${END}`, "g");
 
 type Paths = ReturnType<typeof restorePaths>;
 

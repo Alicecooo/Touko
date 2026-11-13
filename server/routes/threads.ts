@@ -1,4 +1,4 @@
-import type { WireBot, WireGroup, WireTask } from "../../shared/wire.ts";
+import type { WireBot, WireTask } from "../../shared/wire.ts";
 import { ATTACHMENTS_DIR, extensionForMime, FILE_MAX_BYTES, IMAGE_MAX_BYTES, parseAudioRange, readAttachment, saveFile, saveImageUpload, validateAttachmentUploadId, type SavedAttachment } from "../workspace/attachments.ts";
 import { deliveredCopy } from "../bots/bot-attachment.ts";
 import { memberBot, type Viewer, type VisibleSet } from "../bots/bot-visibility.ts";
@@ -6,11 +6,10 @@ import type { ComputerControl } from "../computers/computer-control.ts";
 import type { AppConfig } from "../config/config.ts";
 import type { Coordinator } from "../teams/coordinator.ts";
 import type { ModelSelection } from "../harness/contracts.ts";
-import type { GroupUsageReader } from "../teams/group-thread-usage.ts";
 import { listMessageFolder, messageAttachmentName, messageFileDisposition, messageFileDownloadName, messageFolderEntryName, messageImageTargetAt, messageReferencesFile, openMessageFile, openMessageFolderEntry, referencedFileName } from "../storage/message-file.ts";
 import type { RequestAuth, ResolveOptions } from "../auth/request-auth.ts";
 import type { queuedSteerSnapshot } from "../teams/steer-queue.ts";
-import type { BotRecord, GroupRecord, Message, Store, TaskRecord } from "../storage/store.ts";
+import type { BotRecord, Message, Store, TaskRecord } from "../storage/store.ts";
 import { createJobRoutes } from "./jobs.ts";
 import { PASS, type RouteContext, type RouteHandler } from "./table.ts";
 
@@ -18,19 +17,16 @@ export type MessagePage = { messages: Array<Message | Record<string, unknown>>; 
 
 export interface ThreadRouteDeps {
   store: Pick<Store,
-    | "activeLeaf" | "activePath" | "bot" | "botByThread" | "bots" | "groupByThread" | "groupTaskByThread" | "groups" | "messagesFor"
+    | "activeLeaf" | "activePath" | "bot" | "botByThread" | "bots" | "messagesFor"
     | "onChange" | "sections" | "taskByThread" | "tasks">;
   coordinator: Pick<Coordinator, "job">;
-  groupThreadIsWorking(groupId: string, threadId: string): boolean;
   cfg: Pick<AppConfig, "profile">;
   sessions: ResolveOptions["sessions"];
-  groupUsageReader: Pick<GroupUsageReader, "refresh">;
   defaultPage: number;
   pageSize(raw: string | null): number | null | undefined;
   messagePage(threadId: string, limit: number | undefined, before?: string | null): MessagePage;
   messageWindow(threadId: string, messageId: string, limit: number): { messages: Array<Message | Record<string, unknown>>; hasMore: boolean } | null;
   publicBotQueuedMessages(): ReturnType<typeof queuedSteerSnapshot>;
-  publicGroupState(record: GroupRecord): WireGroup;
   wireBot(bot: BotRecord): WireBot;
   wireTask(task: TaskRecord, botModel: ModelSelection): WireTask;
   botComputerControlSnapshot(botId: string): ReturnType<ComputerControl["snapshot"]>;
@@ -40,13 +36,12 @@ export interface ThreadRouteDeps {
 }
 
 export function createThreadRoutes(deps: ThreadRouteDeps): RouteHandler {
-  const {store, cfg, sessions, groupUsageReader, defaultPage: DEFAULT_PAGE, pageSize, messagePage, messageWindow, publicBotQueuedMessages, wireBot, wireTask, botComputerControlSnapshot, messageFileRootsForThread, viewerFor, visibleTo} = deps;
-  const jobs = createJobRoutes({ store, coordinator: deps.coordinator, groupThreadIsWorking: deps.groupThreadIsWorking, viewerFor, visibleTo, sessions });
+  const {store, cfg, sessions, defaultPage: DEFAULT_PAGE, pageSize, messagePage, messageWindow, publicBotQueuedMessages, wireBot, wireTask, botComputerControlSnapshot, messageFileRootsForThread, viewerFor, visibleTo} = deps;
+  const jobs = createJobRoutes({ store, coordinator: deps.coordinator, viewerFor, visibleTo, sessions });
   const handle = async ({ req, res, url, path, method, auth, json, readBody }: RouteContext): Promise<unknown> => {
     let m: RegExpMatchArray | null = null;
     const visible = visibleTo(viewerFor(auth));
     if (method === "GET" && path === "/api/bots") {
-      try { groupUsageReader.refresh(); } catch { }
       const limit = pageSize(url.searchParams.get("messages"));
       if (limit === null) return json(res, 400, { error: "messages must be a non-negative whole number" });
       // tasks stays explicit: clients expect [] where wireBot() would omit the key.
@@ -73,7 +68,7 @@ export function createThreadRoutes(deps: ThreadRouteDeps): RouteHandler {
     m = path.match(/^\/api\/threads\/([\w-]+)\/messages$/);
     if (m && method === "GET") {
       const threadId = m[1];
-      if (!store.botByThread(threadId) && !store.groupByThread(threadId)) {
+      if (!store.botByThread(threadId)) {
         return json(res, 404, { error: "no such conversation" });
       }
       const limit = pageSize(url.searchParams.get("limit"));
@@ -96,7 +91,7 @@ export function createThreadRoutes(deps: ThreadRouteDeps): RouteHandler {
     m = path.match(/^\/api\/threads\/([\w-]+)\/messages\/([\w-]+)\/image$/);
     if (m && method === "GET") {
       // messagesFor caches a ThreadState for any id it is handed, so unknown ids 404 first.
-      if (!store.botByThread(m[1]) && !store.groupByThread(m[1])) {
+      if (!store.botByThread(m[1])) {
         return json(res, 404, { error: "no such conversation" });
       }
       const message = store.messagesFor(m[1]).find((msg) => msg.id === m![2]);
@@ -121,8 +116,7 @@ export function createThreadRoutes(deps: ThreadRouteDeps): RouteHandler {
       }
       const threadId = m[1]!;
       const directBot = store.botByThread(threadId);
-      const group = directBot ? undefined : store.groupByThread(threadId);
-      if (!directBot && !group) return json(res, 404, { error: "no such conversation" });
+      if (!directBot) return json(res, 404, { error: "no such conversation" });
 
       const message = store.messagesFor(threadId).find((candidate) => candidate.id === m![2]);
       if (!message) return json(res, 404, { error: "no such message" });
@@ -359,15 +353,12 @@ export function createThreadRoutes(deps: ThreadRouteDeps): RouteHandler {
     if (m && method === "GET") {
       const threadId = m[1];
       const bot = store.botByThread(threadId);
-      const group = bot ? undefined : store.groupByThread(threadId);
-      if (!bot && !group) return json(res, 404, { error: "no such conversation" });
+      if (!bot) return json(res, 404, { error: "no such conversation" });
       const format = url.searchParams.get("format") ?? "markdown";
       if (format !== "markdown" && format !== "json") {
         return json(res, 400, { error: "format must be markdown or json" });
       }
-      const title = bot
-        ? (store.taskByThread(bot.id, threadId)?.title || bot.name)
-        : (store.groupTaskByThread(group!.id, threadId)?.title || group!.name);
+      const title = store.taskByThread(bot.id, threadId)?.title || bot.name;
       const filename = (title.replace(/[^\w\- ]+/g, "").trim() || "conversation").slice(0, 60);
       const messages = store.activePath(threadId);
       if (format === "json") {

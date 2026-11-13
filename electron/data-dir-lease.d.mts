@@ -19,7 +19,7 @@ export declare class DataDirLeaseError extends Error {
 
 export declare function acquireDataDirLease(
   dataDir: string,
-  options?: { legacyDataDir?: string },
+  options?: { legacyDataDir?: string | string[]; legacyDataDirs?: string | string[] },
 ): OwnedDataDirLease;
 
 export declare function acquireDataDirLeaseForProcess(

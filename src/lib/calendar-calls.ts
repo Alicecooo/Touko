@@ -1,4 +1,3 @@
-/** Joining the room never starts audio automatically. */
 export type CalendarCallSchedule =
   | { type: "once"; at: number }
   | { type: "daily"; time: string; weekdays: number[] };
@@ -21,7 +20,6 @@ export interface CalendarCall {
   schedule: CalendarCallSchedule;
   durationMinutes: number;
   attachments: CalendarCallAttachment[];
-  roomId?: string;
   nextRunAt: number | null;
   createdAt: number;
   updatedAt: number;

@@ -106,7 +106,6 @@ it("offers the working engine once, and on the person's answer switches this con
   await withQuotaFixture({}, async ({ api, control, respond, backupPrompts, dataDir }) => {
     const text = "SUMMARISE_THE_QUARTER_4K";
     const { bot, threadId, messages, state } = await meetTheLimit(api, control, text);
-    const { task: sibling } = await api("POST", `/api/bots/${bot.id}/tasks`, { title: "Sibling keeps its engine" });
 
     // One account of the failure, and one offer: the engine that works, by name.
     await expect.poll(async () => (await messages()).filter((message) => message.card?.quotaSwitch).length, { timeout: 20_000 }).toBe(1);
@@ -149,14 +148,13 @@ it("offers the working engine once, and on the person's answer switches this con
     expect(after.filter((message) => message.card?.quotaSwitch)).toHaveLength(1);
     expect(after.filter((message) => message.tool?.name?.startsWith("error:"))).toHaveLength(1);
 
-    // This conversation moved; the bot's own engine and its other conversation did not.
+    // This conversation moved; the bot's default engine did not.
     const bots = await state();
     const instances = (await api("GET", "/api/instances")).instances as any[];
     expect(bots.tasks.find((task: any) => task.threadId === threadId)).toMatchObject({
       modelSelection: { instanceId: "backup", model: instances.find((instance) => instance.instanceId === "backup").models.default }, busy: false,
     });
     expect(bots.modelSelection.instanceId).toBe("claude");
-    expect(bots.tasks.find((task: any) => task.threadId === sibling.threadId).modelSelection?.instanceId ?? bots.modelSelection.instanceId).toBe("claude");
 
     // No job twice: the failed turn's root stayed settled, and the resend is one new root that completed.
     const roots = readHandoffs(dataDir).filter((node) => node.threadId === threadId);

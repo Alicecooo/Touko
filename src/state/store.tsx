@@ -135,7 +135,6 @@ export interface Message extends Pick<import("../../shared/wire").WireMessage, "
   secret?: SecretRequestCardData;
   signIn?: import("../../shared/wire").SignInRequestCardData;
   routineRun?: RoutineRunCardData;
-  channelMode?: "chat" | "goal";
   tool?: { name: string; ok?: boolean; setup?: boolean; claudeUpdate?: boolean; place?: PlaceRow; summary?: string; input?: string; output?: string ; itemId?: string; outputPath?: string; fullResult?: boolean };
   steered?: boolean;
   via?: "api";
@@ -153,9 +152,7 @@ export interface Message extends Pick<import("../../shared/wire").WireMessage, "
   sendId?: string;
   from?: { botId: string; name: string; color: MausColor };
   peerAsk?: { botId: string; name: string; unattended?: boolean };
-  roomRequest?: { id: string; phase: "request" | "result" };
   reactions?: Array<{ emoji: string; by: string }>;
-  comm?: { groupId: string; threadId?: string; withBotId: string; withName: string; withColor: MausColor };
   threadRef?: { botId: string; threadId: string; title: string };
   queued?: boolean;
   queueId?: string;
@@ -168,23 +165,6 @@ export interface Group {
   memberIds: string[];
   createdAt: number;
   section?: string;
-  /** Legacy room fields are accepted when reading old snapshots but are not used by the client. */
-  threadId?: string;
-  tasks?: Array<{ threadId: string; title: string; createdAt: number; updatedAt?: number; lastThreadOrderAt?: number; working?: boolean; busyBotId?: string | null }>;
-  messages?: Message[];
-  hasMore?: boolean;
-  unread?: boolean;
-  dm?: boolean;
-  defaultResponder?: import("../../shared/wire").GroupDefaultResponder;
-  bulletin?: string;
-  busyBotId?: string | null;
-  working?: boolean;
-  turnStartedAt?: number | null;
-  memberContext?: import("../../shared/wire").WireGroup["memberContext"];
-  queue?: import("../../shared/wire").WireGroup["queue"];
-  holds?: import("../../shared/wire").WireGroup["holds"];
-  pinnedMessageId?: string;
-  usage?: import("../../shared/wire").GroupThreadUsage | null;
 }
 
 export interface ModelSelection {
@@ -832,7 +812,6 @@ function optimisticUserMessage(
   sendId: string,
   replyToId?: string,
   parentId?: string | null,
-  channelMode?: "chat" | "goal",
 ): Message {
   return {
     id: optimisticMessageId(sendId),
@@ -843,7 +822,6 @@ function optimisticUserMessage(
     parentId: parentId ?? null,
     replyToId,
     sendId,
-    channelMode,
   };
 }
 
@@ -2137,7 +2115,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   threadId: body.threadId,
                   queueId: body.queueId,
                   text: action.text,
-                  reason: body.reason === "capacity" || body.reason === "group-turn" ? body.reason : undefined,
+                  reason: body.reason === "capacity" ? body.reason : undefined,
                 });
               }
             })

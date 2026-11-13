@@ -144,7 +144,7 @@ export async function exportJob(client: HeadlessClient, options: ExportOptions, 
   const botNames = new Map<string, string>();
   for (const node of nodes) {
     if (!threads.has(node.threadId)) threads.set(node.threadId, `${node.botName}${node.threadTitle ? `-${node.threadTitle}` : ""}`);
-    if (!node.groupId && !botNames.has(node.threadId)) botNames.set(node.threadId, String(node.botName));
+    if (!botNames.has(node.threadId)) botNames.set(node.threadId, String(node.botName));
   }
   const transcripts: Rec[] = [];
   const files: Rec[] = [];

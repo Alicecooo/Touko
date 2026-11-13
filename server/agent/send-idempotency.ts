@@ -21,7 +21,6 @@ export function acceptedSendMatch(
   sendId: string,
   text: string,
   replyToId?: string,
-  channelMode?: "chat" | "goal",
 ): AcceptedSendMatch {
   const message = messages.find((candidate) => candidate.sendId === sendId);
   if (!message) return { kind: "none" };
@@ -29,8 +28,7 @@ export function acceptedSendMatch(
     message.role !== "user" ||
     message.kind !== "text" ||
     message.text !== text ||
-    message.replyToId !== replyToId ||
-    (message.channelMode ?? "chat") !== (channelMode ?? "chat")
+    message.replyToId !== replyToId
   ) {
     return { kind: "conflict" };
   }
@@ -65,6 +63,6 @@ export class SendSequencer {
   }
 }
 
-export function sendFingerprint(text: string, replyToId?: string, channelMode?: "chat" | "goal"): string {
-  return JSON.stringify([text, replyToId ?? null, channelMode ?? null]);
+export function sendFingerprint(text: string, replyToId?: string): string {
+  return JSON.stringify([text, replyToId ?? null]);
 }

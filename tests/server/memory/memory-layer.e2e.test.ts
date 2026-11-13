@@ -68,16 +68,13 @@ it("recalls, captures, suggests, forgets and tidies a bot's memory", async () =>
     expect(sentSince(before)).toContain("Loves pasta, hates olives");
 
     await turn(bot.id, bot.threadId, "Note for later: the project codename is Bluebird.");
-    const created = await api<any>(`/api/bots/${bot.id}/tasks`, "POST", { title: "New chat" }, 201);
-    const second: string = created.task?.threadId ?? created.threadId;
     before = sentCount();
-    await turn(bot.id, second, "What was the project codename again?");
+    await turn(bot.id, bot.threadId, "What was the project codename again?");
     expect(sentSince(before)).toContain("Bluebird");
-    expect(sentSince(before)).toMatch(/your main chat|chat \\"[^"\\]+\\"/);
 
     await api(`/api/bots/${bot.id}`, "PATCH", { memoryEnabled: false });
     before = sentCount();
-    await turn(bot.id, second, "Can you suggest some restaurants for Friday?");
+    await turn(bot.id, bot.threadId, "Can you suggest some restaurants for Friday?");
     expect(sentSince(before)).not.toContain("Recalled for this message");
     expect(JSON.stringify(await api(`/api/bots/${bot.id}/system-prompt`))).not.toContain("memory/dining.md");
     await api(`/api/bots/${bot.id}`, "PATCH", { memoryEnabled: true });
@@ -101,7 +98,7 @@ it("recalls, captures, suggests, forgets and tidies a bot's memory", async () =>
     await api(`/api/bots/${bot.id}`, "PATCH", { memoryUpkeep: true });
     await turn(bot.id, bot.threadId, "Just so you know, I'm vegetarian and I have exams this weekend.");
     expect((await memoryFile(bot.id)).text).not.toContain("The person is vegetarian");
-    await api(`/api/bots/${bot.id}`, "PATCH", { memoryUpkeep: false, browser: "invalid" }, 400);
+    await api(`/api/bots/${bot.id}`, "PATCH", { memoryUpkeep: false, pinnedMessageId: {} }, 400);
     expect(await api(`/api/bots/${bot.id}/memory/upkeep`)).toMatchObject({ enabled: true });
     await expect.poll(async () => (await memoryFile(bot.id)).text, { timeout: 20_000 }).toContain("The person is vegetarian");
     await api("/api/config", "PUT", { memory: { captureQuietMs: 1_000 } });

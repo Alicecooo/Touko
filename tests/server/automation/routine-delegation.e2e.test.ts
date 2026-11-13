@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { launchVerificationServer, runControlOmb, type VerificationServer } from "../../../scripts/dev/isolated-environment.ts";
 import { readHandoffs } from "../../support/teams/read-handoff-records.ts";
 
-const SETTLED = "Your downstream room requests have settled.";
+const SETTLED = "Your downstream teammate requests have settled.";
 const REPORT_FROM_PEER = "[OpenMausBot report from @Routine peer";
 
 describe("routine delegation through the isolated harness", () => {
@@ -155,49 +155,6 @@ describe("routine delegation through the isolated harness", () => {
     evidence.push({ deniedHandoffCompleted: true, transcript });
   }, 45_000);
 
-  it.each([
-    { capacity: 3, resume: "completion" },
-    { capacity: 1, resume: "raise" },
-  ])("resumes the waiting routine once a slot frees at capacity $capacity, on $resume", async ({ capacity, resume }) => {
-    await api("PATCH", "/api/config", { threads: { maxConcurrentPerBot: capacity } });
-    const run = await start();
-    await delegate(run.threadId);
-    finish(run.threadId);
-    await expect.poll(async () => (await runState(run.id))?.status, { timeout: 15_000 }).toBe("waiting");
-    const work = await awaitPeerWork(run.threadId);
-    await dump(work.threadId);
-
-    const occupiedThreads: string[] = [];
-    for (let index = 0; index < capacity; index++) {
-      const { task } = await api("POST", `/api/bots/${source.id}/tasks`, { title: `Occupied ${index}` });
-      occupiedThreads.push(task.threadId);
-      await api("POST", `/api/bots/${source.id}/messages`, { threadId: task.threadId, text: "Hold this task open." });
-      await dump(task.threadId);
-    }
-    finish(work.threadId);
-    await expect.poll(async () => (await messages(run.threadId)).some(
-      (message) => message.tool?.name === "Routine peer replied" && message.from?.botId === peer.id,
-    ), { timeout: 15_000 }).toBe(true);
-    await expect.poll(() => peerWork(run.threadId)?.status, { timeout: 15_000 }).toBe("completed");
-    await new Promise((resolve) => setTimeout(resolve, 2_000));
-    expect((await runState(run.id)).status).toBe("waiting");
-    expect(rows().find((node) => node.id === work.parentId)?.status).toBe("resume");
-    expect((await messages(run.threadId)).some((message) => message.tool?.name?.startsWith("Resumed with"))).toBe(false);
-
-    if (resume === "raise") await api("PATCH", "/api/config", { threads: { maxConcurrentPerBot: capacity + 1 } });
-    else {
-      finish(occupiedThreads[0]);
-      await expect.poll(async () => (await botState(source.id)).tasks.find((task: any) => task.threadId === occupiedThreads[0]).busy, { timeout: 15_000 }).toBe(false);
-    }
-    await expect.poll(async () => (await runState(run.id))?.status, { timeout: 15_000 }).toBe("completed");
-    expect((await runState(run.id)).output).toContain(SETTLED);
-    expect((await messages(run.threadId)).some((message) => message.tool?.name?.startsWith("Resumed with Routine peer results"))).toBe(true);
-    const bot = await botState(source.id);
-    expect(occupiedThreads.map(threadId => bot.tasks.find((task: any) => task.threadId === threadId).busy))
-      .toEqual(resume === "raise" ? [true] : [false, true, true]);
-    evidence.push({ resumeWaitedForSlot: true, capacity, resume, runId: run.id, transcript: await messages(run.threadId) });
-  }, 60_000);
-
   it("coordinates a new user request on a completed routine's thread without changing its recorded result", async () => {
     const run = await start();
     finish(run.threadId);
@@ -217,7 +174,7 @@ describe("routine delegation through the isolated harness", () => {
     await dump(handoff().threadId);
     finish(handoff().threadId);
     await expect.poll(async () => (await messages(run.threadId)).some(
-      (message) => message.from?.botId === peer.id && message.roomRequest?.id === requestId && message.roomRequest.phase === "result",
+      (message) => message.from?.botId === peer.id && message.peerRequest?.id === requestId && message.peerRequest.phase === "result",
     ), { timeout: 20_000 }).toBe(true);
     await control(["wait", "--bot", source.id, "--task", run.threadId]);
     expect(handoff().status).toBe("completed");

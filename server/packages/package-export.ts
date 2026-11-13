@@ -201,7 +201,6 @@ export type TeamExportSkipReason =
   | "stdio_server"
   | "insecure_address"
   | "files_not_shared"
-  | "lead_not_in_group_chat"
   | "notes_too_large"
   | "skill_changed"
   | "skill_conflict"

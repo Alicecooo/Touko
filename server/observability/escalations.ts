@@ -19,7 +19,6 @@ export interface Escalation {
   bot: EscalationBot;
   threadId: string;
   title?: string | null;
-  room?: string | null;
   gate: string;
   reason: string;
 }
@@ -80,7 +79,7 @@ export const NEEDS_INPUT_GATE = "its turn ended on a question the person has not
 export const RAISED_GATE = "it raised this flag itself";
 
 function atGate(escalation: Escalation): string {
-  const where = escalation.room ? `in the room "${escalation.room}"` : escalation.title ? `in its thread #${fold(escalation.title, 60)}` : "in its main conversation";
+  const where = escalation.title ? `in its thread #${fold(escalation.title, 60)}` : "in its main conversation";
   return `${peerName(escalation.bot.name)}'s work ${where} is parked at a gate: ${escalation.gate}.`;
 }
 

@@ -10,7 +10,7 @@ export const toolError: Detector = {
     const observations: Observation[] = [];
     for (const record of records) {
       if (record.type !== "tool" || record.ok) continue;
-      // a stopped room turn is turn_timeout's, not a tool's
+      // a stopped turn is turn_timeout's, not a tool's
       if (record.tool === HARNESS_NOTICE && TURN_TIMEOUT_NOTICE.test(record.text)) continue;
       const origin = toolOrigin(record.tool);
       const { key, title } = failureKey(record.tool, record.text);

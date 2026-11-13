@@ -24,21 +24,19 @@ import { lastChangeRequestUrl } from "../../shared/thread-link.ts";
 import { REMOVED_COMPUTER_DRIVER, type ComputerEngineMove } from "../computers/computer-engine-removal.ts";
 import type { ProfileRequestChanges } from "../../shared/profile-request.ts";
 import type { TeamSetupRequest, TeamSetupResult } from "../../shared/team-setup.ts";
-import type { GroupGoalRunCardData } from "../../shared/group-goal-run.ts";
 import { isMentionBoundary, isMentionNameContinuation } from "../../shared/mention-boundary.ts";
-import { roomHomeThreadId } from "../teams/room-home.ts";
 import type { HandedState } from "../agent/delta-context.ts";
 import type { AgentPart, PartPair } from "../packages/package-parts.ts";
-import type { BotActivity, GroupDefaultResponder, GroupTask as GroupTaskRecord, MausColor, OptionCardData, TaskClosedBy, TaskOpenedBy, TaskUsage, WireBot, WireGroup, WireMessage, WireTask, BotProject as BotProjectRecord } from "../../shared/wire.ts";
+import type { BotActivity, MausColor, OptionCardData, TaskClosedBy, TaskOpenedBy, TaskUsage, WireBot, WireGroup, WireMessage, WireTask, BotProject as BotProjectRecord } from "../../shared/wire.ts";
 import { movesThreadToTop } from "../../shared/wire.ts";
 import { parseConnectorTools } from "../integrations/connector-tools.ts";
 import { sameModelSelection } from "../../shared/thread-model.ts";
 import { initialGreeting } from "../bots/initial-greeting.ts";
 export type {
-  BotActivity, ConnectorCardData, GroupDefaultResponder, OptionCardData,
+  BotActivity, ConnectorCardData, OptionCardData,
   SecretRequestCardData, Surface, TaskClosedBy, TaskOpenedBy, TaskUsage,
 } from "../../shared/wire.ts";
-export type { GroupTask as GroupTaskRecord, BotProject as BotProjectRecord } from "../../shared/wire.ts";
+export type { BotProject as BotProjectRecord } from "../../shared/wire.ts";
 export type { InstalledPlaybook, InstalledPackageMetadata, MausColor, MausExpression } from "../../shared/wire.ts";
 
 export type Message = WireMessage;
@@ -50,13 +48,31 @@ export interface GroupPackageStamp {
   parts: Record<string, PartPair>;
 }
 
-export type GroupRecord = Omit<WireGroup, "working" | "usage"> & {
+function normalizeGroups(value: unknown): GroupRecord[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): GroupRecord[] => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const group = item as Record<string, unknown>;
+    if (typeof group.id !== "string" || typeof group.name !== "string" || !Array.isArray(group.memberIds) ||
+        !group.memberIds.every((id) => typeof id === "string") || !Number.isFinite(group.createdAt)) return [];
+    return [{
+      id: group.id,
+      name: group.name,
+      memberIds: [...group.memberIds] as string[],
+      createdAt: group.createdAt as number,
+      ...(typeof group.section === "string" ? { section: group.section } : {}),
+      ...(group.installedPackage && typeof group.installedPackage === "object" && !Array.isArray(group.installedPackage)
+        ? { installedPackage: group.installedPackage as GroupPackageStamp }
+        : {}),
+    }];
+  });
+}
+
+export type GroupRecord = WireGroup & {
   installedPackage?: GroupPackageStamp;
-  /** Conversation this room was created with. Not the task open in the client. */
-  homeThreadId?: string;
 };
-export type GroupWirePrivateKeys = "installedPackage" | "homeThreadId";
-export type GroupWireProjection = Omit<GroupRecord, GroupWirePrivateKeys> & Pick<WireGroup, "usage"> & { working: boolean };
+export type GroupWirePrivateKeys = "installedPackage";
+export type GroupWireProjection = Omit<GroupRecord, GroupWirePrivateKeys>;
 export type GroupWireProjectionIsExact = AssertExact<WireGroup, GroupWireProjection> & AssertSameKeys<WireGroup, GroupWireProjection>;
 export const groupWireProjectionIsExact: GroupWireProjectionIsExact = true;
 
@@ -128,14 +144,6 @@ function redactBotAuthored<T extends Omit<Message, "id" | "at"> & { at?: number 
     if (routineRun.summary) routineRun.summary = redactSecretsInText(routineRun.summary);
     if (routineRun.error) routineRun.error = redactSecretsInText(routineRun.error);
     out.routineRun = routineRun;
-  }
-  if (out.goalRun) {
-    out.goalRun = {
-      ...out.goalRun,
-      goal: redactSecretsInText(out.goalRun.goal),
-      coordinatorName: redactSecretsInText(out.goalRun.coordinatorName),
-      detail: out.goalRun.detail ? redactSecretsInText(out.goalRun.detail) : undefined,
-    };
   }
   if (out.card) {
     const card = { ...out.card } as OptionCardData & { summary?: string };
@@ -349,70 +357,6 @@ export function mentionedBots<T extends { name: string; hidden?: boolean }>(text
   return found;
 }
 
-export function normalizeGroupDefaultResponder(
-  value: unknown,
-  memberIds: string[],
-  dm = false,
-): GroupDefaultResponder {
-  if (dm) return { kind: "mentions" };
-  if (value && typeof value === "object") {
-    const candidate = value as { kind?: unknown; botId?: unknown; fallbackBotId?: unknown };
-    if (candidate.kind === "everyone") return { kind: "everyone" };
-    if (candidate.kind === "mentions") return { kind: "mentions" };
-    if (candidate.kind === "auto") {
-      const fallback = typeof candidate.fallbackBotId === "string" && memberIds.includes(candidate.fallbackBotId)
-        ? candidate.fallbackBotId
-        : memberIds[0];
-      return fallback ? { kind: "member", botId: fallback } : { kind: "mentions" };
-    }
-    if (
-      candidate.kind === "member" &&
-      typeof candidate.botId === "string" &&
-      memberIds.includes(candidate.botId)
-    ) {
-      return { kind: "member", botId: candidate.botId };
-    }
-  }
-  if (memberIds.length === 0) return { kind: "mentions" };
-  return { kind: "member", botId: memberIds[0] };
-}
-
-export function roomResponders<T extends { id: string; name: string; hidden?: boolean }>(
-  text: string,
-  members: T[],
-  defaultResponder: GroupDefaultResponder,
-): T[] {
-  const available = members.filter((member) => !member.hidden);
-  const everyone = "everyone";
-  for (let at = text.indexOf("@"); at !== -1; at = text.indexOf("@", at + 1)) {
-    const candidate = text.slice(at + 1, at + 1 + everyone.length);
-    if (
-      isMentionBoundary(text, at) &&
-      candidate.toLocaleLowerCase() === everyone &&
-      !isMentionNameContinuation(text.slice(at + 1 + everyone.length))
-    ) {
-      return available;
-    }
-  }
-  const mentioned = mentionedBots(text, available);
-  if (mentioned.length) return mentioned;
-  if (defaultResponder.kind === "everyone") return available;
-  if (defaultResponder.kind === "member") {
-    const lead = available.find((member) => member.id === defaultResponder.botId);
-    return lead ? [lead] : [];
-  }
-  return [];
-}
-
-export function pruneRoomHolds(group: Pick<GroupRecord, "memberIds" | "holds" | "heldMessages">): void {
-  for (const key of ["holds", "heldMessages"] as const) {
-    const map = group[key];
-    if (!map) continue;
-    const kept = Object.fromEntries(Object.entries(map).filter(([botId]) => group.memberIds.includes(botId)));
-    if (Object.keys(kept).length !== Object.keys(map).length) (group as Record<typeof key, unknown>)[key] = kept;
-  }
-}
-
 function taskCountsAsBotUnread(task: { unread?: boolean; routineRunId?: string }): boolean {
   return Boolean(task.unread) && !task.routineRunId;
 }
@@ -456,8 +400,11 @@ export class Store {
     } catch {
       this.bots = [];
     }
+    let groupsMigrated = false;
     try {
-      this.groups = JSON.parse(readFileSync(GROUPS_FILE, "utf8"));
+      const storedGroups: unknown = JSON.parse(readFileSync(GROUPS_FILE, "utf8"));
+      this.groups = normalizeGroups(storedGroups);
+      groupsMigrated = !Array.isArray(storedGroups) || JSON.stringify(storedGroups) !== JSON.stringify(this.groups);
     } catch {
       this.groups = [];
     }
@@ -465,7 +412,6 @@ export class Store {
     let botsMigrated = false;
 
     const chiefSectionsSeen = new Set<string>();
-    let groupsMigrated = false;
     for (const b of this.bots) {
       if (b.busy || (b.activity !== undefined && b.activity !== "idle")) botsMigrated = true;
       b.busy = false;
@@ -607,52 +553,10 @@ export class Store {
     }
     const botIds = new Set(this.bots.map((b) => b.id));
     for (const g of this.groups) {
-      g.busyBotId = null;
-      delete g.turnStartedAt;
-      if (botsLoaded && !g.dm && g.memberIds.some((id) => !botIds.has(id))) {
+      if (botsLoaded && g.memberIds.some((id) => !botIds.has(id))) {
         g.memberIds = g.memberIds.filter((id) => botIds.has(id));
         groupsMigrated = true;
       }
-      const normalized = normalizeGroupDefaultResponder(g.defaultResponder, g.memberIds, Boolean(g.dm));
-      if (JSON.stringify(normalized) !== JSON.stringify(g.defaultResponder)) groupsMigrated = true;
-      g.defaultResponder = normalized;
-      if (g.holds !== undefined || g.heldMessages !== undefined) {
-        const before = JSON.stringify([g.holds, g.heldMessages]);
-        pruneRoomHolds(g);
-        if (JSON.stringify([g.holds, g.heldMessages]) !== before) groupsMigrated = true;
-      }
-      if (g.dm) {
-        if (g.tasks !== undefined) {
-          delete g.tasks;
-          groupsMigrated = true;
-        }
-        continue;
-      }
-      if (!g.tasks?.length) {
-        const initialTask: GroupTaskRecord = {
-          threadId: g.threadId,
-          title: this.firstUserLine(g.threadId) ?? UNTITLED_TASK,
-          createdAt: g.createdAt,
-          updatedAt: g.createdAt,
-        };
-        if (g.pinnedCwd !== undefined) initialTask.pinnedCwd = g.pinnedCwd;
-        if (g.pinnedMessageId) initialTask.pinnedMessageId = g.pinnedMessageId;
-        g.tasks = [initialTask];
-        groupsMigrated = true;
-      }
-      const home = roomHomeThreadId(g);
-      if (g.homeThreadId !== home) {
-        g.homeThreadId = home;
-        groupsMigrated = true;
-      }
-      let active = g.tasks.find((task) => task.threadId === g.threadId);
-      if (!active) {
-        active = g.tasks[0]!;
-        g.threadId = active.threadId;
-        groupsMigrated = true;
-      }
-      g.pinnedCwd = active.pinnedCwd;
-      g.pinnedMessageId = active.pinnedMessageId;
     }
     if (groupsMigrated) this.saveGroups();
     const clearModelCopies = !existsSync(THREAD_MODEL_COPIES_CLEARED) && (botsLoaded || !existsSync(BOTS_FILE));
@@ -736,7 +640,7 @@ export class Store {
   /** In memory only: message writes must not rewrite bots.json. */
   private noteThreadActivity(threadId: string, at: number, forOrder = false, orderAt = at): void {
     if (!Number.isFinite(at)) return;
-    for (const task of [...this.bots, ...this.groups].map((owner) => owner.tasks?.find((candidate) => candidate.threadId === threadId))) {
+    for (const task of this.bots.map((owner) => owner.tasks?.find((candidate) => candidate.threadId === threadId))) {
       if (!task) continue;
       task.updatedAt = Math.max(task.updatedAt ?? 0, at);
       if (forOrder) task.lastThreadOrderAt = Math.max(task.lastThreadOrderAt ?? 0, orderAt);
@@ -746,11 +650,9 @@ export class Store {
   /** Never moves a stamp backwards: a clock skew must not reshuffle the list on every boot. */
   private repairThreadUpdatedAts(): void {
     const botTasks = this.bots.flatMap((bot) => bot.tasks ?? []);
-    const groupTasks = this.groups.flatMap((group) => group.tasks ?? []);
-    const latest = mdb.latestMessageAts([...botTasks, ...groupTasks].map((task) => task.threadId));
-    const latestOrder = mdb.latestMessageAts([...botTasks, ...groupTasks].map((task) => task.threadId), true);
+    const latest = mdb.latestMessageAts(botTasks.map((task) => task.threadId));
+    const latestOrder = mdb.latestMessageAts(botTasks.map((task) => task.threadId), true);
     let botsDirty = false;
-    let groupsDirty = false;
     const repair = (task: { threadId: string; createdAt: number; updatedAt?: number; lastThreadOrderAt?: number }) => {
       const fromMessages = latest.get(task.threadId);
       const next = fromMessages !== undefined && (task.updatedAt === undefined || fromMessages > task.updatedAt)
@@ -764,9 +666,7 @@ export class Store {
       return changed;
     };
     for (const task of botTasks) if (repair(task)) botsDirty = true;
-    for (const task of groupTasks) if (repair(task)) groupsDirty = true;
     if (botsDirty) this.saveBots();
-    if (groupsDirty) this.saveGroups();
   }
 
   private fillTaskAskedAts(): void {
@@ -831,10 +731,7 @@ export class Store {
 
   private saveGroups(groups: GroupRecord[] = this.groups, registerSections = true) {
     if (registerSections) this.rememberSections(groups.map((group) => group.section));
-    writeFileAtomicIfChanged(GROUPS_FILE, JSON.stringify(groups.map(({ busyBotId: _busyBotId, turnStartedAt: _turnStartedAt, ...g }) => ({
-      ...g,
-      ...(g.tasks ? { tasks: g.tasks.map((task) => persistedPin(task)) } : {}),
-    })), null, 2), { mode: 0o600 });
+    writeFileAtomicIfChanged(GROUPS_FILE, JSON.stringify(groups, null, 2), { mode: 0o600 });
   }
 
   get sections(): string[] { return readSections(); }
@@ -855,18 +752,18 @@ export class Store {
     if (name === nextName) return undefined;
     if (this.sections.includes(nextName)) return "A team with that name already exists";
     const members = this.bots.filter(bot => sectionKey(bot.section) === name);
-    const rooms = this.groups.filter(group => sectionKey(group.section) === name);
+    const groups = this.groups.filter(group => sectionKey(group.section) === name);
     const affected = this.bots.filter(bot => members.includes(bot) || bot.managedSections?.some(section => sectionKey(section) === name));
-    if (affected.some(bot => bot.busy || bot.tasks?.some(task => task.busy)) || rooms.some(group => group.busyBotId)) {
+    if (affected.some(bot => bot.busy || bot.tasks?.some(task => task.busy))) {
       return "Stop this team's active work before renaming the team";
     }
     // Removing an empty identity revokes its old grants, so recreating it cannot restore access.
-    if (!members.length && !rooms.length) return this.changeEmptySection(name, nextName);
+    if (!members.length && !groups.length) return this.changeEmptySection(name, nextName);
     const nextBots = this.bots.map(bot => ({ ...bot,
       ...(members.includes(bot) ? { section: nextName } : {}),
       ...(bot.managedSections ? { managedSections: [...new Set(bot.managedSections.map(section => sectionKey(section) === name ? nextName : section))] } : {}),
     }));
-    const nextGroups = this.groups.map(group => rooms.includes(group) ? { ...group, section: nextName } : group);
+    const nextGroups = this.groups.map(group => groups.includes(group) ? { ...group, section: nextName } : group);
     try {
       // Register the new name only after saving, or the registry's duplicate-name check rejects this rename.
       this.saveBots(nextBots, false);
@@ -881,7 +778,7 @@ export class Store {
     for (let i = 0; i < nextBots.length; i++) Object.assign(this.bots[i], nextBots[i]);
     for (let i = 0; i < nextGroups.length; i++) Object.assign(this.groups[i], nextGroups[i]);
     for (const bot of affected) this.emit({ type: "bot", botId: bot.id });
-    for (const room of rooms) this.emit({ type: "group", groupId: room.id });
+    for (const group of groups) this.emit({ type: "group", groupId: group.id });
     this.emit({ type: "sections" });
     return undefined;
   }
@@ -889,7 +786,7 @@ export class Store {
   changeEmptySection(name: string, nextName: string | null): string | undefined {
     if (!this.sections.includes(name)) return "No such team";
     if ([...this.bots, ...this.groups].some((record) => sectionKey(record.section) === name)) {
-      return "Move all bots (including archived bots) and group chats out of this team first";
+      return "Move all bots (including archived bots) and groups out of this team first";
     }
     if (nextName !== null && nextName !== name && this.sections.includes(nextName)) {
       return "A team with that name already exists";
@@ -911,8 +808,8 @@ export class Store {
   deleteSection(name: string): string | undefined {
     if (!name || !this.sections.includes(name)) return "No such team";
     const members = this.bots.filter(bot => sectionKey(bot.section) === name);
-    const rooms = this.groups.filter(group => sectionKey(group.section) === name);
-    if (members.some(bot => bot.busy || bot.tasks?.some(task => task.busy)) || rooms.some(group => group.busyBotId)) {
+    const groups = this.groups.filter(group => sectionKey(group.section) === name);
+    if (members.some(bot => bot.busy || bot.tasks?.some(task => task.busy))) {
       return "Stop this team's active work before deleting the team";
     }
     if (this.bots.filter(bot => bot.chiefOfStaff && (!sectionKey(bot.section) || sectionKey(bot.section) === name)).length > 1) {
@@ -935,7 +832,7 @@ export class Store {
     for (let i = 0; i < nextBots.length; i++) Object.assign(this.bots[i], nextBots[i]);
     for (let i = 0; i < nextGroups.length; i++) Object.assign(this.groups[i], nextGroups[i]);
     for (const bot of this.bots) this.emit({ type: "bot", botId: bot.id });
-    for (const group of rooms) this.emit({ type: "group", groupId: group.id });
+    for (const group of groups) this.emit({ type: "group", groupId: group.id });
     this.emit({ type: "sections" });
     return undefined;
   }
@@ -959,85 +856,29 @@ export class Store {
     return this.groups.find((g) => g.id === id);
   }
 
-  groupByThread(threadId: string): GroupRecord | undefined {
-    return this.groups.find(
-      (group) => group.threadId === threadId || group.tasks?.some((task) => task.threadId === threadId),
-    );
-  }
-
-  createGroup(
-    name: string,
-    memberIds: string[],
-    dm = false,
-    section?: string,
-    setup?: {
-      bulletin?: string;
-      defaultResponder?: GroupDefaultResponder;
-      completed?: boolean;
-    },
-  ): GroupRecord {
+  createGroup(name: string, memberIds: string[], section?: string): GroupRecord {
     this.rememberSections([section]);
-    const threadId = newId();
     const createdAt = Date.now();
     const group: GroupRecord = {
       id: newId(),
-      threadId,
       name,
       memberIds,
-      defaultResponder: dm
-        ? { kind: "mentions" }
-        : normalizeGroupDefaultResponder(setup?.defaultResponder, memberIds, false),
-      bulletin: setup?.bulletin ?? "",
-      unread: false,
       createdAt,
-      dm: dm || undefined,
-      busyBotId: null,
       section,
     };
-    if (!dm) {
-      group.homeThreadId = threadId;
-      group.tasks = [{ threadId, title: UNTITLED_TASK, createdAt, updatedAt: createdAt }];
-      group.setupCompletedAt = setup?.completed ? createdAt : null;
-      group.setupSkippedAt = null;
-    }
     this.groups.unshift(group);
     this.saveGroups();
     this.emit({ type: "group", groupId: group.id });
     return group;
   }
 
-  dmGroup(a: string, b: string): GroupRecord | undefined {
-    return this.groups.find(
-      (g) => g.dm && g.memberIds.length === 2 && g.memberIds.includes(a) && g.memberIds.includes(b),
-    );
-  }
-
-  patchGroup(id: string, patch: Partial<Pick<GroupRecord, "name" | "memberIds" | "defaultResponder" | "bulletin" | "unread" | "lastReadMessageId" | "busyBotId" | "cwd" | "pinnedMessageId" | "section" | "setupCompletedAt" | "setupSkippedAt" | "audienceFloor" | "installedPackage" | "holds" | "heldMessages">>): GroupRecord | null {
+  patchGroup(id: string, patch: Partial<Pick<GroupRecord, "name" | "memberIds" | "section" | "installedPackage">>): GroupRecord | null {
     const group = this.group(id);
     if (!group) return null;
     if (Object.prototype.hasOwnProperty.call(patch, "section")) {
       this.rememberSections([patch.section]);
     }
-    const previousBusyBotId = group.busyBotId;
     Object.assign(group, patch);
-    if (Object.prototype.hasOwnProperty.call(patch, "busyBotId")) {
-      if (patch.busyBotId && patch.busyBotId !== previousBusyBotId) group.turnStartedAt = Date.now();
-      else if (!patch.busyBotId) delete group.turnStartedAt;
-    }
-    if (!group.dm && Object.prototype.hasOwnProperty.call(patch, "pinnedMessageId")) {
-      const active = this.activeGroupTask(group.id);
-      if (active) active.pinnedMessageId = patch.pinnedMessageId;
-    }
-    if (!group.dm) {
-      const home = roomHomeThreadId(group);
-      if (group.homeThreadId !== home) group.homeThreadId = home;
-    }
-    group.defaultResponder = normalizeGroupDefaultResponder(
-      group.defaultResponder,
-      group.memberIds,
-      Boolean(group.dm),
-    );
-    if (Object.prototype.hasOwnProperty.call(patch, "memberIds")) pruneRoomHolds(group);
     this.saveGroups();
     this.emit({ type: "group", groupId: group.id });
     return group;
@@ -1062,171 +903,8 @@ export class Store {
     if (!group) return false;
     this.groups = this.groups.filter((g) => g.id !== id);
     this.saveGroups();
-    for (const threadId of new Set([group.threadId, ...(group.tasks ?? []).map((task) => task.threadId)])) {
-      this.deleteThreadRecord(threadId);
-    }
     this.emit({ type: "group.deleted", groupId: id });
     return true;
-  }
-
-  reconcileInterruptedGroupGoals(
-    resolve?: (
-      runId: string,
-      threadId: string,
-    ) => {
-      status: Exclude<GroupGoalRunCardData["status"], "working">;
-      detail: string;
-      finishedAt: number;
-    } | null,
-    fallbackDetail = "OpenMausBot restarted before this goal finished.",
-    fallbackFinishedAt = Date.now(),
-  ): number {
-    const ownedThreadIds = new Set<string>();
-    for (const group of this.groups) {
-      ownedThreadIds.add(group.threadId);
-      for (const task of group.tasks ?? []) ownedThreadIds.add(task.threadId);
-    }
-    let recovered = 0;
-    for (const hit of mdb.workingGoalRunMessages()) {
-      if (!ownedThreadIds.has(hit.threadId) || !hit.message.goalRun) continue;
-      const resolution = resolve?.(hit.message.goalRun.runId, hit.threadId) ?? {
-        status: "failed" as const,
-        detail: fallbackDetail,
-        finishedAt: fallbackFinishedAt,
-      };
-      const state = resolution.status === "needs-input"
-        ? "needs your input"
-        : resolution.status === "limit-reached"
-          ? "reached its turn limit"
-          : resolution.status;
-      this.patchMessage(hit.threadId, hit.message.id, {
-        text: `Goal ${state}: ${resolution.detail}`,
-        goalRun: {
-          ...hit.message.goalRun,
-          status: resolution.status,
-          detail: resolution.detail,
-          finishedAt: resolution.finishedAt,
-        },
-      });
-      recovered += 1;
-    }
-    return recovered;
-  }
-
-  groupTasks(groupId: string): GroupTaskRecord[] {
-    const group = this.group(groupId);
-    return group?.dm ? [] : (group?.tasks ?? []);
-  }
-
-  activeGroupTask(groupId: string): GroupTaskRecord | undefined {
-    const group = this.group(groupId);
-    return group?.tasks?.find((task) => task.threadId === group.threadId);
-  }
-
-  groupTaskByThread(groupId: string, threadId: string): GroupTaskRecord | undefined {
-    const group = this.group(groupId);
-    if (!group || group.dm) return undefined;
-    return group.tasks?.find((task) => task.threadId === threadId);
-  }
-
-  createGroupTask(groupId: string, title?: string, activate = true): GroupTaskRecord | null {
-    const group = this.group(groupId);
-    if (!group || group.dm) return null;
-    const createdAt = Date.now();
-    const task: GroupTaskRecord = {
-      threadId: newId(),
-      title: title?.trim().slice(0, 80) || UNTITLED_TASK,
-      createdAt,
-      updatedAt: createdAt,
-    };
-    group.tasks = [task, ...(group.tasks ?? [])];
-    if (activate) {
-      group.threadId = task.threadId;
-      group.pinnedCwd = undefined;
-      group.pinnedMessageId = undefined;
-    }
-    this.saveGroups();
-    this.emit({ type: "group", groupId });
-    return task;
-  }
-
-  switchGroupTask(groupId: string, threadId: string): GroupRecord | null {
-    const group = this.group(groupId);
-    const task = group?.tasks?.find((candidate) => candidate.threadId === threadId);
-    if (!group || group.dm || !task) return null;
-    group.threadId = task.threadId;
-    group.pinnedCwd = task.pinnedCwd;
-    group.pinnedMessageId = task.pinnedMessageId;
-    this.saveGroups();
-    this.emit({ type: "group", groupId });
-    return group;
-  }
-
-  setGroupTaskPinned(groupId: string, threadId: string, pinned: boolean): GroupTaskRecord | null {
-    const task = this.groupTaskByThread(groupId, threadId);
-    if (!task) return null;
-    if (pinned) task.pinned = true;
-    else delete task.pinned;
-    this.saveGroups();
-    this.emit({ type: "group", groupId });
-    return task;
-  }
-
-  renameGroupTask(groupId: string, threadId: string, title: string): GroupTaskRecord | null {
-    const task = this.groupTaskByThread(groupId, threadId);
-    if (!task) return null;
-    task.title = title.trim().slice(0, 80) || UNTITLED_TASK;
-    this.saveGroups();
-    this.emit({ type: "group", groupId });
-    return task;
-  }
-
-  titleGroupTaskFromFirstMessage(groupId: string, text: string, threadId?: string): GroupTaskRecord | null {
-    const task = threadId ? this.groupTaskByThread(groupId, threadId) : this.activeGroupTask(groupId);
-    if (!task || task.titleFromFirstMessage || task.title !== UNTITLED_TASK) return null;
-    task.title = titleFromMessage(text);
-    task.titleFromFirstMessage = true;
-    this.saveGroups();
-    this.emit({ type: "group", groupId });
-    return task;
-  }
-
-  retitleGroupTask(groupId: string, threadId: string, machineTitle: string, title: string): GroupTaskRecord | null {
-    const task = this.groupTaskByThread(groupId, threadId);
-    if (!task || task.title !== machineTitle) return null;
-    return this.renameGroupTask(groupId, threadId, threadTitleFrom(title));
-  }
-
-  deleteGroupTask(groupId: string, threadId: string): GroupRecord | null {
-    const result = this.deleteGroupTasks(groupId, [threadId]);
-    return result?.deleted.length ? result.group : null;
-  }
-
-  /** Null when nothing may go: no such channel, a bot-to-bot channel, or a request that would leave it with no task. */
-  deleteGroupTasks(groupId: string, threadIds: string[]): { group: GroupRecord; deleted: string[]; missing: string[] } | null {
-    const group = this.group(groupId);
-    if (!group || group.dm || !group.tasks) return null;
-    const present = new Set(group.tasks.map((task) => task.threadId));
-    const unique = [...new Set(threadIds)];
-    const deleted = unique.filter((id) => present.has(id));
-    const missing = unique.filter((id) => !present.has(id));
-    if (deleted.length >= group.tasks.length) return null;
-    if (!deleted.length) return { group, deleted, missing };
-    mdb.deleteThreads(deleted);
-    const doomed = new Set(deleted);
-    group.tasks = group.tasks.filter((task) => !doomed.has(task.threadId));
-    for (const id of deleted) this.deleteThreadRecord(id, true);
-    if (doomed.has(group.threadId)) {
-      const next = group.tasks[0]!;
-      group.threadId = next.threadId;
-      group.pinnedCwd = next.pinnedCwd;
-      group.pinnedMessageId = next.pinnedMessageId;
-    }
-    const home = roomHomeThreadId(group);
-    if (group.homeThreadId !== home) group.homeThreadId = home;
-    this.saveGroups();
-    this.emit({ type: "group", groupId });
-    return { group, deleted, missing };
   }
 
   toggleReaction(threadId: string, messageId: string, emoji: string, by: string): Message | null {
@@ -1613,14 +1291,10 @@ export class Store {
     this.saveBots(nextBots);
     this.bots = nextBots;
     this.legacyActivities.delete(id);
-    const rooms = this.groups.filter((g) => !g.dm && g.memberIds.includes(id));
-    for (const g of rooms) {
-      g.memberIds = g.memberIds.filter((member) => member !== id);
-      if (g.busyBotId === id) { g.busyBotId = null; delete g.turnStartedAt; }
-      g.defaultResponder = normalizeGroupDefaultResponder(g.defaultResponder, g.memberIds, false);
-    }
-    if (rooms.length) {
-      try { this.saveGroups(); } catch (error) { console.warn("store: room cleanup will retry on restart", error); }
+    const groups = this.groups.filter((g) => g.memberIds.includes(id));
+    for (const g of groups) g.memberIds = g.memberIds.filter((member) => member !== id);
+    if (groups.length) {
+      try { this.saveGroups(); } catch (error) { console.warn("store: group cleanup will retry on restart", error); }
     }
     for (const threadId of new Set([bot.threadId, ...(bot.tasks ?? []).map((t) => t.threadId)])) {
       this.deleteThreadRecord(threadId);
@@ -1638,7 +1312,7 @@ export class Store {
     } catch {}
     removeBotFolder(id);
     this.emit({ type: "bot.deleted", botId: id });
-    for (const g of rooms) this.emit({ type: "group", groupId: g.id });
+    for (const g of groups) this.emit({ type: "group", groupId: g.id });
     return true;
   }
 
@@ -2036,29 +1710,6 @@ export class Store {
     return cwd;
   }
 
-  /** Pinned, not read live: engines key their sessions and files to the folder a thread starts in. */
-  pinGroupCwd(groupId: string, threadId?: string): string | null {
-    const group = this.group(groupId);
-    if (!group) return null;
-    const task = threadId ? this.groupTaskByThread(groupId, threadId) : this.activeGroupTask(groupId);
-    if (!task) {
-      if (!group.dm) return null;
-      if (group.pinnedCwd === undefined) {
-        group.pinnedCwd = group.cwd ?? null;
-        this.saveGroups();
-        this.emit({ type: "group", groupId: group.id });
-      }
-      return group.pinnedCwd;
-    }
-    if (task.pinnedCwd === undefined) {
-      task.pinnedCwd = group.cwd ?? null;
-      if (group.threadId === task.threadId) group.pinnedCwd = task.pinnedCwd;
-      this.saveGroups();
-      this.emit({ type: "group", groupId: group.id });
-    }
-    return task.pinnedCwd;
-  }
-
   project(botId: string, projectId: string): BotProjectRecord | undefined {
     return this.bot(botId)?.projects?.find((project) => project.id === projectId);
   }
@@ -2129,9 +1780,9 @@ export class Store {
     return this.bot(botId)?.tasks?.find((t) => t.threadId === threadId);
   }
 
-  workThread(botId: string, fromBotId: string, fromThreadId: string, roomLane = false): TaskRecord | undefined {
+  workThread(botId: string, fromBotId: string, fromThreadId: string): TaskRecord | undefined {
     return this.tasks(botId).find((t) => t.openedBy?.kind === "work" && t.openedBy.botId === fromBotId &&
-      t.openedBy.threadId === fromThreadId && Boolean(t.openedBy.roomLane) === roomLane && t.archivedAt === undefined);
+      t.openedBy.threadId === fromThreadId && t.archivedAt === undefined);
   }
 
   projectBotForTask(botId: string, threadId: string): BotRecord | null {

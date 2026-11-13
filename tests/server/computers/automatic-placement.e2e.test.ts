@@ -38,10 +38,9 @@ it("keeps creation, updates and legacy profiles on automatic placement through H
       ids.push(bot.id);
       created[place] = bot.computer ?? null;
       updates[place] = (await api("PATCH", `/api/bots/${bot.id}`, { computer: place })).status;
-      const task = await api("POST", `/api/bots/${bot.id}/tasks`, { title: "Placement check" });
-      expect(task.status).toBe(201);
-      pins[place] = (await api("PATCH", `/api/bots/${bot.id}/tasks/${task.body.task.threadId}`, { surface: place })).status;
-      expect((await api("PATCH", `/api/bots/${bot.id}/tasks/${task.body.task.threadId}`, { surface: null })).status).toBe(200);
+      const threadId = bot.threadId as string;
+      pins[place] = (await api("PATCH", `/api/bots/${bot.id}/tasks/${threadId}`, { surface: place })).status;
+      expect((await api("PATCH", `/api/bots/${bot.id}/tasks/${threadId}`, { surface: null })).status).toBe(200);
       expect((await api("PATCH", `/api/bots/${bot.id}`, { computer: null })).status).toBe(200);
       const saved = await api("GET", "/api/bots");
       expect(saved.body.bots.find((candidate: any) => candidate.id === bot.id).computer).toBeUndefined();
@@ -49,15 +48,19 @@ it("keeps creation, updates and legacy profiles on automatic placement through H
     manifest.created = created;
     manifest.updates = updates;
     manifest.pins = pins;
-    // Derive old-format records from profiles and tasks created by the real API.
+    // Construct an old-format record directly; users can no longer create these sibling conversations.
     const records = JSON.parse(readFileSync(join(fixture.info.dataDir, "bots.json"), "utf8"));
     ids.forEach((id, index) => {
       const bot = records.find((record: any) => record.id === id);
       bot.computer = places[index];
       bot.tasks[0].surface = "local";
       bot.tasks[0].surfaceSource = "user";
-      bot.tasks[1].surface = "browser";
-      bot.tasks[1].surfaceSource = "auto";
+      const legacyAutoTask = structuredClone(bot.tasks[0]);
+      legacyAutoTask.threadId = `legacy-auto-${id}`;
+      legacyAutoTask.title = "Legacy automatic pin";
+      legacyAutoTask.surface = "browser";
+      legacyAutoTask.surfaceSource = "auto";
+      bot.tasks.push(legacyAutoTask);
     });
     await fixture.close();
     const restored: unknown[] = [];

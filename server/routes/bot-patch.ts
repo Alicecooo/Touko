@@ -21,7 +21,7 @@ import { clientBotPatchViolation, requestSource } from "../auth/request-auth.ts"
 import type { RoutineManager } from "../automation/routines.ts";
 import type { SessionRegistry } from "../auth/sessions.ts";
 import { parseConnectorTools } from "../integrations/connector-tools.ts";
-import { sectionKey, type BotRecord, type GroupRecord, type Store } from "../storage/store.ts";
+import { sectionKey, type BotRecord, type Store } from "../storage/store.ts";
 import { pinnedClientThreadGuard } from "./pinned-client-thread.ts";
 import type { ModelSelectionCheck } from "./bots-create.ts";
 import { PASS, type RouteHandler } from "./table.ts";
@@ -46,20 +46,15 @@ export interface BotPatchRouteDeps {
   storedAvatarExists(avatarUrl: string): boolean;
   requestedTaskBot(botId: string, rawThreadId: unknown): BotRecord;
   threadBusy(botId: string, threadId: string): boolean;
-  activeGroupTurnForBot(botId: string): { group: GroupRecord; threadId: string } | null;
   checkedModelSelection(raw: unknown, current?: { selection: ModelSelection; busy: boolean }, requireAvailableModel?: boolean): ModelSelectionCheck;
   engineSwitchNeedsAsk(mode: ApprovalMode, from: ModelSelection, to: ModelSelection): boolean;
 
   interruptAllDirectThreads(botId: string): Promise<void>;
-  cancelGroupTurnOperations(groupId: string, threadId: string): void;
-  revokeInternalCapabilitiesForThread(threadId: string): void;
-  runningTurnInstance(bot: BotRecord | null | undefined, threadId: string): ReturnType<ProviderRegistry["get"]>;
-  closeOpenApprovals(threadId: string): void;
 
 }
 
 export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
-  const {store, cfg, registry, sessions,   memoryUpkeep, cacheKeepWarm, hostedModels, supportsApprovalMode, hostedWorkspace: HOSTED_WORKSPACE, hostedFullAccessRefusal: HOSTED_FULL_ACCESS_REFUSAL, desktopManaged: DESKTOP_MANAGED, maxWorkspaceBots: MAX_WORKSPACE_BOTS, wireBot, storedAvatarExists, requestedTaskBot, threadBusy, activeGroupTurnForBot, checkedModelSelection, engineSwitchNeedsAsk,  interruptAllDirectThreads, cancelGroupTurnOperations, revokeInternalCapabilitiesForThread, runningTurnInstance, closeOpenApprovals, } = deps;
+  const {store, cfg, registry, sessions,   memoryUpkeep, cacheKeepWarm, hostedModels, supportsApprovalMode, hostedWorkspace: HOSTED_WORKSPACE, hostedFullAccessRefusal: HOSTED_FULL_ACCESS_REFUSAL, desktopManaged: DESKTOP_MANAGED, maxWorkspaceBots: MAX_WORKSPACE_BOTS, wireBot, storedAvatarExists, requestedTaskBot, threadBusy, checkedModelSelection, engineSwitchNeedsAsk,  interruptAllDirectThreads } = deps;
   const pinnedClientThread = pinnedClientThreadGuard(store);
   return async ({ req, res, path, method, auth, json, readBody }) => {
     let m: RegExpMatchArray | null = null;
@@ -132,10 +127,6 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
         );
         if (!checked.ok) return json(res, checked.status, { error: checked.error });
         normalizedSelection = checked.selection;
-        if (existingBot && activeGroupTurnForBot(existingBot.id)) {
-          const groupChecked = checkedModelSelection(normalizedSelection, { selection: existingBot.modelSelection, busy: true });
-          if (!groupChecked.ok) return json(res, groupChecked.status, { error: groupChecked.error });
-        }
       }
       const profile = parseBotProfilePatch(body);
       if (!profile.ok) return json(res, 400, { error: profile.error });
@@ -215,7 +206,7 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
       }
       if (body.memoryEnabled !== undefined) {
         if (typeof body.memoryEnabled !== "boolean") return json(res, 400, { error: "memoryEnabled must be true or false" });
-        if (existingBot && (existingBot.busy || activeGroupTurnForBot(existingBot.id)) &&
+        if (existingBot?.busy &&
             body.memoryEnabled !== (existingBot.memoryEnabled !== false)) {
           return json(res, 409, { error: "stop this bot's turn before changing its memory setting" });
         }
@@ -482,13 +473,6 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
         await interruptAllDirectThreads(existingBot.id);
         const routine = routines!.activeBotRunForBot(existingBot.id);
         if (routine) await routines!.cancelRun(routine.id);
-        const groupTurn = activeGroupTurnForBot(existingBot.id);
-        if (groupTurn) {
-          cancelGroupTurnOperations(groupTurn.group.id, groupTurn.threadId);
-          revokeInternalCapabilitiesForThread(groupTurn.threadId);
-          await runningTurnInstance(existingBot, groupTurn.threadId)?.adapter.interruptTurn(groupTurn.threadId).catch(() => {});
-          closeOpenApprovals(groupTurn.threadId);
-        }
       }
       const chiefMovedSections =
         Boolean(existingBot?.chiefOfStaff) &&
@@ -500,7 +484,7 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
       // Rechecked: the awaits above can yield after the first memory check.
       if (freshBrowserBot && body.memoryEnabled !== undefined &&
           body.memoryEnabled !== (freshBrowserBot.memoryEnabled !== false) &&
-          (freshBrowserBot.busy || activeGroupTurnForBot(freshBrowserBot.id))) {
+          freshBrowserBot.busy) {
         return json(res, 409, { error: "stop this bot's turn before changing its memory setting" });
       }
       if (Object.hasOwn(body, "toolScope")) {
@@ -511,7 +495,7 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
           return json(res, 409, { error: "A bot is working right now, so this change has to come from the desktop app or a paired device. Try again once every bot is idle." });
         }
         if (freshBrowserBot && JSON.stringify(freshBrowserBot.toolScope) !== JSON.stringify(patch.toolScope)
-          && (freshBrowserBot.busy || activeGroupTurnForBot(freshBrowserBot.id))) {
+          && freshBrowserBot.busy) {
           return json(res, 409, { error: "Stop this bot's turns before changing its tool selection." });
         }
       }
@@ -527,7 +511,7 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
         }
         if (freshBrowserBot &&
             JSON.stringify(requestedMcpServers?.toSorted()) !== JSON.stringify(freshBrowserBot.mcpServers?.toSorted()) &&
-            (freshBrowserBot.busy || activeGroupTurnForBot(freshBrowserBot.id))) {
+            freshBrowserBot.busy) {
           return json(res, 409, { error: "Stop this bot's turns before changing its MCP servers." });
         }
       }
@@ -536,10 +520,6 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
         if (!current) return json(res, 404, { error: "no such task" });
         const checked = checkedModelSelection(normalizedSelection, { selection: current.modelSelection, busy: threadBusy(current.id, current.threadId) });
         if (!checked.ok) return json(res, checked.status, { error: checked.error });
-        if (freshBrowserBot && activeGroupTurnForBot(freshBrowserBot.id)) {
-          const groupChecked = checkedModelSelection(normalizedSelection, { selection: freshBrowserBot.modelSelection, busy: true });
-          if (!groupChecked.ok) return json(res, groupChecked.status, { error: groupChecked.error });
-        }
       }
 
       if (Object.keys(profile.patch).length) {

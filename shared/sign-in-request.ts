@@ -34,24 +34,20 @@ export function normalizeSignInSite(raw: unknown): { url: string; site: string }
 
 /** A still-open sign-in card for this site — the set a newer request
  * supersedes. Done, cancelled and already-superseded cards keep their
- * settled state. In a room only the asking bot's own cards count. */
+ * settled state. */
 export function isPendingSignInRequest(
   message: {
     kind?: unknown;
     signIn?: { site?: unknown; done?: unknown; cancelled?: unknown; superseded?: unknown };
-    from?: { botId?: unknown };
   },
   site: string,
-  requestingBotId: string,
-  roomThread: boolean,
 ): boolean {
   return (
     message.kind === "signin" &&
     message.signIn?.site === site &&
     message.signIn.done !== true &&
     message.signIn.cancelled !== true &&
-    message.signIn.superseded !== true &&
-    (!roomThread || message.from?.botId === requestingBotId)
+    message.signIn.superseded !== true
   );
 }
 

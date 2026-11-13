@@ -1,5 +1,5 @@
-// A failed turn is stored as an activity row named "error: <what went wrong>",
-// in a 1:1 chat and a room alike. A place that could not be used also stores
+// A failed turn is stored as an activity row named "error: <what went wrong>".
+// A place that could not be used also stores
 // its state, so the app words it again in the reader's language; the words
 // stay English and whole for the phones, which read only them.
 import type { PlaceRow } from "./place-view.ts";

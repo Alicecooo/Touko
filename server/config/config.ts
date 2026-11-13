@@ -1,7 +1,7 @@
-// ~/.openmausbot/config.json, with env vars overriding its credentials.
+// ~/.touko/config.json, with env vars overriding its credentials.
 import { readFileSync, mkdirSync, existsSync, renameSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 
@@ -18,8 +18,6 @@ import { loopGuardConfigSchema, type LoopGuardConfig } from "../host/loop-guard.
 import { migrateLegacyFeatureFlags } from "./legacy-feature-flags.ts";
 import { isRemoteMcpServer, parseStoredMcpServer } from "../mcp/mcp-registry.ts";
 import { parseJson, schemaIssue, type JsonObject, type JsonValue } from "./schema.ts";
-
-import { roomContextSettings } from "../teams/room-context-settings.ts";
 
 const optionalText = z.string().optional();
 
@@ -189,7 +187,7 @@ const appConfigSchema = z.object( {
   context: z.object({
     compactAt: z.number().positive().max(10_000_000).optional(),
     autoCompact: z.boolean().optional(),
-  }).extend(roomContextSettings).extend(replaySettings).optional(),
+  }).extend(replaySettings).optional(),
   /** Memory upkeep timing, for bots with Memory upkeep switched on. */
   memory: z.object({
     /** Quiet time after a turn before its facts are captured (ms). */
@@ -254,7 +252,7 @@ export interface AppConfig extends HelperConfig {
   profile?: { name?: string; email?: string; aboutMe?: string };
   mcp?: { callTimeoutMinutes?: number };
   threads?: { maxConcurrentPerBot: number; eventLogMaxBytes?: number; eventLogRetentionDays?: number };
-  context?: { rebuildBytes?: number; compactAt?: number; autoCompact?: boolean; roomCompactAt?: number; roomSessions?: boolean; replayToolHistory?: boolean };
+  context?: { rebuildBytes?: number; compactAt?: number; autoCompact?: boolean; replayToolHistory?: boolean };
   memory?: { captureQuietMs?: number; tidyHour?: number };
   features?: { skillAuthoring?: boolean; skillReview?: boolean; skillReviewSteps?: number; showToolCalls?: boolean;  sharedComputers?: boolean; claudeUserMcp?: boolean; claudeUserSkills?: boolean; llmThreadTitles?: boolean; autoRecall?: boolean; routinesInConversation?: boolean; skillsLibrary?: boolean; shareLearnedSkills?: "off" | "ask" | "auto"; chiefEscalations?: boolean; acpPlanLines?: boolean; agentsToolBridge?: boolean };
   onboarding?: { completedAt?: string; version?: number; reelSeen?: boolean; hintsSeen?: string[]; firstTurnAt?: string };
@@ -387,16 +385,29 @@ export function changedInstanceIds(before: Record<string, unknown>, after: Recor
     .filter((id) => !isDeepStrictEqual(before[id], after[id]));
 }
 
-export const DATA_DIR = process.env.OMB_DATA_DIR ?? join(homedir(), ".openmausbot");
-const LEGACY_DATA_DIR = join(homedir(), ".opengrokbot");
+const DEFAULT_DATA_DIR = join(homedir(), ".touko");
+export const DATA_DIR = process.env.OMB_DATA_DIR ?? DEFAULT_DATA_DIR;
+const LEGACY_DATA_DIRS = [join(homedir(), ".openmausbot"), join(homedir(), ".opengrokbot")];
+const isDefaultDataDir = (candidate: string) => {
+  const target = resolve(candidate);
+  const defaultTarget = resolve(DEFAULT_DATA_DIR);
+  return process.platform === "win32" ? target.toLowerCase() === defaultTarget.toLowerCase() : target === defaultTarget;
+};
 export const EVENTS_DIR = join(DATA_DIR, "events");
 export const NATIVE_DIR = join(DATA_DIR, "native");
 
 export function ensureDirs() {
-  if (!existsSync(DATA_DIR) && existsSync(LEGACY_DATA_DIR)) {
-    try {
-      renameSync(LEGACY_DATA_DIR, DATA_DIR);
-    } catch {
+  if (!existsSync(DATA_DIR)) {
+    const legacyDirs = isDefaultDataDir(DATA_DIR) ? LEGACY_DATA_DIRS : [];
+    for (const legacyDir of legacyDirs) {
+      if (!existsSync(legacyDir)) continue;
+      try {
+        renameSync(legacyDir, DATA_DIR);
+        break;
+      } catch (error) {
+        if (existsSync(DATA_DIR)) break;
+        throw new Error(`Could not migrate Touko data from ${JSON.stringify(legacyDir)}.`, { cause: error });
+      }
     }
   }
   for (const dir of [DATA_DIR, EVENTS_DIR, NATIVE_DIR]) mkdirSync(dir, { recursive: true });

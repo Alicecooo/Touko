@@ -124,7 +124,7 @@ export interface RoutineRun {
   status: RoutineRunStatus;
   manual: boolean;
   triggerSource?: RoutineRunTrigger;
-  /** Room task created for a team-goal run. */
+  /** Conversation task created for the run. */
   executionThreadId?: string;
   sourceThreadId?: string;
   resultsThreadId?: string;

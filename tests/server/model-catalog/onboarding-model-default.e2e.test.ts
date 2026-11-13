@@ -111,7 +111,7 @@ async function send(fixture: Fixture, botId: string, threadId: string, text: str
 it("connecting a provider selects a blank starter and future bot defaults without replacing chosen models", async () => {
   await withUnselectedStarter(async (fixture) => {
     const starter = (await fixture.api("GET", "/api/bots")).bots[0];
-    const pinned = (await fixture.api("POST", `/api/bots/${starter.id}/tasks`, { title: "Pinned model" })).task;
+    const pinned = { threadId: starter.activeTaskId };
     await fixture.api("PATCH", `/api/bots/${starter.id}/tasks/${pinned.threadId}`, { modelSelection: CHOSEN });
     const intentional = (await fixture.api("POST", "/api/bots", { name: "Chosen model", modelSelection: CHOSEN })).bot;
     await fixture.restart({ clearStarter: true });

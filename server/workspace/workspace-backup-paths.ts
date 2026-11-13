@@ -108,7 +108,7 @@ export function restorePaths(source: string, destination: string) {
   };
   return {
     fields: (value: unknown) => fields(value, false),
-    /** Bots, rooms, routines and settings: a working folder left on another kind of computer is cleared and noted. */
+    /** Bots, groups, routines and settings: a working folder left on another kind of computer is cleared and noted. */
     definitions: (value: unknown, bot?: string) => fields(value, true, bot),
     text,
     message,

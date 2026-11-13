@@ -26,13 +26,11 @@ export interface HandoffView {
   id: string;
   rootId: string;
   parentId?: string;
-  groupId?: string;
   threadId: string;
   botId: string;
   key: string;
   text: string;
   createdAt: number;
-  requestBatchKey?: string;
   status: HandoffStatus;
   result: string;
   reported: boolean;
@@ -40,7 +38,6 @@ export interface HandoffView {
   startedAt?: number;
   lastProgressAt?: number;
   approvalGranted: boolean;
-  kind: "work" | "assignment";
   origin?: WorkOrigin;
   restarts: number;
   restart?: "rerun" | "cut" | "teammates";
@@ -53,17 +50,15 @@ export interface HandoffView {
   question?: string;
   cards?: string[];
   continuation?: { note: string; handoffPath?: string; count: number };
-  goalRunId?: string;
 }
 
 export interface BeginTurnRequest {
   id: string;
-  address: RoomAddress;
+  address: ThreadAddress;
   brief: string;
   level: Level;
   opener?: HandoffOpener;
   origin?: WorkOrigin;
-  goalRunId?: string;
 }
 
 /** `cap` continues the same node in place (a step cap, a seat it could not get); `cards` parks it on the person. */
@@ -86,13 +81,12 @@ export interface HandoffOptions {
   thread?: "standing" | "new";
   approvalGranted?: boolean;
   rework?: boolean;
-  requestBatchKey?: string;
   doneWhen?: string;
 }
 
-export type RoomAddress = Pick<HandoffView, "groupId" | "threadId" | "botId">;
+export type ThreadAddress = Pick<HandoffView, "threadId" | "botId">;
 
-/** `note` is `text` without the brief, for a room whose transcript already has the words; `restartNote` already leads `text`. */
+/** `note` is `text` without the brief when the transcript already has the words; `restartNote` already leads `text`. */
 export interface ComposedTurn {
   text: string;
   note: string;
@@ -108,14 +102,12 @@ export interface CoordinatorHost {
   /** For a root this is the person's own conversation continuing: person-visible, never internal. */
   run(node: HandoffView, resumed: boolean, signal: AbortSignal, composed: ComposedTurn): Promise<HostTurnResult>;
   report(child: HandoffView, parent?: HandoffView): void;
-  changed(groupIds: ReadonlySet<string>, directThreadIds: ReadonlySet<string>): void;
+  changed(directThreadIds: ReadonlySet<string>): void;
   names(node: HandoffView, parent?: HandoffView): EnvelopeNames;
   /** `restored` shows the question again only if the first showing never happened; a root parked on its own cards shows nothing more. */
   park(node: HandoffView, question: string, restored?: boolean): void;
-  /** The level the target thread will really run with, so the envelope states the truth. A Chief's level flows into a room
-   * with the hand-off, never onto the shared thread, so it resolves from `source`. */
-  levelOf(target: RoomAddress, source?: RoomAddress): { level: Level; driverKind?: string };
-  chiefOf(address: RoomAddress): boolean;
+  levelOf(target: ThreadAddress, source?: ThreadAddress): { level: Level; driverKind?: string };
+  chiefOf(address: ThreadAddress): boolean;
   /** What the cut turn already did outward (sent, posted, paid): a turn that acted outward is not run again. */
   outward?(node: HandoffView): string[];
 }
@@ -127,14 +119,14 @@ export interface Coordinator {
   active(): HandoffView[];
   children(id: string): HandoffView[];
   /** A generation with no root is refused; throws an Error whose message is the typed refusal shown to the model. */
-  enqueue(source: RoomAddress, generation: string, parentId: string | undefined, target: RoomAddress, text: string,
+  enqueue(source: ThreadAddress, generation: string, parentId: string | undefined, target: ThreadAddress, text: string,
     options?: HandoffOptions): { node: HandoffView; duplicate: boolean };
   status(id: string): StatusView | undefined;
   /** Every assignment this conversation was given that was open at `since` or began after, with all handed out under it; rows oldest first. */
   job(threadId: string, since: number, botId?: string): { scopes: string[]; rows: Assignment[] };
   /** Undelivered inbox items for a polling requester, marked delivered. */
   poll(owner: Owner): { items: StatusView["inbox"]; assignments: HandoffView[] };
-  /** Non-terminal work the conversation in this thread is waiting on, rooms included. */
+  /** Non-terminal work the conversation in this thread is waiting on. */
   outstandingFor(threadId: string): HandoffView[];
   beginTurn(req: BeginTurnRequest): HandoffView;
   endTurn(id: string, result: HostTurnResult): void;
@@ -142,8 +134,6 @@ export interface Coordinator {
   answerRoot(id: string, text: string): boolean;
   parkedDirect(threadId: string): HandoffView | undefined;
   prune(before: number): number;
-  sharedRequest(node: HandoffView): { id: string; botIds: string[] };
-  cancelRoom(groupId: string, threadId?: string, reason?: string, status?: "failed" | "cancelled"): void;
   cancelDirect(threadId: string, reason?: string): void;
   activeDirect(threadId: string): boolean;
   assignerOf(threadId: string): HandoffView | undefined;

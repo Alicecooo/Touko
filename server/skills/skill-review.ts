@@ -45,11 +45,10 @@ export interface ReviewChange {
   baseSha256?: string;
 }
 
-export function turnToolSteps(messages: readonly ReviewMessage[], turnId: string, botId: string, room: boolean): number {
+export function turnToolSteps(messages: readonly ReviewMessage[], turnId: string): number {
   let steps = 0;
   for (const message of messages) {
     if (message.kind !== "activity" || message.turnId !== turnId || !message.tool?.name || message.tool.setup) continue;
-    if (room && message.from?.botId !== botId) continue;
     steps += 1;
   }
   return steps;
@@ -70,10 +69,10 @@ interface Entry {
   text: string;
 }
 
-function entriesFor(messages: readonly ReviewMessage[], bot: { id: string; name: string }, room: boolean): Entry[] {
+function entriesFor(messages: readonly ReviewMessage[], bot: { id: string; name: string }): Entry[] {
   const entries: Entry[] = [];
   for (const message of messages) {
-    const mine = room ? message.from?.botId === bot.id : !message.from || message.from.botId === bot.id;
+    const mine = !message.from || message.from.botId === bot.id;
     if (message.kind === "text" && message.text?.trim()) {
       if (message.role === "user") entries.push({ role: "person", speaker: "Person", text: message.text });
       else entries.push({ role: mine ? "self" : "other", speaker: mine ? bot.name : message.from?.name ?? "Another bot", text: message.text });
@@ -95,8 +94,8 @@ function fullLine(entry: Entry): string {
   return `${entry.speaker}: ${clip(entry.text, FULL_LINE_MAX)}`;
 }
 
-export function reviewTranscript(messages: readonly ReviewMessage[], bot: { id: string; name: string }, room: boolean): string {
-  const entries = entriesFor(messages, bot, room);
+export function reviewTranscript(messages: readonly ReviewMessage[], bot: { id: string; name: string }): string {
+  const entries = entriesFor(messages, bot);
   let tail = Math.min(TRANSCRIPT_TAIL, entries.length);
   for (;;) {
     const older = entries.slice(0, entries.length - tail);
@@ -305,7 +304,7 @@ export interface SkillReviewDeps {
   bot: (botId: string) => { id: string; name: string } | undefined;
   engine: (botId: string) => ReviewEngine | null;
   busy: (botId: string) => boolean;
-  transcript: (botId: string, threadId: string) => { messages: readonly ReviewMessage[]; room: boolean } | null;
+  transcript: (botId: string, threadId: string) => { messages: readonly ReviewMessage[] } | null;
   skills: (botId: string) => ReviewSkill[];
   currentSha: (botId: string, name: string) => string | null;
   apply: (botId: string, threadId: string, change: ReviewChange) => { ok: true } | { ok: false; error: string };
@@ -459,7 +458,7 @@ export function createSkillReview(deps: SkillReviewDeps): SkillReview {
     }
     const engine = deps.engine(botId);
     if (!engine) return failed(botId, threadId, "this bot's engine cannot run a background review", steps);
-    const transcript = reviewTranscript(conversation.messages, bot, conversation.room);
+    const transcript = reviewTranscript(conversation.messages, bot);
     const skills = deps.skills(botId);
     const { shown } = shownSkills(skills, transcript);
     const prompt = skillReviewPrompt({ botName: bot.name, transcript, skills });

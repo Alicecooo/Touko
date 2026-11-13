@@ -1,4 +1,4 @@
-/** The client-visible wire model for tasks, bots, messages and rooms. A field
+/** The client-visible wire model for tasks, bots, messages and groups. A field
  * here is one the server emits in every response and SSE frame that carries
  * the shape. */
 import type { ApprovalMode } from "./approval-mode.ts";
@@ -15,7 +15,6 @@ import type { SkillRequestCardData } from "./skill-request.ts";
 import type { QuestionRequestCardData } from "./ask-question.ts";
 import type { RoutineRunCardData } from "./routine-run.ts";
 import type { WidgetPayload } from "./widget.ts";
-import type { GroupGoalRunCardData } from "./group-goal-run.ts";
 import type { RuntimeEvent } from "./runtime-events.ts";
 import type { NotificationLogEntry } from "./notification.ts";
 import type { Routine, RoutineRun } from "./routines.ts";
@@ -73,8 +72,6 @@ export interface TaskOpenedBy {
   /** The opener's own conversation this "work" thread was opened from.
    * Everything that conversation later sends this bot continues here. */
   threadId?: string;
-  /** A parallel room job's thread: `threadId` is the room thread it came from, and the member must stay in that room. */
-  roomLane?: true;
   at: number;
 }
 
@@ -327,7 +324,7 @@ export interface WireBot {
   browserProfile?: string;
   playbooks?: InstalledPlaybook[];
   installedPackage?: InstalledPackageMetadata;
-  /** Aggregate of task and room activity; transient, reset on load. */
+  /** Aggregate of task and group activity; transient, reset on load. */
   busy?: boolean;
   /** What the bot is doing right now; transient like busy. */
   activity?: BotActivity;
@@ -364,7 +361,7 @@ export type CardAnswerer = (
 
 /** One transcript line, serialized as stored. */
 export interface WireMessage {
-  roomRequest?: { id: string; phase: "request" | "result" };
+  peerRequest?: { id: string; phase: "request" | "result" };
   id: string;
   role: "bot" | "user";
   kind: "text" | "options" | "activity" | "screen" | "connector" | "secret" | "signin" | "routine.run" | "digest" | "compaction" | "widget";
@@ -394,8 +391,6 @@ export interface WireMessage {
   signIn?: SignInRequestCardData;
   /** One idempotently updated status card for a routine run. */
   routineRun?: RoutineRunCardData;
-  /** Terminal receipt for a bounded multi-bot channel goal. */
-  goalRun?: GroupGoalRunCardData;
   /** activity messages: tool name + outcome. */
   tool?: {
     name: string; ok?: boolean; setup?: boolean; terminal?: boolean; summary?: string; input?: string; output?: string;
@@ -451,24 +446,17 @@ export interface WireMessage {
   replyToId?: string;
   /** Stable client identity for at-most-once chat POST retries. */
   sendId?: string;
-  /** Per-send channel behavior. Absent is legacy quick chat. */
-  channelMode?: "chat" | "goal";
-  /** group threads: which member said this (sender attribution). */
+  /** Which bot authored this message in a bot-to-bot conversation. */
   from?: { botId: string; name: string; color: string };
-  /** A room reply whose speaker the decision model picked (an Auto room),
-   * with how sure it was. Absent on every other message; clients that do
-   * not know it ignore it. */
   /** On a conversational bot's user line: the picker label of the quick model its reply ran on. */
   quickModel?: string;
   /** Set on the user-role line another bot delivered into this bot's own
-   * conversation (coordinate_bots, start_thread). `incident`: the line is a
+   * conversation (coordinate_bots). `incident`: the line is a
    * Team incidents report or Team escalations notice about that bot's thread
    * in `threadId`, not its words; `notified`: the person was already buzzed. */
   peerAsk?: { botId: string; name: string; unattended?: boolean; incident?: { threadId: string; notified?: boolean } };
   /** emoji reactions; by = "user" or a member botId. */
   reactions?: Array<{ emoji: string; by: string }>;
-  /** comm chips: "Messaged @X", linking to the bot-bot channel. */
-  comm?: { groupId: string; threadId?: string; withBotId: string; withName: string; withColor: string };
   /** thread chips: "Opened thread #Title on @X". */
   threadRef?: { botId: string; threadId: string; title: string };
   /** user messages waiting in the steer-queue while the bot is mid-turn. */
@@ -624,84 +612,18 @@ export interface ComputerHelpRef {
   place: Surface;
 }
 
-/** Accounting for the currently displayed room thread, across all speakers. */
-export interface GroupThreadUsage extends TaskUsage {
-  lastSpeaker?: { botId: string; name: string };
-}
-
-/** Legacy room fields retained for wire/storage compatibility while room chat is removed from the UI. */
-export type GroupDefaultResponder =
-  | { kind: "member"; botId: string }
-  | { kind: "everyone" }
-  | { kind: "mentions" };
-
-export interface GroupTask {
-  threadId: string;
-  title: string;
-  createdAt: number;
-  pinnedCwd?: string | null;
-  pinnedMessageId?: string;
-  pinned?: boolean;
-  updatedAt?: number;
-  lastThreadOrderAt?: number;
-  titleFromFirstMessage?: true;
-  working?: boolean;
-  busyBotId?: string | null;
-}
-
-/** A grouping container. Legacy room fields remain on the wire for migration compatibility. */
+/** A grouping container; conversations belong to individual bots. */
 export interface WireGroup {
-  usage?: GroupThreadUsage | null;
-  memberContext?: Record<string, { tokens: number; window: number; compactRequested?: true }> | null;
   id: string;
-  threadId: string;
-  tasks?: GroupTask[];
   name: string;
   memberIds: string[];
-  defaultResponder: GroupDefaultResponder;
-  bulletin: string;
-  unread: boolean;
-  lastReadMessageId?: string;
   createdAt: number;
-  dm?: boolean;
-  busyBotId?: string | null;
-  turnStartedAt?: number;
-  cwd?: string;
-  pinnedCwd?: string | null;
-  pinnedMessageId?: string;
   section?: string;
-  setupCompletedAt?: number | null;
-  setupSkippedAt?: number | null;
-  audienceFloor?: BotVisibility;
-  working: boolean;
-  holds?: Record<string, RoomHold>;
-  heldMessages?: Record<string, RoomHeldMessage[]>;
-  queue?: RoomQueueEntry[];
-}
-
-export interface RoomQueueEntry {
-  botId: string;
-  threadId: string;
-  state: "running" | "queued";
-  position: number;
-  of: number;
-  waitingForBotId?: string;
-  assignmentId?: string;
-}
-
-export interface RoomHold {
-  at: number;
-  noted?: boolean;
-}
-
-export interface RoomHeldMessage {
-  threadId: string;
-  messageId: string;
 }
 
 /** Pending steer-queue chips, as `queuedSteerSnapshot` emits them and the
  * `bot.queued` frame carries them: threadId → queued items. */
-export type SteerQueueReason = "capacity" | "group-turn";
+export type SteerQueueReason = "capacity";
 export type BotQueuedMessages = Record<string, Array<{ queueId: string; text: string; reason?: SteerQueueReason }>>;
 
 /** Skills library browse surface: one row per library entry, with the bots

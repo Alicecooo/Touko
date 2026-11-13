@@ -137,8 +137,8 @@ export function parseTeamBackup(input: unknown): TeamBackup {
     chiefs.add(section);
   }
   for (const group of backup.groups) {
-    if (group.memberIds.some((id) => !bots.has(id))) throw new Error("Invalid backup: unknown room member");
-    unique(group.memberIds, "room member");
+    if (group.memberIds.some((id) => !bots.has(id))) throw new Error("Invalid backup: unknown group member");
+    unique(group.memberIds, "group member");
   }
   for (const routine of backup.routines) {
     if (!bots.has(routine.botId)) throw new Error("Invalid backup: unknown routine bot");

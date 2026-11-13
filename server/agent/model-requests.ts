@@ -124,7 +124,7 @@ export function modelCardCopy(args: {
     : ["Why: " + args.reason];
   lines.push("Default engine/model: " + JSON.stringify(args.before) + " → " + JSON.stringify(args.selection));
   lines.push(...args.capabilityLines);
-  lines.push("Default models apply to groups and new threads. Every existing thread keeps its current model and permissions.");
+  lines.push("Bot defaults apply to new conversations. Every existing conversation keeps its current model and permissions.");
   lines.push("Nothing runs.");
   return { title, summary: title + " · default engine/model", detail: lines.join("\n") };
 }

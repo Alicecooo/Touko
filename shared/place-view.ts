@@ -19,9 +19,9 @@ export const PLACE_STATES = [
 export type PlaceState = (typeof PLACE_STATES)[number];
 
 /** Where a failed place came from: the one control a person changes when it
- * can't be used. A routine and a room member are their own sources; Auto and
- * a team's shared computer name no place, so they never fail as one. */
-export type PlaceSource = "works-on" | "pin" | "auto-pin" | "routine" | "room";
+ * can't be used. Auto and a team's shared computer name no place, so they
+ * never fail as one. */
+export type PlaceSource = "works-on" | "pin" | "auto-pin" | "routine";
 
 /** The next actions a place offers. Each is one button in the app and, on a
  * stored row, one sentence a phone can read. */
@@ -315,16 +315,13 @@ export function placeState(facts: PlaceFacts): { state: PlaceState; params: Plac
   }
 }
 
-/** Where the person goes when a passing cause stops a place: try again in
- * place, clear the pin that holds this conversation, change where the
- * routine runs. A room member's turn has no retry of its own. */
+/** Where the person goes when a passing cause stops a place. */
 function sourceAction(source: PlaceSource): PlaceActionId | null {
   switch (source) {
     case "works-on": return "try-again";
     case "auto-pin": return "try-again";
     case "pin": return "clear-pin";
     case "routine": return "change-routine";
-    case "room": return null;
   }
 }
 

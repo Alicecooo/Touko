@@ -34,7 +34,6 @@ it("starts the next scheduled run of a routine whose sign-in nobody answered, an
   const runs = async () => (await api("GET", "/api/routines")).runs as any[];
   const messages = async (threadId: string) => (await api("GET", `/api/threads/${threadId}/messages?limit=100`)).messages as any[];
   const bot = (await runControlOmb(["new-bot", "--name", "Morning bot", "--url", url]) as any).bot;
-  // Each conversation's turn waits on its own gate file, so a run stays running until the test finishes it.
   const wrapper = join(dataDir, "routine-gated.mjs");
   writeFileSync(wrapper, [
     "#!/usr/bin/env node",
@@ -48,7 +47,6 @@ it("starts the next scheduled run of a routine whose sign-in nobody answered, an
     `await import(${JSON.stringify(pathToFileURL(join(process.cwd(), "tests/support/drivers/fake-claude-cli.ts")).href)});`,
   ].join("\n"), { mode: 0o700 });
   await api("PATCH", "/api/instances/claude", { cli: wrapper });
-  await api("PATCH", "/api/config", { features: {  } });
   await api("PATCH", `/api/bots/${bot.id}`, { computer: "browser" });
   const { routine } = await api("POST", "/api/routines", {
     name: "Morning check", prompt: "Sign in to the site and check the dashboard.", botId: bot.id,
@@ -69,7 +67,6 @@ it("starts the next scheduled run of a routine whose sign-in nobody answered, an
   expect((await runs()).find((run) => run.id === first.id).waitingSince).toEqual(expect.any(Number));
   expect(readHandoffs(dataDir).find((node) => node.threadId === threadId)).toMatchObject({ status: "waiting", cards: [asked.body.messageId] });
 
-  // A day later, with nobody having answered: the stopped server's own store says so, then it starts again.
   await waitForExit(fixture.child, { signal: "SIGTERM" });
   const file = join(dataDir, "routines.json");
   const disk = JSON.parse(readFileSync(file, "utf8"));
@@ -96,12 +93,10 @@ it("starts the next scheduled run of a routine whose sign-in nobody answered, an
   expect(saved.skippedRuns).toBeUndefined();
   expect(saved.nextRunAt).toBeGreaterThan(Date.now());
 
-  // The old conversation's question is closed, and answering it now resumes nothing.
   expect(readHandoffs(dataDir).find((node) => node.threadId === threadId)?.status).toBe("cancelled");
   expect((await messages(threadId)).find((message) => message.kind === "signin")?.signIn).toMatchObject({ stopped: true });
   const late = await raw("POST", `/api/bots/${bot.id}/sign-in-cards/${asked.body.messageId}/done`, { threadId });
   expect(late.body).toMatchObject({ resumed: false });
-  // Where the routine reports, its old run's card says why it stopped.
   const card = (await messages(old.resultsThreadId)).find((message) => message.routineRun?.runId === first.id);
   expect(card?.routineRun).toMatchObject({ status: "cancelled", error: ROUTINE_SUPERSEDED });
 

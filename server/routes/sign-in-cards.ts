@@ -32,7 +32,7 @@ type Answer = { status: number; body: Record<string, unknown> };
 export interface SignInCardRouteDeps {
   settle(botId: string, threadId: string, messageId: string, outcome: SignInOutcome): Answer;
 
-  /** A member reaches a card only in a thread shown to them, which in a room can be narrower than the bot. */
+  /** A member reaches a card only in a thread shown to them, which can be narrower than the bot. */
   threadVisible(auth: RequestAuth, threadId: string): boolean;
 }
 

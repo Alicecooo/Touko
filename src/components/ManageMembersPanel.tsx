@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { track } from "@/lib/analytics";
 import { useStore, type Group } from "@/state/store";
 import { BotPickerList } from "./BotPickerList";
-import { nextMemberIds } from "@/lib/room-members";
+import { nextMemberIds } from "@/lib/group-members";
 
 export function ManageMembersPanel({
   group,
@@ -20,7 +20,7 @@ export function ManageMembersPanel({
   const openedMemberIds = useRef([...group.memberIds]);
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  // Archived bots stay listed while still members, or a room could keep a member you cannot remove.
+  // Archived bots stay listed while they remain in a group, so the roster can be repaired.
   const bots = useMemo(
     () => state.bots.filter((b) => !b.hidden || group.memberIds.includes(b.id)),
     [state.bots, group.memberIds],
@@ -86,7 +86,7 @@ export function ManageMembersPanel({
     }
     if (changed) {
       dispatch({ type: "patchGroup", groupId: group.id, patch: { memberIds } });
-      track("room_members_changed", {
+      track("group_members_changed", {
         members: memberIds.length,
         added: memberIds.filter((id) => !group.memberIds.includes(id)).length,
         removed: group.memberIds.filter((id) => !memberIds.includes(id)).length,

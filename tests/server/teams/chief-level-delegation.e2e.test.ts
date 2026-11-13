@@ -54,7 +54,8 @@ it("starts a thread a Chief opens with a teammate at the Chief's level, and a Ch
       && message.tool?.name === "Approve for me — delegated by Clive, a Chief of Staff on Approve for me")).toBe(true);
     expect((await api("GET", "/api/bots")).bots.find((bot: any) => bot.id === ada.id).approvalMode ?? "ask").toBe("ask");
 
-    const askThread = (await api("POST", `/api/bots/${chief.id}/tasks`, { title: "Plain Ask work", approvalMode: "ask" }, 201)).task;
+    const askThread = { threadId: chief.activeTaskId };
+    await api("PATCH", `/api/bots/${chief.id}/tasks/${askThread.threadId}`, { approvalMode: "ask" });
     const beaTurn = await bringIn(chief, askThread.threadId, bea, "check-ask");
     expect(beaTurn.permissionMode).toBe("default");
     expect(persistedTask(bea.id, beaTurn.threadId)?.approvalMode ?? "ask").toBe("ask");

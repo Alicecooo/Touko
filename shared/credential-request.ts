@@ -46,19 +46,15 @@ export function isPendingCredentialRequest(
   message: {
     kind?: unknown;
     secret?: { target?: unknown; provided?: unknown; dismissed?: unknown; superseded?: unknown };
-    from?: { botId?: unknown };
   },
   target: CredentialTargetId,
-  requestingBotId: string,
-  roomThread: boolean,
 ): boolean {
   return (
     message.kind === "secret" &&
     message.secret?.target === target &&
     message.secret.provided !== true &&
     message.secret.dismissed !== true &&
-    message.secret.superseded !== true &&
-    (!roomThread || message.from?.botId === requestingBotId)
+    message.secret.superseded !== true
   );
 }
 

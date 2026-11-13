@@ -10,7 +10,7 @@ import { launchVerificationServer, runControlOmb } from "../../../scripts/dev/is
 import { waitForExit } from "../../support/environment/process-cleanup.ts";
 import { readHandoffs } from "../../support/teams/read-handoff-records.ts";
 
-it("applies requested Full Access workflows through MCP without duplicate approvals, and the same changes apply in an Ask task with Undo", async () => {
+it("applies requested Full Access workflows through MCP without duplicate approvals, and applies them in Ask mode with Undo", async () => {
   const fixture = await launchVerificationServer({}, undefined, undefined, undefined, undefined, { scripted: true });
   const { url, dataDir, logPath } = fixture.info;
   const planPath = join(dataDir, "room-plan.json");
@@ -84,6 +84,7 @@ it("applies requested Full Access workflows through MCP without duplicate approv
       TEMP: join(dataDir, "tmp"), TMP: join(dataDir, "tmp"), TMPDIR: join(dataDir, "tmp"),
       OMB_PORT: new URL(url).port, PATH: dirname(process.execPath),
       FAKE_CLAUDE_MODE: "happy", FAKE_CLAUDE_DUMP: fixture.fixtureDumpPath,
+      FAKE_CLAUDE_ROOM_PLAN: planPath,
     });
     const log = openSync(logPath, "a", 0o600);
     restarted = spawn(process.execPath, ["--experimental-strip-types", fileURLToPath(new URL("../../../server/index.ts", import.meta.url))], {
@@ -99,7 +100,7 @@ it("applies requested Full Access workflows through MCP without duplicate approv
   try {
     const chief = (await cli("new-bot", "--name", "Clive", "--section", "Operations")).bot;
     await api("PATCH", `/api/bots/${chief.id}`, { chiefOfStaff: true, approvePeerComms: true });
-    const ask = (await api("POST", `/api/bots/${chief.id}/tasks`, { title: "Ask sibling" }, 201)).task;
+    const chiefThread = { threadId: chief.activeTaskId };
     const peer = (await cli("new-bot", "--name", "Ada", "--section", "Operations")).bot;
     // Ada's own level is an explicit Ask, so the Chief's Full has something to raise.
     await api("PATCH", `/api/bots/${peer.id}`, { approvalMode: "ask" });
@@ -114,7 +115,7 @@ it("applies requested Full Access workflows through MCP without duplicate approv
     const savedChief = savedBots.find((bot: any) => bot.id === chief.id);
     savedChief.approvalMode = "full"; savedChief.autoApprove = false;
     for (const task of savedChief.tasks) {
-      task.approvalMode = task.threadId === ask.threadId ? "ask" : "full";
+      task.approvalMode = "full";
       task.autoApprove = false;
     }
     const savedInverse = savedBots.find((bot: any) => bot.id === inverse.id);
@@ -127,21 +128,20 @@ it("applies requested Full Access workflows through MCP without duplicate approv
     const request = { threadId: chief.activeTaskId, text: "WRONG_MODE_MUST_NOT_RUN", sendId: randomUUID(),
       expectedActiveLeafId: (await api("GET", `/api/threads/${chief.activeTaskId}/messages?limit=1`)).activeLeafId };
     expect((await api("POST", `/api/bots/${chief.id}/messages/guarded`, request, 409)).code).toBe("guarded_permissions");
-    expect((await api("POST", `/api/bots/${chief.id}/messages/guarded`, { ...request, threadId: ask.threadId, expectedApprovalMode: "full", expectedActiveLeafId: null }, 409)).code).toBe("guarded_permissions");
-    await api("POST", `/api/bots/${chief.id}/tasks`, { title: "No operator grant", approvalMode: "full" }, 403);
+    await api("POST", `/api/bots/${chief.id}/tasks`, { title: "No extra conversation" }, 410);
     expect(providerTurns()).toHaveLength(0);
     evidence.push({ setup: "fixture-only persisted modes", restartedPid: restarted?.pid, modes: [
-      { botId: chief.id, default: "full", fullTask: chief.activeTaskId, askTask: ask.threadId },
+      { botId: chief.id, default: "full", activeTask: chief.activeTaskId },
       { botId: inverse.id, default: "ask", fullTask: inverse.activeTaskId },
     ] });
 
     const skill = (name: string, instruction: string) => `---\nname: ${name}\ndescription: Summarize fixture-only monthly activity.\n---\n\n# Monthly fixture review\n\n${instruction}\n`;
     const schedule = { type: "cron", expression: "0 9 1 * *", timeZone: "America/New_York" };
     const specialist = (name: string, section: string) => ({ action: "create", key: name,
-      fields: { name, title: "Research specialist", soul: "Use only fixture evidence.", section, modelSelection } });
+      fields: { name, title: "Research specialist", description: "Use only fixture evidence.", section, modelSelection } });
     const created = await run(chief, chief.activeTaskId,
       "Set up my monthly reporting profile, save its reusable skill, schedule 9am New York time on the first of each month, and create Mira in Research.", [
-        step("propose_profile", { title: "Monthly reporting Chief", soul: "Report only verified fixture results.", reason: "Requested reporting profile" }),
+        step("propose_profile", { title: "Monthly reporting Chief", description: "Report only verified fixture results.", reason: "Requested reporting profile" }),
         step("list_triggers", {}),
         step("create_trigger", { when: "schedule", name: "Monthly fixture report", instructions: "Summarize fixture-only monthly results.", schedule }),
         step("skills_list", {}),
@@ -159,11 +159,11 @@ it("applies requested Full Access workflows through MCP without duplicate approv
       expect(entry.response.result.content[0].text).not.toContain("End this turn and wait");
     }
     const updatedChief = (await bots()).find(bot => bot.id === chief.id);
-    expect(updatedChief).toMatchObject({ title: "Monthly reporting Chief", description: "Coordinates monthly fixture reports", soul: "Report only verified fixture results.", approvalMode: "full", approvePeerComms: true, managedSections: ["Research"] });
+    expect(updatedChief).toMatchObject({ title: "Monthly reporting Chief", description: "Coordinates monthly fixture reports", approvalMode: "full", approvePeerComms: true, managedSections: ["Research"] });
     const createdTheo = created.evidence.find((item: any) => item.step?.tool === "create_bot");
     expect(createdTheo.response.result.content[0].text).toMatch(/^Created @Theo in Operations/);
     expect((await bots()).find(bot => bot.name === "Theo")).toMatchObject({ section: "Operations", title: "Totals checker",
-      soul: "Check fixture totals before each report.", approvalMode: "full", autoApprove: false, composio: false });
+      description: "Check fixture totals before each report.", approvalMode: "full", autoApprove: false, composio: false });
     const mira = (await bots()).find(bot => bot.name === "Mira");
     expect(mira).toMatchObject({ section: "Research", approvalMode: "full", autoApprove: false, composio: false });
     const routine = (await api("GET", "/api/routines")).routines.find((item: any) => item.name === "Monthly fixture report");
@@ -207,26 +207,30 @@ it("applies requested Full Access workflows through MCP without duplicate approv
     expect((await messages(peerTurn.threadId)).some(message => message.kind === "activity" && /^Full access — delegated by Clive, a Chief of Staff on Full access$/.test(message.tool?.name ?? ""))).toBe(true);
     evidence.push({ delegatedFullAccess: { peerThreadId: peerTurn.threadId, permissionMode: peerTurn.permissionMode } });
 
-    const askTurn = await run(chief, ask.threadId, "Change my own profile, routine and named skill, and add a specialist in this Ask task.", [
+    await api("PATCH", `/api/bots/${chief.id}/tasks/${chiefThread.threadId}`, { approvalMode: "ask" });
+    const priorReceiptIds = new Set((await messages(chiefThread.threadId))
+      .filter(message => message.card?.autoApplied).map(message => message.id));
+    const askTurn = await run(chief, chiefThread.threadId, "Change my own profile, routine and named skill, and add a specialist in this Ask conversation.", [
       step("propose_profile", { title: "Applied in Ask", reason: "Applies at every level" }),
-      step("create_trigger", { when: "schedule", name: "Own Ask report", instructions: "Report from the Ask task.", schedule }),
+      step("create_trigger", { when: "schedule", name: "Own Ask report", instructions: "Report from the Ask conversation.", schedule }),
       step("skill_manage", { action: "create", skill_md: skill("own-ask-review", "Applies at once as the bot's own skill."), source: "conversation" }),
-      step("propose_team_setup", { reason: "Ask task specialist", operations: [specialist("Ask specialist", "Operations")] }),
+      step("propose_team_setup", { reason: "Ask conversation specialist", operations: [specialist("Ask specialist", "Operations")] }),
     ], { guarded: "ask" });
     expect(askTurn.permissionMode).not.toBe("bypassPermissions");
-    expect(await unanswered(ask.threadId)).toHaveLength(0);
+    expect(await unanswered(chiefThread.threadId)).toHaveLength(0);
     expect((await bots()).find(bot => bot.id === chief.id).title).toBe("Applied in Ask");
     expect((await bots()).some(bot => bot.name === "Ask specialist")).toBe(true);
     expect((await api("GET", "/api/routines")).routines).toHaveLength(2);
     expect((await api("GET", `/api/bots/${chief.id}/skills`)).skills.some((item: any) => item.name === "own-ask-review" && item.enabled)).toBe(true);
-    const receipts = (await messages(ask.threadId)).filter(message => message.card?.autoApplied);
+    const receipts = (await messages(chiefThread.threadId)).filter(message => message.card?.autoApplied && !priorReceiptIds.has(message.id));
     expect(receipts.map(message => Boolean(message.card.profileRequest || message.card.routineRequest || message.card.skillRequest || message.card.teamSetupRequest)))
       .toEqual([true, true, true, true]);
     for (const receipt of receipts) {
-      expect(await api("POST", `/api/threads/${ask.threadId}/undo`, { requestId: receipt.card.requestId })).toMatchObject({ ok: true, undone: true });
-      expect(await api("POST", `/api/threads/${ask.threadId}/undo`, { requestId: receipt.card.requestId })).toMatchObject({ alreadyUndone: true });
+      expect(await api("POST", `/api/threads/${chiefThread.threadId}/undo`, { requestId: receipt.card.requestId })).toMatchObject({ ok: true, undone: true });
+      expect(await api("POST", `/api/threads/${chiefThread.threadId}/undo`, { requestId: receipt.card.requestId })).toMatchObject({ alreadyUndone: true });
     }
-    expect((await messages(ask.threadId)).filter(message => message.card?.autoApplied).every(message => message.card.undone)).toBe(true);
+    expect((await messages(chiefThread.threadId)).filter(message => message.card?.autoApplied && !priorReceiptIds.has(message.id))
+      .every(message => message.card.undone)).toBe(true);
     expect((await bots()).find(bot => bot.id === chief.id).title).toBe("Monthly reporting Chief");
     expect((await api("GET", "/api/routines")).routines).toHaveLength(1);
     expect((await api("GET", `/api/bots/${chief.id}/skills`)).skills.some((item: any) => item.name === "own-ask-review")).toBe(false);
@@ -241,23 +245,25 @@ it("applies requested Full Access workflows through MCP without duplicate approv
     expect(providerTurns()).toHaveLength(7);
     const persisted = JSON.parse(readFileSync(join(dataDir, "bots.json"), "utf8"));
     expect(persisted.find((bot: any) => bot.id === chief.id)).toMatchObject({ title: "Monthly reporting Chief", approvalMode: "full" });
-    expect(persisted.find((bot: any) => bot.id === chief.id).tasks.find((task: any) => task.threadId === ask.threadId).approvalMode).toBe("ask");
+    expect(persisted.find((bot: any) => bot.id === chief.id).tasks.find((task: any) => task.threadId === chiefThread.threadId).approvalMode).toBe("ask");
     expect(persisted.find((bot: any) => bot.id === inverse.id)).toMatchObject({ title: "Applied from Full task", approvalMode: "ask" });
     expect(persisted.find((bot: any) => bot.id === inverse.id).tasks.find((task: any) => task.threadId === inverse.activeTaskId).approvalMode).toBe("full");
     expect(persisted.find((bot: any) => bot.id === peer.id).approvalMode).not.toBe("full");
     expect(persisted.find((bot: any) => bot.id === peer.id).tasks.find((task: any) => task.threadId === peerTurn.threadId)).toMatchObject({ approvalMode: "full", autoApprove: false, alwaysAllow: [] });
     expect(JSON.parse(readFileSync(join(dataDir, "routines.json"), "utf8")).routines[0]).toMatchObject({ enabled: false, schedule });
     evidence.push({ persistedBots: persisted, routines: await api("GET", "/api/routines"), handoffs,
-      fullMessages: await messages(chief.activeTaskId), askMessages: await messages(ask.threadId), inverseMessages: await messages(inverse.activeTaskId) });
+      chiefMessages: await messages(chief.activeTaskId), inverseMessages: await messages(inverse.activeTaskId) });
 
-    const interrupted = (await api("POST", `/api/bots/${chief.id}/tasks`, { title: "Restart while awaiting teammate" }, 201)).task;
+    await api("PATCH", `/api/bots/${chief.id}/tasks/${chief.activeTaskId}`, { approvalMode: "full" });
+    const interrupted = { threadId: chief.activeTaskId };
     const gate = join(dataDir, "restart-peer.gate");
     const peerWorking = join(dataDir, "restart-peer.ready");
     plans[chief.id].turns.push({ steps: [step("coordinate_bots", { bot_ids: [peer.id], request_key: "restart-proof", message: "Wait at the isolated fixture gate." })],
       reply: "Assigned the restart check" }, { reply: "Reviewed the resumed check" });
     plans[peer.id].turns.push({ gateFile: gate, readyFile: peerWorking, reply: "The gated check finished" });
     writeFileSync(planPath, JSON.stringify(plans));
-    const pendingInput = { threadId: interrupted.threadId, text: "Coordinate the gated restart check.", sendId: randomUUID(), expectedActiveLeafId: null, expectedApprovalMode: "full" };
+    const pendingInput = { threadId: interrupted.threadId, text: "Coordinate the gated restart check.", sendId: randomUUID(),
+      expectedActiveLeafId: (await api("GET", `/api/threads/${interrupted.threadId}/messages?limit=1`)).activeLeafId, expectedApprovalMode: "full" };
     const pendingReceipt = await api("POST", `/api/bots/${chief.id}/messages/guarded`, pendingInput, 202);
     const pendingRoute = `/api/bots/${chief.id}/requests/${pendingInput.sendId}?threadId=${interrupted.threadId}`;
     await expect.poll(async () => {

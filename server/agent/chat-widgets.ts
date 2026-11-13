@@ -6,7 +6,6 @@ import { isSecretName, mask, redactSecretsInText } from "../security/redact.ts";
 import type { Message } from "../storage/store.ts";
 
 export interface AgentCardStore {
-  groupByThread(threadId: string): unknown;
   messagesFor(threadId: string): Message[];
   appendMessage(threadId: string, message: Omit<Message, "id" | "at">): Message;
   patchMessage(threadId: string, messageId: string, patch: Partial<Message>): Message | null;
@@ -17,7 +16,6 @@ export type AgentCardResult =
   | { ok: true; messageId: string; masked?: true }
   | { ok: false; status: 400 | 403 | 404 | 409; error: string };
 
-const ROOM_REFUSAL = "Widgets are not available in rooms yet. Answer in text.";
 const NO_SUCH_WIDGET = "No widget with that id in this conversation.";
 const EMPTY_FALLBACK = "[widget]";
 
@@ -104,8 +102,6 @@ export function createAgentCard(args: {
   if (input.tool !== "show_widget" && input.tool !== "update_widget") {
     return { ok: false, status: 400, error: "tool: must be show_widget or update_widget." };
   }
-  if (store.groupByThread(threadId)) return { ok: false, status: 409, error: ROOM_REFUSAL };
-
   if (input.tool === "show_widget") {
     const widget = canonicalWidget(input);
     if (!widget.ok) return widget;

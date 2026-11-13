@@ -13,11 +13,11 @@ export type NotifyKind =
   /** A bot asked the person to sign in to a website themselves
    * (request_sign_in): it waits on their hands, at the place it works. */
   | "sign-in"
-  /** A delegated room request settled and the coordinator auto-resumed with
+  /** A delegated bot request settled and the coordinator auto-resumed with
    * the results; both are internal, so without this the parent conversation
    * sits silent until the resume's first token. */
   | "delegation-settled"
-  /** A bot's settled room reply tagged the person (`@you` or their profile name). Rooms only. */
+  /** Legacy stored notifications emitted when a room reply tagged the person. No longer produced. */
   | "mention"
   /** The workspace crossed its monthly spend warning or reached its cap.
    * Sent to admins only, at most once per month for each. */
@@ -33,9 +33,7 @@ export interface Notification {
   /** The bot's stored profile image, when it has one; clients show it as
    * the OS notification's icon so every banner carries its bot's face. */
   avatarUrl?: string;
-  /** The room this came out of, when the bot was speaking in one. Routing
-   * already works off `threadId` alone; this is what lets a client say which
-   * room, and stack a room's banners together instead of under the bot. */
+  /** Legacy room metadata retained when reading existing notification history. */
   groupId?: string;
 }
 

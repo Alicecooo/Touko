@@ -76,7 +76,6 @@ export interface PackageImportOptions {
   trust: PackageTrust;
   mode: "add" | "project";
   cwd?: string | null;
-  room?: string;
   org?: OrgImportContext;
 }
 
@@ -420,12 +419,8 @@ function runImport(source: ImportSource, options: PackageImportOptions, deps: Pa
     } else for (const preset of pkg?.presets ?? []) skipped.push({ part: `presets[${preset.key}]`, reason: "presets_not_supported_yet" });
 
     if (!pkg && options.mode === "project" && importedBots.length > 0) {
-      const roomName = options.room?.trim() || name;
-      group = store.createGroup(roomName, importedBots.map((bot) => bot.id), false, section);
+      group = store.createGroup(name, importedBots.map((bot) => bot.id), section);
       createdGroups.push(group);
-      if (options.cwd) {
-        group = store.patchGroup(group.id, { cwd: options.cwd }) ?? group;
-      }
     }
 
     const referenced = new Set((pkg?.agents ?? []).flatMap((agent) => agent.skills ?? []));

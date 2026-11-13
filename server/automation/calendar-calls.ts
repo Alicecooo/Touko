@@ -301,7 +301,7 @@ export class CalendarCallManager {
           try {
             await this.onDue?.(cloneCall(call), scheduledFor);
           } catch (error) {
-            console.error(`calendar call ${call.id}: scheduled room kickoff failed`, error);
+            console.error(`calendar call ${call.id}: scheduled call failed`, error);
             continue;
           }
         }

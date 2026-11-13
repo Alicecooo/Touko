@@ -14,8 +14,8 @@ export interface ContextMessage {
   steered?: boolean;
 }
 
-export function isContextMessage(m: Pick<Message, "kind" | "text" | "digest" | "roomRequest">): boolean {
-  return Boolean(((m.kind === "text" || m.kind === "widget") && m.text) || (m.kind === "digest" && m.digest) || m.kind === "compaction" || m.roomRequest?.phase === "result");
+export function isContextMessage(m: Pick<Message, "kind" | "text" | "digest" | "peerRequest">): boolean {
+  return Boolean(((m.kind === "text" || m.kind === "widget") && m.text) || (m.kind === "digest" && m.digest) || m.kind === "compaction" || m.peerRequest?.phase === "result");
 }
 
 export interface HandedState {

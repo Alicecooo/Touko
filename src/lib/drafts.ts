@@ -4,12 +4,10 @@ import { isAttachment, type Attachment } from "./composer-attachments.js";
 const KEY = "omb-drafts";
 const ATTACHMENTS_KEY = "omb-draft-attachments";
 const SEND_IDS_KEY = "omb-draft-send-ids";
-const CHANNEL_MODES_KEY = "omb-draft-channel-modes";
 // Outside React, so a late failure from an unmounted composer cannot overwrite a newer draft.
 const draftRevisions = new Map<string, number>();
 const replyDrafts = new Map<string, string>();
-type ChannelMode = "chat" | "goal";
-type DraftRestore = { text: string; attachments: Attachment[]; channelMode?: ChannelMode };
+type DraftRestore = { text: string; attachments: Attachment[] };
 type DraftRestoreListener = (draft: DraftRestore) => void;
 const restoreListeners = new Map<string, Set<DraftRestoreListener>>();
 const attachmentPendingCounts = new Map<string, number>();
@@ -21,7 +19,6 @@ export interface FailedComposerSend {
   requestText: string;
   replyToId?: string;
   threadId: string;
-  channelMode?: "chat" | "goal";
 }
 type FailedComposerSendInput = Omit<FailedComposerSend, "id">;
 export interface ComposerSendSnapshot extends FailedComposerSendInput {
@@ -43,9 +40,6 @@ const fallbackTextDrafts = new Map<string, string>();
 const fallbackAttachmentDrafts = new Map<string, Attachment[]>();
 const textDraftsByStore = new WeakMap<object, Map<string, string>>();
 const attachmentDraftsByStore = new WeakMap<object, Map<string, Attachment[]>>();
-const fallbackChannelModes = new Map<string, ChannelMode>();
-const channelModesByStore = new WeakMap<object, Map<string, ChannelMode>>();
-
 function memoryFor<T>(
   store: Store,
   stored: WeakMap<object, Map<string, T>>,
@@ -114,25 +108,6 @@ function saveDrafts(): void {
       unsavedDrafts.delete(store);
     } catch {
     }
-  }
-}
-
-export function getDraftChannelMode(store: Store, id: string): ChannelMode {
-  const memory = memoryFor(store, channelModesByStore, fallbackChannelModes);
-  if (memory.has(id)) return memory.get(id)!;
-  const mode = read(store, CHANNEL_MODES_KEY)[id] === "goal" ? "goal" : "chat";
-  memory.set(id, mode);
-  return mode;
-}
-
-export function setDraftChannelMode(store: Store, id: string, mode: ChannelMode): void {
-  memoryFor(store, channelModesByStore, fallbackChannelModes).set(id, mode);
-  const modes = read(store, CHANNEL_MODES_KEY);
-  if (mode === "goal") modes[id] = mode;
-  else delete modes[id];
-  try {
-    store?.setItem(CHANNEL_MODES_KEY, JSON.stringify(modes));
-  } catch {
   }
 }
 
@@ -293,7 +268,6 @@ export function restoreComposerDraft(id: string, draft: DraftRestore): void {
   const store = getStore();
   setDraft(store, id, draft.text);
   setDraftAttachments(store, id, draft.attachments);
-  setDraftChannelMode(store, id, draft.channelMode ?? "chat");
   for (const listener of restoreListeners.get(id) ?? []) listener(draft);
 }
 
@@ -304,7 +278,6 @@ export function appendComposerDraft(id: string, text: string): void {
   restoreComposerDraft(id, {
     text: current ? `${current}\n\n${text}` : text,
     attachments: getDraftAttachments(store, id),
-    channelMode: getDraftChannelMode(store, id),
   });
 }
 
@@ -315,7 +288,6 @@ export function prependComposerDraft(id: string, text: string): void {
   restoreComposerDraft(id, {
     text: current.trim() ? `${text}\n\n${current}` : text,
     attachments: getDraftAttachments(store, id),
-    channelMode: getDraftChannelMode(store, id),
   });
 }
 
@@ -418,7 +390,6 @@ export function recoverFailedComposerSend(sent: ComposerSendSnapshot): "restored
       requestText: sent.requestText,
       replyToId: sent.replyToId,
       threadId: sent.threadId,
-      channelMode: sent.channelMode,
     });
     return "outbox";
   }
@@ -426,7 +397,6 @@ export function recoverFailedComposerSend(sent: ComposerSendSnapshot): "restored
   restoreComposerDraft(sent.draftId, {
     text: sent.text,
     attachments: sent.attachments,
-    channelMode: sent.channelMode,
   });
   // The response may have vanished after the server accepted it: the next Send reuses this identity.
   const retry = { sendId: sent.sendId, requestText: sent.requestText };
@@ -464,22 +434,6 @@ function getStore(): Store {
   } catch {
     return undefined;
   }
-}
-
-export function useComposerChannelMode(id: string): [ChannelMode, (next: SetStateAction<ChannelMode>) => void] {
-  const store = getStore();
-  const [mode, setMode] = useState(() => getDraftChannelMode(store, id));
-  useEffect(() => {
-    const unsubscribe = subscribeToDraftRestores(id, () => setMode(getDraftChannelMode(store, id)));
-    setMode(getDraftChannelMode(store, id));
-    return unsubscribe;
-  }, [id, store]);
-  const set = useCallback((next: SetStateAction<ChannelMode>) => {
-    const value = typeof next === "function" ? next(getDraftChannelMode(store, id)) : next;
-    setDraftChannelMode(store, id, value);
-    setMode(value);
-  }, [id, store]);
-  return [mode, set];
 }
 
 export function useDraft(id: string, legacyId?: string): [string, (next: string) => void] {

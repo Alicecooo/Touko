@@ -32,7 +32,7 @@ export function isStatusActivity(message: Message): boolean {
 export function isToolStep(message: Message): message is Message & { tool: NonNullable<Message["tool"]> } {
   const tool = message.tool;
   if (message.kind !== "activity" || !tool) return false;
-  if (message.comm || message.threadRef || isStatusActivity(message)) return false;
+  if (message.threadRef || isStatusActivity(message)) return false;
   return failedTurnCause(tool.name) === null;
 }
 
@@ -91,23 +91,6 @@ function assistantTurnFolds(messages: Message[]): {
   });
 
   return { byAnchorId, hiddenIds };
-}
-
-export function roomTurnFolds(messages: Message[]): {
-  byTerminalId: Map<string, TurnFold>;
-  hiddenIds: Set<string>;
-} {
-  const { byAnchorId, hiddenIds } = assistantTurnFolds(messages);
-  const terminals = new Map<string, string>();
-  for (const message of messages) {
-    if (message.role === "bot" && message.kind === "text" && message.turnId && message.turnTerminal) terminals.set(message.turnId, message.id);
-  }
-  const byTerminalId = new Map<string, TurnFold>();
-  for (const fold of byAnchorId.values()) {
-    const terminalId = terminals.get(fold.turnId);
-    if (terminalId) byTerminalId.set(terminalId, fold);
-  }
-  return { byTerminalId, hiddenIds };
 }
 
 function group(messages: Message[], foldAssistantTurns: boolean): TranscriptItem[] {

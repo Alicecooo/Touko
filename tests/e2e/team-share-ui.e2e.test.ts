@@ -40,7 +40,7 @@ describe("Share team in the real renderer", () => {
     const api = (path: string, method = "GET", body?: unknown) => request(path, { method, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }, info.url);
     const control = (...args: string[]) => runControlOmb([...args, "--url", info.url]) as Promise<Record<string, any>>;
 
-    await api(`/api/bots/${info!.botId}`, "PATCH", { section: "Sales desk", chiefOfStaff: true, soul: "Lead the desk. The portal password=UiFixture-Secret-1 stays private.\n" });
+    await api(`/api/bots/${info!.botId}`, "PATCH", { section: "Sales desk", chiefOfStaff: true, description: "Lead the desk. The portal password=UiFixture-Secret-1 stays private.\n" });
     const scout = (await control("new-bot", "--name", "Scout", "--section", "Sales desk")).bot;
     await api(`/api/section-context?section=${encodeURIComponent("Sales desk")}`, "PUT", { text: "Quote list prices only." });
     await api(`/api/bots/${scout.id}/skill-template`, "POST", { name: "research-brief", description: "Write a prospect brief.", source: "fixture",

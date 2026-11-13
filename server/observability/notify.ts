@@ -1,5 +1,4 @@
 import type { Notification, NotifyKind } from "../../shared/notification.ts";
-import { personMentionExcerpt } from "../../shared/person-mention.ts";
 
 export type { Notification, NotifyKind } from "../../shared/notification.ts";
 
@@ -28,12 +27,12 @@ export function buildNotification(
   bot: NotifyBot,
   threadId: string,
   detail: string,
-  extra?: { avatarUrl?: string; group?: { id: string; name: string }; site?: string },
+  extra?: { avatarUrl?: string; site?: string },
 ): Notification | null {
   if (bot.notifications === false) return null;
 
   const body = summarize(detail);
-  const who = extra?.group ? `${bot.name} in ${extra.group.name}` : bot.name;
+  const who = bot.name;
   const title =
     kind === "approval"
       ? `${who} needs approval`
@@ -59,32 +58,5 @@ export function buildNotification(
 
   const notification: Notification = { kind, botId: bot.id, botName: bot.name, threadId, title, body };
   if (extra?.avatarUrl) notification.avatarUrl = extra.avatarUrl;
-  if (extra?.group) notification.groupId = extra.group.id;
   return notification;
-}
-
-type MentionSource = {
-  activePath(threadId: string): readonly { role: string; kind: string; text?: string; turnId?: string; from?: { botId: string } }[];
-  bot(id: string): { name: string; hidden?: boolean } | null | undefined;
-};
-
-export function buildMentionNotification(
-  source: MentionSource,
-  bot: Omit<NotifyBot, "threadId"> & { avatarUrl?: string },
-  room: { id: string; name: string; dm?: boolean; memberIds: readonly string[] },
-  turn: { threadId: string; turnId?: string; reply: string; profileName?: string },
-): Notification | null {
-  if (room.dm) return null;
-  const texts = turn.turnId
-    ? source.activePath(turn.threadId).filter((m) => m.role === "bot" && m.kind === "text" && m.turnId === turn.turnId && m.from?.botId === bot.id).map((m) => m.text ?? "")
-    : [turn.reply];
-  const botNames = room.memberIds.flatMap((id) => {
-    const member = source.bot(id);
-    return member && !member.hidden ? [member.name] : [];
-  });
-  for (const text of texts) {
-    const excerpt = personMentionExcerpt(text, { profileName: turn.profileName, botNames });
-    if (excerpt) return buildNotification("mention", { ...bot, threadId: turn.threadId }, turn.threadId, excerpt, { avatarUrl: bot.avatarUrl, group: room });
-  }
-  return null;
 }

@@ -1,7 +1,5 @@
 // Who may see a bot on a shared workspace: absent/"everyone", "admins", or { people: [...] } plus admins. Access control,
-// not an approval gate; the owner, a session-less local service and admin sessions see everything. A member sees a room
-// only when they can see every bot in it, and bots reach each other only with the same audience (sameAudience): a room
-// transcript or a delegation would otherwise carry a restricted bot's words to people who cannot see it.
+// not an approval gate; the owner, a session-less local service and admin sessions see everything.
 import { z } from "zod";
 import { parsePortraitAssetName } from "../../shared/portrait-avatars.ts";
 
@@ -104,11 +102,6 @@ export function audienceEquals(a: unknown, b: unknown): boolean {
   return sameAudience(a, b);
 }
 
-/** Only when everyone who can see the bot can see every bot in the room; otherwise recall leaks a restricted bot's room words. */
-export function roomFeeds(memberVisibilities: readonly unknown[], botVisibility: unknown): boolean {
-  return memberVisibilities.every((visibility) => audienceWithin(botVisibility, visibility));
-}
-
 export interface VisibilityBot {
   id: string;
   threadId: string;
@@ -120,15 +113,11 @@ export interface VisibilityBot {
 
 export interface VisibilityGroup {
   id: string;
-  threadId: string;
   memberIds: readonly string[];
   section?: string;
-  tasks?: ReadonlyArray<{ threadId: string }>;
-  /** The narrowest audience the room has had: a bot leaving never widens it, only an admin's explicit reset. */
-  audienceFloor?: unknown;
 }
 
-export type ThreadOwner = { bot: string; group?: undefined } | { group: string; bot?: undefined };
+export type ThreadOwner = { bot: string };
 
 export class VisibleSet {
   readonly everything: boolean;
@@ -147,7 +136,7 @@ export class VisibleSet {
   ) {
     this.viewer = viewer;
     this.everything = viewer.kind === "all" ||
-      (!bots.some((bot) => isRestricted(bot.visibility)) && !groups.some((group) => isRestricted(group.audienceFloor)));
+      !bots.some((bot) => isRestricted(bot.visibility));
     this.ownerOf = ownerOf ?? ((threadId) => this.indexedOwner(threadId));
     if (this.everything) return;
     for (const bot of bots) this.bots.set(bot.id, bot);
@@ -170,15 +159,14 @@ export class VisibleSet {
     const group = this.groups.get(id);
     if (!group) return false;
     const members = group.memberIds.filter((member) => this.bots.has(member));
-    return members.length > 0 && members.every((member) => this.bot(member)) && viewerSees(this.viewer, group.audienceFloor);
+    return members.length > 0 && members.length === group.memberIds.length && members.every((member) => this.bot(member));
   }
 
   /** An unknown thread is not visible. */
   thread(threadId: string): boolean {
     if (this.everything) return true;
     const owner = this.ownerOf(threadId);
-    if (!owner) return false;
-    return owner.bot !== undefined ? this.bot(owner.bot) : this.group(owner.group);
+    return owner ? this.bot(owner.bot) : false;
   }
 
   private indexedOwner(threadId: string): ThreadOwner | undefined {
@@ -187,10 +175,6 @@ export class VisibleSet {
       for (const bot of this.bots.values()) {
         threads.set(bot.threadId, { bot: bot.id });
         for (const task of bot.tasks ?? []) threads.set(task.threadId, { bot: bot.id });
-      }
-      for (const group of this.groups.values()) {
-        if (!threads.has(group.threadId)) threads.set(group.threadId, { group: group.id });
-        for (const task of group.tasks ?? []) if (!threads.has(task.threadId)) threads.set(task.threadId, { group: group.id });
       }
       this.threads = threads;
     }
@@ -283,13 +267,6 @@ export function memberBot<T extends object>(bot: T, visible: VisibleSet): T {
   return { ...rest, ...(peers ? { peers } : {}) } as T;
 }
 
-/** A room as a member receives it: without its audience floor. */
-export function memberGroup<T extends object>(group: T): T {
-  if (!("audienceFloor" in group)) return group;
-  const { audienceFloor: _floor, ...rest } = group as T & { audienceFloor?: unknown };
-  return rest as T;
-}
-
 export function memberBody(body: unknown, visible: VisibleSet): unknown {
   if (visible.everything || !body || typeof body !== "object" || Array.isArray(body)) return body;
   const narrow = (value: unknown, depth: number): unknown => {
@@ -301,9 +278,6 @@ export function memberBody(body: unknown, visible: VisibleSet): unknown {
       if (key === "bot" && child && typeof child === "object" && !Array.isArray(child)) next = memberBot(child, visible);
       else if (key === "bots" && Array.isArray(child)) {
         next = child.map((bot) => (bot && typeof bot === "object" ? memberBot(bot as object, visible) : bot));
-      } else if (key === "group" && child && typeof child === "object" && !Array.isArray(child)) next = memberGroup(child);
-      else if (key === "groups" && Array.isArray(child)) {
-        next = child.map((group) => (group && typeof group === "object" ? memberGroup(group as object) : group));
       } else if (depth > 0 && key !== "messages" && child && typeof child === "object" && !Array.isArray(child)) next = narrow(child, depth - 1);
       if (next !== child) (out ??= { ...record })[key] = next;
     }
@@ -357,9 +331,9 @@ export function frameForMember(payload: Record<string, unknown>, ctx: FrameConte
       if (!seen.groups.has(id)) {
         seen.groups.add(id);
         const fresh = ctx.freshGroup(id);
-        if (fresh) return { ...payload, group: memberGroup({ ...fresh, ...group }) };
+        if (fresh) return { ...payload, group: { ...fresh, ...group } };
       }
-      return "audienceFloor" in group ? { ...payload, group: memberGroup(group) } : payload;
+      return payload;
     }
     case "group.deleted":
       return seen.groups.delete(str(payload.groupId)) ? payload : undefined;

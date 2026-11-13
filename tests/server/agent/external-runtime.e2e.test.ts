@@ -155,8 +155,6 @@ describe("a bot's external runtime", () => {
       for (const [method, path, body] of [
         ["POST", "/api/internal/threads", { fromBotId: runtime.id, fromThreadId: runtime.threadId, title: "Side quest", message: "go" }],
         ["POST", "/api/internal/create-bot", { fromBotId: runtime.id, name: "Minion" }],
-        ["POST", "/api/internal/create-room", { fromBotId: runtime.id, name: "War room" }],
-        ["POST", "/api/internal/post-to-room", { groupId: "none", message: "all hands" }],
         ["POST", "/api/internal/skills/stage", { name: "x" }],
         ["GET", "/api/internal/memory", undefined],
       ] as const) {
@@ -200,25 +198,23 @@ describe("a bot's external runtime", () => {
     }
   });
 
-  it("pins a configured thread across sidebar selection and refuses deleted bindings", async () => {
+  it("refuses absent, mismatched or deleted thread bindings", async () => {
     const runtime = await createBot("Pinned gateway");
     const peer = await createBot("Pinned peer");
     try {
       writeFileSync(runtimesFile(), JSON.stringify({ [runtime.id]: { token: TOKEN, threadId: runtime.threadId } }), { mode: 0o600 });
-      const sibling = await api("POST", `/api/bots/${runtime.id}/tasks`, { title: "Other work" });
-      expect(sibling.status).toBe(201);
-      expect((await botState(runtime.id)).threadId).toBe(sibling.body.task.threadId);
+      expect((await api("POST", `/api/bots/${runtime.id}/tasks`, { title: "Other work" })).status).toBe(410);
+      expect((await botState(runtime.id)).threadId).toBe(runtime.threadId);
       expect((await asRuntime("GET", `/api/internal/agents?fromThreadId=${runtime.threadId}`)).status).toBe(200);
-      expect((await asRuntime("GET", `/api/internal/agents?fromThreadId=${sibling.body.task.threadId}`)).status).toBe(403);
+      expect((await asRuntime("GET", `/api/internal/agents?fromThreadId=${peer.threadId}`)).status).toBe(403);
       // A bare token cannot identify a stable conversation.
       writeFileSync(runtimesFile(), JSON.stringify({ [runtime.id]: TOKEN }));
       expect((await asRuntime("GET", "/api/internal/agents")).status).toBe(401);
       writeFileSync(runtimesFile(), JSON.stringify({ [runtime.id]: { token: TOKEN, threadId: peer.threadId } }));
       expect((await asRuntime("GET", "/api/internal/agents")).status).toBe(401);
-      writeFileSync(runtimesFile(), JSON.stringify({ [runtime.id]: { token: TOKEN, threadId: runtime.threadId } }));
-      expect((await api("DELETE", `/api/bots/${runtime.id}/tasks/${runtime.threadId}`)).status).toBe(200);
+      writeFileSync(runtimesFile(), JSON.stringify({ [runtime.id]: { token: TOKEN, threadId: "deleted-thread" } }));
       expect((await asRuntime("GET", "/api/internal/agents")).status).toBe(401);
-      expect((await botState(runtime.id)).threadId).toBe(sibling.body.task.threadId);
+      expect((await botState(runtime.id)).threadId).toBe(runtime.threadId);
     } finally {
       for (const bot of [runtime, peer]) await api("DELETE", `/api/bots/${bot.id}`);
     }
@@ -239,10 +235,10 @@ describe("a bot's external runtime", () => {
       await expect.poll(() => rows().find((row) => row.id === requestId)?.threadId, { timeout: 15_000 }).toEqual(expect.any(String));
       const child = rows().find((row) => row.id === requestId)!;
       expect(child.threadId).not.toBe(peer.threadId);
-      let line: { text?: string; from?: { botId: string }; roomRequest?: { phase: string } } | undefined;
+      let line: { text?: string; from?: { botId: string }; peerRequest?: { phase: string } } | undefined;
       await expect.poll(async () => {
         const messages = (await api("GET", `/api/threads/${child.threadId}/messages`)).body.messages as Array<typeof line>;
-        line = messages.find((message) => message?.roomRequest?.phase === "request" && message.text?.includes("RUNTIME_TASK"));
+        line = messages.find((message) => message?.peerRequest?.phase === "request" && message.text?.includes("RUNTIME_TASK"));
         return Boolean(line);
       }, { timeout: 15_000 }).toBe(true);
       expect(line!.from).toMatchObject({ botId: runtime.id });

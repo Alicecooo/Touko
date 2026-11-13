@@ -37,7 +37,6 @@ function messageText(message: Message): string {
   if (message.kind === "secret") parts.push("[Secret request — not restored]");
   if (message.kind === "signin") parts.push("[Sign-in request — not restored]");
   if (message.routineRun) parts.push(`[Routine: ${message.routineRun.routineName} — ${message.routineRun.status}]`, message.routineRun.summary ?? "", message.routineRun.error ?? "");
-  if (message.goalRun) parts.push(`[Room goal: ${message.goalRun.status}]`, message.goalRun.goal, message.goalRun.detail ?? "");
   if (message.kind === "screen" || message.attachments?.length) parts.push("[Image or attachment — file not included in this backup]");
   return parts.filter(Boolean).join("\n");
 }
@@ -75,7 +74,7 @@ export function createTeamBackup(store: Store, routines: Routine[], name: string
   });
   const validRoutines = routines.filter((routine) => {
     const valid = botIds.has(routine.botId);
-    if (!valid) warnings.push(`Routine “${routine.name}” is not included because its bot, room or coordinator was deleted.`);
+    if (!valid) warnings.push(`Routine “${routine.name}” is not included because its bot was deleted.`);
     return valid;
   });
   const document = parseTeamBackup({
@@ -178,7 +177,7 @@ export function importTeamBackup(store: Store, routines: RoutineManager, input: 
       source.tasks.forEach((task, i) => restore(task, tasks[i].threadId));
     }
     for (const source of backup.groups) {
-      const group = store.createGroup(takeImportName(source.name, takenGroups), source.memberIds.map((id) => botIds.get(id)!), false, sectionFor(source.section));
+      const group = store.createGroup(takeImportName(source.name, takenGroups), source.memberIds.map((id) => botIds.get(id)!), sectionFor(source.section));
       groups.push(group);
       store.patchGroup(group.id, { section: sectionFor(source.section) });
     }

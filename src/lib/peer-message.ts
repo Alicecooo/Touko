@@ -36,10 +36,10 @@ export function peerLine(message: Pick<Message, "role" | "text" | "peerAsk">): P
 }
 
 export function peerRequest(
-  message: Pick<Message, "role" | "text" | "from" | "roomRequest">,
+  message: Pick<Message, "role" | "text" | "from" | "peerRequest">,
   threadBotId: string,
 ): PeerLine | null {
-  if (message.role !== "bot" || message.roomRequest?.phase !== "request") return null;
+  if (message.role !== "bot" || message.peerRequest?.phase !== "request") return null;
   const from = message.from;
   if (!from?.name || from.botId === threadBotId) return null;
   return { botId: from.botId, name: from.name, delivery: "coordinate_bots", body: message.text ?? "" };

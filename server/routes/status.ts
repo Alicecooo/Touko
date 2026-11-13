@@ -18,7 +18,7 @@ import type { ConfigStatus } from "./config.ts";
 import { PASS, type RouteHandler } from "./table.ts";
 
 export interface StatusRouteDeps {
-  store: Pick<Store, "bot" | "bots" | "tasks" | "groupByThread">;
+  store: Pick<Store, "bot" | "bots" | "tasks">;
   cfg: AppConfig;
   outboundCounts: Pick<OutboundCounts, "today">;
   staticDir: string | null;
@@ -80,9 +80,7 @@ export function createStatusRoutes(deps: StatusRouteDeps): RouteHandler {
     m = path.match(/^\/api\/threads\/([\w-]+)\/events$/);
     if (m && method === "GET") {
       const threadId = m[1];
-      const known =
-        store.bots.some((b) => store.tasks(b.id).some((t) => t.threadId === threadId)) ||
-        Boolean(store.groupByThread(threadId));
+      const known = store.bots.some((b) => store.tasks(b.id).some((t) => t.threadId === threadId));
       if (!known) return json(res, 404, { error: "no such thread" });
       const rawLimit = url.searchParams.get("limit");
       const parsedLimit = rawLimit === null ? undefined : Number(rawLimit);

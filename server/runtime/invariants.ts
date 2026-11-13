@@ -101,7 +101,7 @@ export function checkInvariants(store: RuntimeStore, live: { running: Set<string
   for (const [parentId, siblings] of childrenOf) {
     const seen = new Map<string, number>();
     for (const c of siblings) {
-      const key = JSON.stringify([c.brief, c.mode, c.assignee.botId, c.assignee.destination.threadId, c.assignee.destination.groupId ?? ""]);
+      const key = JSON.stringify([c.brief, c.mode, c.assignee.botId, c.assignee.destination.threadId]);
       const count = seen.get(key) ?? 0;
       if (count > 0 && !c.rework) problems.push(`I3 ${c.id}: the same brief under ${parentId} without rework`);
       seen.set(key, count + 1);

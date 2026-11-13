@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 if (!process.env.OMB_DATA_DIR) {
   const repository = dirname(dirname(fileURLToPath(import.meta.url)));
   const developmentRoot = join(repository, "..", "dev-env");
-  if (existsSync(developmentRoot)) process.env.OMB_DATA_DIR = join(developmentRoot, ".runtime", "openmausbot");
+  if (existsSync(developmentRoot)) process.env.OMB_DATA_DIR = join(developmentRoot, ".runtime", "touko");
 }
 
 process.env.OMB_DEV_TRUST_LOCAL_BROWSER ??= "1";

@@ -4,8 +4,8 @@ import { existsSync, linkSync, mkdirSync, readFileSync, renameSync, unlinkSync, 
 import { hostname, uptime } from "node:os";
 import { join } from "node:path";
 
-const LEASE_NAME = "openmausbot-server.lease";
-const DELEGATED_CHILD_DIR = ".openmausbot-server-child";
+const LEASE_NAME = "touko-server.lease";
+const DELEGATED_CHILD_DIR = ".touko-server-child";
 // Internal parent-to-child capability, obtained only from utilityServerLeaseEnvironment(); never public configuration.
 const CHILD_LEASE_ENV = "OPENMAUSBOT_INTERNAL_DATA_DIR_LEASE";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -294,13 +294,20 @@ function validateDataDir(dataDir) {
 
 function prepareDataDir(dataDir, legacyDataDir) {
   validateDataDir(dataDir);
-  if (legacyDataDir !== undefined) {
-    validateDataDir(legacyDataDir);
+  const legacyDataDirs = legacyDataDir === undefined ? [] : Array.isArray(legacyDataDir) ? legacyDataDir : [legacyDataDir];
+  for (const candidate of legacyDataDirs) validateDataDir(candidate);
+  if (legacyDataDirs.length) {
     // Before acquiring: creating the new directory first would turn the one-time legacy rename into a no-op.
-    if (!existsSync(dataDir) && existsSync(legacyDataDir)) {
-      try {
-        renameSync(legacyDataDir, dataDir);
-      } catch {
+    if (!existsSync(dataDir)) {
+      for (const candidate of legacyDataDirs) {
+        if (!existsSync(candidate)) continue;
+        try {
+          renameSync(candidate, dataDir);
+          break;
+        } catch (error) {
+          if (existsSync(dataDir)) break;
+          throw leaseError(`OpenMausBot could not migrate its existing data from ${JSON.stringify(candidate)}.`, error);
+        }
       }
     }
   }
@@ -465,7 +472,10 @@ function acquireDataDirLeaseInternal(dataDir, options = {}) {
 }
 
 export function acquireDataDirLease(dataDir, options = {}) {
-  return acquireDataDirLeaseInternal(dataDir, options);
+  const normalizedOptions = options.legacyDataDirs === undefined
+    ? options
+    : { ...options, legacyDataDir: options.legacyDataDirs };
+  return acquireDataDirLeaseInternal(dataDir, normalizedOptions);
 }
 
 export function acquireDataDirLeaseForProcess(dataDir, environment = process.env) {

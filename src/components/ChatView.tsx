@@ -590,27 +590,9 @@ function PeerLabel({ peer }: { peer: PeerLine }) {
 }
 
 const ActivityChip = memo(function ActivityChip({ message, place = "auto" }: { message: Message; place?: EffectivePlace }) {
-  const { bots, dispatch } = useChatRows();
   const tool = message.tool;
   if (!tool) return null;
   if (message.threadRef) return <ThreadChip message={message} />;
-  const comm = message.comm;
-  if (comm) {
-    const withBot = bots.find((b) => b.id === comm.withBotId);
-    return (
-      <div className="flex justify-start">
-        <button
-          onClick={() => dispatch({ type: "select", id: comm.groupId })}
-          title={t("chat.openConversationWith", { name: comm.withName })}
-          className="ui-pill"
-        >
-          <BotAvatar bot={withBot ?? { name: comm.withName, color: comm.withColor }} size={16} />
-          <span className="max-w-[480px] truncate">{tool.name}</span>
-          <ChevronRight size={13} />
-        </button>
-      </div>
-    );
-  }
   return <ToolActivity tool={tool} place={toolPlace(tool.name, place)} />;
 });
 
@@ -783,7 +765,7 @@ const MessagesList = memo(function MessagesList({
                   />
                 );
               }
-              if (!showToolCalls && !m.comm && !m.threadRef) return null;
+              if (!showToolCalls && !m.threadRef) return null;
               return <ActivityChip message={m} place={place} />;
             }
             case "digest":
@@ -1051,7 +1033,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
     <main className="relative flex h-full min-w-0 flex-1 flex-col bg-app">
       
       <GlassScrollFrame className="flex-1 [--glass-tint:var(--color-app)]">
-      {/* z-[25]: above the room set-up card (z-20), below the CallOverlay (z-30). */}
+      {/* Keep the header above the call overlay while it is open. */}
       <GlassBar edge="top" className="z-[25]">
       <div
         {...headerDragProps}

@@ -39,7 +39,7 @@ async function launch() {
   return { fixture, url, dataDir, api, cli, wire, tasks, stamps, thread, idle, said, replied, finished };
 }
 
-it("stamps askedAt where a person writes, never for a routine, start_thread, a teammate's hand-off or a Slack relay", async () => {
+it("stamps askedAt where a person writes, never for a routine, a teammate's hand-off or a Slack relay", async () => {
   const { fixture, dataDir, api, cli, wire, stamps, thread, idle, said, replied, finished } = await launch();
   try {
     // One turn at a time per bot, each step settling first, so every turn meets its own scripted entry.
@@ -48,8 +48,7 @@ it("stamps askedAt where a person writes, never for a routine, start_thread, a t
     const { bot: teammate } = await cli("new-bot", "--name", "Teammate");
     writeFileSync(join(dataDir, "room-plan.json"), JSON.stringify({
       [bot.id]: { turns: [
-        { steps: [{ tool: "start_thread", arguments: { title: "Side job", message: "Check the side job." } }], reply: "Opened a side job." },
-        { reply: "Side job checked." },
+        { reply: "Main request checked." },
         { reply: "Relayed line handled." },
         { reply: "Routine report." },
         { reply: "Hand-off done." },
@@ -59,17 +58,17 @@ it("stamps askedAt where a person writes, never for a routine, start_thread, a t
       ] },
     }));
     const first = bot.activeTaskId as string;
-    await cli("send", "--bot", bot.id, "--task", first, "--text", "Open a side job.");
-    const side = await thread(bot.id, "Side job");
-    await replied(bot.id, side.threadId, "Side job checked.");
+    await cli("send", "--bot", bot.id, "--task", first, "--text", "Handle the main request.");
+    await replied(bot.id, first, "Main request checked.");
     const asked = stamps(bot.id);
     expect(asked).toEqual({ [first]: expect.any(Number) });
-    expect(side.openedBy).toMatchObject({ botId: bot.id });
 
     // Slack's worker relays a person's line through the guarded route.
-    const { task: relayed } = await api("POST", `/api/bots/${bot.id}/tasks`, { title: "From Slack", approvalMode: "ask" }, 201);
+    const relayed = { threadId: first };
+    await api("PATCH", `/api/bots/${bot.id}/tasks/${relayed.threadId}`, { approvalMode: "ask" });
     await api("POST", `/api/bots/${bot.id}/messages/guarded`, {
-      threadId: relayed.threadId, sendId: randomUUID(), text: "Sent from Slack.", expectedActiveLeafId: null,
+      threadId: relayed.threadId, sendId: randomUUID(), text: "Sent from Slack.",
+      expectedActiveLeafId: (await api("GET", `/api/threads/${relayed.threadId}/messages?limit=1`)).activeLeafId,
     }, 202);
     await replied(bot.id, relayed.threadId, "Relayed line handled.");
     expect(await said(relayed.threadId)).toContain("relayed: Sent from Slack.");
@@ -88,7 +87,7 @@ it("stamps askedAt where a person writes, never for a routine, start_thread, a t
     await replied(bot.id, handoff.threadId, "Hand-off done.");
     await idle(teammate.id);
     const handed = (await api("GET", `/api/threads/${handoff.threadId}/messages?limit=50`)).messages as any[];
-    expect(handed.some((message) => message.from?.botId === teammate.id && message.roomRequest?.phase === "request" && String(message.text).includes("Take this over."))).toBe(true);
+    expect(handed.some((message) => message.from?.botId === teammate.id && message.peerRequest?.phase === "request" && String(message.text).includes("Take this over."))).toBe(true);
     expect(handed.filter((message) => message.role === "user")).toEqual([]);
     expect(handoff.openedBy).toMatchObject({ botId: teammate.id });
 
@@ -111,10 +110,8 @@ it("moves no main thread for a teammate's work or results or a team incident; re
     await api("PATCH", `/api/bots/${chief.id}`, { chiefOfStaff: true });
     writeFileSync(join(dataDir, "room-plan.json"), JSON.stringify({
       [asker.id]: { script: [
-        { key: "open", match: ["Open a side job that asks Teammate."],
-          steps: [{ tool: "start_thread", arguments: { title: "Side job", message: "Ask Teammate to check the books." } }], reply: "Opened a side job." },
         { key: "ask", match: ["Ask Teammate to check the books."], steps: [{ arguments: { bot_ids: [teammate.id], message: "BOOKS: check the books." } }], reply: "Asked Teammate." },
-        { key: "review", match: ["Your downstream room requests have settled."], reply: "Side job done: the books balance." },
+        { key: "review", match: ["Your downstream teammate requests have settled."], reply: "The books balance." },
       ] },
       [teammate.id]: { script: [
         { key: "books", match: ["BOOKS: check the books."], reply: "The books balance." },
@@ -123,9 +120,8 @@ it("moves no main thread for a teammate's work or results or a team incident; re
       [chief.id]: { script: [{ key: "incident", match: ["Incident report"], reply: "Incident noted." }] },
     }));
 
-    await cli("send", "--bot", asker.id, "--task", asker.activeTaskId, "--text", "Open a side job that asks Teammate.");
-    const side = await thread(asker.id, "Side job");
-    await replied(asker.id, side.threadId, "Side job done: the books balance.");
+    await cli("send", "--bot", asker.id, "--task", asker.activeTaskId, "--text", "Ask Teammate to check the books.");
+    await replied(asker.id, asker.activeTaskId, "The books balance.");
     const work = (await tasks(teammate.id)).find((task) => task.openedBy?.kind === "work");
     expect(await said(work.threadId)).toContain("The books balance.");
     await idle(teammate.id);
@@ -140,7 +136,7 @@ it("moves no main thread for a teammate's work or results or a team incident; re
     expect((await wire(asker.id)).mainThreadId).toBe(asker.activeTaskId);
     expect((await wire(teammate.id)).mainThreadId).toBe(teammate.activeTaskId);
     expect((await wire(chief.id)).mainThreadId).toBe(chief.activeTaskId);
-    expect((await tasks(asker.id)).find((task) => task.threadId === side.threadId).unread).toBe(true);
+    expect((await tasks(asker.id)).find((task) => task.threadId === asker.activeTaskId).unread).toBe(true);
     expect((await tasks(chief.id)).find((task) => task.threadId === incidents.threadId).unread).toBe(true);
   } finally {
     await fixture.close();
@@ -156,7 +152,7 @@ it("marks a job's review answer unread where it lands", async () => {
     writeFileSync(join(dataDir, "room-plan.json"), JSON.stringify({
       [asker.id]: { script: [
         { key: "ask", match: ["Ask Teammate to check the books."], steps: [{ arguments: { bot_ids: [teammate.id], message: "BOOKS: check the books." } }], reply: "Asked Teammate." },
-        { key: "review", match: ["Your downstream room requests have settled."], gateFile: gate, reply: "Reviewed: the books balance." },
+        { key: "review", match: ["Your downstream teammate requests have settled."], gateFile: gate, reply: "Reviewed: the books balance." },
       ] },
       [teammate.id]: { script: [{ key: "books", match: ["BOOKS: check the books."], reply: "The books balance." }] },
     }));

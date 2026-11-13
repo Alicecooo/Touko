@@ -243,21 +243,6 @@ export const TOOLS: McpToolDefinition[] = [
     annotations: MUTATING,
   },
   {
-    name: "create_task",
-    description: "Create and activate a fresh conversation task for a bot.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        target_type: { const: "bot" },
-        target_id: { type: "string" },
-        title: { type: "string", description: "Optional task title." },
-      },
-      required: ["target_type", "target_id"],
-      additionalProperties: false,
-    },
-    annotations: ADDITIVE,
-  },
-  {
     name: "switch_task",
     description: "Select an existing bot task.",
     inputSchema: {
@@ -824,23 +809,6 @@ export async function handleToolCall(
         throw new Error("OpenMausBot did not return the updated bot");
       }
       return { success: true, bot: projectBot(result.bot) };
-    }
-
-    case "create_task": {
-      const targetId = idArg(args, "target_id");
-      const title = optionalStringArg(args, "title", { max: 80 });
-      const route = taskRoute(args.target_type, targetId);
-      const result = await fetcher(route, { method: "POST", body: JSON.stringify(title ? { title } : {}) });
-      if (!isRecord(result?.task) || typeof result.task.threadId !== "string") {
-        throw new Error("OpenMausBot did not return the created task");
-      }
-      const activeTaskId = result.bot?.threadId ?? result.task?.threadId;
-      return {
-        success: true,
-        targetType: args.target_type,
-        targetId,
-        task: projectTask(result.task, activeTaskId),
-      };
     }
 
     case "switch_task": {

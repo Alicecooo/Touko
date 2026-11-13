@@ -6,21 +6,8 @@ import { withoutExpired, withoutSuperseded } from "./memory-entries.ts";
 import { join } from "node:path";
 
 type RecallOwner = { id: string; threadId: string; tasks?: readonly { threadId: string }[] };
-type RecallRoom = { threadId: string; memberIds: readonly string[]; tasks?: readonly { threadId: string }[] };
-
-/** A room that feeds fewer people than the bot stays out, or its lines would reach them. */
-export function recallRooms<Room extends RecallRoom, Bot extends RecallOwner>(rooms: Iterable<Room>, bot: Bot, feeds: (room: Room, bot: Bot) => boolean): Map<string, Room> {
-  const byThread = new Map<string, Room>();
-  for (const room of rooms) {
-    if (!room.memberIds.includes(bot.id) || !feeds(room, bot)) continue;
-    byThread.set(room.threadId, room);
-    for (const task of room.tasks ?? []) byThread.set(task.threadId, room);
-  }
-  return byThread;
-}
-
-export function recallThreadIds(bot: RecallOwner, rooms: ReadonlyMap<string, unknown>): string[] {
-  return [...new Set([bot.threadId, ...(bot.tasks ?? []).map((task) => task.threadId), ...rooms.keys()])];
+export function recallThreadIds(bot: RecallOwner): string[] {
+  return [...new Set([bot.threadId, ...(bot.tasks ?? []).map((task) => task.threadId)])];
 }
 
 export const RECALL_MIN_CHARS = 8;
@@ -105,7 +92,7 @@ export function renderRecall(passages: readonly RecallPassage[], maxChars = RECA
 export interface RecallInput {
   botId: string;
   message: string;
-  /** Empty when conversations must not be searched (rooms or peer turns). */
+  /** Empty when conversation recall is disabled. */
   threadIds: readonly string[];
   label: (threadId: string) => string;
   author: (hit: RecallHit) => string;

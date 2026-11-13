@@ -425,7 +425,6 @@ export function Composer({
           requestText: failed.requestText,
           replyToId: failed.replyToId,
           threadId: failed.threadId,
-          channelMode: failed.channelMode,
         });
       },
     };
@@ -455,7 +454,6 @@ export function Composer({
       reply: replyTo ?? null,
       replyToId: replyTo?.id,
       threadId,
-      channelMode: undefined,
     };
     if (bot) {
       dispatch({
@@ -659,7 +657,7 @@ export function Composer({
                   )}
                   name={peer.name}
                   description={description || undefined}
-                  kind={peer.bot ? t("composer.mention.agent") : t("composer.mention.channel")}
+                  kind={t("composer.mention.agent")}
                 />
               );
             })}

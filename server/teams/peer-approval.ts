@@ -57,9 +57,6 @@ function settleCard(pending: Pending, behavior: string, source: "user" | "system
   const task = store.projectBotForTask(pending.fromBotId, pending.threadId);
   if (task) {
     if (task.activity === "waiting-on-you") store.setTaskActivity(task.id, pending.threadId, "working");
-  } else if (store.groupByThread(pending.threadId)) {
-    const waiting = store.bot(pending.fromBotId);
-    if (waiting?.activity === "waiting-on-you") store.setActivity(waiting.id, "working");
   }
 }
 
@@ -108,16 +105,12 @@ function pushApprovalCard(
 
 function announceCard(bus: ApprovalBus, from: BotRecord, card: Message, sourceThreadId: string): void {
   const task = bus.store.projectBotForTask(from.id, sourceThreadId);
-  const room = bus.store.groupByThread(sourceThreadId);
   if (task) {
     if (task.busy) bus.store.setTaskActivity(from.id, sourceThreadId, "waiting-on-you");
-  } else if (room && bus.store.bot(from.id)?.busy) {
-    bus.store.setActivity(from.id, "waiting-on-you");
   }
-  const group = room && !room.dm ? { id: room.id, name: room.name } : undefined;
   const title = card.card?.title ?? "";
   const detail = card.card?.subtitle ? `${title} — ${card.card.subtitle}` : title;
-  bus.notify?.(buildNotification("approval", from, sourceThreadId, detail, { avatarUrl: from.avatarUrl, group }));
+  bus.notify?.(buildNotification("approval", from, sourceThreadId, detail, { avatarUrl: from.avatarUrl }));
 }
 
 export function requestPeerApproval(
@@ -203,10 +196,6 @@ function peerCardThreads(bus: ApprovalBus): Set<string> {
   for (const bot of bus.store.bots) {
     threadIds.add(bot.threadId);
     for (const task of bot.tasks ?? []) threadIds.add(task.threadId);
-  }
-  for (const group of bus.store.groups) {
-    threadIds.add(group.threadId);
-    for (const task of group.tasks ?? []) threadIds.add(task.threadId);
   }
   return threadIds;
 }

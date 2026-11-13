@@ -18,7 +18,6 @@ export interface Incident {
   bot: IncidentBot;
   threadId: string;
   title?: string | null;
-  room?: string | null;
   detail: string;
   lastRequest?: string | null;
   lastReply?: string | null;
@@ -92,7 +91,7 @@ const fold = (text: string, max: number): string => {
 const ordinal = (n: number): string => (n === 1 ? "first" : n === 2 ? "second" : n === 3 ? "third" : `${n}th`);
 
 function whatHappened(incident: Incident): string {
-  const where = incident.room ? `in the room "${incident.room}"` : incident.title ? `in its thread #${fold(incident.title, 60)}` : "in its main conversation";
+  const where = incident.title ? `in its thread #${fold(incident.title, 60)}` : "in its main conversation";
   const detail = incident.detail ? `: "${fold(incident.detail, 240)}"` : "";
   switch (incident.kind) {
     case "stalled":

@@ -38,7 +38,7 @@ it.each(["already busy", "became busy during approval"])(
       const messages = async (threadId: string): Promise<any[]> => (await api("GET", `/api/threads/${threadId}/messages?limit=100`)).messages;
       const sourceCards = async () => (await messages(sourceThread)).filter(message => ["ask_bot", "delegate_bot"].includes(message.card?.tool));
       const peerRequests = async (threadId: string) => (await messages(threadId))
-        .filter(message => message.roomRequest?.phase === "request" && message.from?.botId === source.id);
+        .filter(message => message.peerRequest?.phase === "request" && message.from?.botId === source.id);
       const sourceState = async () => (await api("GET", "/api/bots?messages=0")).bots.find((bot: any) => bot.id === source.id);
       const receipt = (id: string) => api("GET", `/api/internal/assignment-status?id=${id}`, undefined, true);
       const row = (id: string) => readHandoffs(session.info.dataDir).find(node => node.id === id);
@@ -85,7 +85,9 @@ it.each(["already busy", "became busy during approval"])(
       expect(row(id)).toMatchObject({ botId: peer.id, mode: "consult", reply: "poll", approvalGranted: true });
       const workThread = row(id)!.threadId;
       expect(workThread).not.toBe(peerThread);
-      expect(await peerRequests(workThread)).toHaveLength(0);
+      const queuedRequests = await peerRequests(workThread);
+      expect(queuedRequests).toHaveLength(1);
+      expect(queuedRequests[0].text).toContain(requestText);
       expect((await sourceState()).busy).toBeFalsy();
       expect((await messages(sourceThread)).filter(message => message.role === "user")).toHaveLength(0);
       const early = await receipt(id);
@@ -101,6 +103,7 @@ it.each(["already busy", "became busy during approval"])(
       expect((await messages(sourceThread)).filter(message => message.role === "bot" && message.turnId && !message.from)).toEqual([]);
       const requests = await peerRequests(workThread);
       expect(requests).toHaveLength(1);
+      expect(requests[0].id).toBe(queuedRequests[0].id);
       expect(requests[0].text).toContain(requestText);
       expect((await sourceCards()).map(card => ({ tool: card.card.tool, answered: card.card.answered })))
         .toEqual([{ tool: "ask_bot", answered: "allow" }]);

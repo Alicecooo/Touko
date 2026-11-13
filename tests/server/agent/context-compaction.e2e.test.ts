@@ -165,6 +165,7 @@ it.each([
     await f.restart(() => {
       const path = join(f.session.info.dataDir, "config.json");
       const config = JSON.parse(readFileSync(path, "utf8"));
+      config.instances.claude.environment ??= {};
       config.instances.claude.environment.OMB_CLAUDE_AUTOCOMPACT = native;
       writeFileSync(path, JSON.stringify(config));
     });

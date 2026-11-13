@@ -56,6 +56,7 @@ function open(): DatabaseSync {
       payload TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS chat_followups_receipt ON chat_followups(kind, owner_id, thread_id, send_id);
+    DELETE FROM chat_followups WHERE kind = 'channel';
     CREATE TABLE IF NOT EXISTS command_receipts (
       kind TEXT NOT NULL,
       key TEXT NOT NULL,
@@ -201,8 +202,6 @@ export interface FollowupPayload {
   reason?: SteerQueueReason;
   unattended?: boolean;
   peerAsk?: Message["peerAsk"];
-  mode?: "chat" | "goal";
-  via?: "api";
   sender?: ResolvedSender;
   trigger?: UsageTrigger;
   origin?: WorkOrigin;
@@ -211,7 +210,7 @@ export interface FollowupPayload {
 export type FollowupStatus = "pending" | "dispatching" | "interrupted" | "cancelled";
 export interface ChatFollowup {
   id: string;
-  kind: "bot" | "channel" | "aside";
+  kind: "bot" | "aside";
   ownerId: string;
   threadId: string;
   status: FollowupStatus;

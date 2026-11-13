@@ -5,14 +5,14 @@ import { UNDO_STALE, type DirectApply } from "../agent/direct-apply.ts";
 import { TeamMemoryConflict, type TeamMemory, type TeamMemoryInput } from "./team-memory.ts";
 import type { OptionCardData } from "../../shared/wire.ts";
 
-type Speaker = { id: string; name: string; color: string; section?: string };
+type Speaker = { id: string; name: string; section?: string };
 type Card = OptionCardData;
 
 export interface TeamMemoryRequestDeps {
   teamMemory: Pick<TeamMemory, "propose" | "resolve" | "resolveProposal" | "undoAccept" | "list">;
   store: {
     messagesFor(threadId: string): Array<{ id: string; card?: Card; from?: { botId: string } }>;
-    appendMessage(threadId: string, message: { role: "bot"; kind: "options"; card: Card; from?: { botId: string; name: string; color: string } }): { id: string };
+    appendMessage(threadId: string, message: { role: "bot"; kind: "options"; card: Card }): { id: string };
     patchMessage(threadId: string, messageId: string, patch: { card: Card }): unknown;
     bot(id: string): { id: string; name: string } | null | undefined;
     botByThread(threadId: string): { id: string; name: string } | null | undefined;
@@ -33,7 +33,7 @@ export function createTeamMemoryRequests(deps: TeamMemoryRequestDeps) {
 
   return {
     /** Throws on invalid input; a conflict with an accepted fact comes back as `error` and saves nothing. */
-    submit(from: Speaker, threadId: string, inRoom: boolean, input: TeamMemoryInput, direct: DirectApply | null) {
+    submit(from: Speaker, threadId: string, input: TeamMemoryInput, direct: DirectApply | null) {
       const proposed = teamMemory.propose(from.section, input, { botId: from.id, botName: from.name, threadId, at: Date.now() });
       const entry = proposed.entry;
       let revision: string | undefined;
@@ -50,7 +50,6 @@ export function createTeamMemoryRequests(deps: TeamMemoryRequestDeps) {
       const message = store.appendMessage(threadId, {
         role: "bot",
         kind: "options",
-        ...(inRoom ? { from: { botId: from.id, name: from.name, color: from.color } } : {}),
         card: {
           title: direct ? "Remembered for the team" : "Remember this for the team?",
           subtitle: summary,

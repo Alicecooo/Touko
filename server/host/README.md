@@ -37,5 +37,5 @@
 
 Order of the split (facts and line maps in the program's notes): routes out of
 the request handler, then cards and proposal services, computers, turn
-admission and `startTurn`, rooms and the coordinator host hooks, the event
+admission and `startTurn`, the coordinator host hooks, the event
 folds, identity and wire projections, boot and shutdown.

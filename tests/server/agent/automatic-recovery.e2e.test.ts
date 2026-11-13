@@ -80,9 +80,11 @@ async function withRecoveryFixture(
     config.automaticRecovery = { enabled: options.enabled !== false, backup };
     writeFileSync(configPath, JSON.stringify(config));
     const log = openSync(logPath, "a", 0o600);
+    const childEnv = verificationServerEnvironment({}, dataDir, Number(new URL(url).port));
+    if (options.scripted) childEnv.FAKE_CLAUDE_ROOM_PLAN = join(dataDir, "room-plan.json");
     server = spawn(process.execPath, ["--experimental-strip-types", fileURLToPath(new URL("../../../server/index.ts", import.meta.url))], {
       cwd: fileURLToPath(new URL("../../..", import.meta.url)),
-      env: verificationServerEnvironment({}, dataDir, Number(new URL(url).port)), stdio: ["ignore", log, log],
+      env: childEnv, stdio: ["ignore", log, log],
     });
     closeSync(log);
     await expect.poll(async () => {
@@ -109,7 +111,7 @@ async function withRecoveryFixture(
   }
 }
 
-it("recovers once on the same thread with its history and permissions, leaving the bot default and sibling unchanged", async () => {
+it("recovers once on the same thread with its history and permissions, leaving the bot default unchanged", async () => {
   await withRecoveryFixture({}, async ({ api, control, calls, backupPrompts, backupReceipt, evidence }) => {
     const { bot } = await control("new-bot", "--name", "Recover in place");
     const threadId = bot.activeTaskId;
@@ -120,7 +122,6 @@ it("recovers once on the same thread with its history and permissions, leaving t
     await send("REMEMBER_AUTOMATIC_RECOVERY_7Q");
     expect((await wait()).status).toBe("settled");
     await api("PATCH", route, { modelSelection: primary, updateBotDefault: true });
-    const { task: sibling } = await api("POST", `/api/bots/${bot.id}/tasks`, { title: "Sibling keeps primary" });
     const state = async () => (await api("GET", "/api/bots")).bots.find((entry: any) => entry.id === bot.id);
     const before = await state();
     const beforeTask = before.tasks.find((task: any) => task.threadId === threadId);
@@ -150,7 +151,6 @@ it("recovers once on the same thread with its history and permissions, leaving t
     expect(task.alwaysAllow).toEqual(beforeTask.alwaysAllow);
     expect(after.modelSelection).toEqual(primary);
     expect(after.approvalMode).toBe(before.approvalMode);
-    expect(after.tasks.find((entry: any) => entry.threadId === sibling.threadId).modelSelection).toEqual(primary);
     await control("messages", "--bot", bot.id, "--task", threadId, "--limit", "20");
     evidence.push({ beforeTask, task, messages, receipt });
   });
@@ -196,11 +196,11 @@ it("recovers a coordinated specialist and returns its result to the Chief exactl
     expect(calls().some((call) => call.method === "session/prompt")).toBe(false);
     const chiefMessages = (await api("GET", `/api/threads/${chief.activeTaskId}/messages?limit=100`)).messages as any[];
     expect(chiefMessages.filter((message) => message.text === finalReply)).toHaveLength(1);
-    expect(chiefMessages.filter((message) => message.roomRequest?.id === child.id && message.roomRequest.phase === "result")).toHaveLength(1);
+    expect(chiefMessages.filter((message) => message.peerRequest?.id === child.id && message.peerRequest.phase === "result")).toHaveLength(1);
     const specialistMessages = (await api("GET", `/api/threads/${child.threadId}/messages?limit=100`)).messages as any[];
     evidence.push({ chiefMessages, specialistMessages, turns });
     expect(specialistMessages.filter((message) => message.text === specialistReply)).toHaveLength(1);
-    expect(specialistMessages.filter((message) => message.roomRequest?.id === child.id && message.roomRequest.phase === "request" && message.text?.includes(brief))).toHaveLength(1);
+    expect(specialistMessages.filter((message) => message.peerRequest?.id === child.id && message.peerRequest.phase === "request" && message.text?.includes(brief))).toHaveLength(1);
     expect(specialistMessages.some((message) => message.role === "user")).toBe(false);
     expect(specialistMessages.filter((message) => message.tool?.name?.startsWith("recovery:"))).toHaveLength(1);
     const fleet = await api("GET", "/api/bots");
@@ -220,7 +220,6 @@ it("uses the ordered bot list only for proven pre-prompt failures and leaves def
     const { bot } = await control("new-bot", "--name", "Ordered startup fallback");
     const threadId = bot.activeTaskId;
     await api("PATCH", `/api/bots/${bot.id}/tasks/${threadId}`, { modelSelection: primary, updateBotDefault: true });
-    const { task: sibling } = await api("POST", `/api/bots/${bot.id}/tasks`, { title: "Unchanged sibling" });
     await api("PATCH", `/api/bots/${bot.id}`, { fallback: [{ instanceId: "secondary", model: primary.model }, backup] });
     const text = "ORDERED_STARTUP_ONLY_3F";
     await control("send", "--bot", bot.id, "--task", threadId, "--text", text);
@@ -230,7 +229,6 @@ it("uses the ordered bot list only for proven pre-prompt failures and leaves def
     expect(backupPrompts()).toHaveLength(1);
     const after = (await api("GET", "/api/bots")).bots.find((entry: any) => entry.id === bot.id);
     expect(after.modelSelection).toEqual(primary);
-    expect(after.tasks.find((task: any) => task.threadId === sibling.threadId).modelSelection).toEqual(primary);
     expect(after.tasks.find((task: any) => task.threadId === threadId)).toMatchObject({ modelSelection: backup, busy: false });
     const { messages } = await control("messages", "--bot", bot.id, "--task", threadId, "--limit", "30");
     expect(messages.filter((message: any) => message.role === "user" && message.text === text)).toHaveLength(1);

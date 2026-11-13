@@ -2,7 +2,7 @@ import { Target } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 
-/** Finish together: the room keeps working until the goal is done. The chip turns accent while it is on. */
+/** Finish together: the conversation keeps working until the goal is done. The chip turns accent while it is on. */
 export function GoalToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
     <button

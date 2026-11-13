@@ -7,7 +7,7 @@ export type JobState = "running" | "needs-input" | "completed" | "failed" | "sta
 export const FINAL_JOB_STATES: ReadonlySet<JobState> = new Set(["needs-input", "completed", "failed", "stalled", "idle"]);
 
 export interface ConversationState {
-  kind: "bot" | "room";
+  kind: "bot";
   busy: boolean;
   activity?: string;
   queued: number;
@@ -22,7 +22,6 @@ export interface JobNode {
   botName: string;
   threadId: string;
   threadTitle?: string;
-  groupId?: string;
   status: Assignment["status"];
   outcome?: Assignment["outcome"];
   outcomeDetail?: string;
@@ -105,7 +104,7 @@ export function jobView(input: JobInput): JobView {
   const asking = live.filter((row) => row.status === "running" && input.activityOf(row) === "waiting-on-you");
   const { conversation } = input;
   const lead = scoped.at(-1);
-  const leadName = lead ? nameOf(lead.assignee.botId) : conversation.kind === "room" ? "The room" : "The bot";
+  const leadName = lead ? nameOf(lead.assignee.botId) : "The bot";
 
   let state: JobState;
   let reason: string;
@@ -160,7 +159,7 @@ export function jobView(input: JobInput): JobView {
     return {
       id: row.id, rootId: row.rootId, ...(row.parentId ? { parentId: row.parentId } : {}), depth: row.depth,
       botId: row.assignee.botId, botName: nameOf(row.assignee.botId), threadId: destination.threadId,
-      ...(title ? { threadTitle: title } : {}), ...(destination.groupId ? { groupId: destination.groupId } : {}),
+      ...(title ? { threadTitle: title } : {}),
       status: row.status, ...(row.outcome ? { outcome: row.outcome } : {}), ...(row.outcomeDetail ? { outcomeDetail: row.outcomeDetail } : {}),
       ...(row.question ? { question: row.question } : {}), mode: row.mode, reply: row.reply,
       awaited: input.scope === "job" ? counts(row) : starts.has(row.id),

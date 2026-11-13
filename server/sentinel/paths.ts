@@ -14,7 +14,7 @@ export function defaultSentinelOut(dataDir: string, platform: NodeJS.Platform = 
     : path.join(state, FOLDER);
   // two workspaces never count into one set of issues
   const resolved = path.resolve(dataDir);
-  if (resolved === path.join(home, ".openmausbot")) return base;
+  if (resolved === path.join(home, ".touko")) return base;
   return path.join(base, `data-${createHash("sha256").update(resolved).digest("hex").slice(0, 12)}`);
 }
 

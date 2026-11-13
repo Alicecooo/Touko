@@ -12,12 +12,11 @@ type PeerAsk = NonNullable<Message["peerAsk"]>;
 export type EscalationOutcome = "chief" | "person" | "muted" | "off" | "skipped" | "failed";
 
 export interface ChiefNoticeDeps {
-  store: Pick<Store, "bots" | "bot" | "tasks" | "taskByThread" | "groupByThread" | "createTask" | "appendMessage" | "messagesFor">;
+  store: Pick<Store, "bots" | "bot" | "tasks" | "taskByThread" | "createTask" | "appendMessage" | "messagesFor">;
   assignerOf(threadId: string): unknown;
   notify(notification: Notification | null): void;
   threadBusy(botId: string, threadId: string): boolean;
   botAtThreadCapacity(botId: string): boolean;
-  groupTurnActive(botId: string): boolean;
   startTurn(botId: string, text: string, opts: { threadId: string; unattended: true; peerAsk: PeerAsk }): Promise<unknown>;
   escalationsEnabled(): boolean;
 }
@@ -37,10 +36,8 @@ export function createChiefNotices(deps: ChiefNoticeDeps) {
       if (!bot) continue;
       const { threadId } = ask.incident;
       const chip = lines.findLast(line => line.kind === "activity" && line.tool?.ok === false && line.threadRef?.threadId === threadId)?.tool?.name;
-      const group = store.groupByThread(threadId);
       deps.notify(buildNotification("incident", bot, threadId, chip ?? refused, {
         avatarUrl: bot.avatarUrl,
-        ...(group ? { group: { id: group.id, name: group.name } } : {}),
       }));
     }
   }
@@ -50,12 +47,10 @@ export function createChiefNotices(deps: ChiefNoticeDeps) {
   }): "chief" | "person" {
     const { chief, bot, threadId } = input;
     const task = store.taskByThread(bot.id, threadId);
-    const group = store.groupByThread(threadId);
     const tellThePerson = () => {
       if (!input.alreadyNotified) {
         deps.notify(buildNotification("incident", bot, threadId, input.chip, {
           avatarUrl: bot.avatarUrl,
-          ...(group ? { group: { id: group.id, name: group.name } } : {}),
         }));
       }
       return "person" as const;
@@ -68,14 +63,13 @@ export function createChiefNotices(deps: ChiefNoticeDeps) {
       role: "bot",
       kind: "activity",
       tool: { name: input.chip, ok: false },
-      threadRef: { botId: bot.id, threadId, title: task?.title ?? (group ? group.name : `${bot.name}'s conversation`) },
+      threadRef: { botId: bot.id, threadId, title: task?.title ?? `${bot.name}'s conversation` },
     });
     const peerAsk = { botId: bot.id, name: bot.name, unattended: true,
       incident: { threadId, ...(input.alreadyNotified ? { notified: true } : {}) } };
     const decision = admit("incident", {}, {
       threadBusy: deps.threadBusy(chief.id, notices.threadId),
       atCapacity: deps.botAtThreadCapacity(chief.id),
-      groupTurn: deps.groupTurnActive(chief.id),
     });
     if (decision.action === "queue") {
       queueSteeredMessage(chief.id, notices.threadId, input.text, { reason: decision.reason, unattended: true, peerAsk });
@@ -91,13 +85,11 @@ export function createChiefNotices(deps: ChiefNoticeDeps) {
     const { bot, threadId } = input;
     const task = store.taskByThread(bot.id, threadId);
     if (deps.assignerOf(threadId)) return;
-    const group = store.groupByThread(threadId);
     const incident: Incident = {
       kind: input.kind,
       bot,
       threadId,
       title: task?.title ?? null,
-      room: group?.name ?? null,
       detail: redactSecretsInText(input.detail),
       ...incidentContext(deps.store.messagesFor(threadId)),
     };
@@ -119,13 +111,11 @@ export function createChiefNotices(deps: ChiefNoticeDeps) {
       const { bot, threadId } = input;
       if (input.kind === "needs-input" && deps.assignerOf(threadId)) return "skipped";
       const task = store.taskByThread(bot.id, threadId);
-      const group = store.groupByThread(threadId);
       const escalation: Escalation = {
         kind: input.kind,
         bot,
         threadId,
         title: task?.title ?? null,
-        room: group?.name ?? null,
         gate: input.gate,
         reason: redactSecretsInText(input.reason),
       };

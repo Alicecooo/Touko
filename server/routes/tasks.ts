@@ -145,41 +145,6 @@ export function createTaskRoutes(deps: TaskRouteDeps): RouteHandler {
     m = path.match(/^\/api\/bots\/([\w-]+)\/tasks$/);
     if (m && method === "POST") {
       return json(res, 410, { error: "Bots have one conversation; routine executions create internal tasks automatically." });
-      /*
-      const body = await readBody(req);
-      if (!body || typeof body !== "object" || Array.isArray(body)) return json(res, 400, { error: "body must be a JSON object" });
-      const bot = store.bot(m[1]);
-      if (!bot) return json(res, 404, { error: "no such bot" });
-      let cwd: string | undefined;
-      if (body.cwd !== undefined) {
-        // Choosing where its file tools run takes the same authority as editing the bot's folder.
-        if (!auth.scopes.includes("admin")) {
-          return json(res, 403, { error: "Choosing a working folder requires the admin scope" });
-        }
-        const checked = validateBotCwd(body.cwd);
-        if (!checked.ok) return json(res, 400, { error: checked.error });
-        if (!checked.cwd) return json(res, 400, { error: "Choose an existing working folder, or omit cwd to use the bot's default" });
-        cwd = checked.cwd;
-      }
-      if (body.approvalMode !== undefined && body.approvalMode !== "ask" && body.approvalMode !== "full") {
-        return json(res, 400, { error: "new task approvalMode must be ask or full" });
-      }
-      if (body.approvalMode === "full") {
-        if (auth.kind !== "loopback" || !sharedWorkspaceFullAccessEnabled()) {
-          return json(res, 403, { error: "New Full tasks require the operator's dedicated shared-workspace policy" });
-        }
-        if (bot.approvalGrant) return json(res, 409, { error: "the bot's approval mode is still being confirmed" });
-      }
-      
-      if (body.projectId !== undefined && (typeof body.projectId !== "string" || !store.project(bot.id, body.projectId))) {
-        return json(res, 400, { error: "projectId must belong to this bot" });
-      }
-      const task = store.createTask(bot.id, typeof body.title === "string" ? body.title : undefined, true, body.projectId, undefined, body.approvalMode, undefined, cwd);
-      if (!task) return json(res, 500, { error: "couldn't create that task" });
-      // Who opened it decides who may answer its cards on a shared workspace.
-      if (auth.kind === "session") threadStarters.set(task.threadId, actorKey(auth));
-      return json(res, 201, { bot: publicBot(store.bot(bot.id)!), task: wireTask(task, store.bot(bot.id)!.modelSelection) });
-      */
     }
     m = path.match(/^\/api\/bots\/([\w-]+)\/tasks\/delete$/);
     if (m && method === "POST") {

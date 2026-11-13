@@ -15,7 +15,7 @@ import type { RequestAuth } from "../auth/request-auth.ts";
 import type { RoutineManager } from "../automation/routines.ts";
 import { acceptedSendMatch, parseSendId } from "../agent/send-idempotency.ts";
 import { cancelSteeredMessage, holdSteeredQueue, restoreHeldSteeredQueue, settleHeldSteeredQueue } from "../teams/steer-queue.ts";
-import type { BotRecord, GroupRecord, Message, Store } from "../storage/store.ts";
+import type { BotRecord, Message, Store } from "../storage/store.ts";
 import { extractSteerImages } from "../agent/turn-images.ts";
 import type { UsageTrigger } from "../usage/usage-ledger.ts";
 import { pinnedClientThreadGuard } from "./pinned-client-thread.ts";
@@ -38,14 +38,13 @@ type Behavior = "allow" | "deny" | "answer";
 
 export interface BotMessageRouteDeps {
   store: Pick<Store,
-    | "activeLeaf" | "appendMessage" | "bot" | "botByThread" | "bots" | "groupByThread" | "messagesFor"
+    | "activeLeaf" | "appendMessage" | "bot" | "botByThread" | "bots" | "messagesFor"
     | "patchMessage" | "patchTask" | "projectBotForTask" | "setActiveLeaf" | "setTaskAskedAt" | "taskByThread" | "tasks">;
   registry: Pick<ProviderRegistry, "get">;
   routines(): RoutineManager | null;
   handoffs: Pick<Handoffs, "current" | "steered" | "stoppedByPerson">;
   
   directTurnDispatchClaims: { get(threadId: string): { threadId: string } | undefined };
-  groupSpeakers: ReadonlyMap<string, { botId: string }>;
   desktopManaged: boolean;
   cloudHome: boolean;
   DirectSendRefused: abstract new (...args: never[]) => { readonly status: number; readonly body: Record<string, unknown> };
@@ -72,7 +71,6 @@ export interface BotMessageRouteDeps {
   threadBusy(botId: string, threadId: string): boolean;
   botAtThreadCapacity(botId: string): boolean;
   parksBehindCoordination(botId: string, threadId: string): boolean;
-  activeGroupTurnForBot(botId: string): { group: GroupRecord; threadId: string } | null;
   runningTurnInstance(bot: BotRecord | null | undefined, threadId: string): RunningInstance;
   engineSteersImages(instance: RunningInstance | undefined): boolean;
   resolveReplyTarget(threadId: string, value: unknown): Message | undefined;
@@ -96,8 +94,6 @@ export interface BotMessageRouteDeps {
   interruptDirectThread(botId: string, threadId: string): Promise<void>;
   cancelDirectTurnDispatch(botId: string, expectedThreadId?: string): unknown;
   revokeInternalCapabilitiesForThread(threadId: string): void;
-  cancelGroupTurnOperations(groupId: string, threadId: string): void;
-  closeOpenApprovals(threadId: string): void;
   /** The outcome of a card the harness raised itself (a peer approval, a quota-switch offer); undefined for any other card. */
   harnessCardOutcome(threadId: string, requestId: string, behavior: Behavior, message: unknown): Promise<string | undefined>;
 }
@@ -118,7 +114,7 @@ const guardedSendSchema = z.object({
 }).strict();
 
 export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler {
-  const {store, registry, handoffs, directTurnDispatchClaims, groupSpeakers, desktopManaged: DESKTOP_MANAGED, cloudHome: CLOUD_HOME, DirectSendRefused, acceptDirectSend, directSendRefusal, startTurn, usageTriggerFor, messageSender, cardAnswerRefusal, requestBehavior, requestedTaskBot, botForThread, threadBusy, botAtThreadCapacity, parksBehindCoordination, activeGroupTurnForBot, runningTurnInstance, engineSteersImages, resolveReplyTarget, turnSelection, policyModelRefusal, clearUnattended, drainQueuedSends, answeringCardAs, resolveAndSendTrust, resolveAndSendTeamSetup, resolveAndSendRoutine, resolveAndSendProfile, resolveAndSendModel, resolveSkillRequest, sendSkillResolution, answerRequest, deliverLateQuestionAnswer, interruptDirectThread, cancelDirectTurnDispatch, revokeInternalCapabilitiesForThread, cancelGroupTurnOperations, closeOpenApprovals, harnessCardOutcome} = deps;
+  const {store, registry, handoffs, directTurnDispatchClaims, desktopManaged: DESKTOP_MANAGED, cloudHome: CLOUD_HOME, DirectSendRefused, acceptDirectSend, directSendRefusal, startTurn, usageTriggerFor, messageSender, cardAnswerRefusal, requestBehavior, requestedTaskBot, botForThread, threadBusy, botAtThreadCapacity, parksBehindCoordination, runningTurnInstance, engineSteersImages, resolveReplyTarget, turnSelection, policyModelRefusal, clearUnattended, drainQueuedSends, answeringCardAs, resolveAndSendTrust, resolveAndSendTeamSetup, resolveAndSendRoutine, resolveAndSendProfile, resolveAndSendModel, resolveSkillRequest, sendSkillResolution, answerRequest, deliverLateQuestionAnswer, interruptDirectThread, cancelDirectTurnDispatch, revokeInternalCapabilitiesForThread, harnessCardOutcome} = deps;
   const pinnedClientThread = pinnedClientThreadGuard(store);
   /** widget -> sendId of a press on its way in: a second tap before acceptance must not send a second answer. */
   const pressesInFlight = new Map<string, string | undefined>();
@@ -189,7 +185,6 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
               threadBusy: threadBusy(bot.id, threadId),
               atCapacity: botAtThreadCapacity(bot.id),
               parksBehindCoordination: parksBehindCoordination(bot.id, threadId),
-              groupTurn: Boolean(activeGroupTurnForBot(bot.id)),
             });
             if (guardedAdmission.action === "refuse") {
               throw Object.assign(new Error("wait for a free thread slot before retrying this message"), { status: 409, code: "guarded_busy" });
@@ -383,7 +378,7 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
         if (resolveAndSendTrust(res, bot.threadId, String(body.requestId), behavior)) return;
         if (await resolveAndSendTeamSetup(res, {
           botId: bot.id, threadId: bot.threadId, requestId: String(body.requestId), behavior,
-        }, auth.kind === "loopback" ? DESKTOP_MANAGED || Boolean(req.headers.origin) && !store.bots.some((bot) => bot.busy || activeGroupTurnForBot(bot.id)) : auth.scopes.includes("admin"))) return;
+        }, auth.kind === "loopback" ? DESKTOP_MANAGED || Boolean(req.headers.origin) && !store.bots.some((bot) => bot.busy) : auth.scopes.includes("admin"))) return;
         if (resolveAndSendRoutine(res, {
           botId: bot.id,
           botName: bot.name,
@@ -483,7 +478,7 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
           const setupBotId = setupCard.from?.botId ?? store.botByThread(threadId)?.id;
           if (!setupBotId) return json(res, 400, { error: "This team setup has no valid owner" });
           if (await resolveAndSendTeamSetup(res, { botId: setupBotId, threadId, requestId, behavior },
-            auth.kind === "loopback" ? DESKTOP_MANAGED || Boolean(req.headers.origin) && !store.bots.some((bot) => bot.busy || activeGroupTurnForBot(bot.id)) : auth.scopes.includes("admin"))) return;
+            auth.kind === "loopback" ? DESKTOP_MANAGED || Boolean(req.headers.origin) && !store.bots.some((bot) => bot.busy) : auth.scopes.includes("admin"))) return;
         }
         const profileCard = store.messagesFor(threadId).find(
           (message) => message.card?.requestId === requestId && message.card.profileRequest,
@@ -517,25 +512,15 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
         }
         const own = await harnessCardOutcome(threadId, requestId, behavior, body.message);
         if (own) return json(res, 200, { ok: true, outcome: own });
-        const group = store.groupByThread(threadId);
         const pending = store.messagesFor(threadId).find((message) => message.card?.requestId === requestId);
         const dismissed = dismissQuestionCard(store, threadId, pending, body);
         if (dismissed) return json(res, dismissed.status, dismissed.body);
         const persistentQuestion = isPersistentQuestionCard(pending?.card);
-        const owner = group
-          ? persistentQuestion
-            ? (pending?.from ? store.bot(pending.from.botId) : undefined)
-            : (groupSpeakers.get(threadId) ? store.bot(groupSpeakers.get(threadId)!.botId) : undefined) ??
-              (pending?.from ? store.bot(pending.from.botId) : undefined)
-          : store.botByThread(threadId);
-        // A surviving question belongs to its original asker, never a later speaker.
-        if (group && persistentQuestion && !owner) {
-          return json(res, 409, { error: "the bot that asked this question is no longer available" });
-        }
+        const owner = store.botByThread(threadId);
         if (!owner && !pending) return json(res, 404, { error: "nothing is waiting on an answer in this conversation" });
         const requestOwner = owner ? botForThread(owner.id, threadId) : null;
         const outcome = await answerRequest(threadId, requestOwner?.modelSelection.instanceId ?? "", requestId, behavior, body.message, owner ? { id: owner.id, name: owner.name } : undefined, body.always === true);
-        if (outcome === "unavailable" && isPersistentQuestionCard(pending?.card) && behavior === "answer") {
+        if (outcome === "unavailable" && persistentQuestion && behavior === "answer") {
           if (!pending?.card) return json(res, 404, { error: "this question is no longer available" });
           const answer = typeof body.message === "string" ? body.message.trim() : "";
           if (!answer) return json(res, 400, { error: "a question answer is required" });
@@ -586,21 +571,8 @@ export function createBotMessageRoutes(deps: BotMessageRouteDeps): RouteHandler 
         await routines!.cancelRun(routineRun.id);
         return json(res, 200, { ok: true });
       }
-      const instance = registry.get((botForThread(bot.id, expectedThreadId ?? bot.threadId) ?? bot).modelSelection.instanceId);
-      const busyGroup = activeGroupTurnForBot(bot.id);
-      if (busyGroup) {
-        if (expectedThreadId !== undefined && busyGroup.threadId !== expectedThreadId) {
-          return json(res, 409, { error: `this bot is working in channel ${busyGroup.group.name}` });
-        }
-        cancelGroupTurnOperations(busyGroup.group.id, busyGroup.threadId);
-        revokeInternalCapabilitiesForThread(busyGroup.threadId);
-        await instance?.adapter.interruptTurn(busyGroup.threadId).catch(() => {});
-        closeOpenApprovals(busyGroup.threadId);
-        return json(res, 200, { ok: true });
-      }
       if (
         expectedThreadId !== undefined &&
-        !busyGroup &&
         bot.threadId !== expectedThreadId &&
         directClaim?.threadId !== expectedThreadId
       ) {

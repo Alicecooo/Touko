@@ -76,7 +76,6 @@ export const BOT_SOURCE = ["blank", "template", "preset"] as const;
 export type BotSource = (typeof BOT_SOURCE)[number];
 export const CONNECTOR_RESULT = ["connected", "failed", "expired", "timed_out"] as const;
 export type ConnectorResult = (typeof CONNECTOR_RESULT)[number];
-export const ROOM_MODE = ["chat", "goal"] as const;
 export const CONNECTORS_MODE = ["managed", "self_hosted", "unavailable"] as const;
 export const LOCAL_VM_MODE = ["shared", "per_bot", "pool"] as const;
 export const TRIAL_CREDIT = ["active", "used_up", "ended", "none"] as const;

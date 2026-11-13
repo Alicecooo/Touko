@@ -78,12 +78,11 @@ async function withEngines(check: (fixture: Fixture) => Promise<void>) {
 
 async function botWithOwnModel(fixture: Fixture, own: { instanceId: string; model: string }) {
   const { bot: created } = await fixture.control("new-bot", "--name", "Ada");
-  const { task } = await fixture.api("POST", `/api/bots/${created.id}/tasks`, { title: "Own model" });
-  await fixture.api("PATCH", `/api/bots/${created.id}/tasks/${task.threadId}`, { modelSelection: own });
+  await fixture.api("PATCH", `/api/bots/${created.id}/tasks/${created.activeTaskId}`, { modelSelection: own });
   const profile = async () => (await fixture.api("GET", "/api/bots")).bots.find((entry: any) => entry.id === created.id);
-  const thread = async () => (await profile()).tasks.find((entry: any) => entry.threadId === task.threadId);
+  const thread = async () => (await profile()).tasks.find((entry: any) => entry.threadId === created.activeTaskId);
   expect(await thread()).toMatchObject({ modelSelection: own, followsBotModel: false });
-  return { bot: await profile(), threadId: task.threadId as string, thread };
+  return { bot: await profile(), threadId: created.activeTaskId as string, thread };
 }
 
 async function sendAndSettle(fixture: Fixture, botId: string, threadId: string, text: string, status = "settled") {

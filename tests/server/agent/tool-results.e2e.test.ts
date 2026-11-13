@@ -83,13 +83,10 @@ it("bounds a real roster, retrieves its tail, isolates owners and expires stoppe
     for (let i = 0; i < 70; i++) expect(preview.slice(0, 16_000) + tail).toContain(`Roster-${String(i).padStart(2, "0")}`);
     evidence.push({ preview, read, tailIncludesLastBot: true });
     expect((await api(`/api/internal/tool-result?id=${id}`)).status).toBe(401);
-    const sibling = (await api(`/api/bots/${bot.id}/tasks`, { title: "Sibling scope" })).body.task;
-    const second = await held(bot, sibling.threadId);
-    expect((await second.tool("tool_result_read", { id })).isError).toBe(true);
-    expect((await api(`/api/internal/tool-result?id=${id}&fromThreadId=${bot.threadId}`, undefined, second.token)).status).toBe(403);
     const other = (await cli("new-bot", "--name", "Other owner")).bot;
     const third = await held(other);
     expect((await third.tool("tool_result_read", { id })).isError).toBe(true);
+    expect((await api(`/api/internal/tool-result?id=${id}&fromThreadId=${bot.threadId}`, undefined, third.token)).status).toBe(403);
     expect((await api("/api/internal/tool-result", { text: "x".repeat(128 * 1024 + 1) }, first.token)).status).toBe(400);
     expect((await first.tool("tool_result_read", { id, offset: -1 })).isError).toBe(true);
     await cli("messages", "--bot", bot.id, "--task", bot.threadId);
@@ -99,8 +96,8 @@ it("bounds a real roster, retrieves its tail, isolates owners and expires stoppe
       .tasks.find((t: any) => t.threadId === bot.threadId).busy).toBe(false);
     const resumed = await held(bot);
     expect((await resumed.tool("tool_result_read", { id, offset: 16_000 })).isError).toBeFalsy();
-    evidence.push({ checks: ["real roster capped", "tail retrievable", "unauthenticated refused", "sibling thread refused",
-      "other bot refused", "spoofed thread refused", "oversize save refused", "stopped capability revoked", "next turn can read own result"] });
+    evidence.push({ checks: ["real roster capped", "tail retrievable", "unauthenticated refused", "other bot refused",
+      "spoofed thread refused", "oversize save refused", "stopped capability revoked", "next turn can read own result"] });
   } finally {
     try {
       await Promise.all(proxies.map((proxy) => waitForExit(proxy, { signal: "SIGTERM" })));

@@ -47,8 +47,6 @@ it("preserves conversations and scheduled work when deletion cannot save, then s
       prompt: "Prepare the fixture report.", enabled: true, schedule: { type: "interval", everyMinutes: 60, anchorAt: later } }, 201);
     const { call: solo } = await api("POST", "/api/calendar-calls", { name: "Retain this solo call", botIds: [bot.id],
       schedule: { type: "once", at: later }, durationMinutes: 10 }, 201);
-    const { call: shared } = await api("POST", "/api/calendar-calls", { name: "Retain this shared call", botIds: [bot.id, guest.id],
-      schedule: { type: "once", at: later }, durationMinutes: 10 }, 201);
     const before = await schedules();
     expect(before.routines.find((item: any) => item.id === routine.id)?.enabled).toBe(true);
     const beforeBot = (await api("GET", "/api/bots?messages=0")).bots.find((item: any) => item.id === bot.id);
@@ -79,7 +77,6 @@ it("preserves conversations and scheduled work when deletion cannot save, then s
     const afterRetry = await schedules();
     expect(afterRetry.routines.find((item: any) => item.id === routine.id)).toMatchObject({ enabled: false, nextRunAt: null });
     expect(afterRetry.calls.some((item: any) => item.id === solo.id)).toBe(false);
-    expect(afterRetry.calls.find((item: any) => item.id === shared.id)?.botIds).toEqual([guest.id]);
     evidence.push({ retryApplied: true, afterRetry, survivingGuest: guest.id });
   } finally {
     restoreBotsFile();

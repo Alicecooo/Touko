@@ -48,7 +48,7 @@ describe("Preset bots in the real renderer", () => {
     // My New bot defaults: a name, words, a colour, a skill that is on, notes,
     // and things a preset must never carry (approval, connected apps).
     await api("/api/config", "PATCH", { newBotDefaults: {
-      profile: { name: "Sky", title: "Support", soul: "Be kind and precise.\n", color: "blue", approvalMode: "auto", composio: true },
+      profile: { name: "Sky", title: "Support", description: "Be kind and precise.\n", color: "blue", approvalMode: "auto", composio: true },
       memory: { "MEMORY.md": "- Customers first.\n" },
       skills: [{ name: "follow-up", description: "Write a short follow-up.", source: "fixture", enabled: true, warnings: [],
         text: "---\nname: follow-up\ndescription: Write a short follow-up.\n---\n\n# Follow-up\n" }],

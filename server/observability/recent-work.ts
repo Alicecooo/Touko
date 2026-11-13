@@ -1,5 +1,5 @@
 import { latestSaidByBot, type ThreadLatest } from "../storage/message-db.ts";
-import type { BotRecord, GroupRecord, TaskRecord } from "../storage/store.ts";
+import type { BotRecord, TaskRecord } from "../storage/store.ts";
 
 export const RECENT_WORK_WINDOW_MS = 48 * 60 * 60_000;
 export const RECENT_WORK_MAX_LINES = 10;
@@ -15,7 +15,6 @@ export interface BotThread {
 }
 
 export interface RecentWorkStore {
-  groups: readonly GroupRecord[];
   taskByThread(botId: string, threadId: string): TaskRecord | undefined;
 }
 
@@ -30,14 +29,6 @@ export function botThreads(store: RecentWorkStore, bot: Pick<BotRecord, "id" | "
   const direct = `1:1 with ${userName}`;
   add({ threadId: bot.threadId, where: direct, title: store.taskByThread(bot.id, bot.threadId)?.title ?? null, private: true });
   for (const task of bot.tasks ?? []) add({ threadId: task.threadId, where: direct, title: task.title, private: true });
-  for (const group of store.groups) {
-    if (!group.memberIds.includes(bot.id)) continue;
-    const where = `room ${JSON.stringify(group.name)}`;
-    const privateChat = group.dm === true;
-    const openTask = group.tasks?.find((task) => task.threadId === group.threadId);
-    add({ threadId: group.threadId, where, title: openTask?.title ?? null, private: privateChat });
-    for (const task of group.tasks ?? []) add({ threadId: task.threadId, where, title: task.title, private: privateChat });
-  }
   return out;
 }
 

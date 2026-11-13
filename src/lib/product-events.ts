@@ -1,5 +1,5 @@
 import { track } from "@/lib/analytics";
-import { allow, APP, BOT_SOURCE, BOT_TEMPLATE, CONNECTOR_RESULT, engineSlug, KEY_PROVIDER, KEY_RESULT, KEY_VIA, ROOM_MODE, SIGN_IN_ENGINE, SIGN_IN_METHOD, type BotSource, type ConnectorResult, type KeyProvider, type KeyResult, type KeyVia, type SignInMethod } from "@/lib/analytics-allowlist";
+import { allow, APP, BOT_SOURCE, BOT_TEMPLATE, CONNECTOR_RESULT, engineSlug, KEY_PROVIDER, KEY_RESULT, KEY_VIA, SIGN_IN_ENGINE, SIGN_IN_METHOD, type BotSource, type ConnectorResult, type KeyProvider, type KeyResult, type KeyVia, type SignInMethod } from "@/lib/analytics-allowlist";
 
 type Instances = ReadonlyArray<{ instanceId: string; driverKind: string }>;
 
@@ -49,8 +49,3 @@ export function connectorConnect(app: string, result: ConnectorResult): void {
 export function directMessageSent(instances: Instances, instanceId: unknown, queued: boolean): void {
   track("message_sent", { driver: engineSlug(instances, instanceId), queued });
 }
-
-export function roomMessageSent(mode: string, queued: boolean): void {
-  track("message_sent", { room: true, mode: allow(mode, ROOM_MODE), queued });
-}
-

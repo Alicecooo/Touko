@@ -35,14 +35,13 @@ export interface InstanceRouteDeps {
   cliProbeEnvironment(): NodeJS.ProcessEnv;
   threadBusy(botId: string, threadId: string): boolean;
   botForThread(botId: string, threadId: string): Pick<{ modelSelection: ModelSelection }, "modelSelection"> | null;
-  activeGroupTurnForBot(botId: string): { threadId: string } | null;
 }
 
 export function createInstanceRoutes(deps: InstanceRouteDeps): RouteHandler {
   const {
     store, cfg, registry, sessions, providerAuthSessions, hostedModels, providerConfigBusy, providerInstancesChanging,
     persistProviderInstance, configStatus, broadcast, testCliBinary, cliProbeEnvironment, threadBusy,
-    botForThread, activeGroupTurnForBot,
+    botForThread,
   } = deps;
   const describeInstances = async () => hostedModels ? deps.describeInstances() : withEndpointUrls(await deps.describeInstances(), cfg.instances ?? {});
   // One updater per executable: Claude instances can share an install, and two self-updates would race its files.
@@ -248,7 +247,7 @@ export function createInstanceRoutes(deps: InstanceRouteDeps): RouteHandler {
     const busyProviderSelections = () => store.bots.flatMap((bot) => {
       const busyTasks = store.tasks(bot.id).filter((task) => threadBusy(bot.id, task.threadId));
       const selections = busyTasks.map((task) => botForThread(bot.id, task.threadId)!.modelSelection);
-      if (activeGroupTurnForBot(bot.id) || (bot.busy && busyTasks.length === 0)) selections.push(bot.modelSelection);
+      if (bot.busy && busyTasks.length === 0) selections.push(bot.modelSelection);
       return selections;
     });
     const claudeUpdate = /^\/api\/instances\/([\w.-]+)\/claude-update$/.exec(path);

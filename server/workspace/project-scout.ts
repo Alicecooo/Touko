@@ -27,7 +27,7 @@ export interface ProjectProfile {
 }
 
 export interface TeamSuggestion {
-  roomName: string;
+  groupName: string;
   manifest: TeamManifestV2;
   reasons: Record<string, string>;
 }
@@ -279,14 +279,14 @@ const LEAD: RoleTemplate = {
   title: "Project Lead",
   color: "yellow",
   describe: (profile) =>
-    `You coordinate work on ${profile.name}: break briefs into tasks for the team, keep the room's bulletin current, and review results before they count as done.${stackLine(profile)}${profile.summary ? ` The project, in its own words: ${profile.summary}` : ""}`,
+    `You coordinate work on ${profile.name}: break briefs into tasks for the team and review results before they count as done.${stackLine(profile)}${profile.summary ? ` The project, in its own words: ${profile.summary}` : ""}`,
 };
 
 const MAX_SUGGESTED_SPECIALISTS = 5;
 
 export function suggestTeam(profile: ProjectProfile): TeamSuggestion {
   const reasons: Record<string, string> = {
-    lead: "Every project room needs one member who briefs, splits, and reviews.",
+    lead: "Every project group needs one member who briefs, splits, and reviews.",
   };
   const members: TeamManifestMember[] = [
     {
@@ -330,5 +330,5 @@ export function suggestTeam(profile: ProjectProfile): TeamSuggestion {
   if (profile.summary) manifest.team.description = profile.summary.slice(0, 2_000);
 
   // Same parser as import, so a suggestion is exactly as valid as a shared file.
-  return { roomName: profile.name, manifest: parseTeamManifest(manifest), reasons };
+  return { groupName: profile.name, manifest: parseTeamManifest(manifest), reasons };
 }

@@ -111,7 +111,7 @@ const claudeEntry = (dumpFile: string) => ({
   driver: "claudeAgent", displayName: ENGINE_NAME, config: { cli: FAKE_CLI }, environment: { FAKE_CLAUDE_DUMP: dumpFile },
 });
 const onEngine = (model: string) => ({ instanceId: "computer", model });
-/** A bot (and each of its conversations) as v0.1.94 saved it on the engine. */
+/** A bot and its conversation as v0.1.94 saved them on the engine. */
 const savedOnEngine = (saved: any) => {
   saved.modelSelection = onEngine("claude-fable-5");
   for (const task of saved.tasks) task.modelSelection = onEngine("claude-fable-5");
@@ -171,7 +171,7 @@ describe("removing the Computer engine", () => {
     for (const home of homes) await removeTempDir(home);
   });
 
-  it("moves bots off it once, keeps each conversation where it worked, and never hands a turn to Boat's own agent", async () => {
+  it("moves each bot's conversation off it and never hands a turn to Boat's own agent", async () => {
     const { server } = fresh();
     // A turn's first computer call is what creates the Boat, as with a real model, so this engine uses the cloud computer.
     const claudeEntry = (dumpFile: string) => ({
@@ -181,12 +181,9 @@ describe("removing the Computer engine", () => {
     server.editConfig(config => Object.assign(config, { box: { token: "box_verification_fixture" }, instances: { claude: claudeEntry(server.dumpFile) } }));
     await server.start();
     const [starter] = await server.bots();
-    const { task: opened } = await server.api("POST", `/api/bots/${starter.id}/tasks`, {});
-    const main = opened.threadId;
-    const other = starter.threadId;
+    const main = starter.threadId;
     const { bot: auto } = await server.api("POST", "/api/bots", { name: "Atlas" });
     const { bot: mixed } = await server.api("POST", "/api/bots", { name: "Iris" });
-    const { task: mixedConversation } = await server.api("POST", `/api/bots/${mixed.id}/tasks`, {});
     await server.stop();
 
     // Everything as v0.1.94 saved it. The fleet, the new-bot defaults and the
@@ -197,14 +194,13 @@ describe("removing the Computer engine", () => {
       newBotDefaults: { profile: { modelSelection: { instanceId: "computer", model: "claude-fable-5" } } },
       automaticRecovery: { enabled: true, backup: { instanceId: "computer", model: "sonnet" } },
     }));
-    // The starter: on the engine with Works on Cloud, another conversation
-    // and a backup on it, and Boat's run id.
+    // The starter: on the engine with Works on Cloud, a backup on it, and Boat's run id.
     server.editSavedBot(starter.id, saved => {
       saved.modelSelection = onEngine("claude-fable-5");
       saved.computer = "cloud";
       saved.fallback = [onEngine("sonnet")];
       saved.resumeCursors = { computer: "boat-prompt-run" };
-      for (const task of saved.tasks) task.modelSelection = onEngine(task.threadId === other ? "gpt-5.4" : "claude-fable-5");
+      for (const task of saved.tasks) task.modelSelection = onEngine("claude-fable-5");
     });
     // Atlas: on the engine with Works on Auto, the default for new bots.
     server.editSavedBot(auto.id, saved => {
@@ -214,7 +210,7 @@ describe("removing the Computer engine", () => {
     });
     // Iris: on Claude and Auto, with its open conversation switched to the engine.
     server.editSavedBot(mixed.id, saved => {
-      saved.tasks.find((task: any) => task.threadId === mixedConversation.threadId).modelSelection = onEngine("claude-fable-5");
+      saved.tasks.find((task: any) => task.threadId === mixed.threadId).modelSelection = onEngine("claude-fable-5");
     });
 
     await server.start();
@@ -228,11 +224,8 @@ describe("removing the Computer engine", () => {
     expect(movedStarter.computer).toBe("cloud");
     expect(movedStarter.fallback ?? []).toEqual([]);
     expect(movedStarter.threadId).toBe(main);
-    expect(movedStarter.tasks.find((task: any) => task.threadId === other).modelSelection).toEqual(replacement);
     const starterLine = `${starter.name} now uses ${ENGINE_NAME}. ${REMOVED} ${starter.name} still works on its cloud computer.`;
-    const otherLine = `This conversation now uses ${ENGINE_NAME}. ${REMOVED} It still works on ${starter.name}'s cloud computer.`;
     expect(await server.moveLines(main)).toEqual([starterLine]);
-    expect(await server.moveLines(other)).toEqual([otherLine]);
 
     const movedAuto = await server.bot(auto.id);
     expect(movedAuto.modelSelection).toEqual(replacement);
@@ -243,9 +236,7 @@ describe("removing the Computer engine", () => {
     expect(movedMixed.modelSelection).toEqual(mixed.modelSelection);
     expect(movedMixed.computer).toBeUndefined();
     expect(await server.moveLines(mixed.threadId)).toEqual([]);
-    expect(await server.moveLines(mixedConversation.threadId))
-      .toEqual([`This conversation now uses ${ENGINE_NAME}. ${REMOVED} It still works on Iris's cloud computer.`]);
-    const mixedTask = movedMixed.tasks.find((task: any) => task.threadId === mixedConversation.threadId);
+    const mixedTask = movedMixed.tasks.find((task: any) => task.threadId === mixed.threadId);
     expect(mixedTask.modelSelection).toEqual(replacement);
     expect(mixedTask).toMatchObject({ surface: "cloud", surfaceAuto: true });
 
@@ -260,9 +251,7 @@ describe("removing the Computer engine", () => {
     await server.stop();
     await server.start();
     expect(await server.moveLines(main)).toEqual([starterLine]);
-    expect(await server.moveLines(other)).toEqual([otherLine]);
     expect(await server.moveLines(auto.threadId)).toHaveLength(1);
-    expect(await server.moveLines(mixedConversation.threadId)).toHaveLength(1);
 
     const cloudTurn = await server.turn(starter.id, main, "Take a screenshot of the cloud computer.");
     expect(cloudTurn.argv[cloudTurn.argv.indexOf("--model") + 1]).toBe(replacement.model);
@@ -270,15 +259,14 @@ describe("removing the Computer engine", () => {
     expect(boxesCreated).toBe(1);
     expect(agentCalls).toEqual([]);
 
-    const { task: atlasNew } = await server.api("POST", `/api/bots/${auto.id}/tasks`, {});
-    const autoMovedTurn = await server.turn(auto.id, atlasNew.threadId, "Take a screenshot of the cloud computer.");
+    const autoMovedTurn = await server.turn(auto.id, auto.threadId, "Take a screenshot of the cloud computer.");
     expect(autoMovedTurn.mcpConfig.mcpServers.computer.args).toEqual([expect.stringMatching(/harness-mcp-proxy\.(?:ts|js)$/), "computer"]);
     expect(boxesCreated).toBe(2);
     expect(agentCalls).toEqual([]);
 
     await server.api("PATCH", `/api/bots/${starter.id}`, { computer: null });
     const callsBeforeAuto = boatCalls;
-    const autoTurn = await server.turn(starter.id, other, "what is 2+2?");
+    const autoTurn = await server.turn(starter.id, main, "what is 2+2?");
     expect(autoTurn.mcpConfig?.mcpServers?.computer?.args?.[1]).not.toBe("computer");
     expect(boatCalls - callsBeforeAuto, "an Auto turn reached the Boat account").toBe(0);
     expect(agentCalls).toEqual([]);

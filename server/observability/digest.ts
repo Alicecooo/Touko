@@ -129,7 +129,7 @@ export function digestTools(d: Pick<TurnDigest, "tools" | "toolsDropped">): stri
   return `${tools}${d.toolsDropped ? ` +${d.toolsDropped} more` : ""}`;
 }
 
-/** Never multi-line, so it sits in a transcript replay or a room window like any speaker line. */
+/** Never multi-line, so it sits in a transcript replay like any speaker line. */
 export function digestPromptLine(d: TurnDigest, botName: string): string {
   const body = renderDigest(d).replace(/^\[digest\]\s*/, "").replace(/\s+/g, " ").trim();
   return `[What ${botName} did in an earlier turn: ${body}]`;

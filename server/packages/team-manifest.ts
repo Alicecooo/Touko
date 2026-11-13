@@ -23,21 +23,6 @@ const COLORS = [
   "coral",
 ] as const satisfies readonly MausColor[];
 
-const RESPONDER_KINDS = new Set(["member", "everyone", "mentions", "auto"]);
-/** A responder kind from a newer release reads as "no responder": the room gets the default lead, never a refusal. */
-const responderSchema = z.preprocess(
-  (value) => {
-    const kind = value && typeof value === "object" ? (value as { kind?: unknown }).kind : undefined;
-    return typeof kind === "string" && !RESPONDER_KINDS.has(kind) ? { kind: "mentions" } : value;
-  },
-  z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("member"), member: requiredText(64) }),
-    z.object({ kind: z.literal("everyone") }),
-    z.object({ kind: z.literal("mentions") }),
-    z.object({ kind: z.literal("auto"), member: requiredText(64).optional() }),
-  ]),
-);
-
 const memberSchema = z.object({
   key: requiredText(64).regex(/^[a-z0-9][a-z0-9_-]*$/, {
     message: "may only contain lowercase letters, numbers, - and _",
@@ -65,11 +50,8 @@ const manifestSchema = z.discriminatedUnion("version", [
       name: requiredText(100),
       description: optionalText(2_000),
       members: membersSchema,
-      room: z.object({
-        name: requiredText(100),
-        bulletin: optionalText(12_000),
-        defaultResponder: responderSchema,
-      }),
+      // Version 1 required room configuration. Consume it as opaque legacy data and ignore it.
+      room: z.record(z.string(), z.unknown()),
     }),
   }),
   z.object({
@@ -95,18 +77,6 @@ export interface TeamManifestMember {
   };
 }
 
-export type TeamManifestResponder =
-  | { kind: "member"; member: string }
-  | { kind: "everyone" }
-  | { kind: "mentions" }
-  | { kind: "auto"; member?: string };
-
-export interface TeamManifestRoom {
-  name: string;
-  bulletin: string;
-  defaultResponder: TeamManifestResponder;
-}
-
 export interface ParsedTeamManifest {
   format: typeof TEAM_MANIFEST_FORMAT;
   version: typeof LEGACY_TEAM_MANIFEST_VERSION | typeof TEAM_MANIFEST_VERSION;
@@ -114,7 +84,6 @@ export interface ParsedTeamManifest {
     name: string;
     description?: string;
     members: TeamManifestMember[];
-    room?: TeamManifestRoom;
   };
 }
 
@@ -181,19 +150,6 @@ export function parseTeamManifest(value: TeamManifestInput): ParsedTeamManifest 
     },
   };
   if (parsed.data.team.description) result.team.description = parsed.data.team.description;
-
-  if (parsed.data.version === LEGACY_TEAM_MANIFEST_VERSION) {
-    const defaultResponder = parsed.data.team.room.defaultResponder;
-    if ((defaultResponder.kind === "member" || defaultResponder.kind === "auto") && defaultResponder.member !== undefined &&
-      !seenKeys.has(defaultResponder.member)) {
-      throw new Error(`Unknown default responder: ${defaultResponder.member}`);
-    }
-    result.team.room = {
-      name: parsed.data.team.room.name,
-      bulletin: parsed.data.team.room.bulletin ?? "",
-      defaultResponder,
-    };
-  }
 
   return result;
 }

@@ -158,15 +158,16 @@ export async function runVerb(ctx: VerbContext): Promise<VerbOutcome> {
   waitPolicy(ctx);
   const out = flag(ctx.flags, "export")?.trim();
   if (out) exportFolder(out, ctx.flags.force === true);
-  const task = flag(ctx.flags, "task")?.trim() || (flag(ctx.flags, "thread") ? undefined : "new");
+  const requestedTask = flag(ctx.flags, "task")?.trim();
+  if (requestedTask === "new") {
+    throw usageError("bots have one conversation; use --task current or omit --task", "openmausbot run TARGET TEXT --task current");
+  }
+  const task = requestedTask || (flag(ctx.flags, "thread") ? undefined : "current");
   const target = await resolveTarget({ ...ctx, flags: { ...ctx.flags, task: undefined } }, named ? undefined : first);
   const client = await ctx.client();
   let threadId: string;
   if (target.taskId) threadId = target.taskId;
-  else if (task === "new") {
-    const title = (flag(ctx.flags, "title") ?? text.split("\n")[0]!).trim().slice(0, 80) || "Headless run";
-    threadId = (await client.tool("create_task", { target_type: target.type, target_id: target.id, title })).task.taskId;
-  } else if (task === "current") {
+  else if (task === "current") {
     const fleet = await client.json<Rec>("/api/bots?messages=0");
     const owner = fleet.bots?.find((record: Rec) => record.id === target.id);
     if (!owner) throw usageError(`no bot with id ${target.id}`);

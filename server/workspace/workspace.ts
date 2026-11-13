@@ -1,4 +1,4 @@
-// Per-bot workspaces (~/.openmausbot/workspaces/<botId>/) that double as file-based memory.
+// Per-bot workspaces (~/.touko/workspaces/<botId>/) that double as file-based memory.
 import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -123,7 +123,7 @@ export function workspaceLocationsPrompt(botId: string, cwd: string | undefined,
     otherThreadFiles: join(TASK_WORKSPACES_DIR, botId),
     ...(botCwd ? { configuredProjectFolder: botCwd } : {}),
   }) + ". Different conversations can have different working folders. For an existing file, use the exact path from the conversation; if missing here, check this bot's listed folders before saying it is gone or recreating it." +
-    " Follow an explicitly requested destination. Otherwise put new task output in the current working folder and report its absolute path so another thread or room can use it." +
+    " Follow an explicitly requested destination. Otherwise put new task output in the current working folder and report its absolute path so another thread can use it." +
     " Do not move old files, edit another active thread's work, or read another bot's private folders without authorization. These paths do not grant additional access." +
     " Chat links and inline images open only files in currentWorkingFolder and sharedBotFolder." +
     (opts.attachFile
@@ -281,9 +281,8 @@ function normaliseEntryText(text: string): string {
   return trimmed.replace(/\s*\n\s*/g, " ").replace(/[ \t]+/g, " ");
 }
 
-export function memorySourceLabel(from: { room?: { name: string }; task?: { title: string }; threadId: string }): string {
+export function memorySourceLabel(from: { task?: { title: string }; threadId: string }): string {
   const short = (name: string) => JSON.stringify(name.length > SOURCE_NAME_MAX ? `${name.slice(0, SOURCE_NAME_MAX)}…` : name);
-  if (from.room) return `room ${short(from.room.name)}`;
   if (from.task?.title) return `chat ${short(from.task.title)}`;
   return `thread ${from.threadId}`;
 }
@@ -517,7 +516,7 @@ export function readMemoryTopic(botId: string, name: string): string | null {
 }
 
 export const SESSION_SEARCH_SYSTEM_PROMPT =
-  " Your own earlier conversations with this user, the rooms you are in, and your memory files (MEMORY.md, memory/<topic>.md, your daily logs), are searchable with the session_search tool —" +
+  " Your own earlier conversations with this user and your memory files (MEMORY.md, memory/<topic>.md, your daily logs) are searchable with the session_search tool —" +
   " by a few words, or by time (since \"24h\", \"3d\", \"yesterday\") for what happened recently, words optional." +
   " Before asking the user to repeat something they may already have told you, and before redoing" +
   " an audit, report, or investigation you may have done in an earlier task, search for it first" +

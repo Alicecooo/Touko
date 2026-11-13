@@ -7,7 +7,7 @@ import { allow, APP, CONNECTORS_MODE, EDITION, engineForDriver, TRIAL_CREDIT, ty
 import { hasActiveConnection, type ConnectorStatus } from "@/lib/connector-status";
 import { addedServers } from "@/lib/openai-compat-endpoints";
 import type { Routine } from "@/lib/routines";
-import type { AppState, Bot, ConfigStatus, Group, InstanceInfo } from "@/state/store";
+import type { AppState, Bot, ConfigStatus, InstanceInfo } from "@/state/store";
 
 export const SNAPSHOT_CHECK_MS = 60 * 60 * 1_000;
 const SOURCE_TIMEOUT_MS = 60_000;
@@ -17,7 +17,6 @@ export interface UsageInput {
   config: ConfigStatus;
   instances: readonly InstanceInfo[];
   bots: ReadonlyArray<Pick<Bot, "computer" | "hidden">>;
-  groups: ReadonlyArray<Pick<Group, "dm">>;
   sections?: readonly string[];
   /** null while the routine list is not loaded. */
   routines: ReadonlyArray<Pick<Routine, "enabled" | "runOn" | "target" | "schedule">> | null;
@@ -73,7 +72,7 @@ function memberFacts(sessions: UsageInput["sessions"]): Record<string, PropValue
 }
 
 export function buildUsageSnapshot(input: UsageInput): EventProps {
-  const { config, groups, instances } = input;
+  const { config, instances } = input;
   const bots = input.bots.filter((bot) => bot.hidden !== true);
   const keys = keyProviders(config);
   const ready = instances.filter(engineReady);
@@ -86,8 +85,6 @@ export function buildUsageSnapshot(input: UsageInput): EventProps {
     bots_browser: place("browser"),
     bots_off: place("off"),
     bots_auto: place(undefined),
-    rooms: tally(groups, (group) => group.dm !== true),
-    bot_channels: tally(groups, (group) => group.dm === true),
     teams: input.sections?.length ?? 0,
     ...routineCounts(input.routines),
     engines: [...new Set(ready.map((instance) => engineForDriver(instance.driverKind)))].sort(),
@@ -165,7 +162,6 @@ export async function sendDailySnapshot(state: SnapshotState, sources: UsageSour
       config,
       instances: state.instances,
       bots: state.bots,
-      groups: [],
       sections: state.sections,
       routines: state.routinesLoadState === "ready" ? state.routines : null,
       apps,

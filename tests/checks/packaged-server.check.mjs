@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -58,7 +58,7 @@ const fixtureEnv = {
   XDG_CONFIG_HOME: join(home, ".config"),
   XDG_CACHE_HOME: join(home, ".cache"),
   XDG_DATA_HOME: join(home, ".local", "share"),
-  OMB_DATA_DIR: join(home, ".openmausbot"),
+  OMB_DATA_DIR: join(home, ".touko"),
   OMB_PORT: String(port),
   // Not a genuine key: enough to make the server look for its enterprise layer.
   OMB_LICENSE_KEY: "omb1.not.real",
@@ -241,7 +241,7 @@ if (listening && process.platform !== "win32") {
   const [launcherPort] = await freePorts(1);
   const launcher = spawn(process.execPath, [join(staging, "server", "server-launcher.js")], {
     cwd: staging,
-    env: { ...fixtureEnv, HOME: launcherHome, USERPROFILE: launcherHome, OMB_DATA_DIR: join(launcherHome, ".openmausbot"), OMB_PORT: String(launcherPort) },
+    env: { ...fixtureEnv, HOME: launcherHome, USERPROFILE: launcherHome, OMB_DATA_DIR: join(launcherHome, ".touko"), OMB_PORT: String(launcherPort) },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let launcherOutput = "";
@@ -292,7 +292,7 @@ if (listening) {
       const [entryPort] = await freePorts(1);
       const entry = spawn(process.execPath, [join(staging, "server", "desktop-entry.mjs")], {
         cwd: staging,
-        env: { ...fixtureEnv, HOME: entryHome, USERPROFILE: entryHome, OMB_DATA_DIR: join(entryHome, ".openmausbot"),
+        env: { ...fixtureEnv, HOME: entryHome, USERPROFILE: entryHome, OMB_DATA_DIR: join(entryHome, ".touko"),
           OMB_PORT: String(entryPort), OMB_SERVER_COMPILE_CACHE: cacheDir },
         stdio: ["ignore", "pipe", "pipe"],
       });

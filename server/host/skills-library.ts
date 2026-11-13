@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 
 import type { SkillRequestCardData, SkillShareRecord } from "../../shared/skill-request.ts";
-import { narrowestAudience, intersectAudience } from "../bots/bot-visibility.ts";
 import { DATA_DIR, type AppConfig } from "../config/config.ts";
 import { appendDecision } from "../observability/decision-log.ts";
 import { UNDO_STALE, type DirectApply } from "../agent/direct-apply.ts";
@@ -80,16 +79,7 @@ export function createSkillsLibraryHost(deps: SkillsLibraryHostDeps) {
   const patchAssigned = (botId: string, assignedSkills: string[]) => {
     store.patchBot(botId, { assignedSkills });
   };
-  /** The bot's audience, narrowed to the room's (its bots and its floor) when the conversation is a room. */
-  const sourceAudience = (bot: { visibility?: unknown }, threadId?: string): unknown => {
-    const room = threadId ? store.groupByThread(threadId) : undefined;
-    if (!room) return bot.visibility;
-    const members = room.memberIds.flatMap((id) => {
-      const member = store.bot(id);
-      return member ? [member.visibility] : [];
-    });
-    return intersectAudience(bot.visibility, narrowestAudience([room.audienceFloor, ...members]));
-  };
+  const sourceAudience = (bot: { visibility?: unknown }): unknown => bot.visibility;
   const conversationStartedAt = (threadId: string): number | undefined => store.messagesFor(threadId)[0]?.at;
   // The bot record predates awaited setup work; an assignment PUT in that window must still reach this prompt.
   const liveAssigned = (bot: BotRecord) => store.bot(bot.id)?.assignedSkills ?? bot.assignedSkills;
@@ -133,7 +123,7 @@ export function createSkillsLibraryHost(deps: SkillsLibraryHostDeps) {
     if (!author) return { error: "unknown bot" };
     const shared = shareLearnedSkill({
       author, bots, name, patchAssigned,
-      audience: sourceAudience(author, receipt?.threadId),
+      audience: sourceAudience(author),
       ...(receipt?.expectSha256 ? { expectSha256: receipt.expectSha256 } : {}),
     });
     if (receipt && !("stale" in shared)) {
@@ -170,7 +160,7 @@ export function createSkillsLibraryHost(deps: SkillsLibraryHostDeps) {
       expectSha256: change.expectSha256,
       patchAssigned,
       assignOnward: mode() === "auto",
-      audience: sourceAudience(self, threadId),
+      audience: sourceAudience(self),
     });
     if ("error" in updated) return updated;
     const gist = redactSecretsInText(change.gist ?? "").replace(/\s+/g, " ").trim().slice(0, 240) || updated.description.slice(0, 240);

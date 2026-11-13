@@ -39,7 +39,7 @@ const taskTitle = async (botId: string, threadId: string): Promise<string | unde
 
 beforeAll(async () => {
   home = mkdtempSync(join(tmpdir(), "omb-regenerate-title-"));
-  const data = join(home, ".openmausbot");
+  const data = join(home, ".touko");
   const staticDir = join(home, "static");
   mkdirSync(data, { recursive: true });
   mkdirSync(join(staticDir, "assets"), { recursive: true });
@@ -141,8 +141,10 @@ describe("Regenerate title", { timeout: 60_000 }, () => {
   });
 
   it("refuses a thread with nothing to name it from, and an unknown one", async () => {
-    const fresh = (await api("POST", `/api/bots/${botId}/tasks`, {})).body.task;
-    const empty = await api("POST", `/api/bots/${botId}/tasks/${fresh.threadId}/title`);
+    const fresh = (await api("POST", "/api/bots", {
+      modelSelection: { instanceId: "titled", model: "claude-sonnet-5" }, requireAvailableModel: true,
+    })).body.bot;
+    const empty = await api("POST", `/api/bots/${fresh.id}/tasks/${fresh.threadId}/title`);
     expect(empty.status).toBe(409);
     expect(empty.body.error).toMatch(/no messages/);
     expect((await api("POST", `/api/bots/${botId}/tasks/no-such-thread/title`)).status).toBe(404);

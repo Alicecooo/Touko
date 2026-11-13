@@ -66,7 +66,6 @@ it("Chief creation uses the workspace default or a validated explicit model with
     for (const [id, modelSelection] of [[first.id, defaultModel], [second.id, explicit]]) {
       expect(bots.find((bot: any) => bot.id === id)).toMatchObject({
         section: "Design", modelSelection, approvalMode: "full", autoApprove: false, composio: false, approvePeerComms: false,
-        soul: "Complete assigned work.",
       });
     }
     await api("PATCH", "/api/config", { defaultModelSelection: explicit });

@@ -1,6 +1,4 @@
 // Receipts for bot-to-bot sends: queued (not started), injected (the recipient's turn started with it) or failed. Never report a delivery that did not happen.
-
-// Receipts for bot-to-bot sends: queued (not started), injected (the recipient's turn started with it) or failed. Never report a delivery that did not happen.
 import { clip, peerName } from "./peer-roster.ts";
 
 export type PeerDeliveryOutcome = "queued" | "injected" | "failed";
@@ -13,8 +11,6 @@ export interface PeerDeliveryReceipt {
   taskId?: string;
   requestId?: string;
   threadId?: string;
-  /** Its place in a room's line when room jobs there run one at a time. */
-  queue?: { position: number; of: number; waitingFor?: string };
 }
 
 // Detail can carry peer- or provider-authored text: flattened and clipped like a roster entry.
@@ -29,8 +25,6 @@ export function peerDeliveryReceipt(receipt: PeerDeliveryReceipt): PeerDeliveryR
     ...(receipt.taskId ? { taskId: receipt.taskId } : {}),
     ...(receipt.requestId ? { requestId: receipt.requestId } : {}),
     ...(receipt.threadId ? { threadId: receipt.threadId } : {}),
-    ...(receipt.queue ? { queue: { position: receipt.queue.position, of: receipt.queue.of,
-      ...(receipt.queue.waitingFor ? { waitingFor: clip(receipt.queue.waitingFor, DETAIL_MAX) } : {}) } } : {}),
   };
 }
 

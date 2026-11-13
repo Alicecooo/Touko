@@ -28,7 +28,6 @@ export interface TeamRouteDeps {
   broadcast(payload: Record<string, unknown>): void;
   publicBot(bot: BotRecord): WireBot;
   publicGroupState(record: GroupRecord): WireGroup;
-  groupWithThread(group: GroupRecord): WireGroup;
   defaultSelection(): Promise<ModelSelection>;
   defaultsPresetFor(body: Record<string, unknown>, includeNotes: boolean): { preset: DefaultsPreset | null; skipped: TeamExportSkip[] };
   packageImportDeps(selection: ModelSelection): PackageImportDeps;
@@ -42,7 +41,7 @@ export interface TeamRouteDeps {
 
 export function createTeamRoutes(deps: TeamRouteDeps): RouteHandler {
   const {
-    store, cfg, broadcast, publicBot, publicGroupState, groupWithThread, defaultSelection, defaultsPresetFor,
+    store, cfg, broadcast, publicBot, publicGroupState, defaultSelection, defaultsPresetFor,
     packageImportDeps, starterNotes, checkedExportSkillNames, collectExportSkills, collectTeamSkills,
   } = deps;
   return async ({ req, res, url, path, method, json, readBody }) => {
@@ -247,7 +246,7 @@ export function createTeamRoutes(deps: TeamRouteDeps): RouteHandler {
         name: imported.name,
         section: imported.section,
         bots: imported.bots.map((bot) => publicBot(store.bot(bot.id) ?? bot)),
-        groups: imported.groups.map((created) => ({ ...publicGroupState(store.group(created.id) ?? created), messages: [] })),
+        groups: imported.groups.map((created) => publicGroupState(store.group(created.id) ?? created)),
         routines: imported.routines,
         offeredSkills: imported.offeredSkills,
         connections: imported.connections,
@@ -271,7 +270,7 @@ export function createTeamRoutes(deps: TeamRouteDeps): RouteHandler {
       return outcome.ok ? json(res, 201, { skill: outcome.value }) : json(res, outcome.status, { error: outcome.error, code: outcome.code });
     }
     if (method === "POST" && path === "/api/teams/import") {
-      // Additive-only: a manifest is untrusted, so every member becomes a NEW bot and none can name an existing bot or room.
+      // Additive-only: a manifest is untrusted, so every member becomes a NEW bot and none can name an existing bot or group.
       const importMode = url.searchParams.get("mode") ?? "add";
       if (importMode === "replace") {
         return json(res, 400, { error: "Replacing your team is no longer supported. Reopen Import in the updated app to add bots alongside your existing conversations." });
@@ -279,7 +278,7 @@ export function createTeamRoutes(deps: TeamRouteDeps): RouteHandler {
       if (importMode !== "add" && importMode !== "project") {
         return json(res, 400, { error: "Team import mode must be add or project" });
       }
-      // No format can point at an existing room or choose a folder: workspace access comes only from this parameter.
+      // No format can point at an existing group or choose a folder: workspace access comes only from this parameter.
       let projectCwd: string | null = null;
       if (importMode === "project") {
         const requested = url.searchParams.get("cwd");
@@ -299,7 +298,7 @@ export function createTeamRoutes(deps: TeamRouteDeps): RouteHandler {
           const imported = importTeamBackup(store, routines!, body, await defaultSelection());
           // A restore writes transcripts without store events: these frames carry the restored pages to other clients.
           const bots = imported.bots.map((bot) => publicBot(bot));
-          const groups = imported.groups.map((group) => groupWithThread(group));
+          const groups = imported.groups.map((group) => publicGroupState(store.group(group.id) ?? group));
           for (const bot of bots) broadcast({ kind: "bot", bot });
           for (const group of groups) broadcast({ kind: "group", group });
           return json(res, 201, { ...imported, bots, groups });
@@ -320,7 +319,6 @@ export function createTeamRoutes(deps: TeamRouteDeps): RouteHandler {
       const options = {
         mode: importMode as "add" | "project",
         cwd: projectCwd,
-        room: url.searchParams.get("room") ?? undefined,
       };
       let imported: PackageImportResult;
       try {
@@ -338,7 +336,7 @@ export function createTeamRoutes(deps: TeamRouteDeps): RouteHandler {
         section: imported.section,
         bots: imported.bots.map((bot) => publicBot(store.bot(bot.id) ?? bot)),
         group: imported.group,
-        groups: imported.groups.map((created) => ({ ...created, messages: [] })),
+        groups: imported.groups.map((created) => publicGroupState(store.group(created.id) ?? created)),
         routines: imported.routines,
         offeredSkills: imported.offeredSkills,
         connections: imported.connections,

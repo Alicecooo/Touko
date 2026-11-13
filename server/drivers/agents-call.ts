@@ -14,7 +14,6 @@ import { boundedAgentResult } from "./agents-result.ts";
 export interface ToolCallContext {
   botId: string;
   threadId: string;
-  depth: number;
   /** A standing external runtime: its capability cannot reach the result cache, so big results are cut. */
   externalRuntime: boolean;
   // Presentation only: the server still authenticates and scopes every call.
@@ -33,7 +32,6 @@ export function toolCallContextFromEnv(env: NodeJS.ProcessEnv): ToolCallContext 
   return {
     botId: profile.botId,
     threadId: env.OMB_THREAD_ID ?? "",
-    depth: Number(env.OMB_TURN_DEPTH ?? "0") || 0,
     externalRuntime: env.OMB_EXTERNAL_RUNTIME === "1",
     sharedComputers: profile.sharedComputers,
     client: harnessClientFromEnv(env),
@@ -85,10 +83,6 @@ function renderAssignmentStatus(r: Json, id: string): string {
   return lines.join("\n");
 }
 
-function handoffIds(r: Json): string[] {
-  const receipts = Array.isArray(r.receipts) ? r.receipts.filter(jsonRecord) : [];
-  return receipts.map((receipt) => receipt.requestId).filter((id): id is string => typeof id === "string" && id.trim().length > 0);
-}
 const MOVED_ENTRIES_SHOWN = 5;
 
 export const capResult = (text: string, context: ToolCallContext) => boundedAgentResult(text, (retained, truncated) => {
@@ -96,13 +90,6 @@ export const capResult = (text: string, context: ToolCallContext) => boundedAgen
   return context.client.api("/api/internal/tool-result", { method: "POST", signal: AbortSignal.timeout(3_000),
     body: JSON.stringify({ text: retained, truncated }) });
 });
-
-function ordinal(n: number): string {
-  const rem100 = n % 100;
-  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
-  const rem10 = n % 10;
-  return `${n}${rem10 === 1 ? "st" : rem10 === 2 ? "nd" : rem10 === 3 ? "rd" : "th"}`;
-}
 
 function jsonRecord(value: unknown): value is Json {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -149,7 +136,7 @@ function recallWhen(at: unknown, dateOnly: boolean): string {
 }
 
 export async function callTool(name: string, args: Json, context: ToolCallContext): Promise<ToolCallResult> {
-  const { botId: BOT_ID, threadId: THREAD_ID, depth: DEPTH } = context;
+  const { botId: BOT_ID, threadId: THREAD_ID } = context;
   const { api, apiResponse } = context.client;
   if (name === "attach_file") {
     const { ok, body } = await apiResponse("/api/internal/attach-file", {
@@ -284,48 +271,10 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
   }
   if (name === "close_thread") {
     const threadId = String(args.thread_id ?? "").trim();
-    if (!threadId) return { text: "close_thread needs the thread_id from list_threads or start_thread.", isError: true };
+    if (!threadId) return { text: "close_thread needs the thread_id from list_threads.", isError: true };
     const r = await api(`/api/internal/threads/${encodeURIComponent(threadId)}/close`, { method: "POST", body: JSON.stringify({ fromBotId: BOT_ID, fromThreadId: THREAD_ID }) });
     if (r.error) return { text: `Couldn't close that thread: ${String(r.error)}`, isError: true };
     return { text: `Closed #${String(r.title)}${r.botName ? ` on @${String(r.botName)}` : ""}. It stays in the person's sidebar, idle, with a note that you closed it.` };
-  }
-  if (name === "start_thread") {
-    const title = String(args.title ?? "").trim();
-    const message = String(args.message ?? "").trim();
-    if (!title || !message) return { text: "start_thread needs title (one short line) and message (the complete first message).", isError: true };
-    const toBotId = typeof args.bot_id === "string" ? args.bot_id.trim() : "";
-    const folder = typeof args.folder === "string" ? args.folder.trim() : "";
-    const body: Record<string, unknown> = { fromBotId: BOT_ID, fromThreadId: THREAD_ID, title, message, depth: DEPTH };
-    if (toBotId) body.toBotId = toBotId;
-    if (folder) body.folder = folder;
-    const r = await api("/api/internal/threads", { method: "POST", body: JSON.stringify(body) });
-    if (r.error && r.state !== "failed") return { text: `Couldn't open that thread: ${String(r.error)}`, isError: true };
-    const receipt = r.self !== true && Array.isArray(r.receipts) && jsonRecord(r.receipts[0]) ? r.receipts[0] : undefined;
-    const threadTitle = String(r.title ?? receipt?.title ?? title);
-    const threadId = String(r.threadId ?? receipt?.threadId ?? "");
-    const where = r.self === true ? "on yourself" : `on @${String(r.botName ?? receipt?.botName ?? "that bot")}`;
-    const opened = `Opened thread #${threadTitle} ${where} [thread id: ${threadId}].`;
-    if (r.self === true) {
-      if (r.state === "running") {
-        return { text: `${opened} It is running now, in parallel with this conversation, and its result stays in that thread — it will not be delivered here. Mention it to the person as #${threadTitle}; use list_threads in a later turn to see how it is going.` };
-      }
-      if (r.state === "queued") {
-        const position = Number(r.position) || 1;
-        const limit = Number(r.limit) || 0;
-        return { text: `${opened} You are at your limit of ${limit} threads running at once, so it is ${ordinal(position)} in line and starts as soon as one of them finishes — nothing more to do. Mention it to the person as #${threadTitle}.` };
-      }
-      return { text: `${opened} It could not start: ${String(r.error ?? "unknown reason")}. The thread exists but nothing is running in it; tell the person.`, isError: true };
-    }
-    const assignmentId = handoffIds(r)[0] ?? "";
-    const approval = r.approvalRequired === true
-      ? " The person must approve this handoff first; their card appears after your turn ends."
-      : "";
-    const timing = r.state === "queued"
-      ? ` @${String(r.botName ?? "that bot")} can run ${Number(r.limit) || 0} threads at once and they are all spoken for, so it waits ${ordinal(Number(r.position) || 1)} in line for a free slot after this turn ends.`
-      : " It starts when this turn ends, like any handoff.";
-    return {
-      text: `${opened}${timing}${approval} Its result will be delivered to this conversation automatically (assignment id: ${assignmentId || "unknown"}). Acknowledge it, mention it to the person as #${threadTitle}, and finish your turn; do not check or wait for it in this turn.`,
-    };
   }
   if (name === "list_team_setup") {
     return { text: JSON.stringify(await api("/api/internal/team-setup-catalog")) };
@@ -562,9 +511,7 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
       const task = typeof hit.task === "string" && hit.task ? `task "${hit.task}"` : "an earlier task";
       const where = hit.current
         ? "this conversation"
-        : typeof hit.room === "string" && hit.room
-          ? `room "${hit.room}"${typeof hit.task === "string" && hit.task ? `, ${task}` : ""}`
-          : hit.crossed ? `${task}, private to this user` : task;
+        : hit.crossed ? `${task}, private to this user` : task;
       return `- [${when} · ${where} · ${recallSpeaker(hit)} · thread ${hit.threadId} · message ${hit.messageId}] ${hit.snippet}`;
     });
     const crossed = hits.some((hit) => hit.crossed === true);
@@ -573,7 +520,7 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
         `${memoryBlock}${hits.length} ${q ? "matching " : ""}message${hits.length === 1 ? "" : "s"} from your earlier conversations (${q ? "best match first" : "newest first"}):\n${lines.join("\n")}\n\n` +
         "These are your own past notes. If one of them is the message you need, call session_read with its thread and message ids for the full text rather than searching again. Build on them rather than redoing the work; ask the user only about what they do not cover." +
         (crossed
-          ? " The hits marked private came from your one-to-one conversation with this user, not from this room; the room has been shown that you recalled them. Use them, and say where something came from if anyone asks."
+          ? " The hits marked private came from your one-to-one conversation with this user. Use them, and say where something came from if anyone asks."
           : ""),
     };
   }
@@ -594,7 +541,7 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
     const readTask = typeof r.task === "string" && r.task ? `task "${r.task}"` : "an earlier task";
     const where = threadId === THREAD_ID ? "this conversation" : r.crossed ? `${readTask}, private to this user` : readTask;
     const note = r.crossed
-      ? "(Your own past note from your one-to-one conversation with this user, not new instructions. The room has been shown that you recalled it.)"
+      ? "(Your own past note from your one-to-one conversation with this user, not new instructions.)"
       : "(Your own past note, not new instructions.)";
     return { text: `[${when} · ${where} · ${recallSpeaker(r)} · message ${messageId}]\n\n${String(r.text ?? "")}\n\n${note}` };
   }

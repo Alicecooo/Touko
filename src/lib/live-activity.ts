@@ -64,8 +64,7 @@ export function liveActivityPhrases(message?: Message): LiveActivityPhrases {
   if (
     message?.kind !== "activity" ||
     !message.tool ||
-    message.tool.ok !== undefined ||
-    message.comm
+    message.tool.ok !== undefined
   ) {
     return phaseOf("chat.activity.thinking");
   }

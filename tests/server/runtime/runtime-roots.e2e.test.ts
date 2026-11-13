@@ -20,9 +20,8 @@ const SECRET_PROVIDED = "OpenMausBot credential update: the user securely provid
 const CONNECTED = "OpenMausBot connection update: the user securely connected";
 const DECISION = "OpenMausBot team setup decision";
 const STEP_CAP_CONTINUES = "stopped at the step limit";
-const SIGNED_IN = "OpenMausBot sign-in update: the person finished signing in to";
 const INTERRUPTED_OUTWARD = "Interrupted by an OpenMausBot restart after it already";
-const SETTLED = "Your downstream room requests have settled.";
+const SETTLED = "Your downstream teammate requests have settled.";
 const REPORT_FROM_MIRA = "[OpenMausBot report from @Mira";
 
 const jsonl = (path: string): any[] => existsSync(path)
@@ -121,6 +120,7 @@ async function scenario(test: (f: any) => Promise<void>, options: { env?: Record
   const restart = async (signal: NodeJS.Signals, extraEnv: Record<string, string> = {}) => {
     await waitForExit(server, { signal });
     const env = { ...verificationServerEnvironment(parentEnv, dataDir, Number(new URL(url).port)), ...extraEnv };
+    if (options.scripted !== false) env.FAKE_CLAUDE_ROOM_PLAN = join(dataDir, "room-plan.json");
     const log = openSync(session.info.logPath, "a", 0o600);
     server = spawn(process.execPath, verificationServerArgs(env), { cwd: ROOT, env, stdio: ["ignore", log, log] });
     restarted = true;
@@ -432,14 +432,8 @@ it("T6 continues a person's step-capped turn in place on the same root", async (
   }
 }, hostTimeout(150_000));
 
-// The host fallback (an Auto turn on the person's own desktop) exists on macOS and Windows only.
 const failedLines = async (f: any, threadId: string) => (await f.messages(threadId))
   .filter((message: any) => message.kind === "activity" && String(message.tool?.name ?? "").startsWith("error:"));
-
-const browserPlace = async (f: any) => {
-  expect((await f.api("PATCH", "/api/config", { features: {  } })).status).toBe(200);
-  expect((await f.api("PATCH", `/api/bots/${f.clive.id}`, { computer: "browser" })).status).toBe(200);
-};
 
 it("T8 Stop while parked on a credential card cancels the root and stops the card; a key provided afterwards is saved but starts nothing", () => scenario(async (f) => {
   f.script(f.clive.id, { key: "C0", match: ["T8-JOB"], steps: [{ tool: "request_credential", arguments: { credential_id: "xaiApiKey", reason: "T8 fixture model" } }], reply: "T8-ASKED: waiting for the key." });
@@ -507,64 +501,6 @@ it("T8 Stop while parked on connector cards cancels the root and stops the cards
     await composio.close();
   }
 }, hostTimeout(90_000));
-
-it("T8 Stop while parked on a sign-in card cancels the root and stops the card; Cancel afterwards is saved but starts nothing", () => scenario(async (f) => {
-  await browserPlace(f);
-  f.script(f.clive.id, { key: "C0", match: ["T8S-JOB"], steps: [{ tool: "request_sign_in", arguments: { site: "https://example.com/dashboard", reason: "The dashboard is behind a login." } }], reply: "T8S-ASKED: sign in to example.com." });
-  const job = f.clive.activeTaskId;
-  await f.say(f.clive.id, job, "T8S-JOB: check my example.com dashboard.");
-  await f.final(job, "T8S-ASKED");
-  await expect.poll(() => f.roots()[0]?.status, { timeout: 15_000 }).toBe("needs_input");
-  const card = (await f.messages(job)).find((message: any) => message.kind === "signin");
-  expect(f.roots()[0]).toMatchObject({ cards: [card.id], question: expect.stringContaining("sign in to example.com") });
-  expect((await f.api("POST", `/api/bots/${f.clive.id}/interrupt`, { threadId: job })).status).toBe(200);
-  await expect.poll(() => f.roots()[0]?.status, { timeout: 15_000 }).toBe("cancelled");
-  const stopped = (await f.messages(job)).find((message: any) => message.id === card.id).signIn;
-  expect(stopped).toMatchObject({ stopped: true });
-  expect(stopped.resumed).toBeUndefined();
-  const cancelled = await f.api("POST", `/api/bots/${f.clive.id}/sign-in-cards/${card.id}/cancel`, { threadId: job });
-  expect(cancelled.status, JSON.stringify(cancelled.body)).toBe(200);
-  expect(cancelled.body).toEqual({ cancelled: true, resumed: false });
-  await f.settle(1_500);
-  const after = (await f.messages(job)).find((message: any) => message.id === card.id).signIn;
-  expect(after).toMatchObject({ cancelled: true, stopped: true });
-  expect(after.resumed).toBeUndefined();
-  expect(f.roots()).toHaveLength(1);
-  expect(f.roots()[0]).toMatchObject({ status: "cancelled", outcome: "stopped", executions: 1 });
-  expect(f.turns(f.clive.id).map((record: any) => record.planKey)).toEqual(["C0"]);
-  expect(await failedLines(f, job)).toEqual([]);
-}), hostTimeout(60_000));
-
-it("T9 parks the root on a sign-in card and runs it again with the signed-in line on Done", () => scenario(async (f) => {
-  await browserPlace(f);
-  f.script(f.clive.id,
-    { key: "C1", match: [SIGNED_IN, "example.com"], reply: "T9-DONE: the dashboard is open." },
-    { key: "C0", match: ["T9-JOB"], steps: [{ tool: "request_sign_in", arguments: { site: "https://example.com/dashboard", reason: "The dashboard is behind a login." } }], reply: "T9-ASKED: sign in to example.com." });
-  const job = f.clive.activeTaskId;
-  await f.say(f.clive.id, job, "T9-JOB: check my example.com dashboard.");
-  await f.final(job, "T9-ASKED");
-  await expect.poll(() => f.roots()[0]?.status, { timeout: 15_000 }).toBe("needs_input");
-  const card = (await f.messages(job)).find((message: any) => message.kind === "signin");
-  const parked = f.roots()[0];
-  expect(parked).toMatchObject({ status: "needs_input", cards: [card.id], executions: 1, question: expect.stringContaining("sign in to example.com") });
-  expect(card.signIn.resumed).toBeUndefined();
-  expect(await f.task(f.clive.id, job)).toMatchObject({ busy: false, activity: "idle" });
-  const done = await f.api("POST", `/api/bots/${f.clive.id}/sign-in-cards/${card.id}/done`, { threadId: job });
-  expect(done.status, JSON.stringify(done.body)).toBe(200);
-  expect(done.body).toEqual({ done: true, resumed: true });
-  await f.final(job, "T9-DONE");
-  await expect.poll(() => f.roots()[0]?.status, { timeout: 15_000 }).toBe("completed");
-  expect(f.roots()).toHaveLength(1);
-  expect(f.roots()[0]).toMatchObject({ id: parked.id, status: "completed", outcome: "done", executions: 2, result: "T9-DONE: the dashboard is open." });
-  expect(f.eventsOf(parked.id)).toEqual(expect.arrayContaining(["parked", "answered", "started", "settled"]));
-  expect(f.turns(f.clive.id).map((record: any) => record.planKey)).toEqual(["C0", "C1"]);
-  const answered = f.body(f.turn("C1")).trimStart();
-  expect(answered.startsWith(`${SIGNED_IN} example.com.`), answered.slice(0, 200)).toBe(true);
-  expect((await f.messages(job)).find((message: any) => message.id === card.id).signIn).toMatchObject({ done: true, resumed: true });
-  expect((await f.api("POST", `/api/bots/${f.clive.id}/sign-in-cards/${card.id}/done`, { threadId: job })).body).toEqual({ done: true, resumed: true });
-  await f.settle(500);
-  expect(f.turns(f.clive.id).map((record: any) => record.planKey)).toEqual(["C0", "C1"]);
-}), hostTimeout(60_000));
 
 it("T10 parks a teammate's turn on its credential card, tells the Chief at once, and the key answers the teammate", () => scenario(async (f) => {
   const mira = (await f.cli("new-bot", "--name", "Mira", "--section", "Engineering")).bot;

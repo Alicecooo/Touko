@@ -1,6 +1,5 @@
-import type { ProviderRegistry } from "../harness/registry.ts";
 import type { RoutineManager } from "../automation/routines.ts";
-import type { BotRecord, GroupRecord, Store } from "../storage/store.ts";
+import type { Store } from "../storage/store.ts";
 import { PASS, type RouteHandler } from "./table.ts";
 
 export interface BotLifecycleRouteDeps {
@@ -9,15 +8,11 @@ export interface BotLifecycleRouteDeps {
   interruptAllDirectThreads(botId: string): Promise<void>;
   cancelDirectTurnDispatch(botId: string, expectedThreadId?: string): unknown;
   revokeInternalCapabilitiesForThread(threadId: string): void;
-  activeGroupTurnForBot(botId: string): { group: GroupRecord; threadId: string } | null;
-  cancelGroupTurnOperations(groupId: string, threadId: string): void;
-  runningTurnInstance(bot: BotRecord | null | undefined, threadId: string): ReturnType<ProviderRegistry["get"]>;
-  closeOpenApprovals(threadId: string): void;
   deleteBotWithLifecycle(botId: string): Promise<{ status: number; body: unknown }>;
 }
 
 export function createBotLifecycleRoutes(deps: BotLifecycleRouteDeps): RouteHandler {
-  const {store, interruptAllDirectThreads, cancelDirectTurnDispatch, revokeInternalCapabilitiesForThread, activeGroupTurnForBot, cancelGroupTurnOperations, runningTurnInstance, closeOpenApprovals, deleteBotWithLifecycle} = deps;
+  const {store, interruptAllDirectThreads, cancelDirectTurnDispatch, revokeInternalCapabilitiesForThread, deleteBotWithLifecycle} = deps;
   return async ({ req, res, path, method, json }) => {
     let m: RegExpMatchArray | null = null;
     const routines = deps.routines();
@@ -37,13 +32,6 @@ export function createBotLifecycleRoutes(deps: BotLifecycleRouteDeps): RouteHand
                 revokeInternalCapabilitiesForThread(routineRun.threadId);
               }
               await routines!.cancelRun(routineRun.id);
-            }
-            const groupTurn = activeGroupTurnForBot(bot.id);
-            if (groupTurn) {
-              cancelGroupTurnOperations(groupTurn.group.id, groupTurn.threadId);
-              revokeInternalCapabilitiesForThread(groupTurn.threadId);
-              await runningTurnInstance(bot, groupTurn.threadId)?.adapter.interruptTurn(groupTurn.threadId).catch(() => {});
-              closeOpenApprovals(groupTurn.threadId);
             }
           }),
       );

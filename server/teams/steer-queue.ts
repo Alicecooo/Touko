@@ -121,7 +121,7 @@ export function queueSteeredMessage(
 export function queuedThreadPosition(botId: string, threadId: string): number | null {
   let position = 0;
   for (const [candidate, entry] of queues) {
-    if (entry.botId !== botId || !entry.items.some((item) => item.reason === "capacity" || item.reason === "group-turn")) continue;
+    if (entry.botId !== botId || !entry.items.some((item) => item.reason === "capacity")) continue;
     position += 1;
     if (candidate === threadId) return position;
   }

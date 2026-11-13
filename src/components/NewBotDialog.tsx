@@ -209,7 +209,7 @@ function DraftSection({ active, draft }: { active: Section; draft: BotCreationDr
       />
     <label className="block text-[13px] text-ink-secondary">{t("newBot.team")}
       <Select size="lg" className="mt-1.5 w-full" value={bot.section ?? ""} onChange={event => draft.patch({ section: event.target.value })}>
-        <option value="">{t("teamSettings.general")}</option>{[...new Set([...(state.sections ?? []), ...state.bots.map(bot => bot.section ?? "")])].filter(Boolean).map(name => <option key={name}>{name}</option>)}
+        <option value="">{t("newBot.general")}</option>{[...new Set([...(state.sections ?? []), ...state.bots.map(bot => bot.section ?? "")])].filter(Boolean).map(name => <option key={name}>{name}</option>)}
       </Select>
     </label>
   </div>;

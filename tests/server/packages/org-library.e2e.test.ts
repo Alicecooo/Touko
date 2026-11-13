@@ -27,7 +27,7 @@ function entry(packageId: string, rel: ReturnType<typeof release>) {
     publisher: { organizationId: PUBLISHER, name: "Acme Partners", self: false }, mode: "available", offAction: "keep",
     release: { version: pkg.release, sha256: rel.sha256, sizeBytes: Buffer.byteLength(rel.bytes), formatVersion: 2, publishedAt: 1_700_000_000_000, notes: "" },
     withdrawnReleases: [],
-    contents: { bots: pkg.agents.length, skills: pkg.skills?.entries.length ?? 0, presets: pkg.presets?.length ?? 0, rooms: pkg.rooms?.length ?? 0,
+    contents: { bots: pkg.agents.length, skills: pkg.skills?.entries.length ?? 0, presets: pkg.presets?.length ?? 0,
       routines: pkg.routines?.length ?? 0, connections: pkg.connections?.length ?? 0, botNames: pkg.agents.map((agent: any) => agent.name) },
     scanFindings: 0,
   };

@@ -11,7 +11,7 @@ import { Output, processIo, type HeadlessIo } from "./output.ts";
 import { runVerb, waitVerb } from "./run.ts";
 import { teamApplyVerb, teamExportVerb } from "./team-apply.ts";
 
-const T = "TARGET is a bot by name or id, or --bot ID, --thread ID; --task ID picks one of its conversations.";
+const T = "TARGET is a bot by name or id, or --bot ID, --thread ID; --task ID selects an existing internal task.";
 
 /** Each verb's help, in plain words. `openmausbot help VERB` or `VERB --help`. */
 export const VERB_HELP: Record<string, string> = {
@@ -25,11 +25,11 @@ export const VERB_HELP: Record<string, string> = {
   send: `openmausbot send TARGET (TEXT | --text TEXT | --message-file FILE | -) [--send-id ID] [--dry-run]
   Send one message and return at once. The same --send-id never sends twice.
   ${T}`,
-  run: `openmausbot run TARGET (TEXT | --message-file FILE | -) [--task new|current|ID] [--title T]
+  run: `openmausbot run TARGET (TEXT | --message-file FILE | -) [--task current|ID]
                 [--wait job|turn|none] [--timeout 30m] [--on-input exit|wait|stop] [--on-timeout leave|stop]
                 [--strict] [--export DIR [--force]]
   Give a bot one job and wait until it, and every teammate it asked, is done.
-  It starts a new conversation unless --task says otherwise, prints progress to stderr,
+  It sends to the bot's main conversation unless --task selects an existing internal task, and prints progress to stderr,
   then the final reply and the files it links. --export writes the job to DIR once it ends
   (a new or empty folder, checked before anything is sent; --force writes into a used one).
   --on-input: exit (3) when someone must answer, wait for the answer, or stop the job.
@@ -44,7 +44,7 @@ export const VERB_HELP: Record<string, string> = {
   interrupt: `openmausbot interrupt TARGET [--tree] [--dry-run]\n  Press Stop on a conversation. --tree also stops every teammate still working on its job.
   ${T}`,
   "new-bot": "openmausbot new-bot NAME [--title T] [--team T] [--model INSTANCE/MODEL] [--effort E]\n  Make a bot.",
-  "set-model": "openmausbot set-model BOT --model INSTANCE/MODEL [--effort E] [--task ID] [--dry-run]\n  Change an idle bot's model (or one idle conversation's, with --task).",
+  "set-model": "openmausbot set-model BOT --model INSTANCE/MODEL [--effort E] [--task ID] [--dry-run]\n  Change an idle bot's model (or one idle internal task's, with --task).",
   edit: "openmausbot edit BOT --message ID (TEXT | --text TEXT) [--task ID] [--dry-run]\n  Rewrite an earlier message of yours and have the bot answer again from there.",
   export: `openmausbot export TARGET --out DIR [--root ID] [--since MS] [--max-files 200] [--max-screens 100] [--max-bytes 500MB] [--force]
   Write a conversation's job to DIR: the job tree, every transcript (secrets removed),

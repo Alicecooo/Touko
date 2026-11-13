@@ -13,9 +13,7 @@ import { HIGHLEVEL_TOOLS, type HighLevelToolResult, type HighLevelWriteRecord } 
 export interface HighLevelHostDeps {
   service: HighLevelService;
   dataDir: string;
-  bot(id: string): (HighLevelBot & { color?: string }) | undefined | null;
-  /** True when the thread is a room, so the activity row names its author. */
-  inRoom(threadId: string): boolean;
+  bot(id: string): HighLevelBot | undefined | null;
   appendMessage(threadId: string, message: Record<string, unknown>): void;
 }
 
@@ -66,11 +64,9 @@ export function createHighLevelHost(deps: HighLevelHostDeps): HighLevelHost {
           return verdict.ok ? { ok: true } : { ok: false, text: verdict.text };
         },
         onWrite: (record) => {
-          const bot = deps.bot(capability.botId);
           deps.appendMessage(capability.threadId, {
             role: "bot", kind: "activity",
             tool: { name: `mcp__${HIGHLEVEL_MCP_SERVER}__${record.tool}`, ok: true, summary: writeSummary(record) },
-            ...(bot && deps.inRoom(capability.threadId) ? { from: { botId: bot.id, name: bot.name, color: bot.color } } : {}),
           });
         },
       });

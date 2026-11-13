@@ -122,7 +122,7 @@ export async function runRoomHandoffAgent(argv: string[], planPath: string, prom
   const system = launch?.system ?? readAtLaunch(arg("--append-system-prompt-file"));
   // Claude snapshots the launch-time system prompt; later instructions arrive in the user message.
   const turnContext = `${system}\n${JSON.stringify(prompt)}`;
-  const resumed = turnContext.includes("Your downstream room requests have settled.");
+  const resumed = turnContext.includes("Your downstream teammate requests have settled.");
   // `byPrompt` [{ promptIncludes, plan }] picks a plan by what the turn was sent; first match wins.
   const botPlan = JSON.parse(readFileSync(planPath, "utf8"))[botId] ?? {};
   const basePlan = (botPlan.byPrompt as Array<{ promptIncludes: string; plan: any }> | undefined)

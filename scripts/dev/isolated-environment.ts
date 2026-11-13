@@ -4,7 +4,7 @@
 // The openmausbot headless verbs for verifying an isolated fixture. A verb that
 // changes something never runs on a server it merely found.
 import { spawn, type ChildProcess } from "node:child_process";
-import { closeSync, mkdirSync, mkdtempSync, openSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -157,6 +157,8 @@ export function verificationServerEnvironment(parentEnv: NodeJS.ProcessEnv, data
     // login shell's PATH, finding a developer's own engine CLIs that CI lacks.
     OMB_TEST_SEALED_PATH: "1",
   });
+  const scriptedPlan = join(dataDir, "room-plan.json");
+  if (existsSync(scriptedPlan)) childEnv.FAKE_CLAUDE_ROOM_PLAN = scriptedPlan;
   // The fake engines' knobs are the one thing a caller may script into the child.
   for (const [key, value] of Object.entries(parentEnv)) {
     // FAKE_CLAUDE_DUMP stays the launcher's: assertions read fixtureDumpPath.
@@ -206,8 +208,8 @@ export async function launchVerificationServer(
   /** A stand-in enterprise layer (the folder shape core loads) and the key
    * it should accept, so a recipe can prove entitled behaviour offline. */
   enterprise?: { dir: string; licenseKey: string },
-  /** Legacy fixture slot retained for callers; group conversations are no longer provisioned. */
-  _room?: { scripted: boolean },
+  /** Enables the existing scripted fake-provider plan for multi-turn verification. */
+  scriptedAgent?: { scripted: boolean },
   /** Optional repository-owned fake providers for multi-engine setup checks. */
   extraProviders: Array<"codex" | "cline"> = [],
   /** Programmatic tests only: an owned loopback Boat provider, never a live account. */
@@ -268,6 +270,7 @@ export async function launchVerificationServer(
   catch (error) { await removeTempDir(dataDir); throw error; }
   const log = openSync(logPath, "a", 0o600);
   const childEnv = verificationServerEnvironment(parentEnv, dataDir, port);
+  if (scriptedAgent?.scripted) childEnv.FAKE_CLAUDE_ROOM_PLAN = join(dataDir, "room-plan.json");
   // Opt-in live Local VM fixture: keep the temporary home and fake engine,
   // granting only the explicitly selected machine connection and static UI.
   if (localVm) Object.assign(childEnv, {
