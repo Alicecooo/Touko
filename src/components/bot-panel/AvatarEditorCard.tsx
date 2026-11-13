@@ -5,7 +5,7 @@ import { t } from "@/lib/i18n";
 import type { LocaleKey } from "@/locales";
 import type { Bot } from "@/state/store";
 import { portraitFromAvatarUrl } from "../../../shared/portrait-avatars";
-import { PortraitAvatarPicker } from "../PortraitAvatarPicker";
+import { MascotAvatarPicker } from "../MascotAvatarPicker";
 import { AvatarFraming, OrganizationAvatarIcons, useAvatarImage, type AvatarPatch } from "../avatar-editing";
 
 export type AvatarEditorTab = "bot" | "upload";
@@ -38,7 +38,7 @@ export function AvatarEditorCard({ bot, onPatch, onClose }: {
     </div>
     <div role="tabpanel" id={"avatar-" + bot.id + "-panel-" + tab} aria-labelledby={"avatar-" + bot.id + "-tab-" + tab}
       className="max-h-[min(650px,calc(100dvh-200px))] overflow-y-auto p-3">
-      {tab === "bot" && <PortraitAvatarPicker bot={bot} disabled={busy} onPatch={onPatch} />}
+      {tab === "bot" && <MascotAvatarPicker bot={bot} disabled={busy} onPatch={onPatch} />}
       {tab === "upload" && <>
         <OrganizationAvatarIcons busy={busy} onUpload={file => void upload(file)} />
         {customImage && <AvatarFraming bot={bot} disabled={busy} onPatch={onPatch} />}

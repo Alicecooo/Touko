@@ -1,11 +1,12 @@
 import type { NotificationTarget } from "@/lib/notify";
 import type { Action, AppState } from "./store";
+import type { PrivateChatRef } from "../../shared/private-chats";
 
 interface NotificationThreadOwner {
   id: string;
   threadId: string;
   mainThreadId?: string;
-  tasks?: Array<{ threadId: string }>;
+  tasks?: Array<{ threadId: string; privateChatRef?: PrivateChatRef }>;
 }
 
 interface NotificationRoutingState {
@@ -13,9 +14,9 @@ interface NotificationRoutingState {
 }
 
 export function visibleNotificationThread(
-  state: NotificationRoutingState & Pick<AppState, "activeView" | "selectedId">,
+  state: NotificationRoutingState & Pick<AppState, "activeView" | "selectedId" | "privateChatsOpen">,
 ): string | null {
-  if (state.activeView !== "chat") return null;
+  if (state.activeView !== "chat" || state.privateChatsOpen) return null;
   return (
     state.bots.find((candidate) => candidate.id === state.selectedId)?.threadId ??
     null
@@ -42,13 +43,13 @@ export function openNotificationTarget(
   else openBot(dispatch, bot, threadsShown);
 }
 
-export function botOpensTo(bot: Pick<NotificationThreadOwner, "threadId" | "mainThreadId" | "tasks">, threadsShown: boolean): string {
-  return !threadsShown && bot.mainThreadId && bot.tasks?.some((task) => task.threadId === bot.mainThreadId)
+export function botOpensTo(bot: Pick<NotificationThreadOwner, "threadId" | "mainThreadId" | "tasks">, _threadsShown: boolean): string {
+  return bot.mainThreadId && bot.tasks?.some((task) => task.threadId === bot.mainThreadId)
     ? bot.mainThreadId : bot.threadId;
 }
 
-export function awayFromMainThread(bot: Pick<NotificationThreadOwner, "threadId" | "mainThreadId" | "tasks">, threadsShown: boolean): boolean {
-  return !threadsShown && botOpensTo(bot, false) !== bot.threadId;
+export function awayFromMainThread(bot: Pick<NotificationThreadOwner, "threadId" | "mainThreadId" | "tasks">, _threadsShown: boolean): boolean {
+  return botOpensTo(bot, false) !== bot.threadId;
 }
 
 export function openBot(
@@ -64,10 +65,15 @@ export function openBot(
 /** With threads hidden the switch alone selects the bot, so the thread left behind keeps its unread mark. */
 export function openBotThread(
   dispatch: (action: Action) => void,
-  bot: Pick<NotificationThreadOwner, "id" | "threadId">,
+  bot: Pick<NotificationThreadOwner, "id" | "threadId" | "tasks">,
   threadId: string,
   threadsShown: boolean,
 ) {
+  const chat = bot.tasks?.find(task => task.threadId === threadId)?.privateChatRef;
+  if (chat) {
+    dispatch({ type: "openPrivateChats", botId: bot.id, chatId: chat.id });
+    return;
+  }
   if (threadsShown || threadId === bot.threadId) dispatch({ type: "select", id: bot.id });
   dispatch({ type: "switchTask", botId: bot.id, threadId });
 }

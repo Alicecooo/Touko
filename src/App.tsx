@@ -6,6 +6,7 @@ import { ThreadRefsProvider } from "@/components/ThreadRefs";
 import { initAnalytics } from "@/lib/analytics";
 import { Sidebar } from "@/components/Sidebar";
 import { ChatView } from "@/components/ChatView";
+import { PrivateChatsPanel } from "@/components/PrivateChatsPanel";
 import { SIDEBAR_AND_PANEL_FIT, TWO_SIDE_PANELS_FIT, useMediaQuery } from "@/lib/use-media-query";
 import { PluginsPanel, preloadConnectedApps } from "@/components/PluginsPanel";
 import { ActivityPanel, BotSettingsDialog, InspectorPanel, NewBotDialog, preloadScreens, SettingsModal, TriggersPage } from "@/components/lazy-screens";
@@ -98,7 +99,13 @@ function Shell() {
 
   useEffect(() => {
     setDrawerOpen(false);
-  }, [state.selectedId, bot?.threadId, state.activeView, state.pluginsOpen, state.settingsOpen]);
+  }, [state.selectedId, bot?.threadId, state.activeView, state.pluginsOpen, state.settingsOpen, state.privateChatsOpen, state.privateChatId]);
+
+  useEffect(() => {
+    if (state.privateChatsOpen && state.hydrated && !state.bots.some((candidate) => candidate.id === state.privateChatsBotId && !candidate.hidden)) {
+      dispatch({ type: "closePrivateChats" });
+    }
+  }, [state.privateChatsOpen, state.privateChatsBotId, state.bots, state.hydrated, dispatch]);
 
   const closeCalendar = useCallback(() => {
     dispatch({ type: "select", id: state.selectedId });
@@ -137,6 +144,8 @@ function Shell() {
       />}
       {state.activeView === "routines" ? (
         <TriggersPage onBack={closeCalendar} />
+      ) : state.privateChatsOpen && state.privateChatsBotId ? (
+        <PrivateChatsPanel botId={state.privateChatsBotId} chatId={state.privateChatId} />
       ) : noEngines ? (
         <NoEngines />
       ) : bot ? (

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { AVATAR_ZOOM_MAX, AVATAR_ZOOM_MIN, BOT_AVATAR_CROPS, botAvatarCropSchema, botAvatarUrlSchema } from "../../shared/bot-avatar.ts";
 import { BOT_PROFILE_LIMITS, fitsOnOneLine } from "../../shared/bot-profile.ts";
+import { mascotBodySchema } from "../../shared/mascot-bodies.ts";
 
 import type { BotRecord } from "../storage/store.ts";
 
@@ -12,6 +13,7 @@ export const BOT_PROFILE_PATCH_FIELDS = [
   "title",
   "description",
   "notifications",
+  "mascotBody",
   "avatarUrl",
   "avatarCrop",
   "avatarZoom",
@@ -44,15 +46,15 @@ export const profilePatchSchema = z.object( {
   avatarZoom: z.number({ error: "avatarZoom must be a number from 1 to 3" }).finite().min(AVATAR_ZOOM_MIN).max(AVATAR_ZOOM_MAX).optional(),
   avatarFocusX: z.number({ error: "avatarFocusX must be a number from 0 to 1" }).finite().min(0).max(1).optional(),
   avatarFocusY: z.number({ error: "avatarFocusY must be a number from 0 to 1" }).finite().min(0).max(1).optional(),
-  // Read retired fields from old bot/default records, but never retain them.
-  mascotBody: z.string().max(40).optional(),
+  mascotBody: mascotBodySchema.nullable().optional(),
+  // Read the retired reply style from old bot/default records, but never retain it.
   replyStyle: z.enum(["default", "conversational"]).optional()});
 
 export type BotProfilePatchInput = z.input<typeof profilePatchSchema>;
 
 export type BotProfilePatch = Partial<
   Pick<
-    BotRecord, "name" | "title" | "description" | "notifications" | "avatarUrl" | "avatarCrop" | "avatarZoom" | "avatarFocusX" | "avatarFocusY"
+    BotRecord, "name" | "title" | "description" | "notifications" | "mascotBody" | "avatarUrl" | "avatarCrop" | "avatarZoom" | "avatarFocusX" | "avatarFocusY"
   >
 >;
 
@@ -77,7 +79,7 @@ export function parseBotProfilePatch(input: BotProfilePatchInput, strict = false
     return { ok: false, error: issue?.message ?? "invalid profile patch" };
   }
 
-  const { avatarUrl, mascotBody: _retiredBody, replyStyle: _retiredReplyStyle, ...fields } = parsed.data;
+  const { avatarUrl, replyStyle: _retiredReplyStyle, ...fields } = parsed.data;
   const patch: BotProfilePatch = fields;
   if (avatarUrl !== undefined) patch.avatarUrl = avatarUrl || undefined;
   return { ok: true, patch };

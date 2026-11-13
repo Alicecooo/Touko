@@ -8,16 +8,23 @@ export function ThreadChip({ message }: { message: Message }) {
   const { state, dispatch } = useStore();
   const showThreads = useShowThreads();
   const ref = message.threadRef;
+  const privateChat = message.privateChatRef;
   const tool = message.tool;
-  if (!ref || !tool) return null;
-  const bot = state.bots.find((candidate) => candidate.id === ref.botId);
+  if ((!ref && !privateChat) || !tool) return null;
+  const bot = state.bots.find((candidate) => candidate.id === ref?.botId);
   return (
     <div className="flex justify-start">
       <button
         type="button"
-        data-thread-chip={ref.threadId}
-        onClick={() => openThread(dispatch, ref, state, showThreads)}
-        title={t("chat.openThread", { title: ref.title })}
+        data-thread-chip={ref?.threadId}
+        data-private-chat={privateChat?.id}
+        onClick={() => {
+          if (privateChat) {
+            const botId = privateChat.botIds.includes(state.selectedId) ? state.selectedId : privateChat.botIds[0];
+            dispatch({ type: "openPrivateChats", botId, chatId: privateChat.id });
+          } else if (ref) openThread(dispatch, ref, state, showThreads);
+        }}
+        title={privateChat ? t("privateChats.open") : t("chat.openThread", { title: ref?.title ?? "" })}
         className="ui-pill"
       >
         {bot ? <BotAvatar bot={bot} size={16} /> : <MessagesSquare size={13} aria-hidden="true" />}

@@ -37,6 +37,7 @@ export const SERVICE_ALLOW: ReadonlyArray<{ methods: readonly string[]; path: Re
   { methods: ["GET"], path: /^\/api\/edition$/ },
   { methods: ["GET"], path: /^\/api\/brand$/ },
   { methods: ["GET"], path: /^\/api\/bots$/ },
+  { methods: ["GET"], path: /^\/api\/private-chats(?:\/[\w-]+)?$/ },
   { methods: ["GET"], path: /^\/api\/threads\/[\w-]+\/messages$/ },
   { methods: ["GET"], path: /^\/api\/attachments\/[\w.-]+$/ },
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/tasks$/ },
@@ -308,8 +309,6 @@ export const CLIENT_ALLOW: ReadonlyArray<{ methods: readonly string[]; path: Reg
   { methods: ["GET"], path: /^\/api\/bots\/[\w-]+\/connector-cards\/[\w-]+\/status$/ },
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/connector-cards\/[\w-]+\/(?:resume|dismiss)$/ },
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/always-allow$/ }, // must match a pending card
-  { methods: ["POST"], path: /^\/api\/groups$/ },
-  { methods: ["PATCH"], path: /^\/api\/groups\/[\w-]+$/ }, // grouping metadata only: see clientGroupPatchViolation
   { methods: ["POST"], path: /^\/api\/threads\/[\w-]+\/messages\/[\w-]+\/reactions$/ },
   { methods: ["POST"], path: /^\/api\/attachments$/ },
   { methods: ["GET"], path: /^\/api\/attachments\/[\w.-]+$/ },
@@ -336,20 +335,12 @@ export function requiredScope(method: string, path: string, features: { sharedCo
 
 /** A client may change how a bot looks, never what it may do. */
 const CLIENT_BOT_PATCH_FIELDS = new Set([
-  "unread", "pinned", "pinnedMessageId", "color", "mascotExpression",
+  "unread", "pinned", "pinnedMessageId", "color", "mascotExpression", "mascotBody",
   "avatarUrl", "avatarCrop", "avatarZoom", "avatarFocusX", "avatarFocusY",
 ]);
 export function clientBotPatchViolation(body: unknown): string | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) return "body";
   for (const key of Object.keys(body)) if (!CLIENT_BOT_PATCH_FIELDS.has(key)) return key;
-  return null;
-}
-
-/** A group is a bot-labeling container; clients may only change its display state. */
-const CLIENT_GROUP_PATCH_FIELDS = new Set(["name", "unread", "pinnedMessageId", "section"]);
-export function clientGroupPatchViolation(body: unknown): string | null {
-  if (!body || typeof body !== "object" || Array.isArray(body)) return "body";
-  for (const key of Object.keys(body)) if (!CLIENT_GROUP_PATCH_FIELDS.has(key)) return key;
   return null;
 }
 

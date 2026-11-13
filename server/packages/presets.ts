@@ -411,10 +411,11 @@ export function presetFromDefaults(defaults: NewBotDefaults | undefined, options
     ...(trimmed(profile.title) ? { title: profile.title!.trim() } : {}),
     ...(trimmed(profile.description) ? { description: profile.description!.trim() } : {}),
   };
-  const mascotExpression = profile.mascotExpression?.trim() || undefined;  if (profile.color || mascotExpression || options.avatar) {
+  const mascotExpression = profile.mascotExpression?.trim() || undefined;  if (profile.color || mascotExpression || profile.mascotBody || options.avatar) {
     const crop = profile.avatarCrop === "rounded" || profile.avatarCrop === "square" ? profile.avatarCrop : "circle";
     bot.appearance = {
       color: profile.color ?? "green",
+      ...(profile.mascotBody ? { mascotBody: profile.mascotBody } : {}),
       ...(mascotExpression ? { mascotExpression } : {}),      ...(options.avatar ? { avatar: { ...options.avatar, crop } } : {}),
     };
   }

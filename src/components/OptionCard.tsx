@@ -30,12 +30,10 @@ export function OptionCard({
   botId,
   threadId,
   message,
-  groupId,
 }: {
   botId: string;
   threadId?: string;
   message: Message;
-  groupId?: string;
 }) {
   const { state, dispatch } = useStore();
   const [custom, setCustom] = useState("");
@@ -51,12 +49,12 @@ export function OptionCard({
 
   const answer = (text: string) => {
     if (!text.trim()) return;
-    dispatch({ type: "answerCard", botId, threadId, messageId: message.id, answer: text.trim(), groupId });
+    dispatch({ type: "answerCard", botId, threadId, messageId: message.id, answer: text.trim() });
     if (card.requestId) returnFocusToComposer();
   };
 
   const dismiss = canDismissOptionCard(card)
-    ? () => dispatch({ type: "dismissCard", botId, threadId, messageId: message.id, groupId })
+    ? () => dispatch({ type: "dismissCard", botId, threadId, messageId: message.id })
     : undefined;
 
   if (card.requestId && card.answered) {

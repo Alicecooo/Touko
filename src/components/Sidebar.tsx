@@ -896,6 +896,18 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
           (cn("top-full mt-1", density === "icons" ? "left-0" : "right-0")),
           plusMotion.className,
         )} {...plusMotion.exitProps}>
+          <button
+            type="button"
+            onClick={() => {
+              setPlusOpen(false);
+              setTeamPickerOpen(false);
+              dispatch({ type: "toggleNewBot", open: true });
+            }}
+            className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-[14px] text-ink hover:bg-raised/70"
+          >
+            <BotIcon size={16} className="text-ink-secondary" />
+            {t("sidebar.newBot")}
+          </button>
           {!remoteClient && <button
             onClick={() => { setPlusOpen(false); setNewTeam(true); }}
             className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-[14px] text-ink hover:bg-raised/70"
@@ -1220,15 +1232,6 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
       {<div className={cn("pb-3 pt-2", density === "icons" ? "flex flex-col items-center gap-1 px-2" : "px-3")}>
         {density === "icons" ? (
           <div className="flex flex-col items-center justify-center gap-1">
-            <button
-              type="button"
-              onClick={() => dispatch({ type: "toggleNewBot", open: true })}
-              aria-label={t("sidebar.newBot")}
-              title={t("sidebar.newBot")}
-              className="flex size-[46px] shrink-0 items-center justify-center rounded-xl text-ink-secondary hover:bg-raised hover:text-ink"
-            >
-              <BotIcon size={20} />
-            </button>
             <SidebarAppsButton />
             <SidebarProfileMenu iconOnly />
           </div>
@@ -1237,15 +1240,6 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
             <div className="min-w-0 flex-1">
               <SidebarProfileMenu />
             </div>
-            <button
-              type="button"
-              onClick={() => dispatch({ type: "toggleNewBot", open: true })}
-              title={t("sidebar.newBot")}
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-ink-secondary hover:bg-raised hover:text-ink"
-            >
-              <BotIcon size={16} />
-              <span>{t("sidebar.newBot")}</span>
-            </button>
             <SidebarAppsButton />
           </div>
         )}

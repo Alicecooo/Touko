@@ -226,7 +226,7 @@ export interface RunInput {
 
 export type RunResult =
   | { kind: "completed"; text: string; evidence?: TurnEvidence }
-  | { kind: "failed"; outcome: Exclude<Outcome, "done" | "needs_input">; text: string; evidence?: TurnEvidence }
+  | { kind: "failed"; outcome: Exclude<Outcome, "done" | "needs_input">; text: string; evidence?: TurnEvidence; terminal?: boolean }
   | { kind: "needs_input"; question: string; cards?: string[]; evidence?: TurnEvidence }
   /** The turn stopped short (a step cap, a seat it could not get) and the
    * same node continues in place with its next execution. */
@@ -236,6 +236,8 @@ export type RunResult =
 export interface EndResult {
   ok: boolean;
   text: string;
+  /** End this assignment and its descendants rather than waiting for children and resuming. */
+  terminalFailure?: boolean;
   evidence?: TurnEvidence;
   /** The turn left the person something to act on: it parks until they do. */
   needsInput?: { question: string; cards?: string[] };

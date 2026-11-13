@@ -150,7 +150,8 @@ export class Runtime {
         ? { kind: "continue", text: result.text, note: result.continue.note, ...(result.continue.handoffPath ? { handoffPath: result.continue.handoffPath } : {}), ...evidence }
         : result.ok
           ? { kind: "completed", text: result.text, ...evidence }
-          : { kind: "failed", outcome: "provider_error", text: result.text, ...evidence };
+          : { kind: "failed", outcome: "provider_error", text: result.text,
+            ...(result.terminalFailure ? { terminal: true } : {}), ...evidence };
     try {
       this.withBatch(() => this.finishTurn(n, outcome));
     } catch (error) {
@@ -448,6 +449,10 @@ export class Runtime {
       return;
     }
     n.result = clip(result.text, RESULT_MAX);
+    if (result.kind === "failed" && result.terminal) {
+      this.cancelTree(n, result.text, "failed", result.outcome);
+      return;
+    }
     const kids = awaited(this.store.children(n.id));
     const outstanding = kids.some(c => !isTerminal(c)) || awaited(childrenSince(this.store, n)).length > 0;
     if (outstanding) {

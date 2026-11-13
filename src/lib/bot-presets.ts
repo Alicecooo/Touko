@@ -1,5 +1,6 @@
 import { t } from "@/lib/i18n";
 import type { BotDefaultsProfile } from "../../shared/new-bot-defaults";
+import { botMascotBody } from "../../shared/mascot-bodies";
 
 export interface BotPreset {
   id: string;
@@ -17,6 +18,7 @@ export interface BotPreset {
     appearance?: {
       color: NonNullable<BotDefaultsProfile["color"]>;
       mascotExpression?: string;
+      mascotBody?: string;
       avatar?: { mime: "image/png" | "image/jpeg" | "image/webp"; data: string; crop: "circle" | "rounded" | "square" };
     };
   };
@@ -61,6 +63,7 @@ export function presetDraftPatch(preset: BotPreset): Partial<BotDefaultsProfile>
   if (look) {
     patch.color = look.color;
     patch.mascotExpression = look.mascotExpression ?? null;
+    patch.mascotBody = botMascotBody(look.mascotBody);
   }
   return patch;
 }

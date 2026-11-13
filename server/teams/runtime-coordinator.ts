@@ -257,7 +257,7 @@ export class RuntimeCoordinator implements Coordinator {
   endTurn(id: string, result: HostTurnResult): void {
     this.ready();
     const cards = result.cards && result.cards.ids.length > 0 ? result.cards : undefined;
-    const end: EndResult = { ok: result.ok, text: result.text, ...(result.evidence ? { evidence: result.evidence } : {}),
+    const end: EndResult = { ok: result.ok, text: result.text, ...(result.terminalFailure ? { terminalFailure: true } : {}), ...(result.evidence ? { evidence: result.evidence } : {}),
       ...(cards ? { needsInput: { question: cards.question, cards: cards.ids } } : {}),
       ...(result.cap ? { continue: { note: result.cap.note, ...(result.cap.handoffPath ? { handoffPath: result.cap.handoffPath } : {}) } } : {}) };
     this.runtime.end(id, end);
@@ -268,6 +268,11 @@ export class RuntimeCoordinator implements Coordinator {
     const a = this.store.get(id);
     if (!a || a.status !== "needs_input") return false;
     return this.runtime.answer(id, text);
+  }
+
+  failNode(id: string, reason: string): void {
+    this.ready();
+    this.runtime.cancel(id, reason, "failed");
   }
 
   answerRoot(id: string, text: string): boolean {
@@ -413,7 +418,8 @@ export class RuntimeCoordinator implements Coordinator {
     if (signal.aborted) return { kind: "failed", outcome: "stopped", text: result.text };
     if (result.cap) return { kind: "continue", text: result.text, note: result.cap.note, ...(result.cap.handoffPath ? { handoffPath: result.cap.handoffPath } : {}), ...evidence(result) };
     if (result.cards) return { kind: "needs_input", question: result.cards.question, cards: result.cards.ids, ...evidence(result) };
-    if (!result.ok) return { kind: "failed", outcome: "provider_error", text: result.text, ...evidence(result) };
+    if (!result.ok) return { kind: "failed", outcome: "provider_error", text: result.text,
+      ...(result.terminalFailure ? { terminal: true } : {}), ...evidence(result) };
     const question = root ? undefined : needsInputQuestion(result.text);
     if (question !== undefined) return { kind: "needs_input", question, ...evidence(result) };
     return { kind: "completed", text: result.text, ...evidence(result) };

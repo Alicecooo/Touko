@@ -7,7 +7,7 @@ import { redactDeep } from "./output.ts";
 
 type Frame = Record<string, any>;
 
-export const DEFAULT_EVENT_KINDS = ["message", "message.patch", "thread", "bot", "group"];
+export const DEFAULT_EVENT_KINDS = ["message", "message.patch", "thread", "bot"];
 const FINAL = new Set(["needs-input", "completed", "failed", "stalled", "idle"]);
 
 export function frameThreads(frame: Frame): string[] {
@@ -16,7 +16,6 @@ export function frameThreads(frame: Frame): string[] {
     case "message": case "message.patch": case "thread": return [frame.threadId];
     case "runtime": return [frame.event?.threadId];
     case "bot": return own(frame.bot);
-    case "group": return own(frame.group);
     default: return [];
   }
 }
@@ -103,7 +102,7 @@ export async function eventsVerb(ctx: VerbContext): Promise<VerbOutcome> {
         let frame: Frame;
         try { frame = JSON.parse(data); } catch { continue; }
         if (wantFrame(frame, kinds, threads)) ctx.io.out(JSON.stringify(redactDeep(frame)));
-        if (job && ["bot", "group", "message", "hello", "ping"].includes(frame.kind)) schedule();
+        if (job && ["bot", "message", "hello", "ping"].includes(frame.kind)) schedule();
       }
     } catch (error) {
       if (signal.aborted) break;

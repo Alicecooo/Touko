@@ -119,7 +119,7 @@ export interface UsageSources {
   remoteClient: boolean;
 }
 
-export type SnapshotState = Pick<AppState, "config" | "instances" | "bots" | "groups" | "sections" | "routines" | "routinesLoadState">;
+export type SnapshotState = Pick<AppState, "config" | "instances" | "bots" | "sections" | "routines" | "routinesLoadState">;
 
 /** Null when the source fails or does not answer in time. */
 function settle<T>(work: () => Promise<T>): Promise<T | null> {

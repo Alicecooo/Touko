@@ -2,7 +2,7 @@ import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import type { Bot } from "@/state/store";
 import { t } from "@/lib/i18n";
 import { portraitFromAvatarUrl } from "../../shared/portrait-avatars";
-import { PortraitAvatarPicker } from "./PortraitAvatarPicker";
+import { MascotAvatarPicker } from "./MascotAvatarPicker";
 import { AvatarFraming, OrganizationAvatarIcons, useAvatarImage, type AvatarPatch } from "./avatar-editing";
 
 export function BotProfileAvatarCard({ bot, onPatch }: {
@@ -17,7 +17,7 @@ export function BotProfileAvatarCard({ bot, onPatch }: {
     </div>
     <div className="p-3">
       {customImage && <AvatarFraming bot={bot} disabled={busy} onPatch={onPatch} />}
-      <PortraitAvatarPicker bot={bot} disabled={busy} onPatch={onPatch} />
+      <MascotAvatarPicker bot={bot} disabled={busy} onPatch={onPatch} />
       <details className="mt-4 border-t border-hairline/40 pt-3" open={customImage || undefined}>
         <summary className="cursor-pointer text-[13px] text-ink-secondary">{t("portrait.custom")}</summary>
         <div className="pt-3">

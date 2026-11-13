@@ -80,6 +80,9 @@ export function createInternalThreadRoutes(deps: {
     if (owner.id !== from.id && task.openedBy?.botId !== from.id && !chiefTidies(from, task, task.openedBy ? store.bot(task.openedBy.botId) : undefined)) {
       return json(res, 403, { error: "that thread is not yours to close — only the bot that opened it, its own bot, or (for a thread a bot opened) a Chief of Staff can" });
     }
+    if (task.openedBy?.kind === "pair") {
+      return json(res, 409, { error: "Bot private chats stay open between assignments. Return your result and end your turn; do not close the private chat." });
+    }
     if (threadId === fromThreadId) return json(res, 400, { error: "you cannot close the thread you are speaking in — finish your turn instead" });
     if (coordinator.awaitingAnswer(threadId)) {
       return json(res, 409, { error: `#${task.title} is waiting on the person's answer to its question — it continues once they reply there, so leave it open` });

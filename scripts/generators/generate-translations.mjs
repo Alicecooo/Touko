@@ -1,6 +1,6 @@
 // Draft or refresh a JSON language pack with an authenticated local Claude
 // CLI. Models never run in CI: generated copy is reviewed and committed
-// like code, verification lives in tests/checks/translations.check.mjs.
+// with the same care as source code.
 //
 //   node scripts/generators/generate-translations.mjs it "Italian"
 //   node scripts/generators/generate-translations.mjs pt-br --accept

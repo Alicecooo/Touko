@@ -23,17 +23,14 @@
    index.ts assigned far from its declaration (`routines`, `calendarCalls`,
    `orgLibrary`, `workspaceAccess`…) becomes a small getter in deps
    (`deps.routines()`), never a reference to a hoisted name.
-6. **Tests follow the code.** A test that sliced index.ts by source text
-   (`readFileSync(... index.ts)` + markers) either imports the new module
-   directly, as a real unit test, or is deleted when an end-to-end scenario
-   already covers the behaviour. A loader hook that rewrote index.ts rewrites
-   the new file.
+6. **End-to-end tests only.** Tests belong in `tests/e2e/` and cover observable
+   behaviour through the app or server boundary. Do not add source-text checks
+   or isolated unit tests. The previous tests were removed; new end-to-end
+   scenarios will be written after feature development is complete.
 7. **Keep concerns small.** Split a module when it owns unrelated state or
    operations. There is no file-size ratchet in the current repository.
 8. **Routes** keep the rules in `server/routes/README.md` (a `createXRoutes`
-   factory, one `ROUTES.push`, `PASS` when not yours) and the route ratchet in
-   business tests live in `tests/server/`, and isolated unit tests stay beside
-   the source module. Test support lives in the domain folders under `tests/support/`.
+   factory, one `ROUTES.push`, `PASS` when not yours).
 
 Order of the split (facts and line maps in the program's notes): routes out of
 the request handler, then cards and proposal services, computers, turn

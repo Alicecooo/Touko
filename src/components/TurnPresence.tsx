@@ -97,7 +97,7 @@ export function TurnPresence({
   const { current, previous } = useRotatingPhrase(list, phase ?? list[0], seed, mounted && showWorking);
   if (!mounted) return null;
   return (
-    <div className="turn-presence flex flex-col items-start">
+    <div data-work-status="active" className="turn-presence flex flex-col items-start border-l-2 border-accent/30 py-1 pl-3">
       <div
         className={cn(
           "flex items-center gap-2",
@@ -124,7 +124,7 @@ export function TurnPresence({
               />
             </span>
             {since !== null && (
-              <WorkingTimer since={since} className="text-[11.5px] text-ink-tertiary" />
+              <WorkingTimer since={since} className="font-mono text-[11px] text-ink-tertiary" />
             )}
           </span>
         ) : null}

@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import type { MausColor } from "@/lib/bot-appearance";
-import { normalizeState } from "@/lib/bot-appearance";
+import { MAUS_COLORS, normalizeState, type MausState } from "@/lib/mascot";
 import { avatarCropRadius, botAvatarProfile, clampAvatarFocus, clampAvatarZoom, type BotAvatarCrop } from "../../shared/bot-avatar";
-import { defaultPortraitCharacter, portraitAvatarUrl, portraitFromAvatarUrl, type PortraitCharacter, type PortraitExpression } from "../../shared/portrait-avatars";
+import { portraitFromAvatarUrl } from "../../shared/portrait-avatars";
+import { botMascotBody, MASCOT_BODIES, type MascotBodyId } from "../../shared/mascot-bodies";
+import { CursorAvatar } from "./CursorAvatar";
 
 export type BotAvatarProps = {
   size?: number;
@@ -12,6 +14,7 @@ export type BotAvatarProps = {
     avatarUrl?: string | null; avatarCrop?: BotAvatarCrop;
     avatarZoom?: number; avatarFocusX?: number; avatarFocusY?: number;
     mascotExpression?: string | null;
+    mascotBody?: MascotBodyId | null;
   };
 };
 
@@ -22,11 +25,11 @@ export function BotAvatar({ bot, size = 44, label }: BotAvatarProps) {
   useEffect(() => setImageFailed(false), [profile.avatarUrl]);
 
 
-  const portrait = portraitFromAvatarUrl(profile.avatarUrl);
-  if (portrait || !profile.avatarUrl || imageFailed) {
-    return <PortraitAvatar
-      character={portrait?.character ?? defaultPortraitCharacter(bot.id || bot.name || bot.color)}
-      expression={normalizeState(bot.mascotExpression) ?? portrait?.expression ?? "idle"}
+  if (portraitFromAvatarUrl(profile.avatarUrl) || !profile.avatarUrl || imageFailed) {
+    return <MausAvatar
+      color={bot.color}
+      bodyId={bot.mascotBody ?? undefined}
+      state={normalizeState(bot.mascotExpression) ?? (bot.busy ? "working" : "idle")}
       size={size}
       label={label ?? bot.name ?? "Bot"}
     />;
@@ -62,22 +65,25 @@ export function BotAvatar({ bot, size = 44, label }: BotAvatarProps) {
   );
 }
 
-export function PortraitAvatar({ character, expression = "idle", size = 44, label = "Bot" }: {
-  character: PortraitCharacter;
-  expression?: PortraitExpression;
+function mixColor(hex: string, toward: string, amount: number): string {
+  const first = Number.parseInt(hex.slice(1), 16);
+  const second = Number.parseInt(toward.slice(1), 16);
+  return `#${[16, 8, 0].map(shift => Math.round(((first >> shift) & 255) * (1 - amount) + ((second >> shift) & 255) * amount).toString(16).padStart(2, "0")).join("")}`;
+}
+
+export function MausAvatar({ color, bodyId, state = "idle", size = 44, label = "Bot", animated = true }: {
+  color: MausColor;
+  bodyId?: MascotBodyId;
+  state?: MausState;
   size?: number;
   label?: string;
+  animated?: boolean;
 }) {
-  const source = portraitAvatarUrl(character, expression);
-  const [failedSource, setFailedSource] = useState<string | null>(null);
-  const [neutralFailed, setNeutralFailed] = useState(false);
-  useEffect(() => { setFailedSource(null); setNeutralFailed(false); }, [character]);
-  if (neutralFailed) return <InitialsAvatar initials={label.slice(0, 1)} size={size} />;
-  const shown = failedSource === source ? portraitAvatarUrl(character) : source;
-  return <span className="relative inline-block shrink-0 overflow-hidden rounded-[22%] bg-raised" style={{ width: size, height: size }}>
-    <img src={shown} alt={label} width={size} height={size} draggable={false}
-      className="block size-full object-cover"
-      onError={() => { if (shown === portraitAvatarUrl(character)) setNeutralFailed(true); else setFailedSource(source); }} />
+  const fill = MAUS_COLORS[color] ?? MAUS_COLORS.green;
+  return <span className="inline-flex shrink-0" style={{ width: size, height: size }}>
+    <CursorAvatar state={state} size={size} title={label} silhouette={MASCOT_BODIES[botMascotBody(bodyId)]}
+      gradient={[mixColor(fill, "#ffffff", 0.55), fill, mixColor(fill, "#000000", 0.42)]} lookAround={0}
+      paused={!animated} effects={animated} glyphs={animated} autoBlink={animated} />
   </span>;
 }
 

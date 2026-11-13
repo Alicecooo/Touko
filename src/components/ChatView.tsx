@@ -2,7 +2,7 @@ import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffec
 import { ThreadLinkContext } from "@/components/ThreadLinkMenu";
 import { useShowThreads } from "@/lib/thread-preferences";
 import { useCopyFeedback } from "@/lib/copy-text";
-import { AlertTriangle, Check, ChevronLeft, ChevronRight, Copy, Crown, Pin, RefreshCw, Square, Reply, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, Copy, Crown, MessagesSquare, Pin, RefreshCw, Square, Reply, X } from "lucide-react";
 import { WorkingDots } from "@/components/WorkingIndicator";
 import { ACTION_ICON, MESSAGE_ROW, MessageActions, messageActionClass } from "@/components/MessageActions";
 import { useBotMessageMenu, userMessageMenu } from "@/components/message-menu";
@@ -113,7 +113,7 @@ function useChatRows(): ChatRows {
 }
 
 const drawnBot = (bot: Bot) =>
-  [bot.id, bot.name, bot.hidden, bot.color, bot.mascotExpression, bot.avatarUrl, bot.avatarCrop, bot.avatarZoom, bot.avatarFocusX, bot.avatarFocusY].join("\u0001");
+  [bot.id, bot.name, bot.hidden, bot.color, bot.mascotBody, bot.mascotExpression, bot.avatarUrl, bot.avatarCrop, bot.avatarZoom, bot.avatarFocusX, bot.avatarFocusY].join("\u0001");
 
 function useDrawnBots(bots: readonly Bot[]): readonly Bot[] {
   const signature = bots.map(drawnBot).join("\u0002");
@@ -337,6 +337,7 @@ function BubbleEditor({
 
 const Bubble = memo(function Bubble({
   message,
+  variant = "reply",
   emerging = false,
   eagerAttachments = false,
   editing,
@@ -350,6 +351,7 @@ const Bubble = memo(function Bubble({
   onReply,
 }: {
   message: Message;
+  variant?: "reply" | "progress";
   emerging?: boolean;
   eagerAttachments?: boolean;
   editing: boolean;
@@ -422,7 +424,7 @@ const Bubble = memo(function Bubble({
     dispatch({ type: "updateTask", botId, threadId, patch: { pinnedMessageId: pinned ? "" : message.id } });
 
   return (
-    <div {...{ [MESSAGE_ROW]: "" }} className={cn("group flex w-full flex-col", user ? "animate-msg-in items-end" : "items-start")}>
+    <div {...{ [MESSAGE_ROW]: "" }} data-message-variant={variant} className={cn("group flex w-full flex-col", user ? "animate-msg-in items-end" : "items-start")}>
       {peer && <PeerLabel peer={peer} />}
       <div className={cn("flex w-full items-center gap-1.5", user ? "justify-end" : "justify-start")}>
         {user && (
@@ -448,7 +450,9 @@ const Bubble = memo(function Bubble({
                 ? "text-ink"
                 : user
                   ? cn("bg-bubble-user px-4 py-2.5 whitespace-pre-wrap text-ink", bubbleStyle && "user-bubble-colored")
-                  : "px-1 py-2 text-ink",
+                  : variant === "progress"
+                    ? "bg-ink/[0.035] px-3 py-2 text-ink-secondary"
+                    : "px-1 py-2 text-ink",
           )}
           style={user && !attachmentsOnly ? bubbleStyle : undefined}
           title={new Date(message.at).toLocaleString()}
@@ -592,7 +596,7 @@ function PeerLabel({ peer }: { peer: PeerLine }) {
 const ActivityChip = memo(function ActivityChip({ message, place = "auto" }: { message: Message; place?: EffectivePlace }) {
   const tool = message.tool;
   if (!tool) return null;
-  if (message.threadRef) return <ThreadChip message={message} />;
+  if (message.threadRef || message.privateChatRef) return <ThreadChip message={message} />;
   return <ToolActivity tool={tool} place={toolPlace(tool.name, place)} />;
 });
 
@@ -700,6 +704,7 @@ const MessagesList = memo(function MessagesList({
                   <div key={message.id} className="contents" data-mid={message.id}>
                     <Bubble
                       message={message}
+                      variant="progress"
                       editing={false}
                       pinned={message.id === pinnedMessageId}
                       onStartEdit={onStartEdit}
@@ -765,7 +770,7 @@ const MessagesList = memo(function MessagesList({
                   />
                 );
               }
-              if (!showToolCalls && !m.threadRef) return null;
+              if (!showToolCalls && !m.threadRef && !m.privateChatRef) return null;
               return <ActivityChip message={m} place={place} />;
             }
             case "digest":
@@ -1088,6 +1093,15 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
               <span className="@max-4xl/chathead:hidden">{t("chat.stop")}</span>
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "openPrivateChats", botId: bot.id })}
+            aria-label={t("privateChats.title")}
+            title={t("privateChats.title")}
+            className={cn(CHATHEAD_PILL, "size-9 justify-center text-ink-secondary hover:bg-raised-hover hover:text-ink")}
+          >
+            <MessagesSquare size={15} />
+          </button>
           <ThreadContextWarning bot={bot} messages={messages} />
           {<ChatHeaderMenu key={`menu:${bot.threadId}`} bot={bot} />}
         </div>

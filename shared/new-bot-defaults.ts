@@ -3,7 +3,7 @@ import type { RoutineInput } from "./routines";
 import type { ToolScope } from "./tool-scope";
 
 /** Data shared by the default template and an individual creation draft. */
-export type BotDefaultsProfile = Partial<Pick<WireBot, "name" | "title" | "description" | "notifications" | "avatarUrl" | "avatarCrop" | "color" | "section" | "modelSelection" | "approvalMode" | "alwaysAllow" | "chiefOfStaff" | "managedSections" | "approvePeerComms" | "composio" | "browser"
+export type BotDefaultsProfile = Partial<Pick<WireBot, "name" | "title" | "description" | "notifications" | "avatarUrl" | "avatarCrop" | "color" | "mascotBody" | "section" | "modelSelection" | "approvalMode" | "alwaysAllow" | "chiefOfStaff" | "managedSections" | "approvePeerComms" | "composio" | "browser"
 >> & {
   mascotExpression?: string | null;
   computer?: WireBot["computer"] | null;
@@ -16,7 +16,7 @@ export type BotDefaultsProfile = Partial<Pick<WireBot, "name" | "title" | "descr
   helperModel?: boolean;
 };
 
-export type BotRoutineTemplate = Omit<RoutineInput, "botId" | "target" | "groupId" | "resultsThreadId">;
+export type BotRoutineTemplate = Omit<RoutineInput, "botId" | "target" | "resultsThreadId">;
 export interface BotSkillTemplate {
   name: string;
   description: string;

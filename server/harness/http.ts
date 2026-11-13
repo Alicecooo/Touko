@@ -6,6 +6,7 @@ export { gzipTunnelReplies } from "./tunnel-gzip.ts";
 
 const jsonHooks = new WeakMap<ServerResponse, (body: unknown) => unknown>();
 const parsedBodies = new WeakMap<IncomingMessage, unknown>();
+const parsedBodySizes = new WeakMap<IncomingMessage, number>();
 
 /** Every JSON body sent on this response passes through `hook` (it may return a narrowed copy); later hooks run after earlier ones. */
 export function onJsonBody(res: ServerResponse, hook: (body: unknown) => unknown): void {
@@ -27,6 +28,12 @@ export function json(res: ServerResponse, status: number, body: unknown) {
 }
 
 export function readBody(req: IncomingMessage, limit = 1_000_000): Promise<any> {
+  if (parsedBodies.has(req)) {
+    if ((parsedBodySizes.get(req) ?? 0) > limit) {
+      return Promise.reject(Object.assign(new Error("body too large"), { status: 413 }));
+    }
+    return Promise.resolve(parsedBodies.get(req));
+  }
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let bytes = 0;
@@ -58,6 +65,7 @@ export function readBody(req: IncomingMessage, limit = 1_000_000): Promise<any> 
       }
       done = true;
       parsedBodies.set(req, body);
+      parsedBodySizes.set(req, bytes);
       resolve(body);
     });
     req.on("error", (e) => fail(400, e instanceof Error ? e.message : String(e)));

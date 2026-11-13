@@ -65,6 +65,8 @@ export interface BeginTurnRequest {
 export interface HostTurnResult {
   ok: boolean;
   text: string;
+  /** This failure ends the assignment and its descendants instead of resuming after their results. */
+  terminalFailure?: boolean;
   evidence?: TurnEvidence;
   cap?: { note: string; handoffPath?: string };
   cards?: { question: string; ids: string[] };
@@ -130,6 +132,8 @@ export interface Coordinator {
   outstandingFor(threadId: string): HandoffView[];
   beginTurn(req: BeginTurnRequest): HandoffView;
   endTurn(id: string, result: HostTurnResult): void;
+  /** Fail one assignment and its descendants without stopping unrelated work in its conversation. */
+  failNode(id: string, reason: string): void;
   answerNode(id: string, text: string): boolean;
   answerRoot(id: string, text: string): boolean;
   parkedDirect(threadId: string): HandoffView | undefined;

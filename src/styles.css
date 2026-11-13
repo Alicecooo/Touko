@@ -823,6 +823,7 @@
 
 /* Message content uses a quiet document rhythm, independent of interface labels. */
 .chat-md { font-size: 15px; font-weight: 400; line-height: 1.75; overflow-wrap: anywhere; }
+[data-message-variant="progress"] .chat-md { font-size: 13px; color: var(--color-ink-secondary); }
 .chat-md strong, .chat-md b { font-weight: 500; }
 .chat-md > * + * { margin-top: 0.85em; }
 .chat-md > :first-child { margin-top: 0; }
@@ -1302,6 +1303,9 @@ body {
   font-size: 16px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+[data-message-variant="progress"] [data-reply-segment] {
+  background: color-mix(in srgb, var(--color-ink) 3.5%, transparent);
 }
 @keyframes bubble-in {
   from { transform: translateY(6px); opacity: 0; }
