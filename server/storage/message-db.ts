@@ -71,7 +71,6 @@ function open(): DatabaseSync {
       bot_id TEXT NOT NULL,
       bot_name TEXT NOT NULL,
       thread_id TEXT NOT NULL,
-      group_id TEXT,
       title TEXT NOT NULL,
       body TEXT NOT NULL,
       avatar_url TEXT,
@@ -79,9 +78,42 @@ function open(): DatabaseSync {
     );
     CREATE INDEX IF NOT EXISTS notification_log_at ON notification_log(at);
   `);
+  migrateNotificationLog(db);
   ensureRecallIndex(db);
   ensureMemoryIndex(db);
   return db;
+}
+
+/** Remove the retired group key from existing notification databases. */
+function migrateNotificationLog(db: DatabaseSync): void {
+  const columns = db.prepare("PRAGMA table_info(notification_log)").all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "group_id")) return;
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.exec(`
+      CREATE TABLE notification_log_without_group (
+        id TEXT PRIMARY KEY,
+        at INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        bot_id TEXT NOT NULL,
+        bot_name TEXT NOT NULL,
+        thread_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        avatar_url TEXT,
+        read INTEGER NOT NULL DEFAULT 0
+      );
+      INSERT INTO notification_log_without_group(id, at, kind, bot_id, bot_name, thread_id, title, body, avatar_url, read)
+        SELECT id, at, kind, bot_id, bot_name, thread_id, title, body, avatar_url, read FROM notification_log;
+      DROP TABLE notification_log;
+      ALTER TABLE notification_log_without_group RENAME TO notification_log;
+      CREATE INDEX IF NOT EXISTS notification_log_at ON notification_log(at);
+    `);
+    db.exec("COMMIT");
+  } catch (error) {
+    try { db.exec("ROLLBACK"); } catch {}
+    throw error;
+  }
 }
 
 function ensureMemoryIndex(db: DatabaseSync): void {
@@ -266,7 +298,7 @@ const NOTIFICATION_LOG_LIMIT = 500;
 
 const rowToNotificationLogEntry = (row: {
   id: string; at: number; kind: string; bot_id: string; bot_name: string; thread_id: string;
-  group_id: string | null; title: string; body: string; avatar_url: string | null; read: number;
+  title: string; body: string; avatar_url: string | null; read: number;
 }): NotificationLogEntry => ({
   id: row.id,
   at: row.at,
@@ -274,7 +306,6 @@ const rowToNotificationLogEntry = (row: {
   botId: row.bot_id,
   botName: row.bot_name,
   threadId: row.thread_id,
-  ...(row.group_id ? { groupId: row.group_id } : {}),
   title: row.title,
   body: row.body,
   ...(row.avatar_url ? { avatarUrl: row.avatar_url } : {}),
@@ -284,8 +315,8 @@ const rowToNotificationLogEntry = (row: {
 export function insertNotificationLog(entry: NotificationLogEntry): void {
   transaction((database) => {
     database.prepare(
-      "INSERT INTO notification_log(id, at, kind, bot_id, bot_name, thread_id, group_id, title, body, avatar_url, read) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
-    ).run(entry.id, entry.at, entry.kind, entry.botId, entry.botName, entry.threadId, entry.groupId ?? null, entry.title, entry.body, entry.avatarUrl ?? null);
+      "INSERT INTO notification_log(id, at, kind, bot_id, bot_name, thread_id, title, body, avatar_url, read) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+    ).run(entry.id, entry.at, entry.kind, entry.botId, entry.botName, entry.threadId, entry.title, entry.body, entry.avatarUrl ?? null);
     database.prepare(
       "DELETE FROM notification_log WHERE id NOT IN (SELECT id FROM notification_log ORDER BY at DESC, rowid DESC LIMIT ?)",
     ).run(NOTIFICATION_LOG_LIMIT);
@@ -305,7 +336,7 @@ export function logNotification(notification: Notification): NotificationLogEntr
 
 export function recentNotificationLog(limit = NOTIFICATION_LOG_LIMIT): NotificationLogEntry[] {
   const rows = db().prepare(
-    "SELECT id, at, kind, bot_id, bot_name, thread_id, group_id, title, body, avatar_url, read FROM notification_log ORDER BY at DESC, rowid DESC LIMIT ?",
+    "SELECT id, at, kind, bot_id, bot_name, thread_id, title, body, avatar_url, read FROM notification_log ORDER BY at DESC, rowid DESC LIMIT ?",
   ).all(limit) as Array<Parameters<typeof rowToNotificationLogEntry>[0]>;
   return rows.map(rowToNotificationLogEntry);
 }
@@ -425,12 +456,6 @@ export function updateMessage(threadId: string, message: Message): void {
   db()
     .prepare("UPDATE messages SET at = ?, role = ?, kind = ?, text = ?, json = ? WHERE thread_id = ? AND id = ?")
     .run(message.at, message.role, message.kind, message.text ?? null, JSON.stringify(message), threadId, message.id);
-}
-
-export function workingGoalRunMessages(): Array<{ threadId: string; message: Message }> {
-  // Group goal runs are no longer a supported conversation mode. Keep this
-  // compatibility function for older stores, but never revive a persisted run.
-  return [];
 }
 
 export function setActiveLeaf(threadId: string, leafId: string | null): void {

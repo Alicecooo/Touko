@@ -33,8 +33,6 @@ export interface Notification {
   /** The bot's stored profile image, when it has one; clients show it as
    * the OS notification's icon so every banner carries its bot's face. */
   avatarUrl?: string;
-  /** Legacy room metadata retained when reading existing notification history. */
-  groupId?: string;
 }
 
 /** A `Notification` as the feed stores it: the live `notify` frame and `GET /api/notifications` carry the same entry. */
