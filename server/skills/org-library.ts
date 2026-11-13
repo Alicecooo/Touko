@@ -400,7 +400,6 @@ export class OrgLibrary {
     return Object.keys(this.state.installs).length > 0 ||
       Object.keys(this.state.adding).length > 0 ||
       this.deps.store.bots.some((bot) => bot.installedPackage?.source === "org") ||
-      this.deps.store.groups.some((group) => group.installedPackage) ||
       this.deps.routines.packageStamps().length > 0 ||
       this.orgPresetRows().length > 0;
   }
@@ -534,17 +533,13 @@ export class OrgLibrary {
       (add.expect.leader === null || store.bot(live.bots[add.expect.leader] ?? "")?.chiefOfStaff === true);
   }
 
-  private discardPartial(installId: string, live: LiveRecords): void {
+  private discardPartial(_installId: string, live: LiveRecords): void {
     const { store, routines } = this.deps;
     const botIds = new Set(Object.values(live.bots));
     for (const routine of routines.listRoutines()) {
       if (botIds.has(routine.botId)) routines.remove(routine.id);
     }
     const section = mostCommon(live.sections);
-    const groups = store.groups.filter((group) => group.installedPackage?.installId === installId ||
-      (!group.installedPackage && section !== undefined && sectionKey(group.section) === section &&
-        group.memberIds.length > 0 && group.memberIds.every((id) => botIds.has(id))));
-    for (const group of groups) store.deleteGroup(group.id);
     for (const id of botIds) store.deleteBot(id);
     if (section && store.sections.includes(section)) store.changeEmptySection(section, null);
     console.warn(`[org-library] removed a team that was only partly added when OpenMausBot stopped; it can be added again from the shelf`);
@@ -596,7 +591,7 @@ export class OrgLibrary {
   }
 
   private onStoreChange(change: StoreChange): void {
-    if (change.type !== "bot.deleted" && change.type !== "group.deleted" && change.type !== "sections") return;
+    if (change.type !== "bot.deleted" && change.type !== "sections") return;
     if (!Object.keys(this.state.installs).length) return;
     if (this.recheck) clearTimeout(this.recheck);
     this.recheck = setTimeout(() => {

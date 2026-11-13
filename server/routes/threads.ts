@@ -18,7 +18,7 @@ export type MessagePage = { messages: Array<Message | Record<string, unknown>>; 
 export interface ThreadRouteDeps {
   store: Pick<Store,
     | "activeLeaf" | "activePath" | "bot" | "botByThread" | "bots" | "messagesFor"
-    | "onChange" | "sections" | "taskByThread" | "tasks">;
+    | "onChange" | "sections" | "groups" | "taskByThread" | "tasks">;
   coordinator: Pick<Coordinator, "job">;
   cfg: Pick<AppConfig, "profile">;
   sessions: ResolveOptions["sessions"];
