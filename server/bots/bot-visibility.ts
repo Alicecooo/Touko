@@ -117,7 +117,7 @@ export interface VisibilityGroup {
   section?: string;
 }
 
-export type ThreadOwner = { bot: string };
+export type ThreadOwner = { bot: string; botIds?: readonly string[] };
 
 export class VisibleSet {
   readonly everything: boolean;
@@ -166,7 +166,7 @@ export class VisibleSet {
   thread(threadId: string): boolean {
     if (this.everything) return true;
     const owner = this.ownerOf(threadId);
-    return owner ? this.bot(owner.bot) : false;
+    return owner ? (owner.botIds ?? [owner.bot]).every(id => this.bot(id)) : false;
   }
 
   private indexedOwner(threadId: string): ThreadOwner | undefined {
@@ -259,12 +259,36 @@ export interface FrameContext {
   freshGroup: (groupId: string) => Record<string, unknown> | undefined;
 }
 
+function privateChatVisible(record: Record<string, unknown>, visible: VisibleSet): boolean {
+  if (record.privateChatRef === undefined) return true;
+  const chat = record.privateChatRef;
+  if (!chat || typeof chat !== "object" || Array.isArray(chat)) return false;
+  const ids = (chat as Record<string, unknown>).botIds;
+  return Array.isArray(ids) && ids.length === 2 && ids.every(id => typeof id === "string" && visible.bot(id));
+}
+
+/** A private-chat link must never name a teammate this member cannot see. */
+function memberMessage<T extends object>(message: T, visible: VisibleSet): T {
+  if (privateChatVisible(message as Record<string, unknown>, visible)) return message;
+  const { privateChatRef: _privateChatRef, threadRef, from, ...rest } = message as T & {
+    privateChatRef?: unknown; threadRef?: { threadId?: string }; from?: { botId?: string };
+  };
+  return { ...rest,
+    ...(threadRef?.threadId && visible.thread(threadRef.threadId) ? { threadRef } : {}),
+    ...(from?.botId && visible.bot(from.botId) ? { from } : {}),
+  } as T;
+}
+
 /** No audience list (who else may see a bot is an admin's business) and no teammate ids the member cannot see. */
 export function memberBot<T extends object>(bot: T, visible: VisibleSet): T {
   if (visible.everything) return bot;
-  const { visibility: _visibility, ...rest } = bot as T & { visibility?: unknown; peers?: unknown };
+  const { visibility: _visibility, ...rest } = bot as T & { visibility?: unknown; peers?: unknown; tasks?: unknown; messages?: unknown };
   const peers = Array.isArray(rest.peers) ? (rest.peers as unknown[]).filter((id): id is string => typeof id === "string" && visible.bot(id)) : undefined;
-  return { ...rest, ...(peers ? { peers } : {}) } as T;
+  const tasks = Array.isArray(rest.tasks) ? rest.tasks.filter(task =>
+    task && typeof task === "object" && privateChatVisible(task as Record<string, unknown>, visible)) : undefined;
+  const messages = Array.isArray(rest.messages) ? rest.messages.map(message =>
+    message && typeof message === "object" ? memberMessage(message as object, visible) : message) : undefined;
+  return { ...rest, ...(peers ? { peers } : {}), ...(tasks ? { tasks } : {}), ...(messages ? { messages } : {}) } as T;
 }
 
 export function memberBody(body: unknown, visible: VisibleSet): unknown {
@@ -278,6 +302,8 @@ export function memberBody(body: unknown, visible: VisibleSet): unknown {
       if (key === "bot" && child && typeof child === "object" && !Array.isArray(child)) next = memberBot(child, visible);
       else if (key === "bots" && Array.isArray(child)) {
         next = child.map((bot) => (bot && typeof bot === "object" ? memberBot(bot as object, visible) : bot));
+      } else if (key === "messages" && Array.isArray(child)) {
+        next = child.map(message => message && typeof message === "object" ? memberMessage(message as object, visible) : message);
       } else if (depth > 0 && key !== "messages" && child && typeof child === "object" && !Array.isArray(child)) next = narrow(child, depth - 1);
       if (next !== child) (out ??= { ...record })[key] = next;
     }
@@ -302,7 +328,11 @@ export function frameForMember(payload: Record<string, unknown>, ctx: FrameConte
       return { ...payload, queues: Object.fromEntries(Object.entries(queues).filter(([threadId]) => visible.thread(threadId))) };
     }
     case "message":
-    case "message.patch":
+    case "message.patch": {
+      if (!visible.thread(str(payload.threadId))) return undefined;
+      const message = memberMessage(field("message"), visible);
+      return message === payload.message ? payload : { ...payload, message };
+    }
     case "thread":
       return visible.thread(str(payload.threadId)) ? payload : undefined;
     case "bot": {

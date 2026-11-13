@@ -19,6 +19,7 @@ import { pickBotName } from "../bots/names.ts";
 import { redactSecretsInText } from "../security/redact.ts";
 import { scrubbedSkillRequest } from "../skills/skill-request-card.ts";
 import { AVATAR_FOCUS_CENTER, AVATAR_ZOOM_MIN, botAvatarProfile, clampAvatarFocus, clampAvatarZoom } from "../../shared/bot-avatar.ts";
+import { botMascotBody } from "../../shared/mascot-bodies.ts";
 import { approvalModeFor, isApprovalMode, modelSwitchNeedsAsk, type ApprovalMode } from "../../shared/approval-mode.ts";
 import { lastChangeRequestUrl } from "../../shared/thread-link.ts";
 import { REMOVED_COMPUTER_DRIVER, type ComputerEngineMove } from "../computers/computer-engine-removal.ts";
@@ -96,7 +97,7 @@ export interface TaskRecord extends Omit<WireTask, TaskWireDerivedKeys> {
 }
 
 export type TaskWirePrivateKeys = "resumeCursors" | "lastInstanceId" | "handedMessages" | "appliedCompactionId" | "contextFloor" | "lastContextModel" | "surfaceSource" | "askedAt";
-export type TaskWireDerivedKeys = "surfaceAuto" | "followsBotModel";
+export type TaskWireDerivedKeys = "surfaceAuto" | "followsBotModel" | "privateChatRef";
 export type TaskWireProjection = Pick<TaskRecord, Exclude<keyof TaskRecord, TaskWirePrivateKeys>> & Pick<WireTask, TaskWireDerivedKeys>;
 type AssertExact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
 type AssertSameKeys<A, B> = [keyof A] extends [keyof B] ? ([keyof B] extends [keyof A] ? true : never) : never;
@@ -469,8 +470,8 @@ export class Store {
         delete b.approvalGrant;
         botsMigrated = true;
       }
-      if ("mascotBody" in b) {
-        delete (b as BotRecord & { mascotBody?: unknown }).mascotBody;
+      if (b.mascotBody != null && botMascotBody(b.mascotBody) !== b.mascotBody) {
+        b.mascotBody = botMascotBody(b.mascotBody);
         botsMigrated = true;
       }
       if ("replyStyle" in b) {
@@ -1133,7 +1134,7 @@ export class Store {
     profile: Partial<
       Pick<
         BotRecord,
-        "name" | "title" | "description" | "color" | "mascotExpression" | "modelSelection" | "section" | "cwd" | "visibility" | "toolScope"
+        "name" | "title" | "description" | "color" | "mascotExpression" | "mascotBody" | "modelSelection" | "section" | "cwd" | "visibility" | "toolScope"
       >
     > = {},
     opts: {
@@ -1154,6 +1155,7 @@ export class Store {
       notifications: true,
       color: profile.color ?? COLORS[this.bots.length % COLORS.length],
       ...(profile.mascotExpression ? { mascotExpression: profile.mascotExpression } : {}),
+      ...(profile.mascotBody ? { mascotBody: botMascotBody(profile.mascotBody) } : {}),
       // Restricted from its first frame: no one else is ever told it exists.
       ...(profile.visibility && profile.visibility !== "everyone" ? { visibility: structuredClone(profile.visibility) } : {}),
       ...(toolScope.scope ? { toolScope: toolScope.scope } : {}),
@@ -1890,11 +1892,12 @@ export class Store {
     return moved;
   }
 
-  setAllThreadApprovalMode(botId: string, mode: Exclude<ApprovalMode, "custom">): BotRecord | null {
+  setAllThreadApprovalMode(botId: string, mode: Exclude<ApprovalMode, "custom">, threadIds?: readonly string[]): BotRecord | null {
     const bot = this.bot(botId);
     if (!bot) return null;
     const patch = { approvalMode: mode, autoApprove: mode === "auto", ...(mode === "full" ? { alwaysAllow: [] } : {}) };
-    const tasks = (bot.tasks ?? []).map(task => ({ ...task, ...patch }));
+    const selected = threadIds ? new Set(threadIds) : null;
+    const tasks = (bot.tasks ?? []).map(task => selected && !selected.has(task.threadId) ? task : { ...task, ...patch });
     const next = { ...bot, ...patch, approvalGrant: undefined, tasks };
     this.saveBots(this.bots.map(candidate => candidate === bot ? next : candidate));
     bot.tasks?.forEach((task, index) => Object.assign(task, tasks[index]));
@@ -2038,9 +2041,9 @@ export class Store {
     const doomed = new Set(deleted);
     mdb.deleteThreads(deleted, () => this.commitBotChange(bot, "the thread deletion", () => {
       const kept = bot.tasks!.filter((t) => !doomed.has(t.threadId));
-      const visible = kept.find((task) => !task.routineRunId) ?? this.buildTask(bot);
+      const visible = kept.find((task) => !task.routineRunId && task.openedBy?.kind !== "pair" && task.openedBy?.kind !== "work") ?? this.buildTask(bot);
       bot.tasks = kept.includes(visible) ? kept : [visible, ...kept];
-      if (doomed.has(bot.threadId) || this.taskByThread(botId, bot.threadId)?.routineRunId) this.mirrorActiveTask(bot, visible);
+      if (doomed.has(bot.threadId)) this.mirrorActiveTask(bot, visible);
       bot.unread = bot.tasks.some(taskCountsAsBotUnread);
       this.refreshBotActivity(bot);
     }));

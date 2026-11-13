@@ -1,5 +1,6 @@
 import { newId, type ModelSelection } from "../harness/contracts.ts";
 import { takeImportName } from "../../shared/import-name.ts";
+import { botMascotBody } from "../../shared/mascot-bodies.ts";
 import { MAX_TEAM_BACKUP_BYTES, parseTeamBackup, type BackupTask, type TeamBackup } from "../../shared/team-backup.ts";
 import { helperModelAllowed } from "../../shared/wire.ts";
 import type { BotRecord, GroupRecord, Message, Store, TaskRecord } from "../storage/store.ts";
@@ -84,6 +85,7 @@ export function createTeamBackup(store: Store, routines: Routine[], name: string
       key: bot.id, name: bot.name, title: bot.title, description: bot.description,
       section: bot.section, color: bot.color,
       mascotExpression: bot.mascotExpression ?? undefined,
+      mascotBody: bot.mascotBody ?? undefined,
       chiefOfStaff: Boolean(bot.chiefOfStaff), hidden: Boolean(bot.hidden), playbooks: bot.playbooks ?? [],
       // Grants travel so the team's shape survives, but the import still lands every bot grant-less.
       ...(bot.connectorTools ? { connectorTools: structuredClone(bot.connectorTools) } : {}),
@@ -146,6 +148,7 @@ export function importTeamBackup(store: Store, routines: RoutineManager, input: 
       const bot = store.createBot({
         name: takeImportName(source.name, takenNames), title: source.title, description: source.description,
         color: source.color, mascotExpression: source.mascotExpression,
+        ...(source.mascotBody ? { mascotBody: botMascotBody(source.mascotBody) } : {}),
         modelSelection: selection, section: sectionFor(source.section),
       }, { seedMessages: false });
       bots.push(bot);

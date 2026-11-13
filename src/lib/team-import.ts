@@ -40,7 +40,8 @@ export function teamImportPreview(manifest: unknown): PendingTeamImport {
     return {
       manifest: backup, kind: "backup", name: backup.name, description: TEAM_BACKUP_CONTENTS,
       members: backup.bots.map((bot) => ({ name: bot.name, title: bot.title })),
-      groups: backup.groups.length, playbooks: backup.bots.reduce((total, bot) => total + bot.playbooks.length, 0),
+      groups: backup.groups.length,
+      playbooks: backup.bots.reduce((total, bot) => total + bot.playbooks.length, 0),
       routines: backup.routines.length, apps: [],
       conversations: backup.bots.reduce((total, owner) => total + owner.tasks.length, 0),
       archivedBots: backup.bots.filter((bot) => bot.hidden).length,
@@ -113,12 +114,12 @@ function sharedTeamPreview(document: PackageDocument, manifest: unknown): Pendin
     teamName: pkg.team?.name ?? pkg.name,
     description: pkg.summary,
     members: pkg.agents.map((agent) => ({ name: agent.name, title: agent.title ?? "" })),
+    groups: 0,
     ...(leader ? { chiefOfStaff: leader } : {}),
     ...(pkg.team?.brief?.trim() ? { brief: pkg.team.brief } : {}),
     pictures: pkg.agents.map((agent) => agent.appearance.avatar
       ? `data:${agent.appearance.avatar.mime};base64,${agent.appearance.avatar.data}`
       : null),
-    groups: 0,
     playbooks: pkg.playbooks?.length ?? 0,
     routines: pkg.routines?.length ?? 0,
     apps: pkg.requirements.apps.map((app) => ({ label: app.label, optional: app.optional === true })),
@@ -196,8 +197,8 @@ function packagePreview(root: Record<string, unknown>, manifest: unknown): Pendi
     name: pkg.name.trim(),
     description: typeof pkg.summary === "string" ? pkg.summary.trim() : "",
     members,
-    ...(typeof chief === "string" ? { chiefOfStaff: chief } : {}),
     groups: 0,
+    ...(typeof chief === "string" ? { chiefOfStaff: chief } : {}),
     playbooks: Array.isArray(pkg.playbooks) ? pkg.playbooks.length : 0,
     routines: Array.isArray(pkg.routines) ? pkg.routines.length : 0,
     apps,

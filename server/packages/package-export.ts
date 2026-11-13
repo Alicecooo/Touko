@@ -151,6 +151,7 @@ export function createBotPackageExport(input: {
   const agents: BotPackageDefinition["agents"] = bots.map((bot) => {
     const appearance: BotPackageDefinition["agents"][number]["appearance"] = { color: bot.color };
     if (bot.mascotExpression) appearance.mascotExpression = bot.mascotExpression;
+    if (bot.mascotBody) appearance.mascotBody = bot.mascotBody;
     const agent: BotPackageDefinition["agents"][number] = {
       key: idToKey.get(bot.id)!,
       name: bot.name,
@@ -504,6 +505,7 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
     const key = botKeys.get(bot.id)!;
     const appearance: PackageAgent["appearance"] = { color: bot.color };
     if (bot.mascotExpression) appearance.mascotExpression = bot.mascotExpression;
+    if (bot.mascotBody) appearance.mascotBody = bot.mascotBody;
     const offered = input.avatars?.[bot.id];
     if (offered !== undefined) {
       const crop = bot.avatarCrop === "rounded" || bot.avatarCrop === "square" ? bot.avatarCrop : "circle";

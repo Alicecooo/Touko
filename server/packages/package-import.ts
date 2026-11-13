@@ -11,6 +11,7 @@ import { importedMemberProfile, type ParsedTeamManifest, type TeamManifestMember
 import { takeImportName } from "../../shared/import-name.ts";
 import { decodeBase64, type PackageAgent, type PackageDocument, type PackageTrust } from "../../shared/package-format.ts";
 import type { ModelSelection } from "../../shared/wire.ts";
+import { botMascotBody } from "../../shared/mascot-bodies.ts";
 
 export const NO_BOTS_MESSAGE = "This package has no bots. Add it from your organization's shelf, or update OpenMausBot.";
 export const NO_PRESETS_MESSAGE = "This file has no bots or preset bots to add. Its skills can be added from your organization's shelf.";
@@ -121,6 +122,7 @@ export function memberFromAgent(agent: PackageAgent): TeamManifestMember {
     appearance: {
       color: agent.appearance.color,
       ...(agent.appearance.mascotExpression ? { mascotExpression: agent.appearance.mascotExpression } : {}),
+      ...(agent.appearance.mascotBody ? { mascotBody: botMascotBody(agent.appearance.mascotBody) } : {}),
     },
   };
 }
@@ -347,8 +349,7 @@ function runImport(source: ImportSource, options: PackageImportOptions, deps: Pa
           look: {
             color: written.color,
             mascotExpression: written.mascotExpression ?? null,
-            // Keep the established package stamp shape while retiring the bot setting.
-            mascotBody: null,
+            mascotBody: written.mascotBody ?? null,
             avatar: avatarHash,
             crop: written.avatarCrop ?? null,
           },

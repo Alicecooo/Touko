@@ -53,9 +53,11 @@ export function createThreadRoutes(deps: ThreadRouteDeps): RouteHandler {
           tasks: store.tasks(bot.id).map((task) => wireTask(task, bot.modelSelection)),
           ...messagePage(bot.threadId, limit),
         }, visible)),
+        groups: store.groups.filter((group) => visible.group(group.id)).map((group) => ({
+          id: group.id, name: group.name, memberIds: group.memberIds, createdAt: group.createdAt, section: group.section,
+        })),
         botQueuedMessages: visible.everything ? queued : Object.fromEntries(Object.entries(queued).filter(([threadId]) => visible.thread(threadId))),
         sections: visible.sections(store.sections),
-        groups: [],
         computerControl: Object.fromEntries(
           shownBots.map((bot) => {
             const snapshot = botComputerControlSnapshot(bot.id);

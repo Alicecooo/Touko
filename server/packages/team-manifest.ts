@@ -3,6 +3,7 @@ import { z } from "zod";
 import { schemaIssue, type JsonValue } from "../config/schema.ts";
 import type { MausColor } from "../storage/store.ts";
 import { takeImportName } from "../../shared/import-name.ts";
+import { botMascotBody, type MascotBodyId } from "../../shared/mascot-bodies.ts";
 import { optionalText, requiredText } from "../../shared/package-format.ts";
 
 export const TEAM_MANIFEST_FORMAT = "openmaus.team" as const;
@@ -73,7 +74,7 @@ export interface TeamManifestMember {
   appearance: {
     color: MausColor;
     mascotExpression?: string;
-    mascotBody?: string;
+    mascotBody?: MascotBodyId;
   };
 }
 
@@ -132,6 +133,7 @@ export function parseTeamManifest(value: TeamManifestInput): ParsedTeamManifest 
     seenKeys.add(member.key);
     const appearance: TeamManifestMember["appearance"] = { color: member.appearance.color };
     if (member.appearance.mascotExpression) appearance.mascotExpression = member.appearance.mascotExpression;
+    if (member.appearance.mascotBody) appearance.mascotBody = botMascotBody(member.appearance.mascotBody);
     return {
       key: member.key,
       name: member.name,
@@ -160,6 +162,7 @@ export interface ImportedMemberProfile {
   description: string;
   color: MausColor;
   mascotExpression?: string;
+  mascotBody?: MascotBodyId;
 }
 
 /** Everything an untrusted manifest may seed into a new bot, and nothing else:
@@ -179,6 +182,7 @@ export function importedMemberProfile(
     color: member.appearance.color,
   };
   if (member.appearance.mascotExpression) profile.mascotExpression = member.appearance.mascotExpression;
+  if (member.appearance.mascotBody) profile.mascotBody = member.appearance.mascotBody;
   return profile;
 }
 
@@ -208,6 +212,7 @@ export function createTeamManifest(team: ExportableTeam, bots: ExportableBot[]):
     const key = memberKey(bot.name, index, usedKeys);
     const appearance: TeamManifestMember["appearance"] = { color: bot.color };
     if (bot.mascotExpression) appearance.mascotExpression = bot.mascotExpression;
+    if (bot.mascotBody) appearance.mascotBody = botMascotBody(bot.mascotBody);
     return {
       key,
       name: bot.name,

@@ -35,7 +35,6 @@ export function releaseLook(appearance: PackageAgent["appearance"]): LookValue {
   return {
     color: appearance.color,
     mascotExpression: appearance.mascotExpression ?? null,
-    // Reserved in the existing stamp format for historical packages, not a live bot setting.
     mascotBody: appearance.mascotBody ?? null,
     avatar: bytes ? sha256Hex(bytes) : null,
     crop: appearance.avatar?.crop ?? null,

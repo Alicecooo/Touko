@@ -5,13 +5,14 @@ import { movesThreadToTop } from "../../shared/wire";
 import type { NotificationLogEntry } from "../../shared/notification";
 import { reduceNotificationFeed, type NotificationFeedAction } from "./notification-feed";
 import { bumpThreadUpdatedAt, mergeTaskStamps, rewindThreadUpdatedAt } from "./thread-stamps";
-import { botOpensTo, openBot, openNotificationTarget, visibleNotificationThread } from "./thread-navigation";
+import { openNotificationTarget, visibleNotificationThread } from "./thread-navigation";
 export { awayFromMainThread, botOpensTo, openBot, openBotThread, openNotificationTarget, openThread, visibleNotificationThread, type ThreadTarget } from "./thread-navigation";
 import type { TurnDigest } from "../../shared/digest";
 import type { ToolScope } from "../../shared/tool-scope";
 import type { ModelVariantOption, RuntimeEvent } from "../../shared/runtime-events";
 import type { MausColor } from "@/lib/bot-appearance";
 import type { BotAvatarCrop } from "../../shared/bot-avatar";
+import type { MascotBodyId } from "../../shared/mascot-bodies";
 import { approvalModeFor, type ApprovalMode } from "../../shared/approval-mode";
 import { desktopCapabilitiesNow } from "@/lib/desktop";
 import { sameModelSelection } from "../../shared/thread-model";
@@ -122,7 +123,7 @@ export interface SecretRequestCardData {
 
 export type ComputerControlState = { held: boolean; helpReason: string | null; help?: import("../../shared/wire").ComputerHelpRef | null };
 
-export interface Message extends Pick<import("../../shared/wire").WireMessage, "widget" | "quickModel"> {
+export interface Message extends Pick<import("../../shared/wire").WireMessage, "widget" | "quickModel" | "privateChatRef"> {
   id: string;
   role: "bot" | "user";
   kind: "text" | "options" | "activity" | "screen" | "connector" | "secret" | "signin" | "routine.run" | "digest" | "compaction" | "widget";
@@ -158,6 +159,13 @@ export interface Message extends Pick<import("../../shared/wire").WireMessage, "
   queueId?: string;
 }
 
+export interface ModelSelection {
+  instanceId: string;
+  model: string;
+  effort?: EffortLevel;
+  variant?: string;
+}
+
 /** Client-side grouping container. Groups never own messages or conversations. */
 export interface Group {
   id: string;
@@ -167,14 +175,8 @@ export interface Group {
   section?: string;
 }
 
-export interface ModelSelection {
-  instanceId: string;
-  model: string;
-  effort?: EffortLevel;
-  variant?: string;
-}
-
 export interface Task {
+  privateChatRef?: import("../../shared/private-chats").PrivateChatRef;
   waitingForTeammates?: boolean;
   threadId: string;
   routineRunId?: string;
@@ -243,6 +245,7 @@ export interface Bot {
   notifications: boolean;
   color: MausColor;
   mascotExpression?: string | null;
+  mascotBody?: MascotBodyId | null;
 
   avatarUrl?: string | null;
   avatarCrop?: BotAvatarCrop;
@@ -530,6 +533,9 @@ export interface AppState {
   botCreationPending: boolean;
   inspectorOpen: boolean;
   activityOpen: boolean;
+  privateChatsOpen: boolean;
+  privateChatsBotId: string | null;
+  privateChatId: string | null;
   /** Cross-bot, so a bot switch leaves it open; pinned, opening another side panel leaves it open too. */
   notificationsOpen: boolean;
   notificationsPinned: boolean;
@@ -641,6 +647,8 @@ export type Action =
  | { type: "sectionDeleted"; section: string; sections: string[] }
  | { type: "showRoutines"; section?: "schedule" | "logs"; view?: "calendar" | "list"; botId?: string; routineId?: string; runStatus?: RoutineRunStatusFilter }
  | { type: "showChat" }
+ | { type: "openPrivateChats"; botId: string; chatId?: string }
+ | { type: "closePrivateChats" }
  | { type: "routinesHydrated"; routines: Routine[]; runs: RoutineRun[] }
  | { type: "routinesLoadFailed" }
  | { type: "routinePatched"; routine: Routine }
@@ -842,14 +850,20 @@ export function reducer(state: AppState, action: Action): AppState {
     case "hydrate": {
       const known = (id: string) => action.bots.some((b) => b.id === id) || action.groups.some((g) => g.id === id);
       const resume = action.resumeId;
-      const resumed =
-        resume && (action.bots.some((b) => b.id === resume && !b.hidden) || action.groups.some((g) => g.id === resume)) ? resume : "";
+      const resumed = resume && (action.bots.some((b) => b.id === resume && !b.hidden) || action.groups.some((g) => g.id === resume)) ? resume : "";
       const selectedId = state.selectedId && known(state.selectedId) ? state.selectedId : resumed || (action.bots[0]?.id ?? "");
       const hydrated = {
         ...state,
         bots: action.bots.map((bot) => {
           const previous = state.bots.find((candidate) => candidate.id === bot.id);
-          return previous ? { ...bot, tasks: mergeTaskStamps(previous.tasks, bot.tasks) } : bot;
+          if (!previous) return bot;
+          const tasks = mergeTaskStamps(previous.tasks, bot.tasks);
+          if (bot.threadId !== previous.threadId && tasks?.some(task => task.threadId === previous.threadId)) {
+            return { ...bot, tasks, threadId: previous.threadId, messages: previous.messages,
+              activeLeafId: previous.activeLeafId, hasMore: previous.hasMore,
+              awaitingThreadSnapshot: previous.awaitingThreadSnapshot, switchingTo: previous.switchingTo };
+          }
+          return { ...bot, tasks };
         }),
         groups: action.groups.map((group) => ({ id: group.id, name: group.name, memberIds: group.memberIds, createdAt: group.createdAt, section: group.section })),
         sections: action.sections ?? [],
@@ -909,12 +923,29 @@ export function reducer(state: AppState, action: Action): AppState {
         settingsOpen: false,
         inspectorOpen: false,
         activityOpen: false,
+        privateChatsOpen: false,
         notificationsOpen: false,
         appSettingsOpen: false,
         pluginsOpen: false,
       };
     case "showChat":
       return state.activeView === "chat" ? state : { ...state, activeView: "chat" };
+    case "openPrivateChats":
+      return {
+        ...state,
+        activeView: "chat",
+        selectedId: action.botId,
+        privateChatsOpen: true,
+        privateChatsBotId: action.botId,
+        privateChatId: action.chatId ?? null,
+        settingsOpen: false,
+        inspectorOpen: false,
+        activityOpen: false,
+        notificationsOpen: false,
+        appSettingsOpen: false,
+      };
+    case "closePrivateChats":
+      return { ...state, privateChatsOpen: false };
     case "routinesHydrated":
       return { ...state, routines: action.routines, routineRuns: trimRoutineRuns(action.runs), routinesLoadState: "ready" };
     case "routinesLoadFailed":
@@ -976,6 +1007,7 @@ export function reducer(state: AppState, action: Action): AppState {
               : state.unreadDivider,
             activeView: "chat",
             selectedId: action.id,
+            privateChatsOpen: false,
           },
         action.id,
         (b) => ({ ...b, unread: Boolean(b.tasks?.some((task) => task.threadId !== b.threadId && task.unread)), tasks: b.tasks?.map((task) => task.threadId === b.threadId ? { ...task, unread: false } : task) }),
@@ -998,7 +1030,7 @@ export function reducer(state: AppState, action: Action): AppState {
         ...state,
         // The HTTP response and its SSE broadcast race; fold both without showing the bot twice.
         bots: [action.bot, ...state.bots.filter((bot) => bot.id !== action.bot.id)],
-        ...(action.preserveSelection ? {} : { activeView: "chat" as const, selectedId: action.bot.id }),
+        ...(action.preserveSelection ? {} : { activeView: "chat" as const, selectedId: action.bot.id, privateChatsOpen: false }),
       };
     case "deleteBot": {
       const bots = state.bots.filter((b) => b.id !== action.botId);
@@ -1207,6 +1239,7 @@ export function reducer(state: AppState, action: Action): AppState {
         selectedId,
         settingsOpen: open,
         activityOpen: open ? false : state.activityOpen,
+        privateChatsOpen: open ? false : state.privateChatsOpen,
         botSettingsSection: action.section ?? state.botSettingsSection,
         botSettingsExpandAccordion: open ? named || (freshOpen && state.botSettingsSectionStored) : false,
         botSettingsExpandRemembered: open ? !named && freshOpen && state.botSettingsSectionStored : false,
@@ -1266,6 +1299,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         inspectorOpen: open,
+        privateChatsOpen: open ? false : state.privateChatsOpen,
         settingsOpen: open ? false : state.settingsOpen,
         activityOpen: open ? false : state.activityOpen,
         appSettingsOpen: open ? false : state.appSettingsOpen,
@@ -1277,6 +1311,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         activityOpen: open,
+        privateChatsOpen: open ? false : state.privateChatsOpen,
         settingsOpen: open ? false : state.settingsOpen,
         inspectorOpen: open ? false : state.inspectorOpen,
         appSettingsOpen: open ? false : state.appSettingsOpen,
@@ -1288,6 +1323,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         notificationsOpen: open,
+        privateChatsOpen: open ? false : state.privateChatsOpen,
         settingsOpen: open ? false : state.settingsOpen,
         inspectorOpen: open ? false : state.inspectorOpen,
         activityOpen: open ? false : state.activityOpen,
@@ -1306,6 +1342,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         appSettingsOpen: open,
+        privateChatsOpen: open ? false : state.privateChatsOpen,
         activityOpen: open ? false : state.activityOpen,
         appSettingsSection: action.section ?? state.appSettingsSection,
         appSettingsCloudLink: action.cloudLink && open ? state.appSettingsCloudLink + 1 : 0,
@@ -1465,7 +1502,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return action.cwd !== undefined ? state : { ...state, selectedId: action.botId, activeView: "chat" };
     case "switchTask": {
       const { [action.threadId]: _old, ...backgroundThreadEvents } = state.backgroundThreadEvents;
-      return updateBot({ ...state, backgroundThreadEvents, selectedId: action.botId, activeView: "chat" }, action.botId,
+      return updateBot({ ...state, backgroundThreadEvents, selectedId: action.botId, activeView: "chat", privateChatsOpen: false }, action.botId,
         (bot) => ({ ...bot, switchingTo: action.threadId }));
     }
     case "switchTaskFailed":
@@ -1495,7 +1532,7 @@ export function reducer(state: AppState, action: Action): AppState {
       if (opened && opened.id === switched.selectedId) {
         switched = { ...switched, unreadDivider: openedUnreadDivider(switched, opened.threadId, threadOpensUnread(opened), visibleMessages(opened), threadReadCursor(opened)) };
         // The snapshot predates the switch's own announcement and must not put the unread dot back.
-        if (switched.activeView === "chat") switched = updateBot(switched, opened.id, (bot) => ({ ...bot,
+        if (switched.activeView === "chat" && !switched.privateChatsOpen) switched = updateBot(switched, opened.id, (bot) => ({ ...bot,
           unread: Boolean(bot.tasks?.some((task) => task.threadId !== bot.threadId && task.unread)),
           tasks: bot.tasks?.map((task) => task.threadId === bot.threadId ? { ...task, unread: false } : task) }));
       }
@@ -1546,6 +1583,9 @@ export const initialState: AppState = {
   botCreationPending: false,
   inspectorOpen: false,
   activityOpen: false,
+  privateChatsOpen: false,
+  privateChatsBotId: null,
+  privateChatId: null,
   notificationsOpen: false,
   notificationsPinned: false,
   notifications: [],
@@ -1945,7 +1985,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
 
     const wrapped: React.Dispatch<Action> = (action) => {
-      if (["select", "newTask", "switchTask", "showChat", "showRoutines"].includes(action.type)) selectionRevision++;
+      if (["select", "newTask", "switchTask", "showChat", "showRoutines", "openPrivateChats", "closePrivateChats"].includes(action.type)) selectionRevision++;
       // Pin before any await or optimistic state change.
       action = pinBotThreadAction(action, stateRef.current.bots);
       if (action.type === "taskSwitched") action = { ...action, bot: withTaskWrites(action.bot) as Bot };
@@ -2268,6 +2308,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             title: source.title,
             description: source.description,
             notifications: source.notifications,
+            color: source.color,
+            mascotExpression: source.mascotExpression,
+            mascotBody: source.mascotBody,
             modelSelection: source.modelSelection,
             computer: source.computer,
             avatarUrl: source.avatarUrl,
@@ -2420,7 +2463,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               if (action.type === "newTask") action.onCreated?.();
               if (!r?.bot || navigation.get(action.botId) !== revision) return;
               const selectsAfterCreation = action.type === "newTask" && action.cwd !== undefined;
-              if (selectsAfterCreation && selectionRevision !== selectedAtStart) return;
+              if (selectionRevision !== selectedAtStart) {
+                rawDispatch({ type: "botPatched", bot: withTaskWrites(r.bot) });
+                if (action.type === "switchTask") rawDispatch({ type: "switchTaskFailed", botId: action.botId, threadId: action.threadId });
+                return;
+              }
               dispatch({ type: "taskSwitched", bot: r.bot });
               if (selectsAfterCreation) rawDispatch({ type: "select", id: action.botId });
             })
@@ -2461,14 +2508,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
     return wrapped;
   }, [botPatchQueue]);
-
-  const launched = useRef(false);
-  useEffect(() => {
-    if (!state.hydrated || launched.current) return;
-    launched.current = true;
-    const bot = state.bots.find((candidate) => candidate.id === state.selectedId);
-    if (bot && state.activeView === "chat" && botOpensTo(bot, showThreads) !== bot.threadId) openBot(dispatch, bot, showThreads);
-  }, [state.hydrated, state.bots, state.selectedId, state.activeView, showThreads, dispatch]);
 
   useEffect(() => {
     let alive = true;
@@ -2567,12 +2606,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
     const loadAll = async (): Promise<boolean> => {
       const chat = () =>
-        api(`/api/bots?messages=${MESSAGE_PAGE_SIZE}`).then(({ bots, sections, computerControl, botQueuedMessages }) => {
+        api(`/api/bots?messages=${MESSAGE_PAGE_SIZE}`).then(async ({ bots, groups, sections, computerControl, botQueuedMessages }) => {
+          if (!alive) return;
+          const refreshed = await Promise.all((bots as Bot[]).map(async bot => {
+            const previous = stateRef.current.bots.find(candidate => candidate.id === bot.id);
+            if (!previous || previous.threadId === bot.threadId || !bot.tasks?.some(task => task.threadId === previous.threadId)) return bot;
+            try {
+              const page = await api<{ messages: Message[]; hasMore: boolean; activeLeafId: string | null }>(
+                `/api/threads/${previous.threadId}/messages?limit=${MESSAGE_PAGE_SIZE}`);
+              return { ...bot, ...page, threadId: previous.threadId };
+            } catch {
+              // Preserve the visible transcript until this thread can be read again; a refresh is not navigation.
+              return { ...bot, threadId: previous.threadId, messages: previous.messages,
+                activeLeafId: previous.activeLeafId, hasMore: previous.hasMore };
+            }
+          }));
           if (!alive) return;
           rawDispatch({
             type: "hydrate",
-            bots,
-            groups: [],
+            bots: refreshed,
+            groups: groups ?? [],
             sections: sections ?? [],
             computerControl: computerControl ?? {},
             botQueuedMessages,
@@ -2653,7 +2706,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const selected = stateRef.current.bots.find((candidate) => candidate.id === bot.id);
           const shown = selected?.switchingTo ?? selected?.threadId;
           const selectedTask = bot.tasks?.find((task) => task.threadId === shown);
-          if (bot.id === stateRef.current.selectedId && stateRef.current.activeView === "chat" &&
+          if (bot.id === stateRef.current.selectedId && stateRef.current.activeView === "chat" && !stateRef.current.privateChatsOpen &&
               (selectedTask?.unread || (!bot.tasks && bot.unread))) {
             if (selectedTask) selectedTask.unread = false;
             bot.unread = botShowsUnread(bot);
@@ -2679,9 +2732,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             visibleNotificationThread(stateRef.current),
           );
           rawDispatch({ type: "notificationReceived", entry: frame.notification });
-          break;
-        case "group.deleted":
-          rawDispatch({ type: "groupDeleted", groupId: frame.groupId });
           break;
         case "routine":
           rawDispatch({ type: "routinePatched", routine: frame.routine });
@@ -2718,6 +2768,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         case "bot.deleted":
           botPatchQueue.cancel(frame.botId);
           rawDispatch({ type: "deleteBot", botId: frame.botId });
+          break;
+        case "group.deleted":
+          rawDispatch({ type: "groupDeleted", groupId: frame.groupId });
           break;
         case "config":
           rawDispatch({

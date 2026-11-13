@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, BookOpen, CalendarClock, Check, Crown, Loader2, MessageSquare, NotebookPen, Plug, Users, UploadCloud, X } from "lucide-react";
+import { ArrowLeft, BookOpen, CalendarClock, Check, Crown, Loader2, NotebookPen, Plug, Users, UploadCloud, X } from "lucide-react";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
@@ -47,7 +47,7 @@ export function TeamImportDetails({ pending, importedNames, org = false }: {
       {(pending.kind === "package" || pending.kind === "backup") && (
         <div className="mt-5 flex flex-wrap gap-2 text-[11.5px] text-ink-secondary">
           {pending.chiefOfStaff && <span className="flex items-center gap-1.5 rounded-full bg-raised px-3 py-1.5"><Crown size={13} />{t("templates.leads", { name: pending.chiefOfStaff })}</span>}
-          {!pending.library && <span className="flex items-center gap-1.5 rounded-full bg-raised px-3 py-1.5"><MessageSquare size={13} />{t("templates.groups", { count: pending.groups })}</span>}
+          {!pending.library && <span className="flex items-center gap-1.5 rounded-full bg-raised px-3 py-1.5"><Users size={13} />{t("templates.groups", { count: pending.groups })}</span>}
           {!(pending.library && !pending.playbooks) && <span className="flex items-center gap-1.5 rounded-full bg-raised px-3 py-1.5"><BookOpen size={13} />{t("templates.playbooks", { count: pending.playbooks })}</span>}
           {!pending.library && <span className="flex items-center gap-1.5 rounded-full bg-raised px-3 py-1.5"><CalendarClock size={13} />{pending.version === 2 ? t("teamImport.routinesPaused", { count: pending.routines }) : t("templates.pausedRoutines", { count: pending.routines })}</span>}
           {pending.kind === "package" && pending.version !== 2 && <span className="flex items-center gap-1.5 rounded-full bg-raised px-3 py-1.5"><Plug size={13} />{t("templates.connections", { count: pending.apps.length })}</span>}

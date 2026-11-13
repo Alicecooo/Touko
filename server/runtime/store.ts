@@ -151,8 +151,8 @@ const SCHEMA = `
 
 type Row = Record<string, unknown>;
 
-// Drop assignments created by the removed group-chat runtime while opening an existing database.
-function removeLegacyGroupTrees(db: DatabaseSync): void {
+// Drop assignments created by the retired room-chat runtime while opening an existing database.
+function removeRetiredRoomTrees(db: DatabaseSync): void {
   const roots = new Set<string>();
   for (const row of db.prepare("SELECT root_id, json FROM assignments").all() as Row[]) {
     try {
@@ -237,7 +237,7 @@ export function openRuntimeStore(path: string): RuntimeStore {
     db.exec("PRAGMA synchronous = NORMAL");
   }
   db.exec(SCHEMA);
-  removeLegacyGroupTrees(db);
+  removeRetiredRoomTrees(db);
 
   const statements = {
     get: db.prepare("SELECT id, json FROM assignments WHERE id = ?"),

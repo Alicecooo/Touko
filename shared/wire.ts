@@ -1,10 +1,12 @@
-/** The client-visible wire model for tasks, bots, messages and groups. A field
+/** The client-visible wire model for tasks, bots and messages. A field
  * here is one the server emits in every response and SSE frame that carries
  * the shape. */
 import type { ApprovalMode } from "./approval-mode.ts";
 import type { ToolScope } from "./tool-scope.ts";
 import type { TurnDigest } from "./digest.ts";
+import type { PrivateChatRef } from "./private-chats.ts";
 import type { BotAvatarCrop } from "./bot-avatar.ts";
+import type { MascotBodyId } from "./mascot-bodies.ts";
 import type { CredentialTargetId } from "./credential-request.ts";
 import type { TeamSetupRequest } from "./team-setup.ts";
 import type { RoutineRequestCardData } from "./routine-request.ts";
@@ -100,6 +102,8 @@ export interface TaskUsage {
 /** One task = one conversation with its own context, thread and provider
  * session. */
 export interface WireTask {
+  /** Derived navigation target for an internal Bot-to-Bot receiving context. */
+  privateChatRef?: PrivateChatRef;
   /** Outstanding handoffs, not an active provider turn. */
   waitingForTeammates?: boolean;
   threadId: string;
@@ -244,6 +248,7 @@ export interface WireBot {
   notifications: boolean;
   color: MausColor;
   mascotExpression?: MausExpression | null;
+  mascotBody?: MascotBodyId | null;
 
   /** App-owned attachment served as this bot's custom profile image;
    * always present on the wire, null when the bot has none. */
@@ -324,7 +329,7 @@ export interface WireBot {
   browserProfile?: string;
   playbooks?: InstalledPlaybook[];
   installedPackage?: InstalledPackageMetadata;
-  /** Aggregate of task and group activity; transient, reset on load. */
+  /** Aggregate activity across the bot's tasks; transient, reset on load. */
   busy?: boolean;
   /** What the bot is doing right now; transient like busy. */
   activity?: BotActivity;
@@ -361,6 +366,8 @@ export type CardAnswerer = (
 
 /** One transcript line, serialized as stored. */
 export interface WireMessage {
+  /** Opens the shared, read-only Bot-to-Bot transcript instead of a personal conversation. */
+  privateChatRef?: PrivateChatRef;
   peerRequest?: { id: string; phase: "request" | "result" };
   id: string;
   role: "bot" | "user";

@@ -14,6 +14,9 @@ import { draftSummary, foldPoint } from "./agent/compaction-summary.ts";
 import { compactBudget, compactionReading, contextWindowFor, shouldCompact } from "./agent/context-budget.ts";
 import { autoCompactWindow } from "./drivers/claude.ts";
 import { createCoordinator, type ComposedTurn, type CoordinateBotsCall, type Coordinator, type HandoffOpener, type HandoffOptions, type HandoffView, type HostTurnResult } from "./teams/coordinator.ts";
+import { privateChatContext, privateChatRef, privateChatRefForTask, privateChatRefForThread, privateChatTask } from "./teams/private-chats.ts";
+import { createPrivateChatRoutes } from "./routes/private-chats.ts";
+import { createPrivateChatReadOnlyRoutes } from "./routes/private-chat-readonly.ts";
 import { queuedBehindPersonText, settledWaitingChip, UnansweredApprovals } from "./agent/waiting-on-person.ts";
 import { assertRequestTarget, guardedRequestPath, requestConflict, requestNeedsInput } from "./agent/guarded-requests.ts";
 import { botAvatarUrlFromStoredPath } from "../shared/bot-avatar.ts";
@@ -35,7 +38,7 @@ import * as checkpoints from "./agent/checkpoints.ts";
 import { commandReceipt } from "./agent/commands.ts";
 import { buildTurnDigest, coverageForDriver, digestPromptLine, renderDigest, toolEvidence } from "./observability/digest.ts";
 import { appendDecision, bindDecisionRetention, decisionRetentionDays, flushDecisionLog, pruneDecisions, withDecisionActor, type DecisionActor } from "./observability/decision-log.ts";
-import { inMyFolderCwd, validateBotCwd } from "./bots/bot-cwd.ts";
+import { validateBotCwd } from "./bots/bot-cwd.ts";
 import { ATTACHMENTS_DIR, attachmentExists, cleanupStaleAttachmentPartials, deleteAttachment, saveImage } from "./workspace/attachments.ts";
 import { messageFileRoots } from "./storage/message-file.ts";
 import { fitsOnOneLine } from "./bots/bot-profile.ts";
@@ -116,7 +119,7 @@ import { computerEngineMoveText, removedComputerInstanceIds, writeComputerEngine
 import { cancelPeerApprovalsFor, cancelPeerApprovalsForThread, dismissStalePeerCards, peerApprovalFailure, requestPeerApproval, type ApprovalBus } from "./teams/peer-approval.ts";
 import { peerDeliveryReceipt, type PeerDeliveryReceipt } from "./teams/peer-delivery.ts";
 import { CONSENT_RULE, OUTSIDE, peerLineText, quoteInNote, requestWorkOrigin, type WorkOrigin } from "./teams/peer-provenance.ts";
-import { pageSize, slimMessage } from "./host/message-pages.ts";
+import { pageSize, slimMessage as baseSlimMessage } from "./host/message-pages.ts";
 import { mentionedBots, sectionKey, Store, threadTitleFrom, titleFromLlm, type BotRecord, type GroupRecord, type Message, type TaskRecord, toWireTask } from "./storage/store.ts";
 import { turnStartLogLine } from "./agent/turn-log.ts";
 import { TurnStops, outwardActions, stoppedTurnOutcome, turnEvidence } from "./agent/turn-outcome.ts";
@@ -553,7 +556,8 @@ function threadOwner(threadId: string): ThreadOwner | undefined {
   let owner = threadOwners.get(threadId);
   if (owner === undefined) {
     const bot = store.botByThread(threadId);
-    owner = bot ? { bot: bot.id } : null;
+    const chat = bot ? privateChatRefForThread(store, threadId) : undefined;
+    owner = bot ? { bot: bot.id, ...(chat ? { botIds: chat.botIds } : {}) } : null;
     if (threadOwners.size >= 20_000) threadOwners.clear();
     threadOwners.set(threadId, owner);
   }
@@ -622,7 +626,7 @@ function recentWorkSources() {
 
 function recallThreads(from: BotRecord): string[] { return recallThreadIds(from); }
 
-/** Other bot conversations never include a group's membership container as a chat source. */
+/** Other bot conversations are recalled only from the bot's own threads. */
 function autoRecallPrompt(bot: BotRecord, threadId: string, message: string, opts: { conversations: boolean; userName: string }): string {
   if (bot.memoryEnabled === false || !autoRecallEnabled(cfg)) return "";
   const threadIds = opts.conversations
@@ -1321,17 +1325,17 @@ function resumableCards(threadId: string, since: number): Array<{ id: string; wa
       continue;
     }
     const connector = message.connector;
-    if (connector && !connector.dismissed && !connector.resumed) {
+    if (connector && !connector.dismissed && !connector.resumed && !connector.stopped) {
       open.push({ id: message.id, waits: `connect ${connector.label}` });
       continue;
     }
     const secret = message.secret;
-    if (secret && !secret.resumed && !secret.superseded) {
+    if (secret && !secret.resumed && !secret.superseded && !secret.stopped) {
       open.push({ id: message.id, waits: `provide ${secret.label}` });
       continue;
     }
     const signIn = message.signIn;
-    if (signIn && !signIn.resumed && !signIn.superseded) {
+    if (signIn && !signIn.resumed && !signIn.superseded && !signIn.stopped) {
       open.push({ id: message.id, waits: `sign in to ${signIn.site}` });
     }
   }
@@ -2180,6 +2184,12 @@ for (const pending of startupCatalogs) {
   }, () => {});
 }
 store.seedIfEmpty();
+// Old clients could leave a Bot's private receiving context selected. Human chat always opens its main conversation.
+for (const bot of store.bots) {
+  if (!privateChatRefForThread(store, bot.threadId)) continue;
+  const main = botMainThread(bot.id);
+  if (main && main !== bot.threadId) store.switchTask(bot.id, main);
+}
 hostedModels?.reconcile(store);
 if (skillsLibraryEnabled(cfg)) {
   try {
@@ -2206,7 +2216,10 @@ let cacheKeepWarmStatus = (_threadId: string): KeepWarmStatus | undefined => und
 const wireTask = (task: TaskRecord, botModel: ModelSelection): WireTask => {
   const base = toWireTask(task, botModel);
   const keepWarm = cacheKeepWarmStatus(task.threadId);
-  return { ...base, waitingForTeammates: activeCoordinationForThread(task.threadId) && !task.busy, ...(keepWarm ? { cacheKeepWarm: keepWarm } : {}) };
+  const owner = store.botByThread(task.threadId);
+  const chat = owner ? privateChatRefForTask(owner.id, task) : undefined;
+  return { ...base, waitingForTeammates: activeCoordinationForThread(task.threadId) && !task.busy,
+    ...(chat ? { privateChatRef: chat } : {}), ...(keepWarm ? { cacheKeepWarm: keepWarm } : {}) };
 };
 
 /** Strips provider session ids (resumeCursors) here, not at call sites, so no broadcast or paired phone ever gets them. */
@@ -2366,19 +2379,34 @@ function applyDelegatedLevel(from: BotRecord, fromThreadId: string, target: BotR
 function handleDesktopTrustedApprovalMessage(raw: unknown): boolean {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
   const message = raw as Record<string, unknown>;
+  const writableTasks = (botId: string) => store.tasks(botId).filter(task => !privateChatRefForThread(store, task.threadId));
   const grantTarget = (bot: BotRecord) => bot.approvalGrant?.threadOnly
     ? store.projectBotForTask(bot.id, bot.approvalGrant.threadId!) : bot;
   const grantBusy = (bot: BotRecord) => bot.approvalGrant?.threadOnly
     ? threadBusy(bot.id, bot.approvalGrant.threadId!) : bot.busy ||
-      Boolean(bot.approvalGrant?.allThreads && store.tasks(bot.id).some(task => threadBusy(bot.id, task.threadId)));
+      Boolean(bot.approvalGrant?.allThreads && writableTasks(bot.id).some(task => threadBusy(bot.id, task.threadId)));
   const grantSupported = (bot: BotRecord, mode: ApprovalMode) => supportsApprovalMode(
     grantTarget(bot)?.modelSelection, mode) &&
-    (!bot.approvalGrant?.allThreads || store.tasks(bot.id).every(task => supportsApprovalMode(
+    (!bot.approvalGrant?.allThreads || writableTasks(bot.id).every(task => supportsApprovalMode(
       task.modelSelection ?? bot.modelSelection, mode)));
   const clearGrant = (bot: BotRecord) => store.patchBot(bot.id, {
     ...(!bot.approvalGrant?.threadOnly ? { approvalMode: "ask" as const, autoApprove: false } : {}),
     approvalGrant: undefined,
   });
+  const phaseResultType = message.type === "approval-trusted-mode-commit" ? "approval-trusted-mode-commit-result"
+    : message.type === "approval-trusted-mode-confirm" ? "approval-trusted-mode-confirm-result"
+      : message.type === "approval-trusted-mode-activate" ? "approval-trusted-mode-activate-result"
+        : message.type === "approval-trusted-mode-finalize" ? "approval-trusted-mode-finalize-result" : null;
+  if (phaseResultType && typeof message.botId === "string" && typeof message.requestId === "string") {
+    const bot = store.bot(message.botId);
+    const grant = bot?.approvalGrant;
+    if (bot && grant?.requestId === message.requestId && grant.threadId && privateChatRefForThread(store, grant.threadId)) {
+      clearGrant(bot);
+      postDesktopPrivateMessage({ type: phaseResultType, requestId: message.requestId, ok: false,
+        error: "Bot private chats are read-only. Change permissions in the bot's main conversation." });
+      return true;
+    }
+  }
   const threadCanReceiveGrant = (bot: BotRecord): boolean => {
     const threadId = bot.approvalGrant?.threadId;
     if (!threadId) return true;
@@ -2407,7 +2435,7 @@ function handleDesktopTrustedApprovalMessage(raw: unknown): boolean {
       grantSupported(bot, mode)
     ) {
       if (bot.approvalGrant.allThreads && mode === "full") {
-        store.setAllThreadApprovalMode(botId, mode);
+        store.setAllThreadApprovalMode(botId, mode, writableTasks(botId).map(task => task.threadId));
       } else if (bot.approvalGrant.refreshPermissions && bot.approvalGrant.threadId) {
         store.refreshTaskPermissions(botId, bot.approvalGrant.threadId);
       } else if (bot.approvalGrant.threadId) {
@@ -2590,6 +2618,10 @@ function handleDesktopTrustedApprovalMessage(raw: unknown): boolean {
   }
   const currentMode = approvalModeFor(existing);
   const threadId = message.threadId;
+  if (typeof threadId === "string" && privateChatRefForThread(store, threadId)) {
+    respond({ ok: false, error: "Bot private chats are read-only. Change permissions in the bot's main conversation." });
+    return true;
+  }
   if (message.allThreads !== undefined && (typeof message.allThreads !== "boolean" ||
     (message.allThreads && (threadId !== undefined || message.threadOnly === true ||
       message.modelSelection !== undefined || message.updateBotDefault !== undefined ||
@@ -2605,7 +2637,7 @@ function handleDesktopTrustedApprovalMessage(raw: unknown): boolean {
     );
     return true;
   }
-  if (message.allThreads === true && (existing.approvalGrant || store.tasks(botId).some(task =>
+  if (message.allThreads === true && (existing.approvalGrant || writableTasks(botId).some(task =>
       threadBusy(botId, task.threadId) || !supportsApprovalMode(
         task.modelSelection ?? existing.modelSelection, mode)))) {
     respond({ ok: false, error: "Finish this bot's active turns and approval changes first. Every thread's provider must support this approval level." });
@@ -2618,11 +2650,11 @@ function handleDesktopTrustedApprovalMessage(raw: unknown): boolean {
       return true;
     }
     if (mode === "auto" && existing.computer === "local" && message.acknowledgeLocalAuto !== true &&
-      [existing, ...store.tasks(botId).map(task => store.projectBotForTask(botId, task.threadId) ?? {})].some(owner => approvalModeFor(owner) !== "auto")) {
+      [existing, ...writableTasks(botId).map(task => store.projectBotForTask(botId, task.threadId) ?? {})].some(owner => approvalModeFor(owner) !== "auto")) {
       respond({ ok: false, error: "Auto mode on this computer requires confirming the warning" });
       return true;
     }
-    store.setAllThreadApprovalMode(botId, mode);
+    store.setAllThreadApprovalMode(botId, mode, writableTasks(botId).map(task => task.threadId));
     respond({ ok: true, bot: wireTrustedApprovalBot(store.bot(botId)!) });
     return true;
   }
@@ -2778,6 +2810,10 @@ const publicBot = (bot: NonNullable<ReturnType<typeof store.bot>>) => ({
   ...messagePage(bot.threadId, DEFAULT_PAGE),
   tasks: store.tasks(bot.id).map((task) => wireTask(task, bot.modelSelection)),
 });
+function publicGroupState(record: GroupRecord): WireGroup {
+  const { installedPackage: _installedPackage, ...group } = record;
+  return group;
+}
 const publicBotQueuedMessages = () => queuedSteerSnapshot((botId, threadId) => Boolean(store.taskByThread(botId, threadId)));
 // Claude reuses a session's first system prompt across --resume, so assignment bodies and results must travel in the user turn.
 function coordinationSystemInstructions(): string {
@@ -2874,6 +2910,81 @@ function followupAtBoot(threadId: string): "dispatched" | "pending" | undefined 
 }
 const followupEndedRoots = new Map<string, string | undefined>();
 
+function privateChatHumanInput(message: Message): string | undefined {
+  const card = message.card;
+  if (card && !card.answered && !card.dismissed && !card.expired && !card.autoApplied && !card.teamSetupRequest?.result) {
+    return `${card.title}${card.subtitle ? `: ${card.subtitle}` : ""}`;
+  }
+  const secret = message.secret;
+  if (secret && !secret.provided && !secret.dismissed && !secret.resumed && !secret.superseded && !secret.stopped) return `provide ${secret.label}`;
+  const connector = message.connector;
+  if (connector && connector.status !== "connected" && !connector.dismissed && !connector.resumed && !connector.stopped) return `connect ${connector.label}`;
+  const signIn = message.signIn;
+  if (signIn && !signIn.done && !signIn.cancelled && !signIn.savedLogin && !signIn.resumed && !signIn.superseded && !signIn.stopped) return `sign in to ${signIn.site}`;
+  return undefined;
+}
+
+function privateChatInputFailure(question: string): HostTurnResult {
+  return { ok: false, terminalFailure: true, text: `Private chat work is blocked by a request for human input: ${question.slice(0, 2_000)}. Ask the person in your main conversation and retry this work after the requirement is resolved. The person can only read this private chat.` };
+}
+
+function stopPrivateChatHumanInput(node: HandoffView): void {
+  for (const message of store.messagesFor(node.threadId)) {
+    if (message.at < (node.startedAt ?? node.createdAt) || privateChatHumanInput(message) === undefined) continue;
+    if (message.card) {
+      store.patchMessage(node.threadId, message.id, { card: { ...message.card, answered: "unavailable", dismissed: true } });
+      if (message.card.requestId) askMessageByRequest.delete(`${node.threadId}:${message.card.requestId}`);
+    } else if (message.secret) store.patchMessage(node.threadId, message.id, { secret: { ...message.secret, stopped: true } });
+    else if (message.connector) store.patchMessage(node.threadId, message.id, { connector: { ...message.connector, stopped: true } });
+    else if (message.signIn) store.patchMessage(node.threadId, message.id, { signIn: { ...message.signIn, stopped: true } });
+  }
+  watchdog.setWaitingOnHuman(node.threadId, false);
+}
+
+/** A private transcript has no human reply surface; return the gap to its requesting Bot instead of parking. */
+function withPrivateChatInputHandling(node: HandoffView, run: () => Promise<HostTurnResult>): Promise<HostTurnResult> {
+  if (!privateChatRefForThread(store, node.threadId)) return run();
+  return new Promise(resolve => {
+    let done = false;
+    let blocking = false;
+    let unsubscribe = () => {};
+    const finish = (outcome: HostTurnResult) => {
+      if (done) return;
+      done = true;
+      unsubscribe();
+      resolve(outcome);
+    };
+    const block = (question: string) => {
+      if (done || blocking) return;
+      blocking = true;
+      unsubscribe();
+      stopPrivateChatHumanInput(node);
+      void interruptParkedTurn(node.botId, node.threadId).catch(() => {}).finally(() => {
+        stopPrivateChatHumanInput(node);
+        finish(privateChatInputFailure(question));
+      });
+    };
+    unsubscribe = store.onChange(change => {
+      if ((change.type !== "message" && change.type !== "message.patch") || change.threadId !== node.threadId ||
+          change.message.at < (node.startedAt ?? node.createdAt) || privateChatHumanInput(change.message) === undefined) return;
+      const id = change.message.id;
+      // Let the normal automatic-grant path settle before deciding this request really needs the person.
+      queueMicrotask(() => {
+        if (done || blocking) return;
+        const message = store.messagesFor(node.threadId).find(item => item.id === id);
+        const question = message && privateChatHumanInput(message);
+        if (question !== undefined) block(question);
+      });
+    });
+    void Promise.resolve().then(run).then(outcome => {
+      if (done || blocking) return;
+      const question = outcome.cards?.question ?? needsInputQuestion(outcome.text);
+      if (question !== undefined) block(question);
+      else finish(outcome);
+    }, error => { if (!blocking) finish({ ok: false, text: String(error) }); });
+  });
+}
+
 const coordinator: Coordinator = createCoordinator({
   dataDir: DATA_DIR,
   now: Date.now,
@@ -2929,6 +3040,7 @@ const coordinator: Coordinator = createCoordinator({
       store.appendMessage(parent.threadId, {
         role: "bot", kind: "activity",
         peerRequest: { id: child.id, phase: "result" },
+        privateChatRef: privateChatRef(parent.botId, child.botId),
         from: bot ? { botId: bot.id, name: bot.name, color: bot.color } : undefined,
         tool: {
           name: child.status === "completed" ? `${bot?.name ?? "Teammate"} replied`
@@ -2949,14 +3061,16 @@ const coordinator: Coordinator = createCoordinator({
           { botId: parent.botId, name: store.bot(parent.botId)?.name ?? childTask.openedBy.name, at: Date.now() });
       }
     },
-    run: async (node, resumed, signal, composed: ComposedTurn) => {
+    run: (node, resumed, signal, composed: ComposedTurn) => withPrivateChatInputHandling(node, async () => {
       const bot = store.bot(node.botId)!;
-      if (!node.parentId && !resumed) return runRootTurn(node, bot, signal, composed);
+      const pairHistory = privateChatContext(store, node.threadId);
+      if (!node.parentId && !resumed) return runRootTurn(node, bot, signal,
+        pairHistory ? { ...composed, text: `${composed.text}\n\n${pairHistory}` } : composed);
       const parent = node.parentId ? coordinator.node(node.parentId) : undefined;
       const sender = parent ? store.bot(parent.botId) : undefined;
       const brief = composed.text;
       const liveRoster = resumed ? undefined : coordinationLiveRosterBlock(bot);
-      const turnText = liveRoster ? `${brief}\n\n${liveRoster}` : brief;
+      const turnText = [brief, liveRoster, pairHistory].filter(Boolean).join("\n\n");
       markInternalTurn(node.threadId);
       if (resumed) {
         const settledFrom = [...new Set(coordinator.children(node.id)
@@ -3002,7 +3116,7 @@ const coordinator: Coordinator = createCoordinator({
           onDispatchError: error => finish({ ok: false, text: error }),
         }).catch(error => finish({ ok: false, text: String(error) }));
       });
-    },
+    }),
     names: (node, parent) => {
       const person = cfg.profile?.name?.trim() || undefined;
       const scope = parent ?? node;
@@ -3015,6 +3129,14 @@ const coordinator: Coordinator = createCoordinator({
       };
     },
     park: (node, question, restored) => {
+      if (privateChatRefForThread(store, node.threadId)) {
+        queueMicrotask(() => {
+          if (coordinator.node(node.id)?.status !== "waiting") return;
+          stopPrivateChatHumanInput(node);
+          coordinator.failNode(node.id, privateChatInputFailure(question).text);
+        });
+        return;
+      }
       if (!node.parentId && node.cards?.length) return;
       const bot = store.bot(node.botId);
       if (!bot) return;
@@ -3028,6 +3150,7 @@ const coordinator: Coordinator = createCoordinator({
           role: "bot", kind: "activity",
           from: { botId: bot.id, name: bot.name, color: bot.color },
           tool: { name: chip, ok: true },
+          privateChatRef: privateChatRef(liveParent.botId, bot.id),
           threadRef: { botId: bot.id, threadId: node.threadId, title },
         });
         store.patchTask(liveParent.botId, liveParent.threadId, { unread: true });
@@ -3064,12 +3187,6 @@ function newestQuestionChip(threadId: string, aboutThreadId: string): string | u
 function readCursor(threadId: string): { lastReadMessageId?: string } {
   const newest = store.activePath(threadId).at(-1)?.id;
   return newest ? { lastReadMessageId: newest } : {};
-}
-
-function publicGroupState(record: GroupRecord): WireGroup {
-  // The organization library's part hashes stay server-side.
-  const { installedPackage: _installedPackage, ...group } = record;
-  return group;
 }
 
 function newestPeerActivityAt(botId: string): number {
@@ -3150,9 +3267,15 @@ store.onChange((change) => {
 
 const DEFAULT_PAGE = 50;
 
+function slimMessage(message: Message) {
+  const slim = baseSlimMessage(message);
+  const chat = message.privateChatRef ?? (message.threadRef ? privateChatRefForThread(store, message.threadRef.threadId) : undefined);
+  return chat ? { ...slim, privateChatRef: chat } : slim;
+}
+
 function messagePage(threadId: string, limit: number | undefined, before?: string | null) {
   if (limit === undefined) {
-    return { messages: store.messagesFor(threadId), activeLeafId: store.activeLeaf(threadId) };
+    return { messages: store.messagesFor(threadId).map(slimMessage), activeLeafId: store.activeLeaf(threadId) };
   }
   if (!before) {
     const tail = store.messagesTail(threadId, limit);
@@ -5175,7 +5298,6 @@ async function deliverLateQuestionAnswer(
   return receipt;
 }
 
-const MAX_THREADS_OPENED_PER_TURN = 5;
 
 type Frame = { png: string; mime: string };
 const screenPollers = new Map<
@@ -7679,6 +7801,15 @@ ROUTES.push(createBotMessageRoutes({
   harnessCardOutcome,
 }));
 // `let` slots are read per request.
+ROUTES.unshift(createPrivateChatReadOnlyRoutes({ store }));
+ROUTES.push(createPrivateChatRoutes({
+  store,
+  visible: (auth, botId) => visibleTo(viewerFor(auth)).bot(botId),
+  busy: threadId => {
+    const bot = store.botByThread(threadId);
+    return Boolean(bot && (threadBusy(bot.id, threadId) || coordinator.activeDirect(threadId)));
+  },
+}));
 ROUTES.push(createThreadRoutes({
   store, cfg, sessions, defaultPage: DEFAULT_PAGE,
   pageSize, messagePage, messageWindow, publicBotQueuedMessages, wireBot, wireTask,
@@ -7973,7 +8104,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         : { status: 503, error: "Workspace sign-in is unavailable." };
       if (failure) return json(res, failure.status, { error: failure.error });
     }
-    // A member reaches a restricted bot, its threads, groups, routines and files exactly as an id that does not exist.
+    // A member reaches a restricted bot, its threads, routines and files exactly as an id that does not exist.
     const visible = visibleTo(viewerFor(auth));
     if (!visible.everything) {
       const subject = pathSubject(path);
@@ -8713,12 +8844,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         }
          const address = { threadId: internalCapability.threadId, botId: internalSender.id };
         if (call.consult && call.reply === "none") return refuse(400, "consult asks a question whose answer comes back to you; leave reply out");
-         const fresh = call.thread === "new";
-        const folder = inMyFolderCwd(call.inMyFolder, fresh, store.taskByThread(internalSender.id, address.threadId)?.cwd, DATA_DIR);
-        if (folder.error) return refuse(400, folder.error);
-        if (fresh && !EXTERNAL && internalCapability.openedThreads >= MAX_THREADS_OPENED_PER_TURN) {
-          return refuse(429, `You have already opened ${MAX_THREADS_OPENED_PER_TURN} threads this turn, which is the limit. Do not retry — finish your turn and tell the person which threads you still wanted to open, so they can open them or ask you again.`);
-        }
+        if (call.inMyFolder) return refuse(400, "Bot private chats use each recipient's own folder. Include the shared file paths in message instead of in_my_folder.");
         const botIds: string[] = [];
         for (const raw of call.botIds) {
           const resolved = resolveTeammate(store.bots, internalSender, raw);
@@ -8784,17 +8910,17 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             requireActiveInternalCapability();
             const recipient = store.bot(target.botId);
             if (!recipient) throw new Error("The recipient no longer exists");
-             const continued = fresh ? undefined : store.workThread(target.botId, internalSender.id, address.threadId);
-             const opened = { botId: internalSender.id, name: internalSender.name, threadId: address.threadId, at: Date.now() };
-             const task = continued ?? (fresh
-               ? store.createTask(target.botId, call.title ?? (call.message.replace(/\s+/g, " ").trim().slice(0, 60) || `From ${internalSender.name}`), false, call.projectId, opened, undefined, undefined, folder.cwd)
-               : store.createTask(target.botId, `@${internalSender.name} · work`, false, undefined, { ...opened, kind: "work" }));
+            const continued = privateChatTask(store, target.botId, internalSender.id);
+            const opened = { botId: internalSender.id, name: internalSender.name, kind: "pair" as const, at: Date.now() };
+            const task = continued ?? store.createTask(target.botId, `${internalSender.name} ↔ ${recipient.name}`, false, undefined, opened);
              if (!task) throw new Error("The recipient no longer exists");
+            if (task.openedBy?.kind !== "pair") store.setTaskOpenedBy(target.botId, task.threadId, opened);
+            if (task.closedBy) store.setTaskClosedBy(target.botId, task.threadId, null);
              target.threadId = task.threadId;
              if (!continued) createdThread = task.threadId;
              applyDelegatedLevel(internalSender, internalCapability.threadId, recipient, target.threadId);
             const { node, duplicate } = coordinator.enqueue(address, generation, internalCapability.coordinationParentId, target, call.message, {
-               mode, reply, thread: call.thread, approvalGranted, rework: call.rework,
+               mode, reply, thread: "standing", approvalGranted, rework: call.rework,
               ...(call.doneWhen ? { doneWhen: call.doneWhen } : {}),
             });
             if (!duplicate) {
@@ -8802,12 +8928,12 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
                 role: "bot", kind: "text", text: call.message,
                 from: { botId: internalSender.id, name: internalSender.name, color: internalSender.color },
                 peerRequest: { id: node.id, phase: "request" },
+                privateChatRef: privateChatRef(internalSender.id, recipient.id),
               });
             }
             if (duplicate && createdThread) store.deleteTask(target.botId, createdThread);
             else if (createdThread) {
               threadStarters.set(createdThread, openerFrom(address.threadId));
-              if (fresh && !EXTERNAL) internalCapability.openedThreads += 1;
             }
             createdThread = undefined;
              const title = store.taskByThread(node.botId, node.threadId)?.title;
@@ -8832,6 +8958,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             if (!duplicate) {
               if (!EXTERNAL) delegatedThisTurn(node.id);
               store.appendMessage(address.threadId, { role: "bot", kind: "activity",
+                privateChatRef: privateChatRef(internalSender.id, recipient.id),
                 from: { botId: internalSender.id, name: internalSender.name, color: internalSender.color },
                  tool: { name: "Sent to " + recipient.name, ok: true,
                   ...(call.reason ? { output: call.reason } : {}) },
