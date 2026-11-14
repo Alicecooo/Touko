@@ -1,10 +1,8 @@
 import * as composio from "../integrations/composio.ts";
-import { changedInstanceIds, engineLaunches, loadConfig, parseConfigPatch, saveConfig, syncCredentialEnv, type AppConfig } from "../config/config.ts";
+import { changedInstanceIds, engineLaunches, loadConfig, parseConfigPatch, saveConfig, syncComposioCredentialEnv, type AppConfig } from "../config/config.ts";
 import type { InstanceConfigMap, ModelSelection } from "../harness/contracts.ts";
 import type { ProviderRegistry } from "../harness/registry.ts";
 import { HOSTED_PROVIDER_SETTINGS_ERROR } from "../deployment/hosted-models.ts";
-import { forgetKey } from "../security/key-rejections.ts";
-import { PROVIDER_KEY_KINDS } from "../model-catalog/provider-key-check.ts";
 import type { SessionRegistry } from "../auth/sessions.ts";
 import { parseSkillMd } from "../skills/skills.ts";
 import type { Store } from "../storage/store.ts";
@@ -34,7 +32,6 @@ export interface ConfigRouteDeps {
 
   configStatus(): ConfigStatus;
   configForAccess(status: ConfigStatus, admin: boolean): unknown;
-  resyncOpenCodeProviderKeys(): void;
   revokeEngineCapabilities(engines: ReadonlySet<string>): void;
   reloadProviders(before: Record<string, unknown>): Promise<void>;
   broadcast(payload: Record<string, unknown>): void;
@@ -42,16 +39,16 @@ export interface ConfigRouteDeps {
 }
 
 export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
-  const { cfg, registry, sessions, hostedModels, providerConfigs, providerConfigBusy, checkedModelSelection, policyModelRefusal, configStatus, configForAccess, resyncOpenCodeProviderKeys, revokeEngineCapabilities, reloadProviders, broadcast, drainQueuedSends } = deps;
+  const { cfg, registry, sessions, hostedModels, providerConfigs, providerConfigBusy, checkedModelSelection, policyModelRefusal, configStatus, configForAccess, revokeEngineCapabilities, reloadProviders, broadcast, drainQueuedSends } = deps;
 
   return async ({ req, res, url, path, method, auth, json, readBody }) => {
-    // API keys are never echoed back: booleans only.
+    // Secrets are never echoed back: booleans only.
     if (method === "GET" && path === "/api/config") {
       return json(res, 200, configForAccess(configStatus(), auth.scopes.includes("admin")));
     }
     if ((method === "PUT" || method === "PATCH") && path === "/api/config") {
       const body = await readBody(req);
-      if (hostedModels && ["instances", "anthropic", "openai", "openrouter", "openaiCompat", "xai", "mistral", "cerebras", "groq", "meta", "opencodeGo"].some(key => Object.hasOwn(body, key))) return json(res, 403, { error: HOSTED_PROVIDER_SETTINGS_ERROR });
+      if (hostedModels && Object.hasOwn(body, "instances")) return json(res, 403, { error: HOSTED_PROVIDER_SETTINGS_ERROR });
       const patch = parseConfigPatch(body);
 
       if (patch.newBotDefaults) {
@@ -95,37 +92,26 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
             patch.composio = { ...patch.composio, apiKey: "", sessionId: "" };
           }
         }
-        const resetKeys = PROVIDER_KEY_KINDS.flatMap((kind) => {
-          const next = patch[kind]?.key;
-          return next === undefined ? [] : [cfg[kind]?.key, next];
-        });
         const enginesBefore = engineLaunches(providerConfigs());
         const externalSecretStorage = url.searchParams.get("secretStorage") === "external";
         if (externalSecretStorage) {
-          // Supplied credentials are already in the OS-encrypted store: tombstone them so no older plaintext survives the merge.
+          // The Composio key is already in OS-encrypted storage; remove any older plaintext copy.
           const persisted = structuredClone(patch);
-          if (persisted.xai?.key !== undefined) persisted.xai.key = "";
           if (persisted.composio?.apiKey !== undefined) persisted.composio.apiKey = "";
-
-          if (persisted.opencodeGo?.apiKey !== undefined) persisted.opencodeGo.apiKey = "";
           saveConfig(persisted);
 
-          syncCredentialEnv(patch);
+          syncComposioCredentialEnv(patch);
           Object.assign(cfg, loadConfig());
         } else {
           saveConfig(patch);
 
-          // loadConfig prefers env over the file for credentials, so the env must follow the save.
-          syncCredentialEnv(patch);
+          syncComposioCredentialEnv(patch);
           Object.assign(cfg, loadConfig());
         }
-        for (const key of resetKeys) if (key) forgetKey(key);
-        // A saved key reaches an engine through the environment its status read uses, often with no reload.
         registry.forgetSnapshots();
 
         if (patch.signIn !== undefined) {
           sessions.revalidateEmailSessions();
-          resyncOpenCodeProviderKeys();
         }
         const changedEngines = new Set(changedInstanceIds(enginesBefore, engineLaunches(providerConfigs())));
         // Revoked before any await: a changed engine's old children are invalid at once.

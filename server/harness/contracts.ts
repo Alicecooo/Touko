@@ -133,8 +133,6 @@ export interface SendTurnInput {
     /** Peer-agent MCP proxy (list_bots / coordinate_bots); the harness owns turns, permissions and recursion limits. */
     agents?: { command: string; args: string[]; env: Record<string, string> };
 
-    /** The HighLevel CRM tools' MCP proxy: the harness holds the tokens and the per-bot verdict. */
-    highlevel?: { command: string; args: string[]; env: Record<string, string> };
     /** dweb daemon tools; `url` is the dweb HTTP base. */
     dweb?: { url: string };
     /** The user's MCP servers, mounted without any pre-allow; a driver skips a kind it cannot speak. */
@@ -184,9 +182,6 @@ export interface ProviderAdapter {
     /** The driver mounts integrations.composio. */
     composioMcp?: boolean;
 
-    /** The driver can mount the Data tools MCP. */
-    /** The driver can mount the HighLevel CRM tools MCP. */
-    highlevelMcp?: boolean;
     /** The engine accepts images in the prompt (gates composer paste). */
     images?: boolean;
     /** sendTurn consumes `images` as structured input, so dispatch strips the attachment path from `text`. */

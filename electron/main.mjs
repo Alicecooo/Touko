@@ -10,7 +10,7 @@ import { openBlankTerminal } from "./terminal-launch.mjs";
 import { pasteMenuItem } from "./paste-menu-item.mjs";
 import { attachUpdaterWindow, startUpdater, registerUpdaterIpc } from "./updater.mjs";
 import { appendDesktopCrashRecord, formatDesktopCrashRecord, installDesktopCrashListeners } from "./diagnostics.mjs";
-import { migrateWorkspaceCredentials, workspaceCredentialEnv } from "./workspace-credentials.mjs";
+import { migrateWorkspaceCredentials } from "./workspace-credentials.mjs";
 import { evictStartupCacheOnce } from "./startup-cache-eviction.mjs";
 import { activateExistingWindow, releaseSingleInstanceLock } from "./single-instance.mjs";
 import { bootFailureMessage, listeningSignal, pollServerIdentity, SERVER_BOOT_TIMEOUT_MS, SERVER_LISTENING_GRACE_MS } from "./server-boot-probe.mjs";
@@ -809,7 +809,6 @@ async function startServerOn(port, dataDir = runningDataDir ?? startupEnvironmen
       ? { COMPOSIO_API_KEY: secureCredentials.composioApiKey }
       : {}),
     OMB_CREDENTIAL_STORE: credentialStoreUnavailable ? "unavailable" : "ok",
-    ...workspaceCredentialEnv(secureCredentials),
   });
   const serverRuntimeModules = path.join(process.resourcesPath, "server-runtime", "node_modules");
   childEnv.NODE_PATH = [serverRuntimeModules, childEnv.NODE_PATH].filter(Boolean).join(path.delimiter);

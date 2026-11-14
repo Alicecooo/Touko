@@ -5,7 +5,7 @@ import { TEAM_TOOLS_FAILED, teamToolsFailed } from "./team-tools.ts";
 // `turn/completed`, approvals arrive as server→client requests, resumeCursor is the codex thread id.
 import { existsSync, mkdirSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { isAbsolute, join, normalize } from "node:path";
 import { homedir } from "node:os";
 import { codexConfigMcp, codexConfigRunsServer, mountedMcpServerName } from "./codex-mcp-names.ts";
 
@@ -24,7 +24,7 @@ import { newEventId, newId } from "../harness/contracts.ts";
 import { decodeCodexSelection, OFFICIAL_CODEX_PROVIDER, readCodexModelCatalog, STATIC_CODEX_MODELS } from "./codex-catalog.ts";
 import { codexLocalProviderArgs } from "./local-inject.ts";
 import { codexBackgroundModel, runCodexOneShot } from "./codex-background-text.ts";
-import { augmentedPath, splitCliString } from "../platform/env-path.ts";
+import { augmentedPath, splitCliString, userHome } from "../platform/env-path.ts";
 import { classifyError, computeBackoff, interruptibleDelay, RETRY_MAX_ATTEMPTS } from "./retry.ts";
 import { appendNative } from "./native.ts";
 import { answersAlone, permissionLaunchCwd, shellRequest } from "./permission-command.ts";
@@ -98,17 +98,59 @@ async function codexReleaseUpdate(version: string, cli: string): Promise<Provide
 export interface CodexConfig {
   cli: string;
   fullAuto: boolean;
+  configDir?: string;
   authMode?: "chatgpt-plan";
   managed?: { url: string; models: string[] };
+}
+
+export function resolveCodexConfigDir(configDir?: string, env: NodeJS.ProcessEnv = process.env): string {
+  const home = userHome(env);
+  const configured = configDir?.trim() || join(home, ".codex");
+  const expanded = configured === "~" ? home : /^~[/\\]/.test(configured) ? join(home, configured.slice(2)) : configured;
+  if (!isAbsolute(expanded) || /[\p{Cc}\p{Cf}]/u.test(expanded)) {
+    throw new Error("codex: configDir must be an absolute path or start with ~/");
+  }
+  return normalize(expanded);
+}
+
+const CODEX_SESSION_ENV_KEYS = new Set([
+  "CODEX_CI", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "CODEX_TOOL_CALL_ID", "CODEX_PERMISSION_PROFILE",
+  "CODEX_SHELL", "CODEX_VERSION", "CODEX_TECTONIC_PATH",
+]);
+
+/** Native Codex configuration belongs to the selected user/account, not the Desktop session
+ * or a development launcher's isolated CODEX_HOME. Provider env_key values stay available. */
+export function codexEnvironment(
+  config: CodexConfig,
+  instanceEnvironment: NodeJS.ProcessEnv = {},
+  source: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...source, ...instanceEnvironment, PATH: augmentedPath(), NPM_CONFIG_LOGLEVEL: "error" };
+  for (const key of Object.keys(env)) {
+    const upper = key.toUpperCase();
+    if (upper === "CODEX_HOME" || CODEX_SESSION_ENV_KEYS.has(upper)
+      || /^CODEX_(?:APP|INTERNAL|MCP|SANDBOX|SAGE|TASK|WINDOWS|APPLY_PATCH)(?:_|$)/.test(upper)) delete env[key];
+  }
+  if (!config.managed) env.CODEX_HOME = resolveCodexConfigDir(config.configDir ?? instanceEnvironment.CODEX_HOME, env);
+  else if (instanceEnvironment.CODEX_HOME) env.CODEX_HOME = instanceEnvironment.CODEX_HOME;
+  // A leaked API key silently flips Codex's own ChatGPT login to pay-as-you-go.
+  delete env.OPENAI_API_KEY;
+  stripWorkspaceCredentialEnv(env);
+  delete env.OPENMAUSBOT_CHATGPT_TOKEN;
+  return env;
 }
 
 function decodeConfig(raw: unknown): CodexConfig {
   const o = (raw ?? {}) as Record<string, unknown>;
   if (o.authMode !== undefined && o.authMode !== "chatgpt-plan") throw new Error("Unknown Codex sign-in mode.");
   if (o.authMode && o.managed) throw new Error("ChatGPT plan and Company billing cannot be combined.");
+  if (o.configDir !== undefined && typeof o.configDir !== "string") throw new Error("codex: configDir must be a string");
+  const configDir = typeof o.configDir === "string" ? o.configDir.trim() : undefined;
+  if (configDir) resolveCodexConfigDir(configDir);
   return {
     cli: typeof o.cli === "string" ? o.cli : "codex",
     fullAuto: o.fullAuto === true,
+    ...(configDir ? { configDir } : {}),
     ...(o.authMode === "chatgpt-plan" ? { authMode: "chatgpt-plan" as const } : {}),
     ...(o.managed && typeof o.managed === "object" ? { managed: decodeManagedCodex(o.managed) } : {}),
   };
@@ -528,16 +570,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
       : undefined;
     const planDirectory = join(DATA_DIR, "providers", "chatgpt-plan", createHash("sha256").update(instanceId).digest("hex"));
     const childEnv = (): Record<string, string | undefined> => {
-      const env: Record<string, string | undefined> = {
-        ...process.env,
-        ...input.environment,
-        PATH: augmentedPath(),
-        NPM_CONFIG_LOGLEVEL: "error",
-      };
-      // A leaked API key silently flips Codex's own ChatGPT login to pay-as-you-go.
-      delete env.OPENAI_API_KEY;
-      stripWorkspaceCredentialEnv(env);
-      delete env.OPENMAUSBOT_CHATGPT_TOKEN;
+      const env = codexEnvironment(config, input.environment);
       if (plan) env.CODEX_HOME = join(planDirectory, "codex");
       return env;
     };
@@ -771,7 +804,6 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
           mountSelected("computer", "computer", turn.integrations.localComputer);
         }
 
-        if (turn.integrations?.highlevel) mountSelected("highlevel", "highlevel", turn.integrations.highlevel);
         // A `-c` override merges with a same-named server in config.toml, and stdio over url is
         // "invalid configuration" that kills the turn, so such a server mounts under its own name.
         const codexConfig = codexConfigMcp(env), declaredInCodexConfig = codexConfig.names;
@@ -1798,7 +1830,6 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
         agentsMcp: true,
       customMcp: true,
 
-        highlevelMcp: true,
         images: true,
         nativeImageInput: true,
         effortLevels: ["low", "medium", "high", "xhigh", "max"],

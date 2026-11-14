@@ -116,7 +116,6 @@ export function setupPaths(machine: Pick<SetupMachine, "home" | "platform" | "en
       { source: "claudeDesktop", path: join(desktop, "claude_desktop_config.json"), format: "json", max: CONFIG_MAX_BYTES },
       { source: "cursor", path: join(home, ".cursor", "mcp.json"), format: "json", max: CONFIG_MAX_BYTES },
       { source: "codex", path: join(codexHome, "config.toml"), format: "toml", max: CONFIG_MAX_BYTES },
-      { source: "gemini", path: join(home, ".gemini", "settings.json"), format: "json", max: CONFIG_MAX_BYTES },
     ] satisfies Array<{ source: SetupSource; path: string; format: ToolFormat; max: number }>,
   };
 }
@@ -214,7 +213,7 @@ function placesFor(machine: SetupMachine): Places {
     return [...new Set([...spellings, ...(found ? [found.path] : [])])];
   };
   const paths = setupPaths(machine);
-  const toolHomes = [join(machine.home, ".claude"), paths.codexHome, join(machine.home, ".gemini"), join(machine.home, ".cursor")].flatMap(forms);
+  const toolHomes = [join(machine.home, ".claude"), paths.codexHome, join(machine.home, ".cursor")].flatMap(forms);
   const roots = new Map<string, string>();
   for (const { root } of paths.skills) {
     const found = locate(machine, { homes, darwin }, root);
@@ -226,7 +225,7 @@ function placesFor(machine: SetupMachine): Places {
 }
 
 /** A skill folder must stay a skill folder wherever its link leads: never a skills folder itself, nor a place in a
- * tool's own folder (~/.claude, $CODEX_HOME, ~/.gemini, ~/.cursor) outside its skills. */
+ * tool's own folder (~/.claude, $CODEX_HOME, ~/.cursor) outside its skills. */
 function skillFolderAllowed(places: Places, real: string): boolean {
   if (places.homes.some((home) => within(real, home)) || places.skillRoots.some((root) => samePath(root, real))) return false;
   return !places.toolHomes.some((tool) => within(tool, real)) || places.skillRoots.some((root) => within(root, real));
@@ -495,7 +494,7 @@ export function topLevelJsonMember(text: string, name: string): unknown {
   }
 }
 
-/** Gemini CLI and some editors allow comments in their settings JSON. */
+/** Some CLI and editor settings allow comments in their JSON. */
 export function withoutJsonComments(text: string): string {
   let out = "";
   for (let at = 0; at < text.length;) {
@@ -559,10 +558,7 @@ function textValues(value: unknown): Record<string, string> | undefined {
 function pasteEntry(source: SetupSource, raw: Record<string, unknown>): Record<string, unknown> {
   const headers = textValues(source === "codex" ? raw.http_headers : raw.headers);
   const remote = (type: "http" | "sse", url: unknown) => ({ type, url, ...(headers ? { headers } : {}) });
-  if (source === "gemini") {
-    if (typeof raw.httpUrl === "string") return remote("http", raw.httpUrl);
-    if (typeof raw.url === "string") return remote(raw.type === "http" ? "http" : "sse", raw.url);
-  } else if (typeof raw.url === "string") {
+  if (typeof raw.url === "string") {
     return remote(typeof raw.type === "string" && /sse/i.test(raw.type) ? "sse" : "http", raw.url);
   }
   const env = textValues(raw.env);

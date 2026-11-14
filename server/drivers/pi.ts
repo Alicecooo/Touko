@@ -1,14 +1,14 @@
-// The pi coding agent (@earendil-works/pi-coding-agent) over its own stdio JSON-RPC mode
-// (`pi --mode rpc --no-session`), not ACP. pi is BYOK and reads ~/.pi/agent/auth.json itself, so
-// this driver holds no key; resumeCursor is pi's `sessionFile` (switch_session).
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+// Pi and Oh My Pi share their stdio JSON-RPC transport. Each runtime owns its configuration,
+// credentials, native model catalog and sessions under its own agent directory.
+// resumeCursor is the runtime's `sessionFile` (switch_session).
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { PROVIDER_CREDENTIAL_ENV, stripWorkspaceCredentialEnv } from "../config/config.ts";
 import { openStartupModelCatalog, writeStartupModelCache } from "../model-catalog/startup-model-catalog.ts";
-import { augmentedPath } from "../platform/env-path.ts";
-import { describeSpawnFailure, execCli, killCliTree, spawnCli } from "../platform/procs.ts";
+import { augmentedPath, userHome } from "../platform/env-path.ts";
+import { describeSpawnFailure, killCliTree, spawnCli } from "../platform/procs.ts";
 import { deletePromptSplitReceipt, promptHalves, readPromptSplitReceipt, splitSessionPrompt, writePromptSplitReceipt } from "./prompt-split.ts";
 import type { PromptSplitReceipt } from "./prompt-split.ts";
 import { SPAWNED_PROXIES } from "../proxy-paths.ts";
@@ -19,15 +19,15 @@ import { EFFORT_LEVELS } from "../../shared/wire.ts";
 
 import { newEventId, newId } from "../harness/contracts.ts";
 import { ASK_USER_TOOL, MAX_QUESTION_TEXT, parseAskQuestions, parseChoices, questionAnswersByQuestion } from "../../shared/ask-question.ts";
-import { decodeInjectId, encodeInjectId, hostApiKey, localHost, mergeLocalInject } from "./local-inject.ts";
+import { decodeInjectId } from "./local-inject.ts";
 import { appendNative } from "./native.ts";
 import { allowsTool, canUseMcpServer, parseToolScope } from "../../shared/tool-scope.ts";
 import { customServerGate, gateServer, mcpStdioServer } from "../mcp/mcp-gate-config.ts";
 import { remoteMcpSpec } from "../mcp/mcp-http.ts";
 
-const DRIVER_KIND = "piAgent";
+export type PiRuntime = "pi" | "omp";
 const PI_ARGS = ["--mode", "rpc", "--no-session"];
-const PI_MODEL_UPDATE_ARGS = ["update", "--models", "--no-approve"];
+const rpcArgs = (runtime: PiRuntime) => runtime === "omp" ? [...PI_ARGS, "--no-ui"] : PI_ARGS;
 const NODE_ENV_FLAG = { ELECTRON_RUN_AS_NODE: "1" };
 /** omp's RPC transport caps a frame at 1 MiB and chunks bigger ones only after the client
  *  negotiates protocol 2. Vanilla pi has no handshake frame to wait for. */
@@ -96,7 +96,6 @@ export function buildMcpServers(turn: SendTurnInput): Record<string, unknown> | 
     };
   }
 
-  if (turn.integrations?.highlevel) servers.highlevel = { ...turn.integrations.highlevel };
   for (const [name, server] of Object.entries(turn.integrations?.custom ?? {})) servers[name] = { ...server, scope: "custom" };
   for (const [name, server] of Object.entries(servers)) {
     if (parsed.scope !== undefined && !canUseMcpServer(parsed.scope, name)) { delete servers[name]; continue; }
@@ -272,117 +271,15 @@ export function splitPiModel(id: string): { provider: string; modelId: string } 
   return { provider, modelId: rest.join("/") };
 }
 
-export function preferPiInjectRows(catalog: ModelCatalog): ModelCatalog {
-  const injectIds = new Set(
-    catalog.options.filter((option) => decodeInjectId(option.id)).map((option) => option.id),
-  );
-  if (!injectIds.size) return catalog;
-  const options = catalog.options.filter((option) => {
-    if (decodeInjectId(option.id)) return true;
-    const slash = option.id.indexOf("/");
-    if (slash <= 0) return true;
-    return !injectIds.has(encodeInjectId(option.id.slice(0, slash), option.id.slice(slash + 1)));
-  });
-  let def = catalog.default;
-  if (def && !options.some((option) => option.id === def)) {
-    const slash = def.indexOf("/");
-    const mapped = slash > 0 ? encodeInjectId(def.slice(0, slash), def.slice(slash + 1)) : "";
-    def = injectIds.has(mapped) ? mapped : (options[0]?.id ?? "");
-  }
-  return { default: def, options };
+export function piAgentDir(env: Record<string, string | undefined>, runtime: PiRuntime = "pi"): string {
+  return env.PI_CODING_AGENT_DIR || join(userHome(env), `.${runtime}`, "agent");
 }
 
-export async function applyPiLocalCatalog(
-  catalog: ModelCatalog,
-  env: Record<string, string | undefined> = process.env,
-  fetchImpl: typeof fetch = fetch,
-): Promise<ModelCatalog> {
-  return preferPiInjectRows(await mergeLocalInject(catalog, env, fetchImpl));
-}
-
-function piAgentDir(env: Record<string, string | undefined>): string {
-  return join(env.HOME || env.USERPROFILE || homedir(), ".pi", "agent");
-}
-
-/** Upsert a live local host into ~/.pi/agent/models.json so `set_model` can reach it. */
-export function ensurePiInjectModel(
-  modelId: string,
-  env: Record<string, string | undefined> = process.env,
-): { provider: string; modelId: string } | null {
-  const split = splitPiModel(modelId);
-  if (!split) return null;
-  const inject = decodeInjectId(modelId);
-  if (!inject) return split;
-  const host = localHost(inject.host);
-  if (!host) return split;
-
-  const dir = piAgentDir(env);
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, "models.json");
-  let root: Record<string, unknown> = { providers: {} };
-  if (existsSync(path)) {
-    try {
-      const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        root = parsed as Record<string, unknown>;
-      } else {
-        return split;
-      }
-    } catch {
-      return split;
-    }
-  }
-
-  const providers =
-    root.providers && typeof root.providers === "object" && !Array.isArray(root.providers)
-      ? { ...(root.providers as Record<string, unknown>) }
-      : {};
-  const previous = providers[inject.host];
-  const existing: Record<string, unknown> =
-    previous && typeof previous === "object" && !Array.isArray(previous)
-      ? { ...(previous as Record<string, unknown>) }
-      : {
-          baseUrl: host.baseUrl,
-          api: "openai-completions",
-          apiKey: hostApiKey(host, env),
-          compat: { supportsDeveloperRole: false, supportsReasoningEffort: true },
-          models: [] as Array<Record<string, unknown>>,
-        };
-  existing.baseUrl = host.baseUrl;
-  existing.api = typeof existing.api === "string" && existing.api ? existing.api : "openai-completions";
-  existing.apiKey = hostApiKey(host, env);
-  if (!existing.compat) {
-    existing.compat = { supportsDeveloperRole: false, supportsReasoningEffort: true };
-  }
-  const models: Array<Record<string, unknown>> = Array.isArray(existing.models)
-    ? existing.models.filter(
-        (row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row),
-      )
-    : [];
-  if (!models.some((row) => row.id === inject.model)) {
-    models.push({
-      id: inject.model,
-      name: inject.model,
-      reasoning: true,
-      input: ["text"],
-      contextWindow: 131072,
-      maxTokens: 16384,
-    });
-  }
-  existing.models = models;
-  providers[inject.host] = existing;
-  root.providers = providers;
-  writeFileSync(path, `${JSON.stringify(root, null, 2)}\n`, { mode: 0o600 });
+function readPiDefaultModel(env: Record<string, string | undefined>, runtime: PiRuntime): string {
+  // OMP owns config.yml/profile resolution; its get_state response supplies the resolved model.
+  if (runtime === "omp") return "";
   try {
-    chmodSync(path, 0o600);
-  } catch {}
-  return split;
-}
-
-function readPiDefaultModel(env: Record<string, string | undefined>): string {
-  const home = env.HOME || env.USERPROFILE || homedir();
-  try {
-    const s = JSON.parse(readFileSync(`${home}/.pi/agent/settings.json`, "utf8")) as {
+    const s = JSON.parse(readFileSync(join(piAgentDir(env, runtime), "settings.json"), "utf8")) as {
       defaultProvider?: string;
       defaultModel?: string;
     };
@@ -395,52 +292,51 @@ function readPiDefaultModel(env: Record<string, string | undefined>): string {
 export async function fetchPiModels(
   cli: string,
   env: Record<string, string | undefined>,
+  runtime: PiRuntime = "pi",
 ): Promise<ModelCatalog> {
-  const child = spawnCli(cli, PI_ARGS, { stdio: ["pipe", "pipe", "pipe"], env });
+  const child = spawnCli(cli, rpcArgs(runtime), { stdio: ["pipe", "pipe", "pipe"], env });
   return new Promise((resolve) => {
     let done = false;
-    const fallbackDefault = readPiDefaultModel(env);
+    let fallbackDefault = readPiDefaultModel(env, runtime);
+    let catalogFrame: Record<string, unknown> | null = null;
+    let stateRead = runtime !== "omp";
     const finish = (catalog: ModelCatalog) => {
       if (done) return;
       done = true;
+      clearTimeout(timer);
       try {
         killCliTree(child);
       } catch {}
       resolve(catalog);
     };
-    const timer = setTimeout(() => finish({ default: "", options: [] }), 15_000);
+    const currentCatalog = () => piCatalogFromFrame(catalogFrame, fallbackDefault) ?? { default: fallbackDefault, options: [] };
+    const timer = setTimeout(() => finish(currentCatalog()), runtime === "omp" ? 30_000 : 15_000);
     timer.unref?.();
     const chunks = new PiRpcChunks();
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", piLineReader((line) => {
       const frame = decodePiFrame(line, chunks);
+      if (frame?.command === "get_state") {
+        stateRead = true;
+        const model = (frame.data as { model?: { provider?: unknown; id?: unknown } } | undefined)?.model;
+        if (frame.success && typeof model?.provider === "string" && typeof model.id === "string") fallbackDefault = `${model.provider}/${model.id}`;
+        if (catalogFrame) { finish(currentCatalog()); return true; }
+        return false;
+      }
       if (frame?.command !== "get_available_models") return false;
-      clearTimeout(timer);
-      finish(piCatalogFromFrame(frame, fallbackDefault) ?? { default: fallbackDefault, options: [] });
-      return true;
+      catalogFrame = frame;
+      if (stateRead) { finish(currentCatalog()); return true; }
+      return false;
     }));
     child.on("error", () => finish({ default: "", options: [] }));
     child.on("close", () => finish({ default: "", options: [] }));
     try {
       child.stdin.write(`${JSON.stringify(PI_NEGOTIATE_FRAME)}\n`);
+      if (runtime === "omp") child.stdin.write(JSON.stringify({ id: "state", type: "get_state" }) + "\n");
       child.stdin.write(JSON.stringify({ id: "catalog", type: "get_available_models" }) + "\n");
     } catch {
       finish({ default: "", options: [] });
     }
-  });
-}
-
-export async function updatePiModelCatalog(
-  cli: string,
-  env: Record<string, string | undefined>,
-): Promise<boolean> {
-  return new Promise((resolve) => {
-    execCli(
-      cli,
-      PI_MODEL_UPDATE_ARGS,
-      { env, timeout: 60_000, maxBuffer: 1024 * 1024 },
-      (error) => resolve(!error),
-    );
   });
 }
 
@@ -450,14 +346,14 @@ export interface PiConfig {
   fullAuto: boolean;
 }
 
-function decodeConfig(raw: unknown): PiConfig {
-  if (raw === null || raw === undefined) return { cli: "pi", fullAuto: false };
+function decodeConfig(raw: unknown, runtime: PiRuntime): PiConfig {
+  if (raw === null || raw === undefined) return { cli: runtime, fullAuto: false };
   if (typeof raw !== "object") throw new Error("pi config must be an object");
   const obj = raw as { cli?: unknown; fullAuto?: unknown };
   if (obj.cli !== undefined && typeof obj.cli !== "string") throw new Error("pi config `cli` must be a string");
   if (obj.fullAuto !== undefined && typeof obj.fullAuto !== "boolean") throw new Error("pi config `fullAuto` must be a boolean");
   return {
-    cli: obj.cli && obj.cli.trim() ? obj.cli.trim() : "pi",
+    cli: obj.cli && obj.cli.trim() ? obj.cli.trim() : runtime,
     fullAuto: obj.fullAuto === true,
   };
 }
@@ -494,10 +390,15 @@ function piEnvironment(source: Record<string, string | undefined>): Record<strin
   return env;
 }
 
-export const PiDriver: ProviderDriver<PiConfig> = {
+export function createPiDriver(runtime: PiRuntime): ProviderDriver<PiConfig> {
+  const DRIVER_KIND = runtime === "omp" ? "ompAgent" : "piAgent";
+  return {
   driverKind: DRIVER_KIND,
-  metadata: { displayName: "pi", supportsMultipleInstances: true, access: "custom" },
-  install: {
+  metadata: { displayName: runtime === "omp" ? "Oh My Pi" : "pi", supportsMultipleInstances: true, access: "custom" },
+  install: runtime === "omp" ? {
+    needsNode: false,
+    docsUrl: "https://omp.sh",
+  } : {
     command: {
       darwin: "npm install -g @earendil-works/pi-coding-agent",
       linux: "npm install -g @earendil-works/pi-coding-agent",
@@ -507,34 +408,27 @@ export const PiDriver: ProviderDriver<PiConfig> = {
     docsUrl: "https://pi.dev",
   },
   models: EMPTY,
-  decodeConfig,
-  defaultConfig: () => decodeConfig({}),
+  decodeConfig: (raw) => decodeConfig(raw, runtime),
+  defaultConfig: () => decodeConfig({}, runtime),
 
   async create(input: DriverCreateInput<PiConfig>): Promise<ProviderInstance> {
     const { instanceId, config } = input;
     const catalogEnv = piEnvironment({ ...process.env, ...input.environment });
     let models = EMPTY;
     const readModels = async () => {
-      let base = models;
       try {
-        const resolved = await fetchPiModels(config.cli, catalogEnv);
-        if (resolved.options.length) base = resolved;
+        models = await fetchPiModels(config.cli, catalogEnv, runtime);
       } catch {}
-      try {
-        const next = await applyPiLocalCatalog(base, catalogEnv);
-        if (next.options.length) models = next;
-      } catch {
-        if (base.options.length) models = base;
-      }
       try { writeStartupModelCache(instanceId, models); } catch {}
     };
-    const refreshModels = async () => {
-      await updatePiModelCatalog(config.cli, catalogEnv);
-      await readModels();
-    };
+    const refreshModels = readModels;
     const startupModelRefresh = (await openStartupModelCatalog({
       instanceId,
-      use: (catalog) => { models = catalog; },
+      use: (catalog) => {
+        // Old app caches may contain synthetic hosts that this driver no longer configures.
+        const options = catalog.options.filter(option => !decodeInjectId(option.id));
+        models = { default: options.some(option => option.id === catalog.default) ? catalog.default : (options[0]?.id ?? ""), options };
+      },
       current: () => models,
       refresh: readModels,
     }))?.pending ?? null;
@@ -563,6 +457,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
     const sendTurn = async (turn: SendTurnInput) => {
       if (startupModelRefresh) await startupModelRefresh;
       const { threadId } = turn;
+      const selectedModel = typeof turn.model === "string" && turn.model ? turn.model : undefined;
       const selection = parseToolScope(turn.toolScope);
       if (!selection.ok) throw new Error(selection.error);
       const toolScope = selection.scope;
@@ -583,16 +478,11 @@ export const PiDriver: ProviderDriver<PiConfig> = {
       let agentEndTimer: ReturnType<typeof setTimeout> | null = null;
       const images = readPiPromptImages(turn);
 
-      // Before any credential-bearing temp file, so a model setup failure leaves nothing to clean up.
-      if (typeof turn.model === "string" && turn.model) {
-        ensurePiInjectModel(turn.model, { ...process.env, ...input.environment });
-      }
-
       // The MCP config carries credentials: a 0600 temp file removed at settle, never argv.
       // Written on every turn: the extension also carries ask_user.
       const mcpServers = buildMcpServers(turn);
       const askUser = toolScope === undefined || allowsTool(toolScope, { kind: "native", name: ASK_USER_TOOL });
-      const mcpTempDir = mkdtempSync(join(tmpdir(), "omb-pi-mcp-"));
+      const mcpTempDir = mkdtempSync(join(tmpdir(), `omb-${runtime}-mcp-`));
       const scopeReadyPath = toolScope !== undefined ? join(mcpTempDir, "scope-ready.json") : undefined;
       try {
         writeFileSync(join(mcpTempDir, "mcp.json"), JSON.stringify({ mcpServers: mcpServers ?? {}, toolScope, scopeReadyPath, approvalMode: turn.approvalMode, askUser }), { mode: 0o600 });
@@ -603,7 +493,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
         } catch {}
         throw err;
       }
-      const childArgs = [...PI_ARGS, "-e", SPAWNED_PROXIES.piMcpExtension];
+      const childArgs = [...rpcArgs(runtime), "-e", SPAWNED_PROXIES.piMcpExtension];
 
       // spawnCli can throw synchronously, before settle() could remove the credential file.
       const child = (() => {
@@ -640,14 +530,14 @@ export const PiDriver: ProviderDriver<PiConfig> = {
         new Promise<unknown>((resolve, reject) => {
           const timer = setTimeout(() => {
             responseWaiters.delete(key);
-            reject(new Error(`pi ${command} timed out`));
+            reject(new Error(`${runtime} ${command} timed out`));
           }, timeoutMs);
           timer.unref?.();
           responseWaiters.set(key, { resolve, reject, timer });
         });
-      child.stdin.on("error", () => rejectWaiters(new Error("pi stdin closed")));
+      child.stdin.on("error", () => rejectWaiters(new Error(`${runtime} stdin closed`)));
       const send = (obj: Record<string, unknown>) => {
-        appendNative(threadId, { dir: "out", source: "pi.rpc", msg: piNativeLogMessage(obj) });
+        appendNative(threadId, { dir: "out", source: `${runtime}.rpc`, msg: piNativeLogMessage(obj) });
         child.stdin.write(JSON.stringify(obj) + "\n");
       };
       // Vanilla pi refuses the unknown command; no waiter is keyed for the reply.
@@ -736,7 +626,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
       active.set(threadId, { stop, turnId, pending, child, steer: steerActiveTurn });
 
       const onEvent = (evt: PiEvent) => {
-        appendNative(threadId, { dir: "in", source: "pi.rpc", msg: evt });
+        appendNative(threadId, { dir: "in", source: `${runtime}.rpc`, msg: evt });
         switch (evt.type) {
           case "response": {
             const key = typeof evt.id === "string" && responseWaiters.has(evt.id) ? evt.id : evt.command;
@@ -745,7 +635,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
               responseWaiters.delete(key);
               clearTimeout(waiter.timer);
               if (evt.success) waiter.resolve(evt.data);
-              else waiter.reject(new PiRpcRefusalError(`pi ${evt.command} failed`));
+              else waiter.reject(new PiRpcRefusalError(`${runtime} ${evt.command} failed`));
             }
             return;
           }
@@ -839,7 +729,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
                 requestId: reqId,
                 type: "request.opened",
                 requestType: isQuestion ? "question" : "permission",
-                tool: String(evt.title ?? "pi"),
+                tool: String(evt.title ?? runtime),
                 summary,
                 ...(choices ? { choices } : {}),
                 ...(question ? { questions: [question] } : {}),
@@ -854,7 +744,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
             // pi compaction (manual or automatic) can absorb the turn that carried the standing prompt.
             if (sessionReady && sessionFile) {
               compactionObserved = true;
-              deletePromptSplitReceipt("pi", JSON.stringify([threadId, sessionFile]));
+              deletePromptSplitReceipt(runtime, JSON.stringify([threadId, sessionFile]));
             }
             return;
           }
@@ -916,7 +806,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
         settle(false);
       });
       child.on("close", () => {
-        rejectWaiters(new Error("pi process exited before replying"));
+        rejectWaiters(new Error(`${runtime} process exited before replying`));
         settle(false);
       });
 
@@ -937,13 +827,13 @@ export const PiDriver: ProviderDriver<PiConfig> = {
           ...base(threadId, turnId),
           type: "session.started",
           sessionId: sessionFile ?? hs?.sessionId ?? null,
-          model: turn.model ?? null,
+          model: selectedModel ?? null,
         });
       } catch {
         // pi --no-session accepts a prompt without an explicit session.
       }
 
-      const chosen = typeof turn.model === "string" ? splitPiModel(turn.model) : null;
+      const chosen = selectedModel ? splitPiModel(selectedModel) : null;
       if (chosen) {
         try {
           const modelPromise = awaitResponse("set_model");
@@ -968,7 +858,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
           ready = receipt.ok === true && JSON.stringify(receipt.toolScope) === JSON.stringify(toolScope);
         } catch { /* Missing or malformed readiness is never a grant. */ }
         if (!ready) {
-          const message = "Pi tool selection enforcement is unavailable. Update Pi and check the OpenMausBot extension before retrying.";
+          const message = `${runtime === "omp" ? "Oh My Pi" : "Pi"} tool selection enforcement is unavailable. Update the runtime and check the Touko extension before retrying.`;
           emit({ ...base(threadId, turnId), type: "runtime.error", message });
           settle(false);
           throw new Error(message);
@@ -983,7 +873,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
         const composed = splitSessionPrompt(
           halves.stable,
           halves.volatile,
-          readPromptSplitReceipt("pi", receiptKey),
+          readPromptSplitReceipt(runtime, receiptKey),
           turn.system,
           turn.text,
           Boolean(turn.mentionTurn),
@@ -1002,7 +892,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
           () => {
             if (!pendingReceipt || compactionObserved) return;
             try {
-              writePromptSplitReceipt("pi", pendingReceipt.key, pendingReceipt.receipt);
+              writePromptSplitReceipt(runtime, pendingReceipt.key, pendingReceipt.receipt);
             } catch {}
           },
           (err: Error) => {
@@ -1031,7 +921,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
       const version = await new Promise<string | null>((resolve) => {
         const child = spawnCli(config.cli, ["--version"], {
           stdio: ["ignore", "pipe", "pipe"],
-          env: piEnvironment({ ...process.env, ...input.environment }),
+          env: catalogEnv,
         });
         let out = "";
         child.stdout?.setEncoding("utf8");
@@ -1078,7 +968,6 @@ export const PiDriver: ProviderDriver<PiConfig> = {
           composioMcp: true,
           customMcp: true,
 
-          highlevelMcp: true,
           localComputerMcp: true,
           images: true,
           nativeImageInput: true,
@@ -1122,4 +1011,8 @@ export const PiDriver: ProviderDriver<PiConfig> = {
       },
     };
   },
-};
+  };
+}
+
+export const PiDriver = createPiDriver("pi");
+export const OmpDriver = createPiDriver("omp");

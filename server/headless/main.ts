@@ -55,20 +55,10 @@ export const VERB_HELP: Record<string, string> = {
   (--kind message,runtime adds token-level events to messages).
   --job follows the threads of one conversation's job; --until-settled ends with it.`,
   team: "openmausbot team apply FILE | team export --out FILE   (see help team apply, help team export)",
-  "team apply": `openmausbot team apply FILE [--dry-run | --check] [--prune] [--rotate-secrets] [--wait-idle 2m]
-  Make the workspace match a team file (YAML or JSON): teams and briefs, bots, skills, Chiefs and engines.
-  Prints the plan, then applies it; a second apply prints "No changes.".
-  --dry-run only prints the plan; --check exits 6 if anything would change. --prune deletes bots
-  and bots the file leaves out, in teams marked prune: true. Keys come from { env } or { file },
-  and a key already set is kept unless --rotate-secrets. docs/headless-cli.md has the format.`,
-  "team export": "openmausbot team export [--team NAME]… --out FILE\n  Write the workspace (or some teams) as a team file; skills go beside it, keys as placeholders,\n  and a key written into a brief or skill is taken out.",
-  engine: "openmausbot engine set KIND … | engine list   (see help engine set)",
-  "engine set": `openmausbot engine set KIND (--key-env VAR | --key-file FILE) [--base-url URL] [--only-claude-api] [--install] [--rotate] [--dry-run]
-  Give the workspace an engine key: claude, openai, openrouter, openai-compatible, xai, groq, mistral or cerebras.
-  The key is never printed. One already set is kept unless --rotate. --install installs the engine's
-  command if it is not running already, so a script can run this on every start.
-  claude: the key runs every Claude bot; --only-claude-api keeps it to "Claude (API key)" bots.`,
-  "engine list": "openmausbot engine list\n  The engines, whether each is ready, and which keys are set (never their values).",
+  "team apply": "openmausbot team apply FILE [--dry-run | --check] [--prune] [--wait-idle 2m]",
+  "team export": "openmausbot team export [--team NAME]… --out FILE\n  Write the workspace (or some teams) as a team file; skills go beside it, and credentials are removed from exported text.",
+  engine: "openmausbot engine list",
+  "engine list": "openmausbot engine list",
   connect: `openmausbot connect [URL] [--code CODE] --out FILE [--label NAME] [--client] [--force]
   Get a token for a workspace you reach over the network, saved to FILE (only you can read it).
   On this computer's own server the code is made for you; elsewhere, get one from Settings → Phone.
@@ -90,7 +80,7 @@ export interface HeadlessOptions {
 const VERBS: Record<string, (ctx: VerbContext) => Promise<VerbOutcome>> = {
   doctor, bots: list, models: list, messages, send, run: runVerb, wait: waitVerb,
   interrupt, "new-bot": newBot, "set-model": setModel, edit, export: exportVerb, events: eventsVerb,
-  "team apply": teamApplyVerb, "team export": teamExportVerb, "engine set": engineVerb, "engine list": engineVerb, connect: connectVerb,
+  "team apply": teamApplyVerb, "team export": teamExportVerb, "engine list": engineVerb, connect: connectVerb,
 };
 
 async function execute(argv: readonly string[], options: HeadlessOptions, io: HeadlessIo): Promise<{ outcome: VerbOutcome; output: Output; client?: HeadlessClient }> {

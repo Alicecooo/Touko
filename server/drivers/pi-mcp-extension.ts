@@ -76,7 +76,7 @@ interface PiExtensionApi {
   registerTool(definition: PiToolDefinition): void;
   on(event: string, handler: (event?: Record<string, unknown>, context?: { abort?(): void }) => unknown): void;
   getActiveTools?(): string[];
-  setActiveTools?(names: string[]): void;
+  setActiveTools?(names: string[]): void | Promise<void>;
 }
 
 const MCP_STARTUP_TIMEOUT_MS = 8_000;
@@ -597,13 +597,14 @@ export default async function (pi: PiExtensionApi): Promise<void> {
     const allowed = (name: string) => directoryTools.has(name)
       ? canUseMcpServer(scope, directoryTools.get(name)!)
       : allowsTool(scope, identities.get(name) ?? { kind: "native", name });
-    const intersect = () => {
+    const intersect = async () => {
       if (enforcementFailed) throw new Error("Pi tool selection enforcement is unavailable");
       try {
         const active = pi.getActiveTools!();
         if (!Array.isArray(active) || active.some((name) => typeof name !== "string")) throw new Error("Pi tool selection enforcement returned an invalid catalog");
         const requested = new Set(active.filter(allowed));
-        pi.setActiveTools!([...requested]);
+        // Pi applies this synchronously; OMP rebuilds the active tool set asynchronously.
+        await pi.setActiveTools!([...requested]);
         const selected = pi.getActiveTools!();
         if (!Array.isArray(selected) || selected.some((name) => !requested.has(name))) throw new Error("Pi tool selection enforcement did not apply the active-tool restriction");
         if (config.scopeReadyPath) writeFileSync(config.scopeReadyPath, JSON.stringify({ ok: true, toolScope: scope }), { mode: 0o600 });
@@ -616,12 +617,12 @@ export default async function (pi: PiExtensionApi): Promise<void> {
         throw error;
       }
     };
-    for (const event of ["session_start", "session_switch", "model_select", "before_agent_start", "context"]) pi.on(event, () => { intersect(); });
+    for (const event of ["session_start", "session_switch", "model_select", "before_agent_start", "context"]) pi.on(event, () => intersect());
     pi.on("tool_call", (event) => !enforcementFailed && typeof event?.toolName === "string" && allowed(event.toolName) ? undefined : { block: true, reason: "Tool selection excludes this tool" });
     // Providers serialize tools before this hook, so the final payload is filtered too.
-    pi.on("before_provider_request", (event, context) => {
+    pi.on("before_provider_request", async (event, context) => {
       let selected = new Set<string>();
-      try { selected = new Set(intersect()); } catch {
+      try { selected = new Set(await intersect()); } catch {
         // Pi catches hook errors: keep the payload empty and block every later execution.
         try { context?.abort?.(); } catch { /* The deny-all payload still applies. */ }
       }

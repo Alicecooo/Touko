@@ -9,7 +9,6 @@ import type { ModelCatalog } from "../harness/contracts.ts";
 import { qualifiedModelLabel } from "../harness/contracts.ts";
 import { killCliTree, spawnCli } from "../platform/procs.ts";
 import { codexHome } from "./codex-identity.ts";
-import { mergeLocalInject } from "./local-inject.ts";
 
 export const STATIC_CODEX_MODELS: ModelCatalog = {
   default: "gpt-5.6-sol",
@@ -357,9 +356,9 @@ export async function readCodexModelCatalog(
   const official = (cli ? await readCodexAppServerModelCatalog(cli, env) : null) ?? STATIC_CODEX_MODELS;
   // A relative CODEX_HOME or user home must not load a catalog from another directory.
   const home = codexHome(env);
-  if (!home) return mergeLocalInject(official, env, fetchImpl);
+  if (!home) return official;
   const mainText = readText(join(home, "config.toml"));
-  if (!mainText) return mergeLocalInject(official, env, fetchImpl);
+  if (!mainText) return official;
 
   const main = parseCodexToml(mainText);
   const known = new Map(main.providers.map((provider) => [provider.id, provider]));
@@ -423,12 +422,8 @@ export async function readCodexModelCatalog(
       ? main.model
       : null;
 
-  return mergeLocalInject(
-    {
-      default: configured && seen.has(configured) ? configured : official.default,
-      options,
-    },
-    env,
-    fetchImpl,
-  );
+  return {
+    default: configured && seen.has(configured) ? configured : official.default,
+    options,
+  };
 }

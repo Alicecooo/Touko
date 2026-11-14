@@ -107,7 +107,7 @@ export interface ConnectorCardData {
 }
 
 export interface SecretRequestCardData {
-  target: import("../../shared/credential-request").CredentialTargetId;
+  target: string;
   label: string;
   description: string;
   placeholder: string;
@@ -373,20 +373,11 @@ export type { ConfigStatus, ManagedPolicySummary };
 // A section left out here is wiped from state.config whenever a config frame lands.
 export type ConfigStatusFrame = Pick<
   ConfigStatus,
-  "xai" | "mistral" | "cerebras" | "groq" | "meta" | "anthropic" | "openai" | "openrouter" | "openaiCompat" | "fleet" | "composio" | "box" | "mcp" | "threads" | "automaticRecovery" | "cacheKeepWarm" | "opencodeGo" | "profile" | "language" | "features" | "onboarding" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
+  "fleet" | "composio" | "box" | "mcp" | "threads" | "automaticRecovery" | "cacheKeepWarm" | "profile" | "language" | "features" | "onboarding" | "edition" | "budgets" | "billing" | "managedPolicy" | "cloudHome"
 >;
 
 export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
   return {
-    xai: frame.xai,
-    mistral: frame.mistral,
-    cerebras: frame.cerebras,
-    groq: frame.groq,
-    meta: frame.meta,
-    anthropic: frame.anthropic,
-    openai: frame.openai,
-    openrouter: frame.openrouter,
-    openaiCompat: frame.openaiCompat,
     fleet: frame.fleet,
     composio: frame.composio,
     box: frame.box,
@@ -394,7 +385,6 @@ export function configStatusFromFrame(frame: ConfigStatusFrame): ConfigStatus {
     threads: frame.threads,
     automaticRecovery: frame.automaticRecovery,
     cacheKeepWarm: frame.cacheKeepWarm,
-    opencodeGo: frame.opencodeGo,
     profile: frame.profile,
     language: frame.language,
     features: frame.features,
@@ -414,12 +404,9 @@ export interface EngineInstall {
   needsNode?: boolean;
   managed?: { label: string; downloadBytes: number };
   server?: { package: string };
-  settings?: "connections";
 }
 
 export interface InstanceInfo {
-  apiProtocol?: "openai" | "anthropic";
-  url?: string;
   instanceId: string;
   driverKind: string;
   displayName: string;
@@ -432,9 +419,7 @@ export interface InstanceInfo {
     state: "available" | "unavailable";
     reason?: string;
     authenticated?: boolean;
-    chatgptPlan?: boolean;
     authenticationUnavailableReason?: string;
-    account?: { email?: string; organization?: string; method?: "login" | "api-key" };
     version?: string | null;
     update?: {
       title: string;
@@ -452,8 +437,6 @@ export interface InstanceInfo {
     computerMcp?: boolean;
     agentsMcp?: boolean;
     composioMcp?: boolean;
-    /** the engine can mount the native HighLevel tools (a connected app without Composio) */
-    highlevelMcp?: boolean;
 
     images?: boolean;
     effortLevels?: readonly EffortLevel[];
@@ -463,13 +446,11 @@ export interface InstanceInfo {
     approvalReview?: boolean;
     backgroundText?: boolean;
   };
-  access?: "subscription" | "custom" | "api";
-  authentication?: { method: "device-code" | "paste-code" | "browser" | "browser-pkce"; signOut?: boolean };
+  access?: "subscription" | "custom";
   install?: EngineInstall;
   cli?: string;
   cliDefault?: string;
   cliCandidates?: string[];
-  claudeAccount?: { configDir: string; signInCommand: string; signInShell: "powershell" | "sh"; isDefault: boolean };
   freeUpSpace?: boolean;
 }
 
@@ -479,7 +460,6 @@ export type AppSettingsSection =
   | "organization"
   | "cloudAccount"
   | "appearance"
-  | "connections"
   | "appConnections"
   | "engines"
   | "companion"

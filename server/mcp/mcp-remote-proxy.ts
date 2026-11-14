@@ -264,7 +264,7 @@ async function handle(message: Json): Promise<void> {
   if (pending.has(id)) { error(message.id, -32600, "Duplicate request ID"); return; }
   const controller = new AbortController();
   pending.set(id, controller);
-  // Engines keep their own tool-call deadline (Gemini CLI and Qwen Code wait ten minutes) and cancel through this proxy.
+  // Engines keep their own tool-call deadline and cancel through this proxy.
   const deadline = message.method !== "tools/call" ? 30_000 : directory ? 120_000 : undefined;
   const signal = deadline === undefined ? controller.signal : AbortSignal.any([controller.signal, AbortSignal.timeout(deadline)]);
   try {

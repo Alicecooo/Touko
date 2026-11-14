@@ -86,15 +86,10 @@ const VERBS: Record<string, { options: ParseArgsOptionsConfig; positionals: numb
   },
   "team apply": {
     options: { "dry-run": { type: "boolean" }, check: { type: "boolean" }, prune: { type: "boolean" },
-      "rotate-secrets": { type: "boolean" }, "wait-idle": { type: "string" } },
+      "wait-idle": { type: "string" } },
     positionals: 1,
   },
   "team export": { options: { team: { type: "string", multiple: true }, out: { type: "string" } }, positionals: 0 },
-  "engine set": {
-    options: { "key-env": { type: "string" }, "key-file": { type: "string" }, "base-url": { type: "string" },
-      "only-claude-api": { type: "boolean" }, install: { type: "boolean" }, rotate: { type: "boolean" }, "dry-run": { type: "boolean" } },
-    positionals: 1,
-  },
   "engine list": { options: {}, positionals: 0 },
   connect: {
     options: { code: { type: "string" }, out: { type: "string" }, label: { type: "string" }, client: { type: "boolean" }, force: { type: "boolean" } },
@@ -107,7 +102,7 @@ export const HEADLESS_VERBS: ReadonlySet<string> = new Set(Object.keys(VERBS).ma
 
 /** Verbs that change something; control-omb refuses them on a discovered server. */
 export const MUTATING_VERBS: ReadonlySet<string> = new Set([
-  "send", "run", "interrupt", "new-bot", "set-model", "edit", "team apply", "engine set",
+  "send", "run", "interrupt", "new-bot", "set-model", "edit", "team apply",
 ]);
 
 export type Flags = Record<string, string | boolean | string[] | undefined>;

@@ -25,6 +25,13 @@ export function skipSubscriptionAuthForLocalInject(model: string | undefined): b
   return Boolean(decodeInjectId(model));
 }
 
+function nativeCliCatalog(catalog: ModelCatalog): ModelCatalog | null {
+  const options = catalog.options.filter((option) => !decodeInjectId(option.id));
+  if (!options.length) return null;
+  const defaultModel = options.some((option) => option.id === catalog.default) ? catalog.default : options[0]!.id;
+  return { ...catalog, default: defaultModel, options };
+}
+
 /** A catalog can contain credential-bearing native configuration, including late replies. */
 export function acpNativeIncomingLogMessage(message: any, privateResponses: ReadonlySet<number>): unknown {
   if (!privateResponses.has(message?.id)) return message;
@@ -486,8 +493,8 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
       const refreshModels = async () => {
         if (!support.resolveModels) return;
         try {
-          const resolved = await support.resolveModels(childEnv(), config, instanceId);
-          if (resolved.options.length) {
+          const resolved = nativeCliCatalog(await support.resolveModels(childEnv(), config, instanceId));
+          if (resolved) {
             models = resolved;
             accountModels = new Set(resolved.options.map((option) => option.id));
           }
@@ -498,7 +505,10 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
       if (support.resolveModels && support.resolveModelsOnCreate !== false) {
         startupModelRefresh = (await openStartupModelCatalog({
           instanceId,
-          use: (catalog) => { models = catalog; },
+          use: (catalog) => {
+            const native = nativeCliCatalog(catalog);
+            if (native) models = native;
+          },
           current: () => models,
           refresh: refreshModels,
         }))?.pending ?? null;
@@ -1942,7 +1952,6 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
             computerMcp: true,
             composioMcp: true,
 
-            highlevelMcp: true,
             images: support.images !== false,
             nativeImageInput: support.images === true,
             effortLevels: support.effortLevels,

@@ -2,9 +2,9 @@
 // The user's own .git is never read, written or locked: every git call sets GIT_DIR to the shadow repo and GIT_WORK_TREE to the folder.
 // Best-effort: nothing here throws into the turn path; a git failure turns checkpoints off for that bot, a timeout for that folder.
 //
-// Adapted from the checkpoint designs of Cline, Roo-Code, and Gemini CLI
+// Adapted from the checkpoint designs of Cline, Roo-Code, and other agent projects
 // (all Apache-2.0): the per-call GIT_DIR/GIT_WORK_TREE/GIT_CONFIG_* env
-// override follows Gemini CLI's gitService, the sanitized GIT_* env list and
+// override follows common agent patterns, the sanitized GIT_* env list and
 // the exclude categories follow Roo-Code's checkpoint service, and the
 // snapshot-before-every-turn cadence follows Cline.
 import { execFile } from "node:child_process";

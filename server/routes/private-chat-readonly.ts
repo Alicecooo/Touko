@@ -49,8 +49,8 @@ function mutationTarget(path: string, method: string): MutationTarget | undefine
   if (queue && ((!queue[2] && method === "DELETE") || (queue[2] && method === "POST"))) return { botId: queue[1], body: true };
   const card = path.match(/^\/api\/bots\/([\w-]+)\/cards\/([\w-]+)$/);
   if (card && method === "PATCH") return { botId: card[1], messageId: card[2], body: true };
-  const continuation = path.match(/^\/api\/bots\/([\w-]+)\/(secret-cards|connector-cards)\/([\w-]+)\/(provided|authorize|resume|dismiss)$/);
-  if (continuation && method === "POST") return { botId: continuation[1], messageId: continuation[3], body: true };
+  const continuation = path.match(/^\/api\/bots\/([\w-]+)\/connector-cards\/([\w-]+)\/(provided|authorize|resume|dismiss)$/);
+  if (continuation && method === "POST") return { botId: continuation[1], messageId: continuation[2], body: true };
   const signIn = path.match(/^\/api\/bots\/([\w-]+)\/sign-in-cards\/([\w-]+)\/(done|cancel|save-login)$/);
   if (signIn && method === "POST") return { botId: signIn[1], messageId: signIn[2], body: true };
   const request = path.match(/^\/api\/bots\/([\w-]+)\/requests\/([A-Za-z0-9_-]{16,80})\/interrupt$/);

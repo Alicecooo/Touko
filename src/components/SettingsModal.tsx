@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Archive, Coins, KeyRound, LockKeyhole, Monitor, Palette, Plug, ScrollText, Search, Terminal, User, X, Building2, BookOpen } from "lucide-react";
+import { Archive, Coins, LockKeyhole, Monitor, Palette, Plug, ScrollText, Search, Terminal, User, X, Building2, BookOpen } from "lucide-react";
 import { api, useStore, type AppSettingsSection, type ConfigStatus } from "@/state/store";
 import { routinesInConversationEnabled, showToolCallsEnabled, skillsLibraryEnabled } from "@/lib/feature-flags";
 import { localeChoices, type LocaleKey } from "@/locales";
 import { t } from "@/lib/i18n";
-import { AppConnectionSettings, ModelApiSettings } from "./ConnectionSettings";
+import { AppConnectionSettings } from "./ConnectionSettings";
 import { EnginesSettings } from "./EnginesSettings";
 import { ActivitySection } from "./ActivitySection";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
@@ -58,8 +58,7 @@ export const SECTIONS: Array<{
   { id: "general", group: "you", labelKey: "settings.section.general", icon: User, keywords: ["profile", "name", "email", "about me", "about", "suggestions", "suggested", "memory", "analytics", "updates", "effort", "new bots", "reasoning", "threads", "parallel", "concurrency", "cleanup", "retention", "event log", "event-log", "log size", "automatic recovery", "backup model", "fallback", "routines", "conversation", "schedule"] },
   { id: "appearance", group: "you", labelKey: "settings.section.appearance", icon: Palette, keywords: ["skin", "theme", "appearance", "chat width", "width", "wide", "full width", "bubble", "bubbles", "tools", "tool calls", "threads", "show threads", "hide threads", "sidebar", "density", "compact", "comfortable", "avatars", "display", "run", "this run", "run card", "commands", "notifications", "sound", "sounds", "mute", "silent", "chime", "pinned", "circles", "universal", "groups", "top", "send", "enter", "return", "shift+enter", "ctrl+enter", "cmd+enter", "⌘+enter", "new line", "keyboard", "ime", "japanese", "message color", "my messages"] },
   { id: "companion", group: "you", labelKey: "settings.section.server", icon: Monitor, keywords: ["server", "https", "domain", "dns", "self-hosted", "caddy"] },
-  { id: "engines", group: "ai", labelKey: "settings.section.engines", icon: Terminal, keywords: ["models", "model providers", "engines", "claude", "codex", "grok", "providers", "cli", "sign in", "subscription"] },
-  { id: "connections", group: "ai", labelKey: "settings.section.connections", icon: KeyRound, keywords: ["keys", "api", "api key", "api keys", "connections", "xai", "mistral", "cerebras", "meta", "muse", "router", "openrouter", "base url", "openai", "anthropic", "groq", "opencode", "provider"] },
+  { id: "engines", group: "ai", labelKey: "settings.section.engines", icon: Terminal, keywords: ["models", "engines", "claude", "codex", "pi", "omp", "antigravity", "cursor", "grok", "cli", "模型", "检测"] },
   { id: "appConnections", group: "ai", labelKey: "settings.section.appConnections", icon: Plug, keywords: ["apps", "connections", "composio", "mcp", "tools", "servers", "gmail", "github", "slack", "notion", "应用", "连接", "工具", "連線", "應用"] },
   { id: "skills", group: "ai", labelKey: "settings.section.skills", icon: BookOpen, keywords: ["skills", "library", "assign", "agent skills", "skill md"] },
   { id: "desktopWorkspaces", group: "computers", labelKey: "settings.section.desktopWorkspaces", icon: Building2, keywords: ["workspace", "cloud", "hosted", "server", "servers", "connect", "pair", "switch", "local"] },
@@ -443,8 +442,6 @@ export function SettingsModal() {
             <RunCardRow />
           </>
         );
-      case "connections":
-        return <ModelApiSettings />;
       case "appConnections":
         return <AppConnectionSettings />;
       case "engines":

@@ -1,5 +1,4 @@
 // The agents tool catalog and which tools a turn sees: definitions only, no environment, no calls.
-import { CREDENTIAL_TARGETS } from "../../shared/credential-request.ts";
 import { OPTIONS_CARD_LIMITS, WATCHER_OPTIONS_CARD_BOT_ID } from "../../shared/options-card.ts";
 import { agentToolAnnotations } from "../agent/agent-tool-policy.ts";
 import { WIDGET_TOOL_DEFINITIONS } from "./agents-widget-tools.ts";
@@ -236,7 +235,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "raise_escalation",
-    description: "Flag a gate only the person can lift — a permission or decision your work is parked on and you cannot proceed without. One reason line, the person's own words where possible; the Chief of Staff (or the person directly) is told at once. Then end your turn and wait: the gate lifting resumes nothing on its own, so say plainly that you stopped and why. Not for failures (those report themselves), not for a credential or sign-in (use request_credential or request_sign_in, which resume you), and not to ask the person a question you could ask by ending your turn on it.",
+    description: "Flag a gate only the person can lift — a permission or decision your work is parked on and you cannot proceed without. One reason line, the person's own words where possible; the Chief of Staff (or the person directly) is told at once. Then end your turn and wait: the gate lifting resumes nothing on its own, so say plainly that you stopped and why. Not for failures (those report themselves), not for a sign-in (use request_sign_in, which resumes you), and not to ask the person a question you could ask by ending your turn on it.",
     inputSchema: { type: "object", additionalProperties: false, properties: {
       reason: { type: "string", minLength: 1, maxLength: 500, description: "One line: what you need from the person and why your work is parked on it." },
     }, required: ["reason"] },
@@ -352,26 +351,6 @@ const TOOL_DEFINITIONS = [
     inputSchema: { type: "object", additionalProperties: false, properties: {
       bot_id: { type: "string", minLength: 1 }, reason: { type: "string", minLength: 1, maxLength: 500 },
     }, required: ["bot_id", "reason"] },
-  },
-  {
-    name: "request_credential",
-    description:
-      "Ask the user for a supported API key through OpenMausBot's secure credential flow. The desktop app and a freshly QR-paired mobile app show a secure entry card; older mobile pairings show how to pair again or finish on the computer. Never claim a secure field opened unless this request succeeds, and never ask the user to paste a secret into chat. The secret is saved by the desktop app and is never returned to you. After calling this tool, end the turn; OpenMausBot resumes the task after the user saves or declines.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        credential_id: {
-          type: "string",
-          enum: Object.keys(CREDENTIAL_TARGETS),
-          description: "The credential the current task requires.",
-        },
-        reason: {
-          type: "string",
-          description: "Optional short, non-sensitive explanation of why the task needs it.",
-        },
-      },
-      required: ["credential_id"],
-    },
   },
   {
     name: "request_sign_in",

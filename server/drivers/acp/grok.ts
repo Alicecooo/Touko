@@ -1,6 +1,6 @@
 // Grok Build: the official `grok` CLI over ACP stdio (`grok … agent stdio`) on the grok.com
 // subscription login (~/.grok/auth.json), not the xAI API key. Verified against grok 1.0.0.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { parse as parseYaml } from "yaml";
@@ -8,7 +8,7 @@ import { parse as parseYaml } from "yaml";
 import type { ModelCatalog } from "../../harness/contracts.ts";
 import { harnessHome, splitCliString } from "../../platform/env-path.ts";
 import type { DeviceSignIn } from "../device-auth.ts";
-import { decodeInjectId, hostApiKey, localHost, mergeLocalInject } from "../local-inject.ts";
+import { decodeInjectId } from "../local-inject.ts";
 import { createAcpDriver, type AcpSupport } from "./core.ts";
 import type { AcpQuestionRequest } from "./question-requests.ts";
 import { allowsTool, canUseMcpServer, narrowsNativeTools, parseToolScope } from "../../../shared/tool-scope.ts";
@@ -39,7 +39,7 @@ function grokLoginFailure(output: string): string {
     return "This server's Grok is too old to sign in with a code. Update Grok on the server, then try again.";
   }
   if (/device-code login is not available/i.test(output)) {
-    return "This Grok account can't sign in with a code. Use an xAI API key instead.";
+    return "This Grok account can't sign in with a code.";
   }
   if (/expired/i.test(output)) return "The Grok sign-in code expired. Start sign-in again for a new code.";
   if (/denied|rejected/i.test(output)) return "Grok sign-in was declined in the browser. Start sign-in again to try once more.";
@@ -129,88 +129,11 @@ export function readGrokModelCatalog(env: Record<string, string | undefined> = p
   };
 }
 
-function suggestGrokSlug(host: string, model: string, taken: Set<string>): string {
-  let base = `${host}-${model}`.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-  if (!base || !/^[a-z]/.test(base)) base = `m-${base || "model"}`;
-  let slug = base;
-  let n = 2;
-  while (taken.has(slug)) {
-    slug = `${base}-${n}`;
-    n += 1;
+function resolveNativeGrokModel(modelId: string | undefined): string | undefined {
+  if (modelId && decodeInjectId(modelId)) {
+    throw new Error("Grok local injected models are no longer supported. Choose a model available in Grok Build.");
   }
-  return slug;
-}
-
-function quoteToml(value: string): string {
-  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-}
-
-/** Write a [model.slug] block so `grok -m` can reach the injected host. */
-export function ensureGrokInjectSlug(
-  modelId: string,
-  env: Record<string, string | undefined> = process.env,
-): string {
-  const inject = decodeInjectId(modelId);
-  if (!inject) return modelId;
-  const host = localHost(inject.host);
-  if (!host) return modelId;
-
-  const path = join(grokHome(env), "config.toml");
-  let text = "";
-  try {
-    text = readFileSync(path, "utf8");
-  } catch {
-    text = "";
-  }
-
-  const taken = new Set<string>(STATIC_GROK_MODELS.options.map((option) => option.id));
-  let current: { slug: string; model?: string; baseUrl?: string } | null = null;
-  const flush = () => {
-    if (!current) return;
-    taken.add(current.slug);
-    if (current.model === inject.model && current.baseUrl === host.baseUrl) {
-      found = current.slug;
-    }
-    current = null;
-  };
-  let found: string | null = null;
-  for (const line of text.split(/\r?\n/)) {
-    const stripped = line.trim();
-    if (stripped.startsWith("[model.") && stripped.endsWith("]")) {
-      flush();
-      let inner = stripped.slice("[model.".length, -1);
-      if (inner.startsWith('"') && inner.endsWith('"')) inner = inner.slice(1, -1);
-      current = { slug: inner };
-      continue;
-    }
-    if (stripped.startsWith("[")) {
-      flush();
-      continue;
-    }
-    if (!current || !stripped.includes("=")) continue;
-    const eq = stripped.indexOf("=");
-    const key = stripped.slice(0, eq).trim();
-    const value = unquote(stripped.slice(eq + 1));
-    if (key === "model") current.model = value;
-    if (key === "base_url") current.baseUrl = value;
-  }
-  flush();
-  if (found) return found;
-
-  const slug = suggestGrokSlug(inject.host, inject.model, taken);
-  const heading = /[^a-z0-9_-]/i.test(slug) ? `[model."${slug}"]` : `[model.${slug}]`;
-  const block = [
-    heading,
-    `model = ${quoteToml(inject.model)}`,
-    `base_url = ${quoteToml(host.baseUrl)}`,
-    `name = ${quoteToml(`${inject.model} (${host.label})`)}`,
-    `api_backend = "chat_completions"`,
-    `api_key = ${quoteToml(hostApiKey(host, env))}`,
-    "",
-  ].join("\n");
-  const next = text && !text.endsWith("\n") ? `${text}\n\n${block}` : `${text}${text ? "\n" : ""}${block}`;
-  writeFileSync(path, next);
-  return slug;
+  return modelId;
 }
 
 /** Grok 1.0.25 consumes native image blocks but advertises image:false; other versions negotiate. */
@@ -374,7 +297,7 @@ const support: AcpSupport = {
   images: true,
   acceptsUnadvertisedImages: grokAcceptsUnadvertisedImages,
   models: STATIC_GROK_MODELS,
-  resolveModels: (env) => mergeLocalInject(readGrokModelCatalog(env), env),
+  resolveModels: (env) => readGrokModelCatalog(env),
   // Grok's levels vary by model and the CLI validates lazily (a rejected level only logs); grok-4.5 rejects xhigh.
   effortLevels: ["low", "medium", "high"],
   defaultCli: "grok",
@@ -392,8 +315,7 @@ const support: AcpSupport = {
   },
   deviceSignIn: GROK_DEVICE_SIGN_IN,
 
-  // With the instance HOME/GROK_HOME: ensureGrokInjectSlug defaults to process.env.
-  resolveTurnModel: (model, env) => (model ? ensureGrokInjectSlug(model, env) : model),
+  resolveTurnModel: (model) => resolveNativeGrokModel(model),
 
   // --permission-mode is global; -m and --reasoning-effort only apply between `agent` and `stdio`
   // (Grok 1.0.6; -m first is taken as a TUI option and ignored). Auto selects Grok's native
@@ -415,7 +337,7 @@ const support: AcpSupport = {
     if (!narrowsNativeTools(turn.toolScope)) return {};
     const profile = grokToolScopeProfile(turn.toolScope, init, grokInheritedProfile(config.cli, env, cwd), hasMcp);
       // Changing harnesses after session/new can discard an ACP profile and restore default tools.
-    if (turn.model) profile.model = ensureGrokInjectSlug(turn.model, env);
+    if (turn.model) profile.model = resolveNativeGrokModel(turn.model)!;
     return { _meta: { agentProfile: profile } };
   },
   toolScopeCacheKey: ({ config, env, cwd }) => JSON.stringify(grokInheritedProfile(config.cli, env, cwd) ?? null),
@@ -426,7 +348,6 @@ const support: AcpSupport = {
       const available = new Set([
         ...(turn.integrations?.agents ? ["agents"] : []), ...(turn.integrations?.composio ? ["composio"] : []),
         ...(turn.integrations?.localComputer ? ["computer"] : []),
-        ...(turn.integrations?.highlevel ? ["highlevel"] : []),
         ...Object.keys(turn.integrations?.custom ?? {}),
       ].filter((name) => canUseMcpServer(turn.toolScope, name)));
       const deadline = Date.now() + 10_000;

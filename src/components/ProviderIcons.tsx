@@ -145,6 +145,8 @@ export function ProviderMark({ driverKind, size, className }: IconProps & { driv
       return <HermesMark size={size} className={className} />;
     case "piAgent":
       return <PiMark size={size} className={className} />;
+    case "ompAgent":
+      return <span className={cn("inline-flex items-center justify-center font-mono font-semibold text-accent-text", className)} style={{ width: size ?? 16, height: size ?? 16, fontSize: (size ?? 16) * 0.4 }} aria-hidden="true">omp</span>;
     default:
       return (
         <span className="flex size-full items-center justify-center text-[10px] font-semibold tracking-tight text-ink-secondary">

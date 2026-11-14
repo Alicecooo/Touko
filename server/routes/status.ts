@@ -7,10 +7,8 @@ import { DATA_DIR, EVENTS_DIR, NATIVE_DIR, instanceConfigs, type AppConfig } fro
 import { boundRetentionDays, decisionsCsv, readDecisionRange, readDecisions } from "../observability/decision-log.ts";
 import { editionForMembers, editionStatus, entitled } from "../deployment/enterprise.ts";
 import { fleetAvailable, fleetRequest, fleetSocketPath } from "../deployment/fleet-client.ts";
-import { noteKeyAccepted, noteKeyRejected } from "../security/key-rejections.ts";
 import type { OutboundCounts } from "../usage/outbound-counts.ts";
 import { loadPlanUsage, planAccountsFromInstances } from "../usage/plan-usage.ts";
-import { checkProviderKey, PROVIDER_KEY_KINDS, providerBaseUrl, type ProviderKeyKind } from "../model-catalog/provider-key-check.ts";
 import type { Store } from "../storage/store.ts";
 import { readThreadEvents } from "../storage/thread-events.ts";
 import { parseUsageRange } from "../usage/usage-ledger.ts";
@@ -99,32 +97,6 @@ export function createStatusRoutes(deps: StatusRouteDeps): RouteHandler {
         refresh: url.searchParams.get("refresh") === "1",
       });
       return json(res, 200, report);
-    }
-
-    // One read-only request from this server; the verdict never carries the key.
-    if (method === "POST" && path === "/api/keys/test") {
-      const body = await readBody(req, 8192);
-      const provider = body?.provider;
-      if (!PROVIDER_KEY_KINDS.includes(provider as ProviderKeyKind)) {
-        return json(res, 400, { error: `provider must be one of ${PROVIDER_KEY_KINDS.join(", ")}` });
-      }
-      const kind = provider as ProviderKeyKind;
-      const saved = { anthropic: cfg.anthropic, openai: cfg.openai, openrouter: cfg.openrouter, openaiCompat: cfg.openaiCompat, mistral: cfg.mistral, cerebras: cfg.cerebras, groq: cfg.groq, meta: cfg.meta, xai: cfg.xai }[kind];
-      if (body?.key !== undefined && typeof body.key !== "string") {
-        return json(res, 400, { error: "key must be a string" });
-      }
-      const key = typeof body?.key === "string" ? body.key.trim() : saved?.key?.trim() || "";
-      if (!key) return json(res, 400, { error: "No key to test. Paste one or save one first." });
-      if (key.length > 512) return json(res, 400, { error: "That does not look like an API key." });
-      const url = typeof body?.url === "string" && body.url.trim() ? body.url.trim() : (saved && "url" in saved ? saved.url : undefined);
-      res.setHeader("cache-control", "no-store");
-      const verdict = await checkProviderKey({ provider: kind, key, url });
-      if (kind !== "anthropic") {
-        const base = providerBaseUrl(kind, url);
-        if (verdict.ok) noteKeyAccepted(base, key);
-        else if (verdict.reason === "rejected") noteKeyRejected(base, key);
-      }
-      return json(res, 200, verdict);
     }
 
     if (method === "GET" && path === "/api/decisions") {

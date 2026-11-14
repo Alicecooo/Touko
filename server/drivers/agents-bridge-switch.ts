@@ -256,7 +256,7 @@ export function engineBridgeRefusal(
   if (driverKind === "claudeAgent") return claudeRefusal(cfg, engine, env, host);
   if (CHAT_RUNTIME_DRIVERS.has(driverKind)) return null;
   if (driverKind === "codex") return "Codex reads its own layered configuration and hooks, which this version does not examine";
-  if (driverKind === "piAgent") return "Pi loads the person's own extensions, which can block a tool by its name, and this version does not examine them";
+  if (driverKind === "piAgent" || driverKind === "ompAgent") return "Pi and Oh My Pi load the person's own extensions, which can block a tool by its name, and this version does not examine them";
   return "this engine keeps its own tool permissions";
 }
 

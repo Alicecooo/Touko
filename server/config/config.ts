@@ -6,7 +6,6 @@ import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 
 import { writeFileAtomic } from "../storage/atomic.ts";
-import { withoutComputerEngine } from "../computers/computer-engine-removal.ts";
 import { newBotDefaultsSchema, type NewBotDefaults } from "../bots/new-bot-defaults.ts";
 import { replaySettings } from "../agent/replay-settings.ts";
 import { EFFORT_LEVELS } from "../../shared/wire.ts";
@@ -92,6 +91,18 @@ const instanceConfigSchema = z.object({
   config: z.json().optional(),
 });
 const instanceConfigMapSchema = z.record(z.string(), instanceConfigSchema);
+const DEFAULT_CLI_INSTANCES: InstanceConfigMap = {
+  pi: { driver: "piAgent" },
+  omp: { driver: "ompAgent" },
+  claude: { driver: "claudeAgent" },
+  codex: { driver: "codex" },
+  antigravity: { driver: "antigravityAgent" },
+  cursor: { driver: "cursorAgent" },
+  grok: { driver: "grokAgent" },
+};
+const LEGACY_MODEL_CONFIG_KEYS = [
+  "anthropic", "openai", "openrouter", "openaiCompat", "xai", "mistral", "cerebras", "groq", "meta", "opencodeGo",
+] as const;
 const defaultModelSelectionSchema = z.object({
   instanceId: z.string().trim().min(1).max(200),
   model: z.string().trim().min(1).max(500),
@@ -136,17 +147,6 @@ const appConfigSchema = z.object( {
     publicUrl: z.string().url().optional(),
     phone: z.enum(["ios", "android"]).optional(),
   }).optional(),
-  mistral: z.object({ key: optionalText }).optional(),
-  cerebras: z.object({ key: optionalText }).optional(),
-  groq: z.object({ key: optionalText, url: optionalText }).optional(),
-  meta: z.object({ key: optionalText, url: optionalText }).optional(),
-  xai: z.object({ key: optionalText, url: optionalText }).optional(),
-  /** Anthropic API key for Claude Code billed per token; `url` is for a proxy or test double. Never a login OAuth token. */
-  anthropic: z.object({ key: optionalText, url: optionalText, everyClaudeBot: z.boolean().optional() }).optional(),
-  /** OpenAI API key for the `openai` instance only; Codex keeps its own login. */
-  openai: z.object({ key: optionalText }).optional(),
-  /** OpenRouter key, for the `openrouter` instance only. */
-  openrouter: z.object({ key: optionalText }).optional(),
   /** Workspace monthly spend limit; enforced only with the `budgets` entitlement. */
   budgets: z
     .object({
@@ -170,15 +170,8 @@ const appConfigSchema = z.object( {
         .optional(),
     })
     .optional(),
-  /** `model` seeds the default selection; `provider` pins an OpenRouter upstream (e.g. "fireworks"). */
-  openaiCompat: z
-    .object({ key: optionalText, url: optionalText, model: optionalText, provider: optionalText })
-    .optional(),
   /** Composio project key; `userId`/`sessionId` reuse one Composio Session. */
   composio: z.object({ apiKey: optionalText, userId: optionalText, sessionId: optionalText }).optional(),
-
-  /** OpenCode service key; write-only and only for its child. */
-  opencodeGo: z.object({ apiKey: optionalText }).optional(),
   /** Non-secret profile details; aboutMe is shared with every bot. */
   profile: z.object({ name: optionalText, email: optionalText, aboutMe: z.string().max(24_000).optional() }).optional(),
   /** UI language override (BCP-47, lowercase); absent follows the system. */
@@ -209,7 +202,9 @@ const appConfigSchema = z.object( {
 const storedAppConfigSchema = appConfigSchema.extend(helperStoredShape).extend({
 
 });
-const appConfigPatchSchema = appConfigSchema.omit({ instances: true, mcpServers: true, cliStartup: true, customDomain: true })
+const appConfigPatchSchema = appConfigSchema.omit({
+  instances: true, mcpServers: true, cliStartup: true, customDomain: true,
+})
   .extend({ threads: threadsPatchSchema.optional() });
 const jsonObjectSchema = z.record(z.string(), z.json());
 
@@ -230,25 +225,14 @@ export interface AppConfig extends HelperConfig {
   };
   mcpServers?: Record<string, unknown>;
   language?: string;
-  xai?: { key?: string; url?: string };
-  mistral?: { key?: string };
-  cerebras?: { key?: string };
-  groq?: { key?: string; url?: string };
-  meta?: { key?: string; url?: string };
-  /** `everyClaudeBot`: the key runs every Claude bot instead of its login; unset means true. */
-  anthropic?: { key?: string; url?: string; everyClaudeBot?: boolean };
-  openai?: { key?: string };
-  openrouter?: { key?: string };
   budgets?: { monthlyUsd?: number; warnAtPercent?: number };
   decisions?: { retentionDays?: number };
   loopGuard?: LoopGuardConfig;
   safetyFloor?: { enabled?: boolean };
   billing?: { currency?: string; prices?: Record<string, { inputPerMillion: number; outputPerMillion: number; cachedInputPerMillion?: number }> };
-  openaiCompat?: { key?: string; url?: string; model?: string; provider?: string };
   composio?: { apiKey?: string; userId?: string; sessionId?: string };
   /** Boat token (ascii.dev renamed Box to Boat); config key "box", env BOX_TOKEN. */
 
-  opencodeGo?: { apiKey?: string };
   profile?: { name?: string; email?: string; aboutMe?: string };
   mcp?: { callTimeoutMinutes?: number };
   threads?: { maxConcurrentPerBot: number; eventLogMaxBytes?: number; eventLogRetentionDays?: number };
@@ -359,25 +343,8 @@ export function llmThreadTitlesEnabled(cfg: AppConfig): boolean {
   return cfg.features?.llmThreadTitles === true;
 }
 
-export function engineLaunches(configs: InstanceConfigMap, env: Record<string, string | undefined> = process.env): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(configs).map(([id, entry]) =>
-    [id, { ...entry, fallbackEnv: Object.fromEntries(fallbackEnv(entry).map((name) => [name, env[name]])) }]));
-}
-
-function fallbackEnv(entry: InstanceConfigMap[string]): string[] {
-  const config = typeof entry.config === "object" && entry.config !== null && !Array.isArray(entry.config)
-    ? entry.config as { apiKeyEnv?: unknown } : {};
-  const named = typeof config.apiKeyEnv === "string" && config.apiKeyEnv ? config.apiKeyEnv : undefined;
-  switch (entry.driver) {
-    case "mistral": return ["MISTRAL_API_KEY"];
-    case "cerebras": return ["CEREBRAS_API_KEY"];
-    case "grok": return [named ?? "XAI_API_KEY"];
-    case "openai-compat":
-      return named && Object.values(API_KEY_FLEET).some((own) => (own.config as { apiKeyEnv?: string } | undefined)?.apiKeyEnv === named)
-        ? [named]
-        : [...new Set([named ?? "OPENAI_COMPAT_API_KEY", "OPENAI_COMPAT_API_KEY", "OPENAI_COMPAT_URL", "OPENAI_COMPAT_MODEL", "OPENAI_COMPAT_PROVIDER"])];
-    default: return [];
-  }
+export function engineLaunches(configs: InstanceConfigMap): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(configs).map(([id, entry]) => [id, { ...entry }]));
 }
 
 export function changedInstanceIds(before: Record<string, unknown>, after: Record<string, unknown>): string[] {
@@ -416,14 +383,66 @@ export function ensureDirs() {
 
 let lastIgnoredConfigWarning = "";
 
+function stripLegacyProviderConfig(stored: JsonValue): boolean {
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) return false;
+  const root = stored as JsonObject;
+  let changed = false;
+  for (const key of LEGACY_MODEL_CONFIG_KEYS) {
+    if (Object.hasOwn(root, key)) {
+      delete root[key];
+      changed = true;
+    }
+  }
+
+  if (Object.hasOwn(root, "instances")) {
+    delete root.instances;
+    changed = true;
+  }
+
+  const supportedSelection = (value: JsonValue | undefined): boolean => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const instanceId = (value as JsonObject).instanceId;
+    return typeof instanceId === "string" && Object.hasOwn(DEFAULT_CLI_INSTANCES, instanceId);
+  };
+  if (root.defaultModelSelection !== undefined && !supportedSelection(root.defaultModelSelection)) {
+    delete root.defaultModelSelection;
+    changed = true;
+  }
+  const defaults = root.newBotDefaults;
+  if (defaults && typeof defaults === "object" && !Array.isArray(defaults)) {
+    const profile = (defaults as JsonObject).profile;
+    if (profile && typeof profile === "object" && !Array.isArray(profile)) {
+      const selection = (profile as JsonObject).modelSelection;
+      if (selection !== undefined && !supportedSelection(selection)) {
+        delete (profile as JsonObject).modelSelection;
+        changed = true;
+      }
+    }
+  }
+  const recovery = root.automaticRecovery;
+  if (recovery && typeof recovery === "object" && !Array.isArray(recovery)) {
+    const recoveryConfig = recovery as JsonObject;
+    if (recoveryConfig.backup !== undefined && !supportedSelection(recoveryConfig.backup)) {
+      if (recoveryConfig.enabled === true) root.automaticRecovery = { enabled: false };
+      else delete recoveryConfig.backup;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 export function loadConfig(): AppConfig {
   let cfg: AppConfig = {};
   try {
     const configPath = join(DATA_DIR, "config.json");
     const stored = parseJson(readFileSync(configPath, "utf8"));
+    let migrated = stripLegacyProviderConfig(stored);
     cfg = parseStoredConfig(stored);
     if (stored && typeof stored === "object" && !Array.isArray(stored) && "localVm" in stored) {
       delete stored.localVm;
+      migrated = true;
+    }
+    if (migrated) {
       writeFileAtomic(configPath, JSON.stringify(stored, null, 2), { mode: 0o600 });
     }
     lastIgnoredConfigWarning = "";
@@ -439,35 +458,10 @@ export function loadConfig(): AppConfig {
       lastIgnoredConfigWarning = "";
     }
   }
-  // Env wins over the file for every credential: the desktop shell injects them as env at spawn.
-  cfg.mistral = { ...cfg.mistral };
-  if (process.env.MISTRAL_API_KEY !== undefined) cfg.mistral.key = process.env.MISTRAL_API_KEY;
-  cfg.cerebras = { ...cfg.cerebras };
-  if (process.env.CEREBRAS_API_KEY !== undefined) cfg.cerebras.key = process.env.CEREBRAS_API_KEY;
-  cfg.groq = { ...cfg.groq };
-  if (process.env.OMB_GROQ_API_KEY !== undefined) cfg.groq.key = process.env.OMB_GROQ_API_KEY;
-  cfg.meta = { ...cfg.meta };
-  if (process.env.OMB_META_API_KEY !== undefined) cfg.meta.key = process.env.OMB_META_API_KEY;
-  cfg.xai = { ...cfg.xai };
-  if (process.env.XAI_API_KEY !== undefined) cfg.xai.key = process.env.XAI_API_KEY;
-  // Never ANTHROPIC_API_KEY: an operator's stray variable must not move every Claude bot onto API billing.
-  cfg.anthropic = { ...cfg.anthropic };
-  if (process.env.OMB_ANTHROPIC_API_KEY !== undefined) cfg.anthropic.key = process.env.OMB_ANTHROPIC_API_KEY;
-  if (process.env.OMB_ANTHROPIC_API_URL !== undefined) cfg.anthropic.url = process.env.OMB_ANTHROPIC_API_URL;
-  cfg.openai = { ...cfg.openai };
-  if (process.env.OMB_OPENAI_API_KEY !== undefined) cfg.openai.key = process.env.OMB_OPENAI_API_KEY;
-  cfg.openrouter = { ...cfg.openrouter };
-  if (process.env.OMB_OPENROUTER_API_KEY !== undefined) cfg.openrouter.key = process.env.OMB_OPENROUTER_API_KEY;
-  cfg.openaiCompat = { ...cfg.openaiCompat };
-  if (process.env.OPENAI_COMPAT_API_KEY !== undefined) cfg.openaiCompat.key = process.env.OPENAI_COMPAT_API_KEY;
-  if (process.env.OPENAI_COMPAT_URL !== undefined) cfg.openaiCompat.url = process.env.OPENAI_COMPAT_URL;
-  if (process.env.OPENAI_COMPAT_MODEL !== undefined) cfg.openaiCompat.model = process.env.OPENAI_COMPAT_MODEL;
-  if (process.env.OPENAI_COMPAT_PROVIDER !== undefined) cfg.openaiCompat.provider = process.env.OPENAI_COMPAT_PROVIDER;
+  // Composio is an app connector, independent of model and agent configuration.
   cfg.composio = { ...cfg.composio };
   if (process.env.COMPOSIO_API_KEY !== undefined) cfg.composio.apiKey = process.env.COMPOSIO_API_KEY;
 
-  cfg.opencodeGo = { ...cfg.opencodeGo };
-  if (process.env.OPENCODE_API_KEY !== undefined) cfg.opencodeGo.apiKey = process.env.OPENCODE_API_KEY;
   const splitEmails = (value: string) => value.split(/[,\s]+/).map((entry) => entry.trim().toLowerCase()).filter(Boolean);
   if (process.env.OMB_SIGNIN_EMAILS !== undefined || process.env.OMB_SIGNIN_MEMBER_EMAILS !== undefined) {
     cfg.signIn = { ...cfg.signIn };
@@ -494,36 +488,12 @@ export function cacheUntilConfigChanges<T>(derive: (config: AppConfig) => T): ()
   };
 }
 
-/** Keeps process.env in step with a saved credential ("" drops the var), because loadConfig() prefers env. */
-export function syncCredentialEnv(patch: Partial<Omit<AppConfig, "threads">>): void {
-  const secrets: Array<[value: string | undefined, name: string]> = [[patch.xai?.key, "XAI_API_KEY"],
-[patch.mistral?.key, "MISTRAL_API_KEY"],
-[patch.cerebras?.key, "CEREBRAS_API_KEY"],
-[patch.groq?.key, "OMB_GROQ_API_KEY"],
-[patch.meta?.key, "OMB_META_API_KEY"],
-[patch.anthropic?.key, "OMB_ANTHROPIC_API_KEY"],
-[patch.openaiCompat?.key, "OPENAI_COMPAT_API_KEY"],
-[patch.openai?.key, "OMB_OPENAI_API_KEY"],
-[patch.openrouter?.key, "OMB_OPENROUTER_API_KEY"],
-[patch.composio?.apiKey, "COMPOSIO_API_KEY"],
-[patch.opencodeGo?.apiKey, "OPENCODE_API_KEY"],
-];
-  for (const [value, name] of secrets) {
-    if (value === undefined) continue;
-    if (value) process.env[name] = value;
-    else delete process.env[name];
-  }
-  const settings: Array<[value: string | undefined, name: string]> = [
-    [patch.openaiCompat?.url, "OPENAI_COMPAT_URL"],
-    [patch.anthropic?.url, "OMB_ANTHROPIC_API_URL"],
-    [patch.openaiCompat?.model, "OPENAI_COMPAT_MODEL"],
-    [patch.openaiCompat?.provider, "OPENAI_COMPAT_PROVIDER"],
-  ];
-  for (const [value, name] of settings) {
-    if (value === undefined) continue;
-    if (value) process.env[name] = value;
-    else delete process.env[name];
-  }
+/** Keeps the live app connector key in sync with its saved config. */
+export function syncComposioCredentialEnv(patch: Pick<AppConfig, "composio">): void {
+  const value = patch.composio?.apiKey;
+  if (value === undefined) return;
+  if (value) process.env.COMPOSIO_API_KEY = value;
+  else delete process.env.COMPOSIO_API_KEY;
 }
 
 /** Workspace credential env names; spawned engine CLIs must never inherit them. */
@@ -630,10 +600,11 @@ export function saveConfig(
   }
   const checkedPatch = appConfigSchema.partial().extend({ threads: threadsPatchSchema.optional() }).parse(patch);
   const before = configSaveListeners.size ? structuredClone(disk) : disk;
+  stripLegacyProviderConfig(disk);
 
   delete disk.localVm;
   delete disk.imageGen;
-  for (const key of ["xai", "anthropic", "mistral", "cerebras", "groq", "meta", "openai", "openrouter", "openaiCompat", "composio", "opencodeGo", "profile", "mcp", "threads", "context", "memory", "features", "budgets", "billing", "decisions", "loopGuard", "onboarding", "safetyFloor"] as const) {
+  for (const key of ["composio", "profile", "mcp", "threads", "context", "memory", "features", "budgets", "billing", "decisions", "loopGuard", "onboarding", "safetyFloor"] as const) {
     const section = checkedPatch[key];
     if (!section) continue;
     const current = jsonObjectSchema.safeParse(disk[key]);
@@ -691,20 +662,7 @@ export function saveConfig(
     }
     disk.instances = diskInstances;
   }
-  if (checkedPatch.openaiCompat?.url !== undefined && checkedPatch.instances?.openaiCompat === undefined) {
-    const instances = jsonObjectSchema.safeParse(disk.instances);
-    const entry = jsonObjectSchema.safeParse(instances.success ? instances.data.openaiCompat : undefined);
-    const config = jsonObjectSchema.safeParse(entry.success ? entry.data.config : undefined);
-    const environment = jsonObjectSchema.safeParse(entry.success ? entry.data.environment : undefined);
-    if (entry.success && entry.data.driver === "openai-compat" && config.success
-      && !config.data.key
-      && (!config.data.apiKeyEnv || config.data.apiKeyEnv === "OPENAI_COMPAT_API_KEY")
-      && !(environment.success && Object.hasOwn(environment.data, "OPENAI_COMPAT_API_KEY"))) {
-      const nextConfig = { ...config.data };
-      delete nextConfig.url;
-      (disk.instances as JsonObject).openaiCompat = { ...entry.data, config: nextConfig };
-    }
-  }
+  stripLegacyProviderConfig(disk);
   mkdirSync(DATA_DIR, { recursive: true });
   writeFileAtomic(p, JSON.stringify(disk, null, 2), { mode: 0o600 });
   for (const listener of configSaveListeners) {
@@ -716,258 +674,13 @@ export function saveConfig(
   }
 }
 
-/** The returned map must stay persistable: never one from instanceConfigs(), which carries injected secrets. */
-export function withInstanceCli(
-  cfg: AppConfig,
-  instanceId: string,
-  cli: string,
-): InstanceCliUpdate {
-  const next: AppConfig = structuredClone(cfg);
-  const map = persistableInstanceConfigs(next);
-  // hasOwn, not truthiness: instanceId comes off the URL, and "__proto__" would poison Object.prototype.
-  if (!Object.hasOwn(map, instanceId)) return { ok: false, config: cfg };
-  const entry = map[instanceId];
-  const cliKey = cli.trim();
-  const currentConfig = jsonObjectSchema.safeParse(entry.config);
-  if (cliKey) {
-    const nextConfig: JsonObject = currentConfig.success ? { ...currentConfig.data } : {};
-    nextConfig.cli = cliKey;
-    entry.config = nextConfig;
-  } else if (currentConfig.success && Object.hasOwn(currentConfig.data, "cli")) {
-    const rest = { ...currentConfig.data };
-    delete rest.cli;
-    entry.config = Object.keys(rest).length ? rest : undefined;
-  }
-  next.instances = map;
-  return { ok: true, config: next };
-}
-
-/** Materialize defaults without freezing injected workspace settings or secrets. */
+/** Materialize the supported CLI inventory without restoring legacy provider settings. */
 export function persistableInstanceConfigs(cfg: AppConfig): InstanceConfigMap {
-  const map = instanceConfigs(cfg);
-  for (const [id, entry] of Object.entries(map)) {
-    const environment = cfg.instances?.[id]?.environment;
-    if (environment) entry.environment = { ...environment };
-    else delete entry.environment;
-    const config = cfg.instances?.[id]?.config;
-    if (config !== undefined) entry.config = structuredClone(config);
-    else delete entry.config;
-  }
-  return map;
+  return instanceConfigs(cfg);
 }
 
-interface InstanceCliUpdate {
-  ok: boolean;
-  config: AppConfig;
-}
-
-/** Claude Code env that picks its endpoint and sign-in; an instance setting any owns its routing. */
-const CLAUDE_ROUTING_ENV = [
-  "ANTHROPIC_BASE_URL",
-  "ANTHROPIC_AUTH_TOKEN",
-  "ANTHROPIC_API_KEY",
-  "ANTHROPIC_CUSTOM_HEADERS",
-  "CLAUDE_CODE_USE_BEDROCK",
-  "CLAUDE_CODE_USE_VERTEX",
-  "CLAUDE_CODE_USE_FOUNDRY",
-] as const;
-
-/** The workspace Anthropic key must never reach a Claude instance with its own routing: it would go as x-api-key to that host. */
-export function claudeInstanceOwnsRouting(environment: Record<string, string> | undefined): boolean {
-  return CLAUDE_ROUTING_ENV.some((key) => typeof environment?.[key] === "string" && environment[key] !== "");
-}
-
-const sameUrl = (a: string, b: string) => a.trim().replace(/\/+$/u, "") === b.trim().replace(/\/+$/u, "");
-
-/** An instance with its own endpoint or credential never gets the workspace key, which would go to its host. */
-export function instanceOwnsRouting(
-  cfg: AppConfig,
-  entry: { driver: string; config?: unknown; environment?: Record<string, string> },
-  routingDefaults?: { url?: string; apiKeyEnv?: string },
-): boolean {
-  const config = typeof entry.config === "object" && entry.config !== null && !Array.isArray(entry.config)
-    ? entry.config as Record<string, unknown>
-    : {};
-  const own = (value: unknown) => typeof value === "string" && value.trim() !== "";
-  const ownUrl = (...workspace: Array<string | undefined>) => own(config.url)
-    && !workspace.some((url) => url !== undefined && sameUrl(config.url as string, url));
-  const compatKeyEnv = routingDefaults?.apiKeyEnv ?? "OPENAI_COMPAT_API_KEY";
-  switch (entry.driver) {
-    case "claudeAgent":
-      return claudeInstanceOwnsRouting(entry.environment);
-    case "openai-compat":
-      return own(config.key) || own(entry.environment?.OPENAI_COMPAT_API_KEY)
-        || own(entry.environment?.[compatKeyEnv])
-        || (own(config.apiKeyEnv) && config.apiKeyEnv !== compatKeyEnv)
-        || ownUrl(routingDefaults?.url || cfg.openaiCompat?.url || process.env.OPENAI_COMPAT_URL || "https://openrouter.ai/api/v1");
-    case "mistral":
-      return own(entry.environment?.MISTRAL_API_KEY) || ownUrl("https://api.mistral.ai/v1");
-    case "cerebras":
-      return own(entry.environment?.CEREBRAS_API_KEY) || ownUrl("https://api.cerebras.ai/v1");
-    case "groq":
-      return own(entry.environment?.GROQ_API_KEY) || ownUrl("https://api.groq.com/openai/v1", cfg.groq?.url);
-    case "meta":
-      return own(entry.environment?.META_API_KEY) || ownUrl("https://api.meta.ai/v1", cfg.meta?.url);
-    case "grok":
-      return own(entry.environment?.XAI_API_KEY) || (own(config.apiKeyEnv) && config.apiKeyEnv !== "XAI_API_KEY")
-        || ownUrl("https://api.x.ai/v1", cfg.xai?.url);
-    default:
-      return false;
-  }
-}
-
-/** Each secret goes only to the driver that reads it; the Boat token reaches no engine. */
-function injectedEnvironment(cfg: AppConfig, instanceId: string, driver: string): Map<string, string> {
-  const environment = new Map<string, string>();
-  if (driver === "mistral" && cfg.mistral?.key) environment.set("MISTRAL_API_KEY", cfg.mistral.key);
-  if (driver === "cerebras" && cfg.cerebras?.key) environment.set("CEREBRAS_API_KEY", cfg.cerebras.key);
-  if (driver === "groq" && cfg.groq?.key) environment.set("GROQ_API_KEY", cfg.groq.key);
-  if (driver === "meta" && cfg.meta?.key) environment.set("META_API_KEY", cfg.meta.key);
-  if (driver === "grok" && cfg.xai?.key) environment.set("XAI_API_KEY", cfg.xai.key);
-  const anthropicHere = driver === "claudeAgent" && Boolean(cfg.anthropic?.key)
-    && (cfg.anthropic?.everyClaudeBot === false ? instanceId === CLAUDE_API_INSTANCE : instanceId !== CLAUDE_API_INSTANCE);
-  if (anthropicHere) environment.set("ANTHROPIC_API_KEY", cfg.anthropic!.key!);
-  if (anthropicHere && cfg.anthropic!.url) environment.set("ANTHROPIC_BASE_URL", cfg.anthropic!.url);
-  if (driver === "openai-compat" && instanceId === OPENAI_API_INSTANCE) {
-    if (cfg.openai?.key) environment.set("OMB_OPENAI_API_KEY", cfg.openai.key);
-  } else if (driver === "openai-compat" && instanceId === OPENROUTER_API_INSTANCE) {
-    if (cfg.openrouter?.key) environment.set("OMB_OPENROUTER_API_KEY", cfg.openrouter.key);
-  } else {
-    if (driver === "openai-compat" && cfg.openaiCompat?.key)
-      environment.set("OPENAI_COMPAT_API_KEY", cfg.openaiCompat.key);
-    if (driver === "openai-compat" && cfg.openaiCompat?.url)
-      environment.set("OPENAI_COMPAT_URL", cfg.openaiCompat.url);
-  }
-  if (driver === "opencodeGo") {
-    if (cfg.opencodeGo?.apiKey) environment.set("OPENCODE_API_KEY", cfg.opencodeGo.apiKey);
-  }
-  return environment;
-}
-
-export const OPENAI_API_INSTANCE = "openai";
-export const OPENROUTER_API_INSTANCE = "openrouter";
-export const XAI_API_INSTANCE = "xaiApi";
-export const CLAUDE_API_INSTANCE = "claudeApi";
-const API_KEY_FLEET: InstanceConfigMap = {
-  [OPENAI_API_INSTANCE]: {
-    driver: "openai-compat", displayName: "OpenAI", access: "api", icon: { kind: "preset", preset: "openai" },
-    config: { url: "https://api.openai.com/v1", apiKeyEnv: "OMB_OPENAI_API_KEY", catalog: "openai" },
-  },
-  [CLAUDE_API_INSTANCE]: {
-    driver: "claudeAgent", displayName: "Claude (API key)", access: "api", icon: { kind: "preset", preset: "anthropic" },
-    config: { requireApiKey: true },
-  },
-  [XAI_API_INSTANCE]: { driver: "grok", displayName: "xAI", access: "api", icon: { kind: "preset", preset: "xai" } },
-  [OPENROUTER_API_INSTANCE]: {
-    driver: "openai-compat", displayName: "OpenRouter", access: "api", icon: { kind: "preset", preset: "openrouter" },
-    config: { url: "https://openrouter.ai/api/v1", apiKeyEnv: "OMB_OPENROUTER_API_KEY" },
-  },
-};
-
-export function instanceConfigs(cfg: AppConfig): InstanceConfigMap {
-  // Google retired Gemini CLI for the free/Pro/Ultra tiers on 2026-06-18; enterprise licences restore it with
-  // `{"instances": {"gemini": {"driver": "geminiAgent"}}}`.
-  const DEFAULT_FLEET: InstanceConfigMap = {
-    grok: { driver: "grokAgent" },
-    kimi: { driver: "kimiAgent" },
-    droid: { driver: "droidAgent" },
-    cursor: { driver: "cursorAgent" },
-    claude: { driver: "claudeAgent" },
-    codex: { driver: "codex" },
-    chatgpt: { driver: "codex", displayName: "ChatGPT plan", config: { authMode: "chatgpt-plan" } },
-    antigravity: { driver: "antigravityAgent" },
-    opencodeGo: { driver: "opencodeGo" },
-    openaiCompat: { driver: "openai-compat" },
-    mistral: { driver: "mistral" },
-    cerebras: { driver: "cerebras" },
-    groq: { driver: "groq" },
-    meta: { driver: "meta" },
-    museCode: { driver: "museCode" },
-    ...API_KEY_FLEET,
-    qwen: { driver: "qwenAgent" },
-    hermes: { driver: "hermesAgent" },
-    cline: { driver: "clineAgent" },
-    pi: { driver: "piAgent" },
-  };
-  const CUSTOM_ONLY = {
-    qwen: { driver: "qwenAgent" },
-    hermes: { driver: "hermesAgent" },
-    cline: { driver: "clineAgent" },
-    pi: { driver: "piAgent" },
-  } as const;
-  const PRODUCT_FLEET_ADDITIONS = {
-    chatgpt: { driver: "codex", displayName: "ChatGPT plan", config: { authMode: "chatgpt-plan" } },
-    cursor: { driver: "cursorAgent" },
-    openaiCompat: { driver: "openai-compat" },
-    mistral: { driver: "mistral" },
-    cerebras: { driver: "cerebras" },
-    groq: { driver: "groq" },
-    meta: { driver: "meta" },
-    museCode: { driver: "museCode" },
-    ...API_KEY_FLEET,
-    ...CUSTOM_ONLY,
-  } as const;
-  const configured = cfg.instances && Object.keys(cfg.instances).length ? cfg.instances : null;
-  const map: InstanceConfigMap = withoutComputerEngine(configured ? { ...configured } : { ...DEFAULT_FLEET });
-  if (
-    configured &&
-    (Object.hasOwn(configured, "claude") || Object.hasOwn(configured, "grok") || Object.hasOwn(configured, "codex"))
-  ) {
-    for (const [id, entry] of Object.entries(PRODUCT_FLEET_ADDITIONS)) {
-      if (!Object.hasOwn(map, id)) map[id] = { ...entry };
-    }
-  }
-  // Re-applied on every load so the openai/openrouter instances never fall back to the shared key and URL.
-  for (const [id, builtIn] of Object.entries(API_KEY_FLEET)) {
-    const saved = map[id];
-    if (!saved || saved.driver !== builtIn.driver) continue;
-    const savedConfig = typeof saved.config === "object" && saved.config !== null && !Array.isArray(saved.config) ? saved.config : {};
-    map[id] = { ...builtIn, ...saved, config: { ...(builtIn.config as object | undefined), ...savedConfig } };
-  }
-  if (map.chatgpt?.driver === "codex" && !(map.chatgpt.config as { cli?: unknown } | undefined)?.cli) {
-    const cli = (map.codex?.config as { cli?: unknown } | undefined)?.cli;
-    if (typeof cli === "string" && cli) map.chatgpt = { ...map.chatgpt, config: { ...map.chatgpt.config as object, cli } };
-  }
-  for (const [id, sourceEntry] of Object.entries(map)) {
-    // Copy: writing into the caller's persisted entry would freeze the workspace URL into it.
-    const entry = { ...sourceEntry };
-    map[id] = entry;
-    const environment = { ...entry.environment };
-    const builtIn = API_KEY_FLEET[id];
-    const routingDefaults = builtIn?.driver === entry.driver
-      ? builtIn.config as { url?: string; apiKeyEnv?: string } | undefined
-      : undefined;
-    const ownsRouting = instanceOwnsRouting(cfg, entry, routingDefaults);
-    if (!ownsRouting) {
-      for (const [key, value] of injectedEnvironment(cfg, id, entry.driver)) environment[key] = value;
-    }
-    entry.environment = environment;
-    if (entry.driver === "groq" && cfg.groq?.url && !ownsRouting) {
-      entry.config = { ...entry.config as object, url: cfg.groq.url };
-    }
-    if (entry.driver === "meta" && cfg.meta?.url && !ownsRouting) {
-      entry.config = { ...entry.config as object, url: cfg.meta.url };
-    }
-    if (entry.driver === "openai-compat" && cfg.openaiCompat && id !== OPENAI_API_INSTANCE && id !== OPENROUTER_API_INSTANCE) {
-      const defaults: Record<string, string> = {};
-      if (cfg.openaiCompat.url) defaults.url = cfg.openaiCompat.url;
-      if (cfg.openaiCompat.model) defaults.model = cfg.openaiCompat.model;
-      if (cfg.openaiCompat.provider) defaults.provider = cfg.openaiCompat.provider;
-      if (Object.keys(defaults).length) {
-        const raw = entry.config;
-        const current =
-          typeof raw === "object" && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
-        const merged = { ...current };
-        for (const [k, v] of Object.entries(defaults)) {
-          // An empty provider means "no upstream pin"; never fill it from the workspace.
-          if (k === "provider" && typeof merged[k] === "string") continue;
-          if (typeof merged[k] !== "string" || !(merged[k] as string).trim()) merged[k] = v;
-        }
-        entry.config = merged;
-      }
-    }
-  }
-  return map;
+export function instanceConfigs(_cfg: AppConfig): InstanceConfigMap {
+  return structuredClone(DEFAULT_CLI_INSTANCES);
 }
 
 // config.json: { "mcpServers": { "notes": { "command": "npx", "args": ["-y", "@x/notes-mcp"], "env": { "NOTES_TOKEN": "…" } },

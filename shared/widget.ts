@@ -350,7 +350,7 @@ const fieldName: Reader = (raw, path) => (typeof raw === "string" && FIELD_NAME.
 const optionalFieldName: Reader = (raw, path) => (raw === undefined || raw === null ? undefined : fieldName(raw, path));
 
 const inputType: Reader = (raw, path) => {
-  if (raw === "password") return fail(path, "password fields are not allowed in a widget; use request_credential for secrets");
+  if (raw === "password") return fail(path, "password fields are not allowed in a widget");
   return oneOf("text", "number", "email", "tel", "url")(raw, path);
 };
 

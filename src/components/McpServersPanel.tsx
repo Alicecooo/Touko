@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, CheckCircle2, FlaskConical, Globe, Loader2, LogIn, LogOut, ServerCog } from "lucide-react";
+import { CheckCircle2, FlaskConical, Globe, Loader2, LogIn, LogOut, ServerCog } from "lucide-react";
 
 import { openExternalLink } from "@/lib/app-links";
 import { cn } from "@/lib/cn";
@@ -10,10 +10,7 @@ import { completeMcpSignIn, mcpSignInLink, runMcpSignIn, type McpSignInStatus } 
 import { api, useStore } from "@/state/store";
 
 import { Switch } from "./SettingsPrimitives";
-import { WhopIcon } from "./WhopIcon";
 import type { McpMessage, McpResultBudgetListing } from "./McpResultBudgetField";
-import { WHOP_MCP_URL, isWhopServer, whopServerName } from "@/lib/whop-integration";
-import { openBotSettings } from "./bot-panel/panel-link";
 
 /** Security: secrets arrive as names only. */
 interface StdioMcpListing extends McpResultBudgetListing {
@@ -52,23 +49,6 @@ export interface ProbeResult {
   auth?: "required";
 }
 
-export async function signedInToolsCheck(
-  name: string,
-  request: (path: string, init?: RequestInit) => Promise<ProbeResult>,
-  signal: AbortSignal,
-): Promise<ProbeResult> {
-  let tested: ProbeResult;
-  try {
-    tested = await request(`/api/mcp/servers/${name}/test`, { method: "POST", signal });
-  } catch (cause) {
-    if (signal.aborted) throw cause;
-    tested = { ok: false, error: cause instanceof Error ? cause.message : String(cause) };
-  }
-  if (tested.ok) return tested;
-  const reason = (tested.error ?? "").trim();
-  return { ...tested, error: t("whop.testFailed", { reason: reason && !/[.!?]$/.test(reason) ? `${reason}.` : reason }) };
-}
-
 function probeToolsLabel(tools: ProbeResult["tools"], total?: number): string {
   if (!tools?.length) return t("mcp.probe.noTools");
   const count = Math.max(total ?? 0, tools.length);
@@ -79,15 +59,12 @@ function probeToolsLabel(tools: ProbeResult["tools"], total?: number): string {
 }
 
 /** Server definitions come from internal MCP configuration; this view manages connection state only. */
-export function McpServersPanel({ embedded = false, whopCard = false, hideWhop = false, refreshKey = 0, onWhopConnection, showContent = true }: {
+export function McpServersPanel({ embedded = false, refreshKey = 0, showContent = true }: {
   embedded?: boolean;
   showContent?: boolean;
-  whopCard?: boolean;
-  hideWhop?: boolean;
   refreshKey?: number;
-  onWhopConnection?: (connected: boolean) => void;
 } = {}) {
-  const { state: store, dispatch } = useStore();
+  const { state: store } = useStore();
   const policy = store.config?.managedPolicy;
   const restricted = Boolean(policy && !policy.mcp.allowCustom);
   const [servers, setServers] = useState<McpServerListing[] | null>(null);
@@ -104,9 +81,6 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
   const [completingSignIn, setCompletingSignIn] = useState(false);
   const loadGeneration = useRef(0);
   const mounted = useRef(true);
-  const whopServer = servers?.find((server) => isRemoteMcpListing(server) && isWhopServer(server));
-  const whopConnected = Boolean(whopServer?.enabled && isRemoteMcpListing(whopServer) && whopServer.auth === "signed-in");
-  useEffect(() => { if (servers !== null) onWhopConnection?.(whopConnected); }, [servers, whopConnected, onWhopConnection]);
 
   const load = useCallback(() => {
     const generation = ++loadGeneration.current;
@@ -199,18 +173,7 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
       } });
       if (!mounted.current || controller.signal.aborted) return;
       if (result.phase === "succeeded") {
-        if (isRemoteMcpListing(server) && isWhopServer(server)) {
-          setSignInFlow({ ...result, flowId: null, authorizationUrl: null });
-          const tested = await signedInToolsCheck(server.name, api, controller.signal);
-          if (controller.signal.aborted || !mounted.current) return;
-          setProbe((current) => ({ ...current, [server.name]: tested }));
-          if (!tested.ok) return;
-          const enabled = await api(`/api/mcp/servers/${server.name}`, { method: "PATCH", body: JSON.stringify({ enabled: true }) });
-          if (!mounted.current) return;
-          setServers(enabled.servers ?? []);
-          updateMcpServers(enabled.servers ?? []);
-          setNotice({ key: "whop.connected" });
-        } else setNotice({ key: "mcp.auth.done", params: { name: server.name } });
+        setNotice({ key: "mcp.auth.done", params: { name: server.name } });
       } else if (result.phase !== "cancelled") {
         setProbe((current) => ({ ...current, [server.name]: { ok: false, error: result.message || t("mcp.auth.failed") } }));
       }
@@ -228,29 +191,6 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
         if (mounted.current) void load();
       }
     }
-  };
-
-  const connectWhop = async () => {
-    if (!servers || busy !== null || signingIn !== null) return;
-    const existing = servers.find((server) => isRemoteMcpListing(server) && isWhopServer(server));
-    if (existing) { await signIn(existing); return; }
-    setBusy("whop");
-    loadGeneration.current += 1;
-    setError(null);
-    setNotice(null);
-    let added: McpServerListing | undefined;
-    try {
-      const name = whopServerName(servers);
-      const result = await api("/api/mcp/servers", { method: "POST", body: JSON.stringify({ name, type: "http", url: WHOP_MCP_URL, enabled: false }) });
-      if (!mounted.current) return;
-      setServers(result.servers ?? []);
-      updateMcpServers(result.servers ?? []);
-      added = result.servers?.find((server: McpServerListing) => server.name === name && isRemoteMcpListing(server) && isWhopServer(server));
-      if (!added) throw new Error(t("whop.setupFailed"));
-    } catch (cause) {
-      if (mounted.current) setError(cause instanceof Error ? cause.message : String(cause));
-    } finally { if (mounted.current) setBusy(null); }
-    if (added && mounted.current) await signIn(added);
   };
 
   const completeSignIn = async () => {
@@ -279,11 +219,6 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
       return next;
     });
     try {
-      if (isRemoteMcpListing(server) && isWhopServer(server)) {
-        const paused = await api(`/api/mcp/servers/${server.name}`, { method: "PATCH", body: JSON.stringify({ enabled: false }) });
-        setServers(paused.servers ?? []);
-        updateMcpServers(paused.servers ?? []);
-      }
       const result = await api(`/api/mcp/servers/${server.name}/sign-out`, { method: "POST" });
       setServers(result.servers ?? []);
       updateMcpServers(result.servers ?? []);
@@ -316,7 +251,7 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
     return signingIn === server.name && (
       <div className="mt-3 space-y-3 rounded-lg bg-raised px-3 py-3 text-[12px] text-ink-secondary">
         <div role="status" className="flex items-center gap-2">
-          <Loader2 size={13} className="animate-spin" /> {t(signInFlow?.phase === "succeeded" ? "whop.loadingTools" : "mcp.auth.waiting")}
+          <Loader2 size={13} className="animate-spin" /> {t("mcp.auth.waiting")}
         </div>
         {signInFlow?.authorizationUrl && mcpSignInLink(signInFlow.authorizationUrl) && (
           <button type="button" onClick={() => void openExternalLink(signInFlow.authorizationUrl!).catch(() => setCallbackError(t("mcp.auth.openFailed")))} className="text-accent hover:underline">
@@ -337,43 +272,6 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
       </div>
     );
   }
-
-  if (whopCard) {
-    const result = whopServer && probe[whopServer.name];
-    const failed = error || (result && !result.ok ? result.error : null);
-    const pending = busy !== null || signingIn !== null;
-    return <div data-app-tile="whop" className="flex min-w-0 flex-col rounded-xl px-2 py-2 transition-colors hover:bg-raised/40">
-      <div className="flex items-center gap-3">
-        <WhopIcon />
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-[14px] font-semibold leading-5 text-ink">Whop</span>
-            {whopConnected && <Check size={13} strokeWidth={2.5} className="shrink-0 text-success" aria-label={t("apps.connected")} />}
-          </div>
-          <p className="truncate text-[12.5px] leading-[18px] text-ink-secondary" title={t("whop.description")}>{t("whop.description")}</p>
-        </div>
-        {signingIn ? <button type="button" onClick={() => signInAbort.current?.abort()} className="inline-flex h-7 shrink-0 items-center rounded-full bg-control/80 px-3 text-[13px] font-medium leading-5 text-ink">{t("mcp.auth.cancel")}</button> :
-          <button type="button" aria-label={t(whopConnected ? "whop.disconnect" : "whop.connect")}
-            disabled={pending || (servers !== null && !whopConnected && (Boolean(whopServer?.managedBy) || (restricted && !policy?.mcp.allowlist.length)))}
-            onClick={() => void (servers === null ? load() : whopConnected && whopServer ? signOut(whopServer) : connectWhop())}
-            className="inline-flex h-7 min-w-[64px] shrink-0 items-center justify-center gap-2 rounded-full bg-control/80 px-3 text-[13px] font-medium leading-5 text-ink hover:bg-raised-hover disabled:opacity-40">
-            {pending ? <Loader2 size={14} className="animate-spin" /> : servers === null ? t("connectors.action.retry") : t(whopConnected ? "connectors.disconnect" : "connectors.action.connect")}
-          </button>}
-      </div>
-      <div className="ps-[52px]">
-      {failed && <p role="alert" className="mt-1.5 text-[12px] text-danger">{typeof failed === "string" ? failed : t(failed.key, failed.params)}</p>}
-      {whopServer && renderSignIn(whopServer)}
-      <details className="mt-1 text-[12px] text-ink-secondary">
-        <summary className="cursor-pointer">{t("whop.access")}</summary>
-        <p className="mt-2 leading-relaxed">{t("whop.notice")}</p>
-        <p className="mt-2 leading-relaxed">{t("whop.accessHint")}</p>
-        <div className="mt-2 flex flex-wrap gap-2">{(store.bots ?? []).filter((bot) => !bot.hidden).map((bot) => <button key={bot.id} type="button" onClick={() => { dispatch({ type: "togglePlugins", open: false }); openBotSettings(dispatch, "access", { botId: bot.id, page: "mcp" }); }} className="rounded-lg bg-control px-2.5 py-1.5 text-ink hover:bg-raised-hover">{t("whop.botSettings", { name: bot.name })}</button>)}</div>
-      </details>
-      </div>
-    </div>;
-  }
-
-  const visibleServers = servers?.filter((server) => !hideWhop || !isRemoteMcpListing(server) || !isWhopServer(server));
 
   return (
     <>
@@ -396,23 +294,22 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
 
         {servers === null ? (
           <div className="flex items-center justify-center gap-2 py-24 text-[13px] text-ink-secondary"><Loader2 size={14} className="animate-spin" /> {t("mcp.loading")}</div>
-        ) : visibleServers?.length === 0 ? null : (
+        ) : servers.length === 0 ? null : (
           <div className="mt-5 space-y-3">
-            {visibleServers?.map((server) => {
-              const whop = isRemoteMcpListing(server) && isWhopServer(server);
+            {servers.map((server) => {
               const result = probe[server.name];
               const auth = isRemoteMcpListing(server) ? server.auth : undefined;
               const canSignIn = isRemoteMcpListing(server)
-                && (auth === "needs-sign-in" || result?.auth === "required" || ((whop || Boolean(server.oauth)) && auth !== "signed-in"));
+                && (auth === "needs-sign-in" || result?.auth === "required" || (Boolean(server.oauth) && auth !== "signed-in"));
               return (
-                <div key={server.name} data-whop-server={whop ? server.name : undefined} className="rounded-2xl border border-hairline/50 bg-card px-4 py-4 sm:px-5">
+                <div key={server.name} className="rounded-2xl border border-hairline/50 bg-card px-4 py-4 sm:px-5">
                   <div data-mcp-row className="flex flex-wrap items-center gap-3">
                     <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", server.enabled ? "bg-success/10 text-success" : "bg-raised text-ink-secondary")}>
-                      {whop ? <WhopIcon /> : isRemoteMcpListing(server) ? <Globe size={19} /> : <ServerCog size={19} />}
+                      {isRemoteMcpListing(server) ? <Globe size={19} /> : <ServerCog size={19} />}
                     </div>
                     <div className="min-w-0 flex-[1_1_220px]">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="min-w-0 truncate text-[14px] font-medium text-ink">{whop ? "Whop" : server.name}</span>
+                        <span className="min-w-0 truncate text-[14px] font-medium text-ink">{server.name}</span>
                         <span className={cn("rounded-full px-2 py-0.5 text-[10.5px]", server.enabled ? "bg-success/10 text-success" : "bg-raised text-ink-secondary")}>{t(server.enabled ? "mcp.badge.on" : "mcp.badge.off")}</span>
                         {auth && <span className={cn("rounded-full px-2 py-0.5 text-[10.5px]", auth === "signed-in" ? "bg-success/10 text-success" : "bg-warning/10 text-warning")}>{t(auth === "signed-in" ? "mcp.auth.signedIn" : "mcp.auth.needsSignIn")}</span>}
                         {server.managedBy && <span className="rounded-full bg-raised px-2 py-0.5 text-[10.5px] text-ink-secondary">{t("policy.managedBy", { organization: server.managedBy })}</span>}
@@ -431,11 +328,11 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
                         </button>
                       ) : canSignIn ? (
                         <button type="button" disabled={busy !== null || signingIn !== null || Boolean(server.managedBy)} onClick={() => void signIn(server)} className="flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-2 text-[12px] font-medium text-white hover:brightness-110 disabled:opacity-40">
-                          <LogIn size={14} /> {t(whop ? "whop.connect" : "mcp.auth.signIn")}
+                          <LogIn size={14} /> {t("mcp.auth.signIn")}
                         </button>
                       ) : auth === "signed-in" ? (
                         <button type="button" disabled={busy !== null || signingIn !== null} onClick={() => void signOut(server)} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[12px] text-ink-secondary hover:bg-raised hover:text-ink disabled:opacity-40">
-                          {busy === `signout:${server.name}` ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />} {t(whop ? "whop.disconnect" : "mcp.auth.signOut")}
+                          {busy === `signout:${server.name}` ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />} {t("mcp.auth.signOut")}
                         </button>
                       ) : null}
                       <button type="button" disabled={busy !== null || signingIn !== null} onClick={() => void test(server)} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[12px] text-ink-secondary hover:bg-raised hover:text-ink disabled:opacity-40">
@@ -456,14 +353,6 @@ export function McpServersPanel({ embedded = false, whopCard = false, hideWhop =
                       </span>
                     </div>
                   </div>
-                  {whop && <div className="mt-3 text-[12px] leading-relaxed text-ink-secondary">
-                    <p>{t("whop.notice")}</p>
-                    <details className="mt-2">
-                      <summary className="cursor-pointer font-medium text-ink">{t("whop.access")}</summary>
-                      <p className="mt-2">{t("whop.accessHint")}</p>
-                      <div className="mt-2 flex flex-wrap gap-2">{(store.bots ?? []).filter((bot) => !bot.hidden).map((bot) => <button key={bot.id} type="button" onClick={() => { dispatch({ type: "togglePlugins", open: false }); openBotSettings(dispatch, "access", { botId: bot.id, page: "mcp" }); }} className="rounded-lg bg-control px-2.5 py-1.5 text-ink hover:bg-raised-hover">{t("whop.botSettings", { name: bot.name })}</button>)}</div>
-                    </details>
-                  </div>}
                   {renderSignIn(server)}
                   {result && signingIn !== server.name && (
                     <div role="status" className={cn("mt-3 rounded-lg px-3 py-2 text-[12px]", result.ok ? "bg-success/10 text-success" : result.auth === "required" ? "bg-warning/10 text-warning" : "bg-danger/10 text-danger")}>

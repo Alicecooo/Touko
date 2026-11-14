@@ -28,7 +28,7 @@ import { claudeApiErrorMessage, claudeLimitRefusal, claudeUsageLimit, claudeLimi
 import { TEAM_TOOLS_FAILED, teamToolsFailed } from "./team-tools.ts";
 import { sessionIdlePolicy } from "./session-idle.ts";
 import { parseVersionTriple, versionAtLeast } from "./acp/core.ts";
-import { applyClaudeInject, decodeInjectId, mergeLocalInject, probeLocalInjects, resolveInjectId } from "./local-inject.ts";
+import { decodeInjectId } from "./local-inject.ts";
 import { appendNative } from "./native.ts";
 import { runKeepWarmPing, type KeepWarmContract } from "./claude-keepwarm.ts";
 import { BACKGROUND_CALL_TIMEOUT_MS, backgroundCallArgs, spawnBackgroundCall } from "./claude-background.ts";
@@ -95,7 +95,6 @@ export function claudeResultError(frame: { errors?: unknown; result?: unknown; s
 /** The CLI environment shared by auth probes and turns, so a probe never reports an API-key login
  * that the turn would strip. */
 function claudeEnvironment(
-  model?: string | null,
   source: NodeJS.ProcessEnv = process.env,
   configDir?: string,
   instanceEnvironment: NodeJS.ProcessEnv = {},
@@ -115,9 +114,8 @@ function claudeEnvironment(
   delete env.CLAUDECODE;
   delete env.CLAUDE_CODE_ENTRYPOINT;
   stripWorkspaceCredentialEnv(env);
-  const applied = applyClaudeInject(env, model);
   // An inherited ANTHROPIC_API_KEY would flip a subscription login to pay-as-you-go.
-  if (!applied.injected && !instanceEnvironment.ANTHROPIC_API_KEY) delete env.ANTHROPIC_API_KEY;
+  if (!instanceEnvironment.ANTHROPIC_API_KEY) delete env.ANTHROPIC_API_KEY;
   return env;
 }
 
@@ -292,16 +290,21 @@ export const STATIC_CLAUDE_MODELS: ModelCatalog = {
   ],
 };
 
-/** Maps an API slug a local host serves to `host::model`, so the turn injects instead of asking
- *  for /login. */
-async function resolveClaudeTurnModel(
-  model: string | null | undefined,
-  env: Record<string, string | undefined>,
-): Promise<string | null | undefined> {
-  if (!model || decodeInjectId(model) || STATIC_CLAUDE_MODELS.options.some((option) => option.id === model)) {
-    return model;
+/** Old injected ids must fail closed instead of reaching a different Claude endpoint. */
+function resolveClaudeTurnModel(model: string | null | undefined): string | null | undefined {
+  if (model && decodeInjectId(model)) {
+    throw new Error("Claude local injected models are no longer supported. Choose a model available in Claude Code.");
   }
-  return resolveInjectId(model, await probeLocalInjects(env)) ?? model;
+  return model;
+}
+
+function withoutClaudeLocalInjects(catalog: ModelCatalog): ModelCatalog {
+  const options = catalog.options.filter((option) => !decodeInjectId(option.id));
+  if (!options.length) return STATIC_CLAUDE_MODELS;
+  const defaultModel = options.some((option) => option.id === catalog.default)
+    ? catalog.default
+    : options.find((option) => option.id === STATIC_CLAUDE_MODELS.default)?.id ?? options[0]!.id;
+  return { default: defaultModel, options };
 }
 
 /** Extra ids from ~/.claude/settings.json's extraModels. Its `model` is Claude Code's last-used
@@ -840,8 +843,8 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
 
   async create(input: DriverCreateInput<ClaudeConfig>): Promise<ProviderInstance> {
     const { instanceId, config } = input;
-    const environment = (model?: string | null) =>
-      claudeEnvironment(config.managed ? undefined : model, { ...process.env, ...input.environment }, config.configDir, input.environment);
+    const environment = () =>
+      claudeEnvironment({ ...process.env, ...input.environment }, config.configDir, input.environment);
     const catalogEnv = environment();
     if (inheritsUserConfig(catalogEnv)) {
       console.error(`claude (${instanceId}): OMB_CLAUDE_INHERIT_USER_CONFIG=1 — bots inherit this machine's Claude Code MCP servers, skills, hooks and CLAUDE.md on every turn; remove it unless a bot needs a user-scope server`);
@@ -851,14 +854,14 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
     const refreshModels = async () => {
       if (config.managed || config.apiModels) return;
       try {
-        const resolved = await mergeLocalInject(readClaudeModelCatalog(catalogEnv), catalogEnv);
+        const resolved = withoutClaudeLocalInjects(readClaudeModelCatalog(catalogEnv));
         if (resolved.options.length) models = resolved;
       } catch {}
       try { writeStartupModelCache(instanceId, models); } catch {}
     };
     const startupModelRefresh = config.managed || config.apiModels ? null : (await openStartupModelCatalog({
       instanceId,
-      use: (catalog) => { models = catalog; },
+      use: (catalog) => { models = withoutClaudeLocalInjects(catalog); },
       current: () => models,
       refresh: refreshModels,
     }))?.pending ?? null;
@@ -1101,9 +1104,8 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
       if (cliVersionChecked && claudeCliSupports(cliVersion, "--system-prompt-snapshot")) {
         args.push("--system-prompt-snapshot", "off");
       }
-      const turnModel = config.managed ? turn.model : await resolveClaudeTurnModel(turn.model, turnEnvironment);
-      const injected = config.managed ? { model: turnModel ?? null, injected: false } : applyClaudeInject({ ...turnEnvironment }, turnModel);
-      if (injected.model) args.push("--model", injected.model);
+      const turnModel = resolveClaudeTurnModel(turn.model);
+      if (turnModel) args.push("--model", turnModel);
       if (turn.effort) args.push("--effort", turn.effort);
 
       // Off argv: Windows' CreateProcess limit (spawn ENAMETOOLONG), and the prompt may be sensitive.
@@ -1132,10 +1134,6 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
         allowed.push("mcp__agents");
       }
 
-      if (turn.integrations?.highlevel) {
-        mcpServers.highlevel = { ...turn.integrations.highlevel };
-        allowed.push("mcp__highlevel");
-      }
       if (turn.integrations?.dweb) {
         mcpServers.dweb = {
           command: process.execPath,
@@ -1191,8 +1189,8 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
         args.push("--allowedTools", allowed.join(","));
       }
 
-      const env = environment(turnModel);
-      const authSettings = isolated && !injected.injected
+      const env = environment();
+      const authSettings = isolated
         ? readClaudeAuthSettings(env, input.environment) : {};
       // The hook helper reads its bearer from a per-thread file refreshed every turn, so a
       // long-lived CLI process never presents a stale token.
@@ -1227,7 +1225,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
         system: turn.systemStable ?? turn.system ?? null,
         mcpServers,
         cwd,
-        model: injected.model ?? null,
+        model: turnModel ?? null,
         base: env.ANTHROPIC_BASE_URL ?? null,
         configDir: env.CLAUDE_CONFIG_DIR ?? null,
         hooks: Boolean(hooks),
@@ -1965,8 +1963,9 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
           return;
         }
         const model = named ?? config.managedModels?.[0] ?? config.apiModels?.[0] ?? "claude-haiku-4-5";
-        const env = environment(model);
-        const args = backgroundCallArgs({ model, outputFormat: onUsage ? "json" : "text", supports: (flag) => cliVersion !== null && claudeCliSupports(cliVersion, flag), isolated: !inheritsUserConfig(env) });
+        const resolvedModel = resolveClaudeTurnModel(model);
+        const env = environment();
+        const args = backgroundCallArgs({ model: resolvedModel ?? model, outputFormat: onUsage ? "json" : "text", supports: (flag) => cliVersion !== null && claudeCliSupports(cliVersion, flag), isolated: !inheritsUserConfig(env) });
         const { child, removeCwd } = spawnBackgroundCall(config.cli, args, env);
         let stdout = "";
         let stderr = "";
@@ -2066,7 +2065,6 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
           computerMcp: true,
           composioMcp: true,
 
-          highlevelMcp: true,
           images: true,
           nativeImageInput: true,
           effortLevels: ["low", "medium", "high", "xhigh", "max"],

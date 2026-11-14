@@ -63,8 +63,7 @@ function CompanyEngineReadiness({ instance, instances }: { instance: InstanceInf
     ? instances.find((candidate) => candidate.driverKind === instance.driverKind && !candidate.readOnly && candidate.install)
     : undefined;
   if (local && needsCli(local)) {
-    return <EngineSetup instance={local} intent="inject" className="mt-2"
-      description={t("organization.engineInstallHelp", { engine: local.displayName })} />;
+    return <EngineSetup instance={local} className="mt-2" />;
   }
   return <p className="mt-1 text-[12px] text-ink-secondary">{instance.snapshot.reason ?? t("organization.engineUnavailable")}</p>;
 }

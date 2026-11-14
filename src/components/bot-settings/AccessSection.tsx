@@ -14,7 +14,6 @@ import { ConfirmDialog } from "../ConfirmDialog";
 import { Switch } from "../SettingsPrimitives";
 import { ProposalStatus } from "./ProposalStatus";
 import { ToolSelectionCard } from "./ToolSelectionCard";
-import { HIGHLEVEL_SLUG } from "@/lib/highlevel-sign-in";
 import { useBotApps } from "./useBotApps";
 import { classifyConnectorTool, connectorServiceAccess, withServiceGrant, type ConnectorVerb } from "@/lib/connector-grants";
 import { inputCls } from "./field";
@@ -508,7 +507,7 @@ export function AccessSection({
 
   } = derived;
 
-  // The same list the Vault tab shows: Composio's connected accounts plus the native HighLevel connection.
+  // Use the same connected account inventory as the Vault tab.
   const apps = useBotApps(bot);
   const inventoryReady = apps.phase === "ready";
   const connectedSlugs = apps.connectedSlugs;
@@ -560,8 +559,7 @@ export function AccessSection({
         {connectedAppsEnabled && inventoryReady && (
           <>
             {!draft && <ConnectorScopesControl connectedSlugs={connectedSlugs} labels={appLabels} scopes={bot.connectorScopes} onChange={(connectorScopes) => patch({ connectorScopes })} />}
-            {/* Tool-level grants list Composio's tools; HighLevel's tools are scoped by read/write above. */}
-            <ConnectorToolsGrants bot={bot} patch={patch} slugs={connectedSlugs.filter((slug) => slug !== HIGHLEVEL_SLUG)} />
+            <ConnectorToolsGrants bot={bot} patch={patch} slugs={connectedSlugs} />
           </>
         )}
         {connectedAppsEnabled && connectedAppsConfigured && (

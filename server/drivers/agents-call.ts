@@ -1,7 +1,5 @@
 // Runs one agents tool: check arguments, call the harness, render the model's text. Stateless;
 // per-turn limits are the harness's, since one proxy can serve many turns of a warm engine.
-import { CREDENTIAL_TARGETS, isCredentialTargetId } from "../../shared/credential-request.ts";
-
 import { peerName } from "../teams/peer-roster.ts";
 import { callCardTool, CARD_TOOL_NAMES } from "./agents-call-cards.ts";
 import { callTriggerTool, TRIGGER_TOOL_NAMES } from "./agents-call-triggers.ts";
@@ -319,28 +317,6 @@ export async function callTool(name: string, args: Json, context: ToolCallContex
     if (!r.id) return completedProposalResult(r, `creating @${botName}`) ?? { text: `@${botName} was not created.`, isError: true };
     return {
       text: `Created @${r.name ?? botName} in ${r.section ?? "General"} [id: ${r.id}].${r.modelSelection ? ` Model: ${JSON.stringify(r.modelSelection)}.` : ""} Assign work with coordinate_bots.`,
-    };
-  }
-  if (name === "request_credential") {
-    const credentialId = args.credential_id;
-    if (!isCredentialTargetId(credentialId)) {
-      return { text: "request_credential needs a supported credential_id.", isError: true };
-    }
-    const reason = typeof args.reason === "string" ? args.reason.trim().slice(0, 240) : "";
-    const r = await api("/api/internal/request-credential", {
-      method: "POST",
-      body: JSON.stringify({
-        fromBotId: BOT_ID,
-        fromThreadId: THREAD_ID,
-        credentialId,
-        ...(reason ? { reason } : {}),
-      }),
-    });
-    if (r.alreadyConfigured) {
-      return { text: `${r.label ?? CREDENTIAL_TARGETS[credentialId].label} is already configured. Continue the task.` };
-    }
-    return {
-      text: `A secure ${r.label ?? CREDENTIAL_TARGETS[credentialId].label} request is ready. The desktop app and a freshly QR-paired mobile app show its secure entry card; older mobile pairings explain how to pair again or finish on the computer. End this turn; OpenMausBot will resume the task after the user saves or declines. Never ask them to paste the key into chat.`,
     };
   }
   if (name === "request_sign_in") {

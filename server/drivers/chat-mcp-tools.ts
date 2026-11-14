@@ -231,7 +231,6 @@ export async function mountChatTools(integrations: SendTurnInput["integrations"]
   const agentsServer = integrations?.agents && scope !== undefined ? unbridgedServer(integrations.agents) : integrations?.agents;
   if (agentsServer && eligible("agents")) servers.push(["agents", agentsServer]);
   if (integrations?.composio && eligible("composio")) servers.push(["composio", integrations.composio]);
-  if (integrations?.highlevel && eligible("highlevel")) servers.push(["highlevel", integrations.highlevel]);
   for (const [name, server] of Object.entries(integrations?.custom ?? {})) {
     if (!eligible(name)) continue;
     const remote = remoteMcpSpec(server) !== undefined;

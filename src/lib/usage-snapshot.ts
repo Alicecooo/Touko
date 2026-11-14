@@ -1,11 +1,10 @@
 // Security: the daily snapshot is counts, booleans and allowlisted words. Names, emails, ids, URLs, labels and
 // timestamps from the inputs never reach the event; only lengths, flags and allow() results do.
 
-import { engineReady } from "@/components/EngineLibrary";
+import { engineReady } from "@/lib/engine-ready";
 import { analyticsEnabled, track } from "@/lib/analytics";
-import { allow, APP, CONNECTORS_MODE, EDITION, engineForDriver, TRIAL_CREDIT, type EventProps, type KeyProvider, type PropValue } from "@/lib/analytics-allowlist";
+import { allow, APP, CONNECTORS_MODE, EDITION, engineForDriver, TRIAL_CREDIT, type EventProps, type PropValue } from "@/lib/analytics-allowlist";
 import { hasActiveConnection, type ConnectorStatus } from "@/lib/connector-status";
-import { addedServers } from "@/lib/openai-compat-endpoints";
 import type { Routine } from "@/lib/routines";
 import type { AppState, Bot, ConfigStatus, InstanceInfo } from "@/state/store";
 
@@ -27,22 +26,6 @@ export interface UsageInput {
 }
 
 const tally = <T,>(items: readonly T[], test: (item: T) => boolean) => items.filter(test).length;
-
-function keyProviders(config: ConfigStatus): KeyProvider[] {
-  const configured: Array<[boolean | undefined, KeyProvider]> = [
-    [config.anthropic?.configured, "anthropic"],
-    [config.openai?.configured, "openai"],
-    [config.openrouter?.configured, "openrouter"],
-    [config.openaiCompat?.configured, "openai_compat"],
-    [config.xai?.configured, "xai"],
-    [config.mistral?.configured, "mistral"],
-    [config.cerebras?.configured, "cerebras"],
-    [config.groq?.configured, "groq"],
-    [config.meta?.configured, "meta"],
-    [config.composio?.configured && config.composio.mode === "self-hosted", "composio"],
-  ];
-  return configured.flatMap(([on, provider]) => on === true ? [provider] : []);
-}
 
 function routineCounts(routines: UsageInput["routines"]): Record<string, number> {
   if (!routines) return {};
@@ -74,12 +57,9 @@ function memberFacts(sessions: UsageInput["sessions"]): Record<string, PropValue
 export function buildUsageSnapshot(input: UsageInput): EventProps {
   const { config, instances } = input;
   const bots = input.bots.filter((bot) => bot.hidden !== true);
-  const keys = keyProviders(config);
   const ready = instances.filter(engineReady);
   const place = (computer: Bot["computer"]) => tally(bots, (bot) => bot.computer === computer);
   const props: Record<string, PropValue | undefined> = {
-    key_providers: keys,
-    key_count: keys.length,
     bots: bots.length,
     bots_this_computer: place("local"),
     bots_browser: place("browser"),
@@ -89,7 +69,6 @@ export function buildUsageSnapshot(input: UsageInput): EventProps {
     ...routineCounts(input.routines),
     engines: [...new Set(ready.map((instance) => engineForDriver(instance.driverKind)))].sort(),
     engine_count: ready.length,
-    custom_endpoints: addedServers(instances).length,
     trial_credit: allow(instances.find((instance) => instance.trialCredit !== undefined)?.trialCredit ?? "none", TRIAL_CREDIT),
     ...appFacts(input.apps),
     connectors_mode: allow(config.composio?.mode?.replace("-", "_"), CONNECTORS_MODE),

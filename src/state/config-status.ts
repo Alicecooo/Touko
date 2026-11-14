@@ -4,16 +4,6 @@ import type { ModelSelection } from "./store";
 
 /** GET /api/config — configured flags only; secrets are never echoed. */
 export interface ConfigStatus {
-  xai?: { configured: boolean };
-  mistral?: { configured: boolean };
-  cerebras?: { configured: boolean };
-  groq?: { configured: boolean };
-  meta?: { configured: boolean };
-  /** `everyClaudeBot`: the key runs every Claude bot, not only "Claude (API key)". */
-  anthropic?: { configured: boolean; everyClaudeBot?: boolean };
-  openai?: { configured: boolean };
-  openrouter?: { configured: boolean };
-  openaiCompat?: { configured: boolean; url?: string };
   /** what this server is entitled to; Settings shows only what works here.
    * `license` reaches admins only, and only while the key is inside its
    * warning window or grace period. */
@@ -36,7 +26,6 @@ export interface ConfigStatus {
   automaticRecovery?: { enabled: boolean; backup?: ModelSelection };
   /** Prompt-cache keep-warm for idle Claude threads. Absent from older servers. */
   cacheKeepWarm?: { enabled: boolean; windowMinutes: number };
-  opencodeGo?: { configured: boolean };
   /** who's using the app — collected in onboarding, shown in the sidebar */
   profile?: { name: string; email: string; aboutMe?: string };
   /** UI language override; "" (or absent) follows the system language. */

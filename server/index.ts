@@ -26,13 +26,11 @@ import { canWorkOnCloud, type CloudEngine } from "../shared/cloud-computer.ts";
 import { approvalModeFor, modelSwitchNeedsAsk, isEmergencyApprovalDowngrade, isApprovalMode, setDefaultApprovalMode, type ApprovalMode } from "../shared/approval-mode.ts";
 import { createApprovalModeSupport } from "./agent/harness-capabilities.ts";
 import { escapeAttribute } from "../src/lib/composer-attachments.ts";
-import { CREDENTIAL_TARGETS, credentialResumeOutcome, credentialIsConfigured, isPendingCredentialRequest, isCredentialTargetId, type CredentialTargetId } from "../shared/credential-request.ts";
 import { isPendingSignInRequest, normalizeSignInSite, signInFallbackText, signInOutcome, signInResumePrompt } from "../shared/sign-in-request.ts";
 
 import { HELD_NOTE, approvalHeldNote, approvalHeldReason, approvalModeForOrigin, autoVerdict, deliverFullAccessApproval, delegatedApprovalMode, undeliveredApprovalTool } from "./agent/auto-approve.ts";
 import { bindSafetyFloor, denyAtSafetyFloor, heldAtSafetyFloor, safetyFloorOn } from "./agent/safety-floor-gate.ts";
 import { providerMcpTool, providerToolAllowKey } from "./agent/provider-tool-allow.ts";
-import { claudeAccountInfo } from "./auth/claude-accounts.ts";
 
 import * as checkpoints from "./agent/checkpoints.ts";
 import { commandReceipt } from "./agent/commands.ts";
@@ -44,10 +42,6 @@ import { messageFileRoots } from "./storage/message-file.ts";
 import { fitsOnOneLine } from "./bots/bot-profile.ts";
 import { routeDirectTurn } from "./agent/turn-route.ts";
 import { pickComputer } from "./computers/computer-selection.ts";
-import { createHighLevelHost } from "./integrations/highlevel/host.ts";
-import { HIGHLEVEL_INTERNAL_MCP_PATH } from "./integrations/highlevel/rpc.ts";
-import { createHighLevelService } from "./integrations/highlevel/service.ts";
-import { createHighLevelRoutes } from "./routes/highlevel.ts";
 
 import { isEffortLevel, type CardAnswerer, type ResolvedSender, type SteerQueueReason, type WireBot, type WireGroup, type WireTask } from "../shared/wire.ts";
 import { isPersistentQuestionCard, shouldSettleRequestCard } from "../shared/ask-question.ts";
@@ -66,7 +60,7 @@ import type { CaptureTurn } from "./memory/memory-capture.ts";
 import { appendAboutMe, commitLearned, planLearned } from "./bots/profile-learned.ts";
 import { canAccessTeam, canReachPeer, livePeerRoster, livePeerRosterBlock, peerAllowed, peerName, peerRosterSystemPrompt, peerStatus, peerStatusWords, reachablePeers, resolveTeammate, PEER_ACCESS_HELP } from "./teams/peer-roster.ts";
 import { attachForTurn, saveBotAttachment } from "./bots/bot-attachment.ts";
-import { cacheUntilConfigChanges, ensureDirs, instanceConfigs, loadConfig, changedInstanceIds, engineLaunches, mcpCallTimeoutMinutes, cacheKeepWarmSettings, threadEventLogMaxBytes, maxConcurrentBotThreads, threadEventLogRetentionDays, saveConfig, showToolCallsEnabled, routinesInConversationEnabled, claudeUserMcpEnabled, skillAuthoringEnabled, skillReviewEnabled, skillReviewSteps, autoRecallEnabled, captureQuietMs, tidyHour, llmThreadTitlesEnabled, stripWorkspaceCredentialEnv, PROVIDER_CREDENTIAL_ENV, persistableInstanceConfigs, type AppConfig, DATA_DIR, customMcpServers, onConfigSaved, CLAUDE_API_INSTANCE } from "./config/config.ts";
+import { cacheUntilConfigChanges, ensureDirs, instanceConfigs, loadConfig, changedInstanceIds, engineLaunches, mcpCallTimeoutMinutes, cacheKeepWarmSettings, threadEventLogMaxBytes, maxConcurrentBotThreads, threadEventLogRetentionDays, saveConfig, showToolCallsEnabled, routinesInConversationEnabled, claudeUserMcpEnabled, skillAuthoringEnabled, skillReviewEnabled, skillReviewSteps, autoRecallEnabled, captureQuietMs, tidyHour, llmThreadTitlesEnabled, stripWorkspaceCredentialEnv, PROVIDER_CREDENTIAL_ENV, type AppConfig, DATA_DIR, customMcpServers, onConfigSaved } from "./config/config.ts";
 import { sweepThreadEventLogs, type ThreadLogRetentionCandidate } from "./storage/thread-retention.ts";
 import { ComputerControl } from "./computers/computer-control.ts";
 import { augmentedPath, resetPathCache } from "./platform/env-path.ts";
@@ -75,7 +69,6 @@ import { appendUsage, flushUsageLedger, type UsageRow, type UsageTrigger } from 
 import { ledgerCost } from "./model-catalog/model-prices.ts";
 import type { PriceList } from "./usage/prices.ts";
 import type { RequestAuth } from "./auth/request-auth.ts";
-import { onKeyRejectionChange } from "./security/key-rejections.ts";
 import { assertWithinBudget, noteSpend, spendAlertText, spendState, takeSpendAlert } from "./usage/spend.ts";
 import { fleetAvailable, fleetSocketPath } from "./deployment/fleet-client.ts";
 import { HOSTED_CONTRACT_HEADER, HOSTED_CONTRACT_METADATA, HOSTED_CONTRACT_VERSION } from "./deployment/hosted-contract.ts";
@@ -91,7 +84,6 @@ import { attachCustomMcp } from "./mcp/mcp-result-budget.ts";
 import { MCP_OAUTH_CALLBACK_PATH, McpOAuthManager, mcpOAuthRedirectUri, withMcpSignIn, withoutPendingSignIn } from "./mcp/mcp-oauth.ts";
 
 import { BUILT_IN_DRIVERS } from "./drivers/builtIn.ts";
-import { openCodeProviderKeysAllowed, setOpenCodeProviderKeyPolicy } from "./drivers/acp/opencode-go.ts";
 import { readMessageText, recallMessages, recentMessages, closeMessageDb, chatFollowups, cancelledChatFollowup, settleChatFollowups, threadsReferencing, logNotification } from "./storage/message-db.ts";
 import { parseSince, parseUntil, recentWork, recentWorkPrompt, turnOutcomeLine } from "./observability/recent-work.ts";
 import { chiefEscalationsEnabled, NEEDS_INPUT_GATE, peerApprovalGate, RAISED_GATE } from "./observability/escalations.ts";
@@ -145,7 +137,7 @@ import { botSkillTemplateSchema, newBotDefaultsSchema } from "./bots/new-bot-def
 import { expandLearnTurnText, learnSource } from "./skills/skill-learn.ts";
 import { connectedAppsForSetup, expandSetupTurnText, setupModeActive, setupSystemPrompt, type SetupConnectedApps } from "./config/setup-mode.ts";
 import type { SkillRequestCardData } from "../shared/skill-request.ts";
-import { botPersona, buildSystemPrompt, userProfileSystemPrompt, computerPrompt, composioSystemPrompt, customMcpPrompt, CREDENTIAL_PROMPT, longCommandsPrompt, THREADS_PROMPT, WIDGET_PROMPT, LEARN_PROMPT, PROFILE_PROMPT, TEAM_MEMORY_PROMPT, TRIGGER_PROMPT, ROUTINE_EXECUTION_PROMPT, resolveComputerPromptKind, teamAvailabilityPart } from "./agent/system-prompt.ts";
+import { botPersona, buildSystemPrompt, userProfileSystemPrompt, computerPrompt, composioSystemPrompt, customMcpPrompt, longCommandsPrompt, THREADS_PROMPT, WIDGET_PROMPT, LEARN_PROMPT, PROFILE_PROMPT, TEAM_MEMORY_PROMPT, TRIGGER_PROMPT, ROUTINE_EXECUTION_PROMPT, resolveComputerPromptKind, teamAvailabilityPart } from "./agent/system-prompt.ts";
 import { shellTimeoutHookResult } from "./agent/shell-timeout-hint.ts";
 import { spillToolResult } from "./agent/tool-result-spill.ts";
 import { readCuaConnection, readCuaUnavailableReason, gatedLocalComputer } from "./computers/local-computer.ts";
@@ -241,7 +233,6 @@ import { createUndoRoutes } from "./routes/undo.ts";
 import { createUpgrades } from "./routes/upgrades.ts";
 
 import { createAntigravityLeftoverRoutes } from "./routes/antigravity-leftovers.ts";
-import { createAntigravityAccountRoutes } from "./routes/antigravity-accounts.ts";
 import { createConfigRoutes } from "./routes/config.ts";
 import { createInstanceRoutes } from "./routes/instances.ts";
 import { createMcpServerRoutes } from "./routes/mcp-servers.ts";
@@ -320,7 +311,6 @@ holdIncludedServices(process.env);
 const threadStarters = new ThreadStarters(join(DATA_DIR, "thread-starters.json"));
 // Every saved login value is scrubbed from whatever a bot or a transcript can read.
 const logins = new LoginStore({ dataDir: DATA_DIR });
-const highlevel = createHighLevelService({ dataDir: DATA_DIR });
 const heldSecrets = new HeldSecrets(logins);
 addHeldSecretScrubber((text) => heldSecrets.scrub(text));
 const onePassword = new OnePasswordLogins({
@@ -697,9 +687,6 @@ interface AuditPlan {
   engineAction?: { id: string; action: string };
 }
 
-const ACCOUNT_ADD_ENGINES = new Map([["/api/instances/claude-accounts", "claude"], ["/api/instances/chatgpt-accounts", "chatgpt"],
-  ["/api/instances/antigravity-accounts", "antigravity"]]);
-
 function adminAuditPlan(method: string, path: string): AuditPlan | null {
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") return null;
   if (path.startsWith("/api/internal/") || path.startsWith("/api/testing/")) return null;
@@ -713,10 +700,8 @@ function adminAuditPlan(method: string, path: string): AuditPlan | null {
   if (m && !m[2] && method === "DELETE") plan.deletesBot = m[1];
   m = /^\/api\/auth\/sessions\/([\w-]+)$/.exec(path);
   if (m && method === "DELETE") plan.sessionId = m[1];
-  m = /^\/api\/instances\/([\w.-]+)\/(install|auth\/complete|auth\/sign-out|claude-update|leftover-files\/remove)$/.exec(path);
+  m = /^\/api\/instances\/([\w.-]+)\/(install|claude-update|leftover-files\/remove)$/.exec(path);
   if (m && method === "POST") plan.engineAction = { id: m[1]!, action: m[2]!.replace("/", "-") };
-  const accountAdd = method === "POST" ? ACCOUNT_ADD_ENGINES.get(path) : undefined;
-  if (accountAdd) plan.engineAction = { id: accountAdd, action: "account-add" };
   return plan.config || plan.botId || plan.createsBots || plan.deletesBot || plan.sessionId || plan.pairing || plan.engineAction ? plan : null;
 }
 
@@ -829,27 +814,6 @@ const mcpOAuth = new McpOAuthManager({
     return parsed?.ok && isRemoteMcpServer(parsed.server) && parsed.server.url === url ? parsed.server.oauth : undefined;
   },
 });
-// OpenCode reads provider keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, …) from its environment. Wired before the first catalog probe below.
-let openCodeOrganisationManaged = (): boolean => false;
-const openCodeKeysAllowed = (): boolean => openCodeProviderKeysAllowed({
-  cloudHome: Boolean(CLOUD_HOME),
-  hostedWorkspace: HOSTED_WORKSPACE,
-  organisationManaged: openCodeOrganisationManaged(),
-  sharedSignIn: sharedSignIn(signInAllowList()),
-});
-setOpenCodeProviderKeyPolicy(openCodeKeysAllowed);
-let openCodeKeysLastAllowed = openCodeKeysAllowed();
-/** OpenCode lists a provider's models only while it may read that provider's key. */
-function resyncOpenCodeProviderKeys(): void {
-  const allowed = openCodeKeysAllowed();
-  if (allowed === openCodeKeysLastAllowed) return;
-  openCodeKeysLastAllowed = allowed;
-  for (const instance of registry.instances()) {
-    if (instance.driverKind !== "opencodeGo") continue;
-    void registry.refreshModels(instance.instanceId)
-      .then(() => broadcast({ kind: "config", ...configStatus() }), () => {});
-  }
-}
 await registry.load(providerConfigs(), decorateHostedProvider);
 const bundledSkills = loadBundledSkills();
 const availableSkills = () => mergeSkills(bundledSkills, loadUserSkills(join(DATA_DIR, "skills")));
@@ -924,9 +888,7 @@ let companyRuntimeReady!: () => void;
 const companyRuntimeStarted = new Promise<void>(resolve => { companyRuntimeReady = resolve; });
 const managedPolicy = new ManagedDesktopPolicy({ onChange: () => {
   broadcast({ kind: "config", ...configStatus() });
-  resyncOpenCodeProviderKeys();
 } });
-onKeyRejectionChange(() => { registry.forgetSnapshots(); broadcast({ kind: "config", ...configStatus() }); });
 function computerPlaceRefusal(kind: ComputerKind): { message: string; code: "cloud_home" | "managed_policy" } | undefined {
 
   const managed = managedPolicy.computerRefusal(kind);
@@ -943,17 +905,13 @@ const managedDesktop = new ManagedDesktopProviders({
   migrate: aliases => { store.renameInstances(new Map(aliases.map(({ from, to }) => [from, to]))); },
   onAvailability: () => {
     broadcast({ kind: "config", ...configStatus() });
-    resyncOpenCodeProviderKeys();
   },
   afterReplace: ids => {
     for (const id of providerInstancesChanging) if (managedDesktop.owns(id)) providerInstancesChanging.delete(id);
     bus.attach(ids.flatMap(id => { const instance = registry.get(id); return instance ? [instance] : []; }));
     broadcast({ kind: "config", ...configStatus() });
-    resyncOpenCodeProviderKeys();
   },
 });
-
-openCodeOrganisationManaged = () => managedPolicy.current() !== null || managedDesktop.enrolled();
 utilityParentPort?.on("message", event => {
   const message = event.data as { type?: unknown; requestId?: unknown; identity?: unknown } | undefined;
   if (message?.type !== "openmausbot:managed-desktop-identity") return;
@@ -1000,7 +958,7 @@ type InternalCapability = {
   threadId: string;
   generation: string;
   depth: number;
-  kind: "agents" | "connectors" | "computer" | "hooks" | "phone" | "highlevel";
+  kind: "agents" | "connectors" | "computer" | "hooks" | "phone";
   skillAuthoring: boolean;
   createdBots: number;
   openedThreads: number;
@@ -1330,8 +1288,10 @@ function resumableCards(threadId: string, since: number): Array<{ id: string; wa
       continue;
     }
     const secret = message.secret;
-    if (secret && !secret.resumed && !secret.superseded && !secret.stopped) {
-      open.push({ id: message.id, waits: `provide ${secret.label}` });
+    if (secret) {
+      if (!secret.resumed && !secret.superseded && !secret.stopped && (secret.provided || secret.dismissed)) {
+        open.push({ id: message.id, waits: `credential result for ${secret.label}` });
+      }
       continue;
     }
     const signIn = message.signIn;
@@ -1795,11 +1755,6 @@ function cancelDirectTurnDispatch(botId: string, expectedThreadId?: string): Dir
   return claim;
 }
 
-/** Only with a connection and for a bot allowed to use it (connected apps on; scopes and grants name highlevel). */
-function highlevelIntegration(bot: BotRecord, turn: { threadId: string; generation: string }) {
-  return highlevelHost.integration(bot, () => mintInternalCapability({ botId: bot.id, ...turn, kind: "highlevel", depth: 0, skillAuthoring: false, createdBots: 0, openedThreads: 0 }), `http://127.0.0.1:${PORT}`);
-}
-
 function connectedAppsIntegration(bot: Pick<BotRecord, "id" | "connectorTools">, threadId: string, generation: string) {
   const token = mintInternalCapability({
     botId: bot.id,
@@ -2160,8 +2115,6 @@ const store = new Store(
 
 const skillsHost = createSkillsLibraryHost({ store, cfg, appendSkillRequestCard, engineConfig: (instanceId) => providerConfigs()[instanceId] });
 const { listBotSkills, readBotSkillFile } = skillsHost;
-const highlevelHost = createHighLevelHost({ service: highlevel, dataDir: DATA_DIR, bot: (id) => store.bot(id),
-  appendMessage: (threadId, message) => { store.appendMessage(threadId, message as Parameters<typeof store.appendMessage>[1]); } });
 
 let followupsReady = false;
 const sendSequencer = new SendSequencer();
@@ -2290,10 +2243,10 @@ function previewSystemPrompt(bot: BotRecord) {
     }, { note: previewPlan.note, cloudHome: Boolean(CLOUD_HOME) }) },
     { id: "", label: "", text: "" },
     { id: "composio", label: "Connected apps", text: caps?.composioMcp && bot.composio !== false && composio.configured(cfg) ? composioSystemPrompt(bot.connectorTools) + describeConnectorScopes(bot.connectorScopes) : "" },
-    { id: "highlevel", label: "HighLevel", text: caps?.highlevelMcp === true && highlevelHost.mounts(bot) ? highlevelHost.prompt(bot) : "" },
     { id: "mcp", label: "MCP servers", text: caps?.customMcp ? customMcpPrompt(Object.keys(engineMcpServers(bot))) : "" },
     { id: "coordination", label: "Team", text: agentsMounted && coordination ? ` ${coordination}` : "" },
-    { id: "credential", label: "Credentials", text: agentsMounted ? CREDENTIAL_PROMPT : "" },
+    { id: "threads", label: "Threads", text: agentsMounted ? THREADS_PROMPT : "" },
+    { id: "widgets", label: "Widgets", text: agentsMounted ? WIDGET_PROMPT : "" },
     { id: "routine", label: "Triggers", text: agentsMounted ? TRIGGER_PROMPT : "" },
     { id: "profile", label: "Profile changes", text: agentsMounted ? PROFILE_PROMPT : "" },
     { id: "section-context", label: "Section context", text: sectionContextSystemPrompt(bot.section) },
@@ -2915,8 +2868,6 @@ function privateChatHumanInput(message: Message): string | undefined {
   if (card && !card.answered && !card.dismissed && !card.expired && !card.autoApplied && !card.teamSetupRequest?.result) {
     return `${card.title}${card.subtitle ? `: ${card.subtitle}` : ""}`;
   }
-  const secret = message.secret;
-  if (secret && !secret.provided && !secret.dismissed && !secret.resumed && !secret.superseded && !secret.stopped) return `provide ${secret.label}`;
   const connector = message.connector;
   if (connector && connector.status !== "connected" && !connector.dismissed && !connector.resumed && !connector.stopped) return `connect ${connector.label}`;
   const signIn = message.signIn;
@@ -5937,7 +5888,7 @@ async function startTurn(
         : integrations.agents && sectionPeers.length > 0
           ? peerRosterSystemPrompt(sectionPeers)
           : "";
-      const credentialPrompt = integrations.agents ? CREDENTIAL_PROMPT + THREADS_PROMPT + WIDGET_PROMPT : "";
+      const agentContextPrompt = integrations.agents ? THREADS_PROMPT + WIDGET_PROMPT : "";
       const routinePrompt = integrations.agents ? TRIGGER_PROMPT : "";
       const profilePrompt = integrations.agents ? PROFILE_PROMPT : "";
       const recallPrompt = integrations.agents && bot.memoryEnabled !== false ? SESSION_SEARCH_SYSTEM_PROMPT : "";
@@ -5964,7 +5915,6 @@ async function startTurn(
           description: liveBot?.description ?? bot.description,
           text: providerText,
         });
-      if (liveBot && instance.adapter.capabilities.highlevelMcp === true) { const crm = highlevelIntegration(liveBot, { threadId, generation: dispatchClaimId }); if (crm) integrations.highlevel = crm; }
       const mountedComputer = surfaceOfComputerKind(computerKind);
 
       if (autoPinAllowed()) {
@@ -6005,11 +5955,10 @@ async function startTurn(
         { id: "", label: "", text: "" },
         { id: "composio", label: "Connected apps", text: integrations.composio ? composioSystemPrompt(liveBot?.connectorTools ?? bot.connectorTools) + describeConnectorScopes((liveBot ?? bot).connectorScopes) : "" },
         { id: "mcp", label: "MCP servers", text: customMcpPrompt(Object.keys(integrations.custom ?? {})) },
-        { id: "highlevel", label: "HighLevel", text: integrations.highlevel ? highlevelHost.prompt(liveBot ?? bot) : "" },
         { id: "coordination", label: "Team", text: coordinationPrompt ? ` ${coordinationPrompt}` : "" },
         { id: "assignment", label: "Teammate task", text: coordinationNode?.parentId ? `\n${coordinationSystemInstructions()}` : "" },
         { id: "outstanding", label: "Outstanding teammate work", text: outstandingAssignmentsPrompt(threadId) },
-        { id: "credential", label: "Credentials", text: credentialPrompt },
+        { id: "agent-context", label: "Agent context", text: agentContextPrompt },
         { id: "recall", label: "Recall", text: recallPrompt },
         { id: "routine", label: "Routines", text: routinePrompt },
         { id: "routine-execution", label: "Routine execution", text: opts?.automationSource === "schedule" || opts?.automationSource === "manual" || opts?.automationSource === "startup" ? ROUTINE_EXECUTION_PROMPT : "" },
@@ -7289,41 +7238,6 @@ function maybeResumeConnectors(threadId: string, resumeKey: string) {
   return true;
 }
 
-function credentialDesktopHandoff(label: string): string {
-  return `Securely provide the ${label} from OpenMausBot on your phone or computer. It is never added to chat.`;
-}
-
-function secretMessage(botId: string, threadId: string, messageId: string): Message | null {
-  if (!connectorThread(botId, threadId)) return null;
-  const message = store.activePath(threadId).find((candidate) => candidate.id === messageId);
-  return message?.kind === "secret" && message.secret ? message : null;
-}
-
-function currentSecretState(botId: string, threadId: string, messageId: string) {
-  const message = secretMessage(botId, threadId, messageId);
-  if (!message?.secret) return null;
-  return {
-    provided: message.secret.provided === true,
-    resumed: message.secret.resumed === true,
-  };
-}
-
-function resumeSecretCard(botId: string, threadId: string, messageId: string, outcome: "provided" | "dismissed") {
-  const message = secretMessage(botId, threadId, messageId);
-  if (!message?.secret) return false;
-  if (message.secret.resumed) return true;
-  const resumed = answerCardNode(threadId, messageId, credentialUpdateText(message.secret.label, outcome));
-  store.patchMessage(threadId, message.id, {
-    secret: {
-      ...message.secret,
-      provided: outcome === "provided" ? true : message.secret.provided,
-      dismissed: outcome === "dismissed" ? true : message.secret.dismissed,
-      ...(resumed ? { resumed: true, error: undefined } : {}),
-    },
-  });
-  return true;
-}
-
 // By design OpenMausBot never receives a website password: the person signs in where the bot works, and the bot uses that session.
 
 function recordTurnPlace(botId: string, threadId: string, place: Surface | null): void {
@@ -7463,18 +7377,9 @@ function editionForSettings(status: EditionStatus) {
 }
 
 function configStatus() {
-  // Keys stay write-only: only settings and configured-or-not flags go out.
   const eventLogMaxBytes = threadEventLogMaxBytes(cfg);
   const eventLogRetentionDays = threadEventLogRetentionDays(cfg);
   return {
-    xai: { configured: Boolean(cfg.xai?.key) },
-    mistral: { configured: Boolean(cfg.mistral?.key) },
-    cerebras: { configured: Boolean(cfg.cerebras?.key) },
-    groq: { configured: Boolean(cfg.groq?.key) },
-    meta: { configured: Boolean(cfg.meta?.key) },
-    anthropic: { configured: Boolean(cfg.anthropic?.key), everyClaudeBot: cfg.anthropic?.everyClaudeBot !== false },
-    openai: { configured: Boolean(cfg.openai?.key) },
-    openrouter: { configured: Boolean(cfg.openrouter?.key) },
     fleet: { available: fleetAvailable(fleetSocketPath()) },
     edition: editionForSettings(editionStatus()),
     budgets: {
@@ -7484,16 +7389,13 @@ function configStatus() {
     billing: { currency: cfg.billing?.currency ?? "USD", prices: cfg.billing?.prices ?? {} },
     decisions: { retentionDays: decisionRetentionDays(cfg.decisions?.retentionDays) },
     safetyFloor: { enabled: safetyFloorOn() },
-    openaiCompat: { configured: Boolean(cfg.openaiCompat?.key), url: cfg.openaiCompat?.url ?? "" },
     composio: {
       configured: composio.configured(cfg),
       mode: composio.connectionMode(cfg),
     },
 
-    opencodeGo: { configured: Boolean(cfg.opencodeGo?.apiKey) },
     profile: { name: cfg.profile?.name ?? "", email: cfg.profile?.email ?? "", aboutMe: cfg.profile?.aboutMe ?? "" },
     managedPolicy: managedPolicy.summary(),
-    ...({}),
     language: cfg.language ?? "",
     mcp: { callTimeoutMinutes: mcpCallTimeoutMinutes(cfg) },
     automaticRecovery: cfg.automaticRecovery ?? { enabled: false },
@@ -7535,7 +7437,6 @@ function configForAccess(status: ReturnType<typeof configStatus>, admin: boolean
     ...status,
     edition: { edition: status.edition.edition, features: status.edition.features },
     signIn: { admins: [], members: [] },
-    opencodeGo: { configured: status.opencodeGo.configured },
     profile: { name: status.profile.name, email: "" },
 
   };
@@ -7576,7 +7477,6 @@ async function describeInstances() {
     const described = {
       ...instance,
       ...(entry?.icon ? { icon: entry.icon } : {}),
-      ...(entry?.access ? { access: entry.access } : {}),
     };
     if (hostedModels) return { ...described, readOnly: true,
       install: undefined, authentication: undefined, cli: undefined, cliCandidates: [],
@@ -7590,16 +7490,7 @@ async function describeInstances() {
     };
       // Windows keeps what Antigravity's runtime unpacked whenever it is stopped by force.
     if (instance.driverKind === "antigravityAgent" && process.platform === "win32") return { ...described, ...policy, freeUpSpace: true };
-    if (entry?.driver !== "claudeAgent") return { ...described, ...policy };
-    if (instance.instanceId === CLAUDE_API_INSTANCE) {
-      return { ...described, ...policy, authentication: undefined, install: { ...instance.install, signInCommand: undefined } };
-    }
-    try {
-      const claudeAccount = claudeAccountInfo(instance.instanceId, entry, instance.cli ?? instance.cliDefault ?? "claude");
-      return { ...described, ...policy, claudeAccount, install: { ...instance.install, signInCommand: claudeAccount.signInCommand } };
-    } catch {
-      return { ...described, ...policy, install: { ...instance.install, signInCommand: undefined } };
-    }
+    return { ...described, ...policy };
   });
 }
 
@@ -7634,21 +7525,6 @@ async function stopCompanyInstances(ids: string[]) {
     }
   }
   for (const id of ids) { providerAuthSessions.clearInstance(id); bus.detach(id); }
-}
-
-async function persistProviderInstance(instanceId: string, instances: NonNullable<AppConfig["instances"]>) {
-  saveConfig({ instances }, { replaceInstances: true });
-  cfg.instances = instances;
-  providerAuthSessions.clearInstance(instanceId);
-  bus.detach(instanceId);
-  if (Object.hasOwn(instances, instanceId)) {
-    await registry.load({ [instanceId]: instanceConfigs(cfg)[instanceId] });
-    const live = registry.get(instanceId);
-    if (live) bus.attach([live]);
-  } else {
-    await registry.dispose(instanceId);
-  }
-  resetPathCache();
 }
 
 /** The engine a bot's process in a conversation runs on: the running turn's when it is the bot's, else the bot's selection there. */
@@ -7842,7 +7718,6 @@ ROUTES.push(createBotLifecycleRoutes({
   deleteBotWithLifecycle,
 }));
 ROUTES.push(createBotSkillsRoutes({ store, cfg, listBotSkills, readBotSkillFile, stagedSkillListing }));
-ROUTES.push(createHighLevelRoutes({ service: highlevel }));
 ROUTES.push(createSkillShareRoutes({ enabled: () => skillsHost.mode() !== "off", botExists: (id) => Boolean(store.bot(id)),
   cardRefusal: (auth, threadId, requestId) => cardAnswerRefusal(auth, threadId, requestId, "allow"), shareFromReceipt: skillsHost.shareFromReceipt, shareFromBot: skillsHost.shareFromBot }));
 ROUTES.push(createTeamContextRoutes({ store, teamMemory }));
@@ -7936,16 +7811,6 @@ ROUTES.push(createAntigravityLeftoverRoutes({
   find: () => findAntigravityLeftovers(),
   remove: () => removeAntigravityLeftovers(),
 }));
-ROUTES.push(createAntigravityAccountRoutes({
-  instances: () => persistableInstanceConfigs(cfg),
-  persist: persistProviderInstance,
-  describe: describeInstances,
-  exclusive: (work) => {
-    if (providerConfigBusy) return null;
-    providerConfigBusy = true;
-    return work().finally(() => { providerConfigBusy = false; });
-  },
-}));
 ROUTES.push(createConfigRoutes({
   store, cfg, registry, sessions,
 
@@ -7953,13 +7818,12 @@ ROUTES.push(createConfigRoutes({
   providerConfigs,
   providerConfigBusy: { get: () => providerConfigBusy, set: (busy) => { providerConfigBusy = busy; } },
   checkedModelSelection, policyModelRefusal,  configStatus, configForAccess,
-  resyncOpenCodeProviderKeys, revokeEngineCapabilities, reloadProviders, broadcast, drainQueuedSends,
+  revokeEngineCapabilities, reloadProviders, broadcast, drainQueuedSends,
 }));
 ROUTES.push(createInstanceRoutes({
-  store, cfg, registry, sessions, providerAuthSessions,
+  store, registry,
   hostedModels: Boolean(hostedModels),
-  providerConfigBusy: { get: () => providerConfigBusy, set: (busy) => { providerConfigBusy = busy; } },
-  providerInstancesChanging, describeInstances, persistProviderInstance, configStatus, broadcast, testCliBinary,
+  describeInstances, testCliBinary,
   cliProbeEnvironment, threadBusy, botForThread,
 }));
 ROUTES.push(createMcpServerRoutes({
@@ -8227,7 +8091,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       const parsed = z.object({
         botId: z.string().regex(/^[\w-]{1,128}$/),
         threadId: z.string().regex(/^[\w-]{1,128}$/),
-        kind: z.enum(["agents", "connectors", "computer", "highlevel"]).default("agents"),
+        kind: z.enum(["agents", "connectors", "computer"]).default("agents"),
         depth: z.number().int().min(0).max(MAX_COMMS_DEPTH).default(0),
         skillAuthoring: z.boolean().default(false),
         deliversSavedFiles: z.boolean().default(false),
@@ -8274,8 +8138,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       }
       const requiredCapabilityKind = path === "/api/internal/hook"
         ? "hooks"
-        : path === HIGHLEVEL_INTERNAL_MCP_PATH
-        ? "highlevel"
         : path === "/api/internal/phone/claim"
         ? "phone"
         : path.startsWith("/api/internal/connectors/")
@@ -8421,10 +8283,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         return json(res, result.ok ? 200 : 400, result);
       }
 
-      // The CRM tokens stay here; the agent process holds only the turn's capability, and every call gets the live bot's verdict.
-      if (method === "POST" && path === HIGHLEVEL_INTERNAL_MCP_PATH) {
-        return json(res, 200, { result: await highlevelHost.handle(await readInternalBody(), internalCapability, requireActiveInternalCapability) });
-      }
       if (method === "POST" && path === "/api/internal/phone/claim") {
         requireActiveInternalCapability();
         if (!claimTurnResource(internalCapability, "computer:phone")) {
@@ -9226,42 +9084,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           mcpConfigBusy = false;
         }
       }
-      if (method === "POST" && path === "/api/internal/request-credential") {
-        const body = await readInternalBody();
-        const from = internalSender;
-        const fromThreadId = internalCapability.threadId;
-        const owner = connectorThread(from.id, fromThreadId);
-        if (!owner) return json(res, 403, { error: "source conversation does not belong to sender" });
-        if (!isCredentialTargetId(body.credentialId)) {
-          return json(res, 400, { error: "unsupported credential id" });
-        }
-        const credentialId: CredentialTargetId = body.credentialId;
-        const target = CREDENTIAL_TARGETS[credentialId];
-        if (credentialIsConfigured(cfg, credentialId)) {
-          return json(res, 200, { alreadyConfigured: true, label: target.label });
-        }
-        // A later request supersedes pending cards; the fresh card is appended FIRST, so a failed save leaves the prior cards actionable.
-        const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 240) : "";
-        const message = store.appendMessage(fromThreadId, {
-          role: "bot",
-          kind: "secret",
-          text: credentialDesktopHandoff(target.label),
-          secret: {
-            target: credentialId,
-            label: target.label,
-            description: `${reason ? `${target.description} ${reason}` : target.description} ${from.name} can use it but never read it back.`,
-            placeholder: target.placeholder,
-            helpUrl: target.helpUrl,
-            requestKey: randomUUID(),
-          },
-        });
-        for (const prior of store.activePath(fromThreadId)) {
-          if (prior.id === message.id) continue;
-          if (!prior.secret || !isPendingCredentialRequest(prior, credentialId)) continue;
-          store.patchMessage(fromThreadId, prior.id, { secret: { ...prior.secret, superseded: true } });
-        }
-        return json(res, 201, { messageId: message.id, label: target.label });
-      }
       if (await dispatchRoutes([createInternalSignInRoutes({
         readBody: readInternalBody,
         request: (site, reason) => requestSignIn(internalSender, internalCapability.threadId, site, reason),
@@ -9929,12 +9751,11 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     }
     if (method === "GET" && path === "/api/connectors/tools") {
       const availability = composio.connectorAvailability(cfg);
-      const highlevelTools = highlevelHost.toolListing();
       if (availability !== "configured") {
-        return json(res, 200, { configured: Boolean(highlevelTools), services: { ...highlevelTools } });
+        return json(res, 200, { configured: false, services: {} });
       }
       try {
-        return json(res, 200, { configured: true, services: { ...await composio.listConnectorTools(cfg), ...highlevelTools } });
+        return json(res, 200, { configured: true, services: await composio.listConnectorTools(cfg) });
       } catch (e) {
         return json(res, 502, { configured: true, services: {}, error: e instanceof Error ? e.message : String(e) });
       }
@@ -9961,54 +9782,6 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     if (m && method === "DELETE") return json(res, 200, await composio.removeAccount(cfg, m[1], m[2]));
     m = path.match(/^\/api\/connectors\/([\w-]+)$/);
     if (m && method === "DELETE") return json(res, 200, await composio.removeService(cfg, m[1]));
-
-    // An HPKE envelope bound to the paired device, bot, task, card and target; only the embedded Electron server holds the key to open it.
-
-    // Desktop credential cards never send the credential through this route: Electron saves it to the OS-backed store first.
-    m = path.match(/^\/api\/bots\/([\w-]+)\/secret-cards\/([\w-]+)\/(provided|resume|dismiss)$/);
-    if (m && method === "POST") {
-      const body = await readBody(req);
-      const threadId = String(body.threadId ?? "");
-      const message = secretMessage(m[1], threadId, m[2]);
-      if (!message?.secret) return json(res, 404, { error: "no such credential request" });
-
-      if (m[3] === "provided") {
-        if (message.secret.dismissed) return json(res, 409, { error: "this credential request was dismissed" });
-        if (message.secret.superseded) return json(res, 409, { error: "this credential request was superseded by a newer one" });
-        if (!credentialIsConfigured(cfg, message.secret.target)) {
-          return json(res, 409, { error: `${message.secret.label} was not saved yet` });
-        }
-        if (!resumeSecretCard(m[1], threadId, message.id, "provided")) {
-          return json(res, 409, { error: "this credential request is no longer available" });
-        }
-        const state = currentSecretState(m[1], threadId, message.id);
-        if (!state) return json(res, 409, { error: "this credential request is no longer available" });
-        return json(res, 200, state);
-      }
-      if (m[3] === "resume") {
-        if (message.secret.superseded) return json(res, 409, { error: "this credential request was superseded by a newer one" });
-        const outcome = credentialResumeOutcome(message.secret);
-        if (!outcome) {
-          return json(res, 409, { error: "this credential request is not ready to resume" });
-        }
-        if (outcome === "provided" && !credentialIsConfigured(cfg, message.secret.target)) {
-          return json(res, 409, { error: `${message.secret.label} is no longer configured` });
-        }
-        if (!resumeSecretCard(m[1], threadId, message.id, outcome)) {
-          return json(res, 409, { error: "this credential request is no longer available" });
-        }
-        const state = currentSecretState(m[1], threadId, message.id);
-        if (!state) return json(res, 409, { error: "this credential request is no longer available" });
-        return json(res, 200, { resumed: state.resumed });
-      }
-      if (message.secret.superseded) return json(res, 409, { error: "this credential request was superseded by a newer one" });
-      if (!message.secret.provided && !resumeSecretCard(m[1], threadId, message.id, "dismissed")) {
-        return json(res, 409, { error: "this credential request is no longer available" });
-      }
-      const state = currentSecretState(m[1], threadId, message.id);
-      if (!state) return json(res, 409, { error: "this credential request is no longer available" });
-      return json(res, 200, { dismissed: true, resumed: state.resumed });
-    }
 
     // The browser auth URL goes only to this local UI and is never stored in the transcript.
     m = path.match(/^\/api\/bots\/([\w-]+)\/connector-cards\/([\w-]+)\/(authorize|status|resume|dismiss)$/);

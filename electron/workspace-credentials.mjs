@@ -1,4 +1,4 @@
-export const WORKSPACE_CREDENTIALS = [{ section: "xai", field: "key", name: "xaiApiKey", env: "XAI_API_KEY" }];
+const LEGACY_WORKSPACE_CREDENTIALS = [{ section: "xai", field: "key", name: "xaiApiKey" }];
 
 /** Moves plaintext secrets into the store and deletes the field. "" never drops a stored secret: every packaged
  * credential save writes an empty tombstone to config.json. The caller persists credentials before config. */
@@ -19,7 +19,7 @@ export function migrateWorkspaceCredentials(config, credentials) {
       credentialsChanged = true;
     }
   }
-  for (const { section, field, name } of WORKSPACE_CREDENTIALS) {
+  for (const { section, field, name } of LEGACY_WORKSPACE_CREDENTIALS) {
     const home = nextConfig?.[section];
     if (!home || typeof home !== "object" || Array.isArray(home)) continue;
     if (!Object.hasOwn(home, field)) continue;
@@ -34,13 +34,4 @@ export function migrateWorkspaceCredentials(config, credentials) {
     configChanged = true;
   }
   return { config: nextConfig, credentials: nextCredentials, configChanged, credentialsChanged };
-}
-
-export function workspaceCredentialEnv(credentials) {
-  const env = {};
-  for (const { name, env: envName } of WORKSPACE_CREDENTIALS) {
-    const value = credentials?.[name];
-    if (typeof value === "string" && value) env[envName] = value;
-  }
-  return env;
 }
